@@ -238,6 +238,8 @@ private:
     ea::vector<Drawable*> drawableUpdates_;
     /// Drawable objects that were inserted during threaded update phase.
     ea::vector<Drawable*> threadedDrawableUpdates_;
+    /// All Drawable objects.
+    ea::vector<Drawable*> drawables_;
     /// Mutex for octree reinsertions.
     Mutex octreeMutex_;
     /// Ray query temporary list of drawables.

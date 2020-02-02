@@ -605,12 +605,28 @@ void Octree::RemoveManualDrawable(Drawable* drawable)
 
 void Octree::OnDrawableAdded(Drawable* drawable)
 {
+    assert(drawable->GetDrawableIndex() == M_MAX_UNSIGNED);
+    const unsigned index = drawables_.size();
+    drawables_.push_back(drawable);
+    drawable->SetDrawableIndex(index);
+
     rootOctant_.InsertDrawable(drawable);
 }
 
 void Octree::OnDrawableRemoved(Drawable* drawable, Octant* octant)
 {
     octant->RemoveDrawable(drawable);
+
+    const unsigned index = drawable->GetDrawableIndex();
+    assert(index != M_MAX_UNSIGNED && drawables_[index] == drawable);
+    if (drawables_.size() > 1)
+    {
+        Drawable* replacement = drawables_.back();
+        drawables_[index] = replacement;
+        replacement->SetDrawableIndex(index);
+    }
+    drawables_.pop_back();
+    drawable->SetDrawableIndex(M_MAX_UNSIGNED);
 }
 
 void Octree::GetDrawables(OctreeQuery& query) const
