@@ -171,10 +171,10 @@ inline bool CompareRayQueryResults(const RayQueryResult& lhs, const RayQueryResu
     return lhs.distance_ < rhs.distance_;
 }
 
-Octant::Octant(const BoundingBox& box, unsigned level, Octant* parent, Octree* root, unsigned index) :
+Octant::Octant(const BoundingBox& box, unsigned level, Octant* parent, Octree* octree, unsigned index) :
     level_(level),
     parent_(parent),
-    root_(root),
+    octree_(octree),
     index_(index)
 {
     Initialize(box);
@@ -182,14 +182,16 @@ Octant::Octant(const BoundingBox& box, unsigned level, Octant* parent, Octree* r
 
 Octant::~Octant()
 {
-    if (root_)
+    if (octree_)
     {
+        Octant* rootOctant = octree_->GetRootOctant();
+
         // Remove the drawables (if any) from this octant to the root octant
         for (auto i = drawables_.begin(); i != drawables_.end(); ++i)
         {
-            (*i)->SetOctant(root_);
-            root_->drawables_.push_back(*i);
-            root_->QueueUpdate(*i);
+            (*i)->SetOctant(rootOctant);
+            rootOctant->drawables_.push_back(*i);
+            octree_->QueueUpdate(*i);
         }
         drawables_.clear();
         numDrawables_ = 0;
@@ -223,7 +225,7 @@ Octant* Octant::GetOrCreateChild(unsigned index)
     else
         newMax.z_ = oldCenter.z_;
 
-    children_[index] = new Octant(BoundingBox(newMin, newMax), level_ + 1, this, root_, index);
+    children_[index] = new Octant(BoundingBox(newMin, newMax), level_ + 1, this, octree_, index);
     return children_[index];
 }
 
@@ -241,7 +243,7 @@ void Octant::InsertDrawable(Drawable* drawable)
     // If root octant, insert all non-occludees here, so that octant occlusion does not hide the drawable.
     // Also if drawable is outside the root octant bounds, insert to root
     bool insertHere;
-    if (this == root_)
+    if (this == octree_->GetRootOctant())
         insertHere = !drawable->IsOccludee() || cullingBox_.IsInside(box) != INSIDE || CheckDrawableFit(box);
     else
         insertHere = CheckDrawableFit(box);
@@ -273,7 +275,7 @@ bool Octant::CheckDrawableFit(const BoundingBox& box) const
     Vector3 boxSize = box.Size();
 
     // If max split level, size always OK, otherwise check that box is at least half size of octant
-    if (level_ >= root_->GetNumLevels() || boxSize.x_ >= halfSize_.x_ || boxSize.y_ >= halfSize_.y_ ||
+    if (level_ >= octree_->GetNumLevels() || boxSize.x_ >= halfSize_.x_ || boxSize.y_ >= halfSize_.y_ ||
         boxSize.z_ >= halfSize_.z_)
         return true;
     // Also check if the box can not fit a child octant's culling box, in that case size OK (must insert here)
@@ -292,9 +294,19 @@ bool Octant::CheckDrawableFit(const BoundingBox& box) const
     return false;
 }
 
-void Octant::ResetRoot()
+void Octant::SetRootSize(const BoundingBox& box)
 {
-    root_ = nullptr;
+    // If drawables exist, they are temporarily moved to the root
+    for (unsigned i = 0; i < NUM_OCTANTS; ++i)
+        DeleteChild(i);
+
+    Initialize(box);
+    numDrawables_ = drawables_.size();
+}
+
+void Octant::ResetOctree()
+{
+    octree_ = nullptr;
 
     // The whole octree is being destroyed, just detach the drawables
     for (auto i = drawables_.begin(); i != drawables_.end(); ++i)
@@ -303,7 +315,7 @@ void Octant::ResetRoot()
     for (auto& child : children_)
     {
         if (child)
-            child->ResetRoot();
+            child->ResetOctree();
     }
 }
 
@@ -331,7 +343,7 @@ void Octant::Initialize(const BoundingBox& box)
 
 void Octant::GetDrawablesInternal(OctreeQuery& query, bool inside) const
 {
-    if (this != root_)
+    if (this != octree_->GetRootOctant())
     {
         Intersection res = query.TestOctant(cullingBox_, inside);
         if (res == INSIDE)
@@ -413,7 +425,7 @@ void Octant::GetDrawablesOnlyInternal(RayOctreeQuery& query, ea::vector<Drawable
 
 Octree::Octree(Context* context) :
     Component(context),
-    Octant(BoundingBox(-DEFAULT_OCTREE_SIZE, DEFAULT_OCTREE_SIZE), 0, nullptr, this),
+    rootOctant_(BoundingBox(-DEFAULT_OCTREE_SIZE, DEFAULT_OCTREE_SIZE), 0, nullptr, this),
     numLevels_(DEFAULT_OCTREE_LEVELS)
 {
     // If the engine is running headless, subscribe to RenderUpdate events for manually updating the octree
@@ -426,7 +438,7 @@ Octree::~Octree()
 {
     // Reset root pointer from all child octants now so that they do not move their drawables to root
     drawableUpdates_.clear();
-    ResetRoot();
+    rootOctant_.ResetOctree();
 }
 
 void Octree::RegisterObject(Context* context)
@@ -447,7 +459,7 @@ void Octree::DrawDebugGeometry(DebugRenderer* debug, bool depthTest)
     {
         URHO3D_PROFILE("OctreeDrawDebug");
 
-        Octant::DrawDebugGeometry(debug, depthTest);
+        rootOctant_.DrawDebugGeometry(debug, depthTest);
     }
 }
 
@@ -455,12 +467,7 @@ void Octree::SetSize(const BoundingBox& box, unsigned numLevels)
 {
     URHO3D_PROFILE("ResizeOctree");
 
-    // If drawables exist, they are temporarily moved to the root
-    for (unsigned i = 0; i < NUM_OCTANTS; ++i)
-        DeleteChild(i);
-
-    Initialize(box);
-    numDrawables_ = drawables_.size();
+    rootOctant_.SetRootSize(box);
     numLevels_ = Max(numLevels, 1U);
 }
 
@@ -555,18 +562,18 @@ void Octree::Update(const FrameInfo& frame)
             const BoundingBox& box = drawable->GetWorldBoundingBox();
 
             // Skip if no octant or does not belong to this octree anymore
-            if (!octant || octant->GetRoot() != this)
+            if (!octant || octant->GetOctree() != this)
                 continue;
             // Skip if still fits the current octant
             if (drawable->IsOccludee() && octant->GetCullingBox().IsInside(box) == INSIDE && octant->CheckDrawableFit(box))
                 continue;
 
-            InsertDrawable(drawable);
+            rootOctant_.InsertDrawable(drawable);
 
 #ifdef _DEBUG
             // Verify that the drawable will be culled correctly
             octant = drawable->GetOctant();
-            if (octant != this && octant->GetCullingBox().IsInside(box) != INSIDE)
+            if (octant != GetRootOctant() && octant->GetCullingBox().IsInside(box) != INSIDE)
             {
                 URHO3D_LOGERROR("Drawable is not fully inside its octant's culling bounds: drawable box " + box.ToString() +
                          " octant box " + octant->GetCullingBox().ToString());
@@ -583,7 +590,7 @@ void Octree::AddManualDrawable(Drawable* drawable)
     if (!drawable || drawable->GetOctant())
         return;
 
-    AddDrawable(drawable);
+    OnDrawableAdded(drawable);
 }
 
 void Octree::RemoveManualDrawable(Drawable* drawable)
@@ -592,14 +599,24 @@ void Octree::RemoveManualDrawable(Drawable* drawable)
         return;
 
     Octant* octant = drawable->GetOctant();
-    if (octant && octant->GetRoot() == this)
-        octant->RemoveDrawable(drawable);
+    if (octant && octant->GetOctree() == this)
+        OnDrawableRemoved(drawable, octant);
+}
+
+void Octree::OnDrawableAdded(Drawable* drawable)
+{
+    rootOctant_.InsertDrawable(drawable);
+}
+
+void Octree::OnDrawableRemoved(Drawable* drawable, Octant* octant)
+{
+    octant->RemoveDrawable(drawable);
 }
 
 void Octree::GetDrawables(OctreeQuery& query) const
 {
     query.result_.clear();
-    GetDrawablesInternal(query, false);
+    rootOctant_.GetDrawablesInternal(query, false);
 }
 
 void Octree::Raycast(RayOctreeQuery& query) const
@@ -607,7 +624,7 @@ void Octree::Raycast(RayOctreeQuery& query) const
     URHO3D_PROFILE("Raycast");
 
     query.result_.clear();
-    GetDrawablesInternal(query);
+    rootOctant_.GetDrawablesInternal(query);
     ea::quick_sort(query.result_.begin(), query.result_.end(), CompareRayQueryResults);
 }
 
@@ -617,7 +634,7 @@ void Octree::RaycastSingle(RayOctreeQuery& query) const
 
     query.result_.clear();
     rayQueryDrawables_.clear();
-    GetDrawablesOnlyInternal(query, rayQueryDrawables_);
+    rootOctant_.GetDrawablesOnlyInternal(query, rayQueryDrawables_);
 
     // Sort by increasing hit distance to AABB
     for (auto i = rayQueryDrawables_.begin(); i != rayQueryDrawables_.end(); ++i)

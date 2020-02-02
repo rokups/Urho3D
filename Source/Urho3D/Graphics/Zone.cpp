@@ -267,7 +267,7 @@ void Zone::UpdateAmbientGradient()
         ea::vector<Zone*> result;
         {
             PointOctreeQuery query(reinterpret_cast<ea::vector<Drawable*>&>(result), minZPosition, DRAWABLE_ZONE);
-            octant_->GetRoot()->GetDrawables(query);
+            octant_->GetOctree()->GetDrawables(query);
         }
 
         // Gradient start position: get the highest priority zone that is not this zone
@@ -293,7 +293,7 @@ void Zone::UpdateAmbientGradient()
         // Do the same for gradient end position
         {
             PointOctreeQuery query(reinterpret_cast<ea::vector<Drawable*>&>(result), maxZPosition, DRAWABLE_ZONE);
-            octant_->GetRoot()->GetDrawables(query);
+            octant_->GetOctree()->GetDrawables(query);
         }
         bestPriority = M_MIN_INT;
         bestZone = nullptr;
@@ -328,7 +328,7 @@ void Zone::ClearDrawablesZone()
     {
         ea::vector<Drawable*> result;
         BoxOctreeQuery query(result, lastWorldBoundingBox_, DRAWABLE_GEOMETRY | DRAWABLE_ZONE);
-        octant_->GetRoot()->GetDrawables(query);
+        octant_->GetOctree()->GetDrawables(query);
 
         for (auto i = result.begin(); i != result.end(); ++i)
         {

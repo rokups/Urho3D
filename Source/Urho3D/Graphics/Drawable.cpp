@@ -237,7 +237,7 @@ void Drawable::SetOccludee(bool enable)
         occludee_ = enable;
         // Reinsert to octree to make sure octant occlusion does not erroneously hide this drawable
         if (octant_ && !updateQueued_)
-            octant_->GetRoot()->QueueUpdate(this);
+            octant_->GetOctree()->QueueUpdate(this);
         MarkNetworkUpdate();
     }
 }
@@ -245,7 +245,7 @@ void Drawable::SetOccludee(bool enable)
 void Drawable::MarkForUpdate()
 {
     if (!updateQueued_ && octant_)
-        octant_->GetRoot()->QueueUpdate(this);
+        octant_->GetOctree()->QueueUpdate(this);
 }
 
 const BoundingBox& Drawable::GetWorldBoundingBox()
@@ -374,7 +374,7 @@ void Drawable::OnMarkedDirty(Node* node)
 {
     worldBoundingBoxDirty_ = true;
     if (!updateQueued_ && octant_)
-        octant_->GetRoot()->QueueUpdate(this);
+        octant_->GetOctree()->QueueUpdate(this);
 
     // Mark zone assignment dirty when transform changes
     if (node == node_)
@@ -392,7 +392,7 @@ void Drawable::AddToOctree()
     {
         auto* octree = scene->GetComponent<Octree>();
         if (octree)
-            octree->InsertDrawable(this);
+            octree->OnDrawableAdded(this);
         else
             URHO3D_LOGERROR("No Octree component in scene, drawable will not render");
     }
@@ -407,14 +407,14 @@ void Drawable::RemoveFromOctree()
 {
     if (octant_)
     {
-        Octree* octree = octant_->GetRoot();
+        Octree* octree = octant_->GetOctree();
         if (updateQueued_)
             octree->CancelUpdate(this);
 
         // Perform subclass specific deinitialization if necessary
         OnRemoveFromOctree();
 
-        octant_->RemoveDrawable(this);
+        octree->OnDrawableRemoved(this, octant_);
     }
 }
 
