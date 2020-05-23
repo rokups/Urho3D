@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "../Core/ThreadedVector.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/Drawable.h"
 #include "../Graphics/PipelineStateCache.h"
@@ -29,6 +30,7 @@
 
 #include <EASTL/algorithm.h>
 #include <EASTL/vector.h>
+#include <EASTL/fixed_vector.h>
 
 namespace Urho3D
 {
@@ -47,27 +49,62 @@ using GeometryCollection = ea::vector<Drawable*>;
 /// Collection of lights in the Scene.
 using LightCollection = ea::vector<Light*>;
 
+/// Collection of geometries in the Scene. Can be used from multiple threads.
+using ThreadedGeometryCollection = ThreadedVector<Drawable*>;
+
+/// Collection of lights in the Scene. Can be used from multiple threads.
+using ThreadedLightCollection = ThreadedVector<Light*>;
+
 /// Min and max Z value of drawable(s).
 using DrawableZRange = NumericRange<float>;
 
-/// Per-viewport per-worker cache.
-struct DrawableWorkerCache
+/// Min and max Z value of scene. Can be used from multiple threads.
+class SceneZRange
 {
-    /// Visible geometries.
-    ea::vector<Drawable*> visibleGeometries_;
-    /// Visible lights.
-    ea::vector<Light*> visibleLights_;
-    /// Range of Z values of the geometries.
-    DrawableZRange zRange_;
+public:
+    /// Clear in the beginning of the frame.
+    void Clear(unsigned numThreads)
+    {
+        threadRanges_.clear();
+        threadRanges_.resize(numThreads);
+        sceneRangeDirty_ = true;
+    }
+
+    /// Accumulate min and max Z value.
+    void Accumulate(unsigned threadIndex, const DrawableZRange& range)
+    {
+        threadRanges_[threadIndex] |= range;
+    }
+
+    /// Get value.
+    const DrawableZRange& Get()
+    {
+        if (sceneRangeDirty_)
+        {
+            sceneRangeDirty_ = false;
+            sceneRange_ = {};
+            for (const DrawableZRange& range : threadRanges_)
+                sceneRange_ |= range;
+        }
+        return sceneRange_;
+    }
+
+private:
+    /// Min and max Z value per thread.
+    ea::vector<DrawableZRange> threadRanges_;
+    /// Min and max Z value for Scene.
+    DrawableZRange sceneRange_;
+    /// Whether the Scene range is dirty.
+    bool sceneRangeDirty_{};
 };
 
-/// Per-viewport per-drawable cache.
-struct DrawableViewportCache
+/// Per-viewport drawable data, indexed via drawable index. Doesn't persist across frames.
+struct TransientDrawableDataIndex
 {
-    /// Underlying type of transient traits.
-    using TransientTraitType = unsigned char;
-    /// Transient traits.
-    enum TransientTrait : TransientTraitType
+    /// Underlying type of traits.
+    using TraitType = unsigned char;
+    /// Traits.
+    enum Trait : TraitType
     {
         /// Whether the drawable is updated.
         DrawableUpdated = 1 << 1,
@@ -75,38 +112,32 @@ struct DrawableViewportCache
         DrawableVisibleGeometry = 1 << 2,
     };
 
-    /// Transient Drawable traits, valid within the frame.
-    ea::vector<TransientTraitType> drawableTransientTraits_;
-    /// Drawable min and max Z values. Invalid if drawable is not visible.
-    ea::vector<DrawableZRange> drawableZRanges_;
-
-    /// Processed visible drawables.
-    ea::vector<DrawableWorkerCache> workerCache_;
-    /// Visible lights.
-    ea::vector<Light*> visibleLights_;
+    /// Traits.
+    ea::vector<TraitType> traits_;
+    /// Drawable min and max Z values. Invalid if drawable is not updated.
+    ea::vector<DrawableZRange> zRange_;
 
     /// Reset cache in the beginning of the frame.
-    void Reset(unsigned numDrawables, unsigned numWorkers)
+    void Reset(unsigned numDrawables)
     {
-        drawableTransientTraits_.resize(numDrawables);
-        drawableZRanges_.resize(numDrawables);
+        traits_.resize(numDrawables);
+        ea::fill(traits_.begin(), traits_.end(), TraitType{});
 
-        workerCache_.resize(numWorkers);
-        for (DrawableWorkerCache& cache : workerCache_)
-            cache = {};
-
-        visibleLights_.clear();
-
-        // Reset transient traits
-        ea::fill(drawableTransientTraits_.begin(), drawableTransientTraits_.end(), TransientTraitType{});
+        zRange_.resize(numDrawables);
     }
+};
 
-    /// Iterate each visible light.
-    template <class T> void ForEachVisibleLight(const T& callback) const
-    {
-        for (unsigned i = 0; i < visibleLights_.size(); ++i)
-            callback(i, visibleLights_[i]);
-    }
+/// Per-viewport result of drawable processing.
+struct DrawableViewportCache
+{
+    /// Visible geometries.
+    ThreadedGeometryCollection visibleGeometries_;
+    /// Visible lights.
+    ThreadedLightCollection visibleLights_;
+    /// Scene Z range.
+    SceneZRange sceneZRange_;
+    /// Transient data index.
+    TransientDrawableDataIndex transient_;
 };
 
 /// Per-viewport per-light cache.
@@ -139,6 +170,8 @@ public:
 class CustomViewportDriver
 {
 public:
+    /// Return number of worker threads.
+    virtual unsigned GetNumThreads() const = 0;
     /// Post task to be running from worker thread.
     virtual void PostTask(std::function<void(unsigned)> task) = 0;
     /// Wait until all posted tasks are completed.
@@ -147,13 +180,11 @@ public:
 
     /// Collect drawables potentially visible from given camera.
     virtual void CollectDrawables(DrawableCollection& drawables, Camera* camera, DrawableFlags flags) = 0;
-    /// Reset per-viewport cache in the beginning of the frame.
-    virtual void ResetViewportCache(DrawableViewportCache& cache) = 0;
     /// Process drawables visible by the primary viewport camera.
-    virtual void ProcessPrimaryDrawables(DrawableViewportCache& cache,
+    virtual void ProcessPrimaryDrawables(DrawableViewportCache& viewportCache,
         const DrawableCollection& drawables, Camera* camera) = 0;
     /// Collect lit geometries.
-    virtual void CollectLitGeometries(const DrawableViewportCache& cache,
+    virtual void CollectLitGeometries(const DrawableViewportCache& viewportCache,
         DrawableLightCache& lightCache, Light* light) = 0;
 
 };

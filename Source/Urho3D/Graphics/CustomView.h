@@ -62,15 +62,15 @@ public:
     void Render();
 
 protected:
+    unsigned GetNumThreads() const override { return numThreads_; }
     void PostTask(std::function<void(unsigned)> task) override;
     void CompleteTasks() override;
 
     //void ClearViewport(ClearTargetFlags flags, const Color& color, float depth, unsigned stencil) override;
     void CollectDrawables(DrawableCollection& drawables, Camera* camera, DrawableFlags flags) override;
-    void ResetViewportCache(DrawableViewportCache& cache) override;
-    void ProcessPrimaryDrawables(DrawableViewportCache& cache,
+    void ProcessPrimaryDrawables(DrawableViewportCache& viewportCache,
         const DrawableCollection& drawables, Camera* camera) override;
-    void CollectLitGeometries(const DrawableViewportCache& cache,
+    void CollectLitGeometries(const DrawableViewportCache& viewportCache,
         DrawableLightCache& lightCache, Light* light) override;
 
 private:

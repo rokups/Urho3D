@@ -23,6 +23,7 @@
 #include "../Precompiled.h"
 
 #include "../Core/Context.h"
+#include "../Core/IteratorRange.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/CustomView.h"
 #include "../Graphics/Graphics.h"
@@ -48,22 +49,6 @@ namespace Urho3D
 
 namespace
 {
-
-/// Helper class to iterate over the range.
-template <class T>
-struct IteratorRange : public ea::pair<T, T>
-{
-    /// Construct empty.
-    IteratorRange() = default;
-    /// Construct valid.
-    IteratorRange(const T& begin, const T& end) : ea::pair<T, T>(begin, end) {}
-};
-
-/// Make iterator range.
-template <class T> IteratorRange<T> MakeIteratorRange(const T& begin, const T& end) { return { begin, end }; }
-
-template <class T> T begin(const IteratorRange<T>& range) { return range.first; }
-template <class T> T end(const IteratorRange<T>& range) { return range.second; }
 
 /// Helper class to evaluate min and max Z of the drawable.
 struct DrawableZRangeEvaluator
@@ -172,11 +157,11 @@ struct DrawableLightAccumulator
 
 /// Process primary drawable.
 void ProcessPrimaryDrawable(Drawable* drawable,
-    const DrawableZRangeEvaluator zRangeEvaluator,
-    DrawableViewportCache& cache, DrawableWorkerCache& workerCache)
+    const DrawableZRangeEvaluator& zRangeEvaluator,
+    DrawableViewportCache& cache, unsigned threadIndex)
 {
     const unsigned drawableIndex = drawable->GetDrawableIndex();
-    cache.drawableTransientTraits_[drawableIndex] |= DrawableViewportCache::DrawableUpdated;
+    cache.transient_.traits_[drawableIndex] |= TransientDrawableDataIndex::DrawableUpdated;
 
     // Skip if too far
     const float maxDistance = drawable->GetDrawDistance();
@@ -193,15 +178,15 @@ void ProcessPrimaryDrawable(Drawable* drawable,
 
         // Do not add "infinite" objects like skybox to prevent shadow map focusing behaving erroneously
         if (!zRange.IsValid())
-            cache.drawableZRanges_[drawableIndex] = { M_LARGE_VALUE, M_LARGE_VALUE };
+            cache.transient_.zRange_[drawableIndex] = { M_LARGE_VALUE, M_LARGE_VALUE };
         else
         {
-            cache.drawableZRanges_[drawableIndex] = zRange;
-            workerCache.zRange_ |= zRange;
+            cache.transient_.zRange_[drawableIndex] = zRange;
+            cache.sceneZRange_.Accumulate(threadIndex, zRange);
         }
 
-        workerCache.visibleGeometries_.push_back(drawable);
-        cache.drawableTransientTraits_[drawableIndex] |= DrawableViewportCache::DrawableVisibleGeometry;
+        cache.visibleGeometries_.Insert(threadIndex, drawable);
+        cache.transient_.traits_[drawableIndex] |= TransientDrawableDataIndex::DrawableVisibleGeometry;
     }
     else if (drawable->GetDrawableFlags() & DRAWABLE_LIGHT)
     {
@@ -210,7 +195,7 @@ void ProcessPrimaryDrawable(Drawable* drawable,
 
         // Skip lights with zero brightness or black color, skip baked lights too
         if (!lightColor.Equals(Color::BLACK) && light->GetLightMaskEffective() != 0)
-            workerCache.visibleLights_.push_back(light);
+            cache.visibleLights_.Insert(threadIndex, light);
     }
 }
 
@@ -225,9 +210,9 @@ struct PointLightLitGeometriesQuery : public SphereOctreeQuery
 
     /// Construct.
     PointLightLitGeometriesQuery(ea::vector<Drawable*>& result,
-        const DrawableViewportCache& cache, Light* light)
+        const TransientDrawableDataIndex& transientData, Light* light)
         : SphereOctreeQuery(result, GetLightSphere(light), DRAWABLE_GEOMETRY)
-        , cache_(&cache)
+        , transientData_(&transientData)
         , lightMask_(light->GetLightMaskEffective())
     {
     }
@@ -237,8 +222,8 @@ struct PointLightLitGeometriesQuery : public SphereOctreeQuery
         for (Drawable* drawable : MakeIteratorRange(start, end))
         {
             const unsigned drawableIndex = drawable->GetDrawableIndex();
-            const unsigned traits = cache_->drawableTransientTraits_[drawableIndex];
-            if (traits & DrawableViewportCache::DrawableVisibleGeometry)
+            const unsigned traits = transientData_->traits_[drawableIndex];
+            if (traits & TransientDrawableDataIndex::DrawableVisibleGeometry)
             {
                 if (drawable->GetLightMask() & lightMask_)
                 {
@@ -250,7 +235,7 @@ struct PointLightLitGeometriesQuery : public SphereOctreeQuery
     }
 
     /// Visiblity cache.
-    const DrawableViewportCache* cache_{};
+    const TransientDrawableDataIndex* transientData_{};
     /// Light mask to check.
     unsigned lightMask_{};
 };
@@ -260,9 +245,9 @@ struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
 {
     /// Construct.
     SpotLightLitGeometriesQuery(ea::vector<Drawable*>& result,
-        const DrawableViewportCache& cache, Light* light)
+        const TransientDrawableDataIndex& transientData, Light* light)
         : FrustumOctreeQuery(result, light->GetFrustum(), DRAWABLE_GEOMETRY)
-        , cache_(&cache)
+        , transientData_(&transientData)
         , lightMask_(light->GetLightMaskEffective())
     {
     }
@@ -272,8 +257,8 @@ struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
         for (Drawable* drawable : MakeIteratorRange(start, end))
         {
             const unsigned drawableIndex = drawable->GetDrawableIndex();
-            const unsigned traits = cache_->drawableTransientTraits_[drawableIndex];
-            if (traits & DrawableViewportCache::DrawableVisibleGeometry)
+            const unsigned traits = transientData_->traits_[drawableIndex];
+            if (traits & TransientDrawableDataIndex::DrawableVisibleGeometry)
             {
                 if (drawable->GetLightMask() & lightMask_)
                 {
@@ -285,7 +270,7 @@ struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
     }
 
     /// Visiblity cache.
-    const DrawableViewportCache* cache_{};
+    const TransientDrawableDataIndex* transientData_{};
     /// Light mask to check.
     unsigned lightMask_{};
 };
@@ -344,17 +329,20 @@ void CustomView::CollectDrawables(DrawableCollection& drawables, Camera* camera,
     octree_->GetDrawables(query);
 }
 
-void CustomView::ResetViewportCache(DrawableViewportCache& cache)
-{
-    cache.Reset(numDrawables_, numThreads_);
-}
-
-void CustomView::ProcessPrimaryDrawables(DrawableViewportCache& cache,
+void CustomView::ProcessPrimaryDrawables(DrawableViewportCache& viewportCache,
     const DrawableCollection& drawables, Camera* camera)
 {
+    // Reset cache
+    viewportCache.visibleGeometries_.Clear(numThreads_);
+    viewportCache.visibleLights_.Clear(numThreads_);
+    viewportCache.sceneZRange_.Clear(numThreads_);
+    viewportCache.transient_.Reset(numDrawables_);
+
+    // Prepare frame info
     FrameInfo frameInfo = frameInfo_;
     frameInfo.camera_ = camera;
 
+    // Process drawables
     const unsigned drawablesPerItem = (drawables.size() + numThreads_ - 1) / numThreads_;
     for (unsigned workItemIndex = 0; workItemIndex < numThreads_; ++workItemIndex)
     {
@@ -363,7 +351,6 @@ void CustomView::ProcessPrimaryDrawables(DrawableViewportCache& cache,
 
         workQueue_->AddWorkItem([&, camera, fromIndex, toIndex](unsigned threadIndex)
         {
-            DrawableWorkerCache& workerCache = cache.workerCache_[threadIndex];
             const DrawableZRangeEvaluator zRangeEvaluator{ camera };
 
             for (unsigned i = fromIndex; i < toIndex; ++i)
@@ -371,52 +358,42 @@ void CustomView::ProcessPrimaryDrawables(DrawableViewportCache& cache,
                 // TODO: Add occlusion culling
                 Drawable* drawable = drawables[i];
                 drawable->UpdateBatches(frameInfo);
-                ProcessPrimaryDrawable(drawable, zRangeEvaluator, cache, workerCache);
+                ProcessPrimaryDrawable(drawable, zRangeEvaluator, viewportCache, threadIndex);
             }
         }, M_MAX_UNSIGNED);
     }
     workQueue_->Complete(M_MAX_UNSIGNED);
 
-    // Collect and sort lights
-    for (DrawableWorkerCache& workerCache : cache.workerCache_)
-    {
-        for (Light* light : workerCache.visibleLights_)
-            cache.visibleLights_.push_back(light);
-    }
-
-    // TODO: Sort lights
+    // TODO: Sort lights?
     //const auto compareLights = [](Light* lhs, Light* rhs) { return lhs->GetSortValue() < rhs->GetSortValue(); };
     //ea::sort(cache.visibleLights_.begin(), cache.visibleLights_.end(), compareLights);
 }
 
-void CustomView::CollectLitGeometries(const DrawableViewportCache& cache,
+void CustomView::CollectLitGeometries(const DrawableViewportCache& viewportCache,
     DrawableLightCache& lightCache, Light* light)
 {
     switch (light->GetLightType())
     {
     case LIGHT_SPOT:
     {
-        SpotLightLitGeometriesQuery query(lightCache.litGeometries_, cache, light);
+        SpotLightLitGeometriesQuery query(lightCache.litGeometries_, viewportCache.transient_, light);
         octree_->GetDrawables(query);
         break;
     }
     case LIGHT_POINT:
     {
-        PointLightLitGeometriesQuery query(lightCache.litGeometries_, cache, light);
+        PointLightLitGeometriesQuery query(lightCache.litGeometries_, viewportCache.transient_, light);
         octree_->GetDrawables(query);
         break;
     }
     case LIGHT_DIRECTIONAL:
     {
         const unsigned lightMask = light->GetLightMask();
-        for (const DrawableWorkerCache& workerCache : cache.workerCache_)
+        viewportCache.visibleGeometries_.ForEach([&](unsigned index, Drawable* drawable)
         {
-            for (Drawable* drawable : workerCache.visibleGeometries_)
-            {
-                if (drawable->GetLightMask() & lightMask)
-                    lightCache.litGeometries_.push_back(drawable);
-            }
-        }
+            if (drawable->GetLightMask() & lightMask)
+                lightCache.litGeometries_.push_back(drawable);
+        });
         break;
     }
     }
@@ -433,19 +410,18 @@ void CustomView::Render()
     DrawableCollection drawablesInMainCamera;
     CollectDrawables(drawablesInMainCamera, camera_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT);
 
-    DrawableViewportCache globalCache;
-    ResetViewportCache(globalCache);
-    ProcessPrimaryDrawables(globalCache, drawablesInMainCamera, camera_);
+    DrawableViewportCache viewportCache;
+    ProcessPrimaryDrawables(viewportCache, drawablesInMainCamera, camera_);
 
     // Process visible lights
     ea::vector<DrawableLightCache> globalLightCache;
-    globalLightCache.resize(globalCache.visibleLights_.size());
-    globalCache.ForEachVisibleLight([&](unsigned lightIndex, Light* light)
+    globalLightCache.resize(viewportCache.visibleLights_.Size());
+    viewportCache.visibleLights_.ForEach([&](unsigned lightIndex, Light* light)
     {
         PostTask([&, this, light, lightIndex](unsigned threadIndex)
         {
             DrawableLightCache& lightCache = globalLightCache[lightIndex];
-            CollectLitGeometries(globalCache, lightCache, light);
+            CollectLitGeometries(viewportCache, lightCache, light);
         });
     });
     CompleteTasks();
@@ -454,7 +430,7 @@ void CustomView::Render()
     ea::vector<DrawableLightAccumulator<4>> lightAccumulator;
     lightAccumulator.resize(numDrawables_);
 
-    globalCache.ForEachVisibleLight([&](unsigned lightIndex, Light* light)
+    viewportCache.visibleLights_.ForEach([&](unsigned lightIndex, Light* light)
     {
         DrawableLightAccumulatorContext ctx;
         ctx.maxPixelLights_ = 1;
@@ -470,10 +446,8 @@ void CustomView::Render()
     auto renderer = context_->GetRenderer();
     //auto graphics = context_->GetGraphics();
     BatchQueue queue;
-    for (DrawableWorkerCache& perWorkerBase : globalCache.workerCache_)
+    viewportCache.visibleGeometries_.ForEach([&](unsigned index, Drawable* drawable)
     {
-        for (Drawable* drawable : perWorkerBase.visibleGeometries_)
-        {
             for (const SourceBatch& sourceBatch : drawable->GetBatches())
             {
                 Batch destBatch(sourceBatch);
@@ -613,8 +587,7 @@ void CustomView::Render()
                     destBatch.geometry_->Draw(graphics_);
                 }
             }
-        }
-    }
+    });
 }
 
 }
