@@ -24,6 +24,7 @@
 
 #include "../Core/Context.h"
 #include "../Graphics/Camera.h"
+#include "../Graphics/CustomView.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Renderer.h"
 #include "../Graphics/RenderPath.h"
@@ -71,6 +72,11 @@ Viewport::~Viewport() = default;
 void Viewport::RegisterObject(Context* context)
 {
     context->RegisterFactory<Viewport>();
+}
+
+void Viewport::SetCustomViewport(CustomViewportScript* script)
+{
+    customViewportScript_ = script;
 }
 
 void Viewport::SetScene(Scene* scene)
@@ -220,7 +226,9 @@ Vector3 Viewport::ScreenToWorldPoint(int x, int y, float depth) const
 
 void Viewport::AllocateView()
 {
-    view_ = context_->CreateObject<View>();
+    view_ = MakeShared<View>(context_);
+    if (customViewportScript_)
+        customView_ = MakeShared<CustomView>(context_, customViewportScript_);
 }
 
 }

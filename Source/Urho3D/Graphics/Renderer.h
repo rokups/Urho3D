@@ -36,6 +36,7 @@
 namespace Urho3D
 {
 
+class CustomView;
 class Geometry;
 class Drawable;
 class Light;
@@ -618,6 +619,8 @@ private:
     ea::vector<ea::pair<WeakPtr<RenderSurface>, WeakPtr<Viewport> > > queuedViewports_;
     /// Views that have been processed this frame.
     ea::vector<WeakPtr<View> > views_;
+    /// Custom views that have been processed this frame.
+    ea::vector<WeakPtr<CustomView> > customViews_;
     /// Prepared views by culling camera.
     ea::unordered_map<Camera*, WeakPtr<View> > preparedViews_;
     /// Octrees that have been updated during the frame.

@@ -219,6 +219,9 @@ public:
     /// @property
     unsigned GetNumLevels() const { return numLevels_; }
 
+    /// Return all drawables in all octants.
+    const ea::vector<Drawable*>& GetAllDrawables() const { return drawables_; }
+
     /// Mark drawable object as requiring an update and a reinsertion.
     void QueueUpdate(Drawable* drawable);
     /// Cancel drawable object's update.
