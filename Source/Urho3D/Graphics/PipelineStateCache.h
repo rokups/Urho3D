@@ -37,8 +37,6 @@ class PixelShader;
 /// Pipeline state description.
 struct PipelineStateDesc
 {
-    /// Input layout: hash of vertex elements for all buffers.
-    unsigned vertexElementsHash_{};
     /// Input layout: vertex elements.
     ea::vector<VertexElement> vertexElements_;
 
