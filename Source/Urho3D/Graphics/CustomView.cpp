@@ -187,7 +187,7 @@ struct DrawableLightAccumulator
     /// Return per-vertex lights.
     VertexLightContainer GetVertexLights() const
     {
-        VertexLightContainer vertexLights;
+        VertexLightContainer vertexLights{};
         for (unsigned i = firstVertexLight_; i < lights_.size(); ++i)
             vertexLights[i - firstVertexLight_] = lights_.at(i).second;
         return vertexLights;
@@ -442,6 +442,12 @@ public:
     void AddParameter(StringHash name, const Matrix4& value)
     {
         AllocateParameter(name, VAR_MATRIX4, 1, value.Data(), 16);
+    }
+
+    /// Add new Vector4 array parameter.
+    void AddParameter(StringHash name, ea::span<const Vector4> values)
+    {
+        AllocateParameter(name, VAR_VECTOR4, values.size(), values.data()->Data(), 4 * values.size());
     }
 
     /// Iterate.
@@ -881,10 +887,12 @@ public:
             for (VertexBuffer* vertexBuffer : geometry->GetVertexBuffers())
                 desc.vertexElements_.append(vertexBuffer->GetElements());
 
+            ea::string vsDefines = "DIRLIGHT NUMVERTEXLIGHTS=4 ";
+            ea::string psDefines = "DIRLIGHT NUMVERTEXLIGHTS=4 ";
             desc.vertexShader_ = graphics_->GetShader(
-                VS, pass->GetVertexShader(), pass->GetEffectiveVertexShaderDefines());
+                VS, pass->GetVertexShader(), vsDefines + pass->GetEffectiveVertexShaderDefines());
             desc.pixelShader_ = graphics_->GetShader(
-                PS, pass->GetPixelShader(), pass->GetEffectivePixelShaderDefines());
+                PS, pass->GetPixelShader(), psDefines + pass->GetEffectivePixelShaderDefines());
 
             desc.primitiveType_ = geometry->GetPrimitiveType();
             if (auto indexBuffer = geometry->GetIndexBuffer())
@@ -1141,7 +1149,7 @@ void CustomView::Render()
             BatchPipelineStateKey pipelineStateKey;
             pipelineStateKey.geometry_ = baseBatch.geometry_;
             pipelineStateKey.material_ = baseBatch.material_;
-            pipelineStateKey.pass_ = baseBatch.material_->GetTechnique(0)->GetSupportedPass(0);
+            pipelineStateKey.pass_ = baseBatch.material_->GetTechnique(0)->GetSupportedPass("litbase");
             pipelineStateKey.light_ = baseBatch.mainDirectionalLight_;
 
             baseBatch.pipelineState_ = batchPipelineStateCache.GetPipelineState(pipelineStateKey, camera_);
@@ -1159,6 +1167,7 @@ void CustomView::Render()
     for (const ForwardBaseBatch& batch : forwardBaseBatches)
     {
         auto geometry = batch.geometry_;
+        auto light = batch.mainDirectionalLight_;
         const SourceBatch& sourceBatch = *batch.sourceBatch_;
         SphericalHarmonicsDot9 sh;
         BatchCollection batchCollection;
@@ -1181,6 +1190,78 @@ void CustomView::Render()
         batchCollection.AddInstanceParameter(VSP_SHBB, sh.Bb_);
         batchCollection.AddInstanceParameter(VSP_SHC, sh.C_);
         batchCollection.AddInstanceParameter(VSP_MODEL, *sourceBatch.worldTransform_);
+
+        Node* lightNode = light->GetNode();
+        float atten = 1.0f / Max(light->GetRange(), M_EPSILON);
+        Vector3 lightDir(lightNode->GetWorldRotation() * Vector3::BACK);
+        Vector4 lightPos(lightNode->GetWorldPosition(), atten);
+
+        batchCollection.AddGroupParameter(VSP_LIGHTDIR, lightDir);
+        batchCollection.AddGroupParameter(VSP_LIGHTPOS, lightPos);
+
+        float fade = 1.0f;
+        float fadeEnd = light->GetDrawDistance();
+        float fadeStart = light->GetFadeDistance();
+
+        // Do fade calculation for light if both fade & draw distance defined
+        if (light->GetLightType() != LIGHT_DIRECTIONAL && fadeEnd > 0.0f && fadeStart > 0.0f && fadeStart < fadeEnd)
+            fade = Min(1.0f - (light->GetDistance() - fadeStart) / (fadeEnd - fadeStart), 1.0f);
+
+        // Negative lights will use subtract blending, so write absolute RGB values to the shader parameter
+        batchCollection.AddGroupParameter(PSP_LIGHTCOLOR, Color(light->GetEffectiveColor().Abs(),
+            light->GetEffectiveSpecularIntensity()) * fade);
+        batchCollection.AddGroupParameter(PSP_LIGHTDIR, lightDir);
+        batchCollection.AddGroupParameter(PSP_LIGHTPOS, lightPos);
+        batchCollection.AddGroupParameter(PSP_LIGHTRAD, light->GetRadius());
+        batchCollection.AddGroupParameter(PSP_LIGHTLENGTH, light->GetLength());
+
+        Vector4 vertexLights[MAX_VERTEX_LIGHTS * 3]{};
+        for (unsigned i = 0; i < batch.vertexLights_.size(); ++i)
+        {
+            Light* vertexLight = batch.vertexLights_[i];
+            if (!vertexLight)
+                continue;
+            Node* vertexLightNode = vertexLight->GetNode();
+            LightType type = vertexLight->GetLightType();
+
+            // Attenuation
+            float invRange, cutoff, invCutoff;
+            if (type == LIGHT_DIRECTIONAL)
+                invRange = 0.0f;
+            else
+                invRange = 1.0f / Max(vertexLight->GetRange(), M_EPSILON);
+            if (type == LIGHT_SPOT)
+            {
+                cutoff = Cos(vertexLight->GetFov() * 0.5f);
+                invCutoff = 1.0f / (1.0f - cutoff);
+            }
+            else
+            {
+                cutoff = -1.0f;
+                invCutoff = 1.0f;
+            }
+
+            // Color
+            float fade = 1.0f;
+            float fadeEnd = vertexLight->GetDrawDistance();
+            float fadeStart = vertexLight->GetFadeDistance();
+
+            // Do fade calculation for light if both fade & draw distance defined
+            if (vertexLight->GetLightType() != LIGHT_DIRECTIONAL && fadeEnd > 0.0f && fadeStart > 0.0f && fadeStart < fadeEnd)
+                fade = Min(1.0f - (vertexLight->GetDistance() - fadeStart) / (fadeEnd - fadeStart), 1.0f);
+
+            Color color = vertexLight->GetEffectiveColor() * fade;
+            vertexLights[i * 3] = Vector4(color.r_, color.g_, color.b_, invRange);
+
+            // Direction
+            vertexLights[i * 3 + 1] = Vector4(-(vertexLightNode->GetWorldDirection()), cutoff);
+
+            // Position
+            vertexLights[i * 3 + 2] = Vector4(vertexLightNode->GetWorldPosition(), invCutoff);
+        }
+
+        batchCollection.AddGroupParameter(VSP_VERTEXLIGHTS, ea::span<const Vector4>{ vertexLights });
+
         batchCollection.CommitInstance();
         batchCollection.CommitGroup();
 
