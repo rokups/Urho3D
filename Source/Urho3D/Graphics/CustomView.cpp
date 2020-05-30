@@ -890,9 +890,9 @@ public:
             ea::string vsDefines = "DIRLIGHT NUMVERTEXLIGHTS=4 ";
             ea::string psDefines = "DIRLIGHT NUMVERTEXLIGHTS=4 ";
             desc.vertexShader_ = graphics_->GetShader(
-                VS, pass->GetVertexShader(), vsDefines + pass->GetEffectiveVertexShaderDefines());
+                VS, "v2/" + pass->GetVertexShader(), vsDefines + pass->GetEffectiveVertexShaderDefines());
             desc.pixelShader_ = graphics_->GetShader(
-                PS, pass->GetPixelShader(), psDefines + pass->GetEffectivePixelShaderDefines());
+                PS, "v2/" + pass->GetPixelShader(), psDefines + pass->GetEffectivePixelShaderDefines());
 
             desc.primitiveType_ = geometry->GetPrimitiveType();
             if (auto indexBuffer = geometry->GetIndexBuffer())
