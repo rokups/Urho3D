@@ -145,6 +145,8 @@ struct DrawableLightAccumulator
     /// Container for lights.
     using Container = ea::vector_map<float, Light*, ea::less<float>, ea::allocator,
         ea::fixed_vector<ea::pair<float, Light*>, NumElements>>;
+    /// Container for vertex lights.
+    using VertexLightContainer = ea::array<Light*, MaxVertexLights>;
 
     /// Reset accumulator.
     void Reset()
@@ -167,12 +169,28 @@ struct DrawableLightAccumulator
         lights_.emplace(penalty, light);
 
         // If too many lights, drop the least important one
-        const unsigned maxLights = MaxVertexLights + ea::max(ctx.maxPixelLights_, numImportantLights_);
+        firstVertexLight_ = ea::max(ctx.maxPixelLights_, numImportantLights_);
+        const unsigned maxLights = MaxVertexLights + firstVertexLight_;
         if (lights_.size() > maxLights)
         {
             // TODO: Update SH
             lights_.pop_back();
         }
+    }
+
+    /// Return main directional per-pixel light.
+    Light* GetMainDirectionalLight() const
+    {
+        return lights_.empty() ? nullptr : lights_.front().second;
+    }
+
+    /// Return per-vertex lights.
+    VertexLightContainer GetVertexLights() const
+    {
+        VertexLightContainer vertexLights;
+        for (unsigned i = firstVertexLight_; i < lights_.size(); ++i)
+            vertexLights[i - firstVertexLight_] = lights_.at(i).second;
+        return vertexLights;
     }
 
     /// Container of per-pixel and per-pixel lights.
@@ -181,6 +199,8 @@ struct DrawableLightAccumulator
     SphericalHarmonicsDot9 sh_;
     /// Number of important lights.
     unsigned numImportantLights_{};
+    /// First vertex light.
+    unsigned firstVertexLight_{};
 };
 
 /// Process primary drawable.
@@ -791,20 +811,138 @@ private:
     ea::unordered_map<PipelineStateDesc, SharedPtr<PipelineState>> states_;
 };
 
-struct ForwardBaseBatch
+struct BatchPipelineStateKey
+{
+    /// Geometry to be rendered.
+    Geometry* geometry_{};
+    /// Material to be rendered.
+    Material* material_{};
+    /// Pass of the material technique to be used.
+    Pass* pass_{};
+    /// Light to be applied.
+    Light* light_{};
+
+    /// Compare.
+    bool operator ==(const BatchPipelineStateKey& rhs) const
+    {
+        return geometry_ == rhs.geometry_
+            && material_ == rhs.material_
+            && pass_ == rhs.pass_
+            && light_ == rhs.light_;
+    }
+
+    /// Return hash.
+    unsigned ToHash() const
+    {
+        unsigned hash = 0;
+        CombineHash(hash, MakeHash(geometry_));
+        CombineHash(hash, MakeHash(material_));
+        CombineHash(hash, MakeHash(pass_));
+        CombineHash(hash, MakeHash(light_));
+        return hash;
+    }
+};
+
+struct BatchPipelineState
+{
+    /// Pipeline state.
+    SharedPtr<PipelineState> pipelineState_;
+    /// Cached state of the geometry.
+    unsigned geometryHash_{};
+    /// Cached state of the material.
+    unsigned materialHash_{};
+    /// Cached state of the pass.
+    unsigned passHash_{};
+    // TODO: Hash light too
+};
+
+class BatchPipelineStateCache
+{
+public:
+    BatchPipelineStateCache(PipelineStateCache& cache)
+        : graphics_(cache.GetContext()->GetGraphics())
+        , underlyingCache_(&cache)
+    {}
+
+    PipelineState* GetPipelineState(const BatchPipelineStateKey& key, Camera* camera)
+    {
+        Geometry* geometry = key.geometry_;
+        Material* material = key.material_;
+        Pass* pass = key.pass_;
+
+        BatchPipelineState& state = validationMap_[key];
+        if (!state.pipelineState_
+            || geometry->GetPipelineStateHash() != state.geometryHash_
+            || material->GetPipelineStateHash() != state.materialHash_
+            || pass->GetPipelineStateHash() != state.passHash_)
+        {
+            PipelineStateDesc desc;
+
+            for (VertexBuffer* vertexBuffer : geometry->GetVertexBuffers())
+                desc.vertexElements_.append(vertexBuffer->GetElements());
+
+            desc.vertexShader_ = graphics_->GetShader(
+                VS, pass->GetVertexShader(), pass->GetEffectiveVertexShaderDefines());
+            desc.pixelShader_ = graphics_->GetShader(
+                PS, pass->GetPixelShader(), pass->GetEffectivePixelShaderDefines());
+
+            desc.primitiveType_ = geometry->GetPrimitiveType();
+            if (auto indexBuffer = geometry->GetIndexBuffer())
+                desc.indexType_ = indexBuffer->GetIndexSize() == 2 ? IBT_UINT16 : IBT_UINT32;
+
+            desc.depthWrite_ = true;
+            desc.depthMode_ = CMP_LESSEQUAL;
+            desc.stencilEnabled_ = false;
+            desc.stencilMode_ = CMP_ALWAYS;
+
+            desc.colorWrite_ = true;
+            desc.blendMode_ = BLEND_REPLACE;
+            desc.alphaToCoverage_ = false;
+
+            desc.fillMode_ = FILL_SOLID;
+            desc.cullMode_ = GetEffectiveCullMode(material->GetCullMode(), camera);
+
+            state.pipelineState_ = underlyingCache_->GetPipelineState(desc);
+            state.geometryHash_ = key.geometry_->GetPipelineStateHash();
+            state.materialHash_ = key.material_->GetPipelineStateHash();
+            state.passHash_ = key.pass_->GetPipelineStateHash();
+        }
+        return state.pipelineState_;
+    }
+
+private:
+    Graphics* graphics_{};
+    PipelineStateCache* underlyingCache_{};
+    ea::unordered_map<BatchPipelineStateKey, BatchPipelineState> validationMap_;
+};
+
+
+struct ForwardBaseBatchSortKey
+{
+    /// Geometry to be rendered.
+    Geometry* geometry_{};
+    /// Material to be rendered.
+    Material* material_{};
+    /// Pipeline state.
+    PipelineState* pipelineState_{};
+    /// Hash of used shaders.
+    unsigned shadersHash_{};
+    /// Distance from camera.
+    float distance_{};
+    /// 8-bit render order modifier from material.
+    unsigned char renderOrder_{};
+};
+
+struct ForwardBaseBatch : public ForwardBaseBatchSortKey
 {
     /// Drawable to be rendered.
     Drawable* drawable_;
     /// Source batch of the drawable.
     const SourceBatch* sourceBatch_;
-    /// Material to be rendered.
-    Material* material_{};
-    /// Pipeline state.
-    PipelineState* pipelineState_{};
     /// Main per-pixel directional light.
-    Light* directionalLight_{};
+    Light* mainDirectionalLight_{};
     /// Array of per-vertex lights.
-    ea::array<Light*, 4> vertexLights_;
+    ea::array<Light*, 4> vertexLights_{};
     /// Accumulated SH lighting.
     SphericalHarmonicsDot9 shLighting_;
 };
@@ -977,231 +1115,84 @@ void CustomView::Render()
 
     //
     static PipelineStateCache pipelineStateCache(context_);
+    static BatchPipelineStateCache batchPipelineStateCache(pipelineStateCache);
+
+    // Collect intermediate batches
+    static ea::vector<ForwardBaseBatch> forwardBaseBatches;
+    forwardBaseBatches.clear();
+    viewportCache.visibleGeometries_.ForEach([&](unsigned index, Drawable* drawable)
+    {
+        const unsigned drawableIndex = drawable->GetDrawableIndex();
+        const auto& drawableLights = lightAccumulator[drawableIndex];
+        for (const SourceBatch& sourceBatch : drawable->GetBatches())
+        {
+            ForwardBaseBatch baseBatch;
+            baseBatch.geometry_ = sourceBatch.geometry_;
+            baseBatch.material_ = sourceBatch.material_;
+            baseBatch.distance_ = sourceBatch.distance_;
+            baseBatch.renderOrder_ = sourceBatch.material_->GetRenderOrder();
+
+            baseBatch.drawable_ = drawable;
+            baseBatch.sourceBatch_ = &sourceBatch;
+
+            baseBatch.mainDirectionalLight_ = drawableLights.GetMainDirectionalLight();
+            baseBatch.vertexLights_ = drawableLights.GetVertexLights();
+
+            BatchPipelineStateKey pipelineStateKey;
+            pipelineStateKey.geometry_ = baseBatch.geometry_;
+            pipelineStateKey.material_ = baseBatch.material_;
+            pipelineStateKey.pass_ = baseBatch.material_->GetTechnique(0)->GetSupportedPass(0);
+            pipelineStateKey.light_ = baseBatch.mainDirectionalLight_;
+
+            baseBatch.pipelineState_ = batchPipelineStateCache.GetPipelineState(pipelineStateKey, camera_);
+            baseBatch.shadersHash_ = 0;
+
+            forwardBaseBatches.push_back(baseBatch);
+        }
+    });
 
     // Collect batches
     ShaderParameterCollection globalSharedParameters;
     FillGlobalSharedParameters(globalSharedParameters, frameInfo_, camera_, octree_->GetZone(), scene_);
 
     auto renderer = context_->GetRenderer();
-    viewportCache.visibleGeometries_.ForEach([&](unsigned index, Drawable* drawable)
+    for (const ForwardBaseBatch& batch : forwardBaseBatches)
     {
-        for (const SourceBatch& sourceBatch : drawable->GetBatches())
+        auto geometry = batch.geometry_;
+        const SourceBatch& sourceBatch = *batch.sourceBatch_;
+        SphericalHarmonicsDot9 sh;
+        BatchCollection batchCollection;
+        if (batch.material_)
         {
-            auto geometry = sourceBatch.geometry_;
-            auto tech = sourceBatch.material_->GetTechnique(0);
-            auto pass = tech->GetSupportedPass(0);
-            SphericalHarmonicsDot9 sh;
+            const auto& parameters = batch.material_->GetShaderParameters();
+            for (const auto& item : parameters)
+                batchCollection.AddGroupParameter(item.first, item.second.value_);
 
-            BatchCollection batchCollection;
-            if (sourceBatch.material_)
-            {
-                const auto& parameters = sourceBatch.material_->GetShaderParameters();
-                for (const auto& item : parameters)
-                    batchCollection.AddGroupParameter(item.first, item.second.value_);
-
-                const auto& textures = sourceBatch.material_->GetTextures();
-                for (const auto& item : textures)
-                    batchCollection.AddGroupResource(item.first, item.second);
-            }
-
-            batchCollection.AddInstanceParameter(VSP_SHAR, sh.Ar_);
-            batchCollection.AddInstanceParameter(VSP_SHAG, sh.Ag_);
-            batchCollection.AddInstanceParameter(VSP_SHAB, sh.Ab_);
-            batchCollection.AddInstanceParameter(VSP_SHBR, sh.Br_);
-            batchCollection.AddInstanceParameter(VSP_SHBG, sh.Bg_);
-            batchCollection.AddInstanceParameter(VSP_SHBB, sh.Bb_);
-            batchCollection.AddInstanceParameter(VSP_SHC, sh.C_);
-            batchCollection.AddInstanceParameter(VSP_MODEL, *sourceBatch.worldTransform_);
-            batchCollection.CommitInstance();
-            batchCollection.CommitGroup();
-
-            PipelineStateDesc pipelineStateDesc;
-            for (VertexBuffer* vertexBuffer : geometry->GetVertexBuffers())
-                pipelineStateDesc.vertexElements_.append(vertexBuffer->GetElements());
-
-            pipelineStateDesc.vertexShader_ = graphics_->GetShader(
-                VS, pass->GetVertexShader(), pass->GetEffectiveVertexShaderDefines());
-            pipelineStateDesc.pixelShader_ = graphics_->GetShader(
-                PS, pass->GetPixelShader(), pass->GetEffectivePixelShaderDefines());
-
-            pipelineStateDesc.primitiveType_ = geometry->GetPrimitiveType();
-            if (auto indexBuffer = geometry->GetIndexBuffer())
-                pipelineStateDesc.indexType_ = indexBuffer->GetIndexSize() == 2 ? IBT_UINT16 : IBT_UINT32;
-
-            pipelineStateDesc.depthWrite_ = true;
-            pipelineStateDesc.depthMode_ = CMP_LESSEQUAL;
-            pipelineStateDesc.stencilEnabled_ = false;
-            pipelineStateDesc.stencilMode_ = CMP_ALWAYS;
-
-            pipelineStateDesc.colorWrite_ = true;
-            pipelineStateDesc.blendMode_ = BLEND_REPLACE;
-            pipelineStateDesc.alphaToCoverage_ = false;
-
-            pipelineStateDesc.fillMode_ = FILL_SOLID;
-            pipelineStateDesc.cullMode_ = GetEffectiveCullMode(sourceBatch.material_->GetCullMode(), camera_);
-
-            ApplyPipelineState(graphics_, pipelineStateDesc);
-
-            globalSharedParameters.ForEach(SharedParameterSetter{ graphics_ });
-            batchCollection.groupParameters_.ForEach(SharedParameterSetter{ graphics_ });
-            batchCollection.instanceParameters_.ForEach(SharedParameterSetter{ graphics_ });
-            ApplyShaderResources(graphics_, batchCollection.groupResources_);
-
-            sourceBatch.geometry_->Draw(graphics_);
+            const auto& textures = batch.material_->GetTextures();
+            for (const auto& item : textures)
+                batchCollection.AddGroupResource(item.first, item.second);
         }
-    });
 
-    return;
+        batchCollection.AddInstanceParameter(VSP_SHAR, sh.Ar_);
+        batchCollection.AddInstanceParameter(VSP_SHAG, sh.Ag_);
+        batchCollection.AddInstanceParameter(VSP_SHAB, sh.Ab_);
+        batchCollection.AddInstanceParameter(VSP_SHBR, sh.Br_);
+        batchCollection.AddInstanceParameter(VSP_SHBG, sh.Bg_);
+        batchCollection.AddInstanceParameter(VSP_SHBB, sh.Bb_);
+        batchCollection.AddInstanceParameter(VSP_SHC, sh.C_);
+        batchCollection.AddInstanceParameter(VSP_MODEL, *sourceBatch.worldTransform_);
+        batchCollection.CommitInstance();
+        batchCollection.CommitGroup();
 
-#if 0
-    //auto graphics = context_->GetGraphics();
-    BatchQueue queue;
-    viewportCache.visibleGeometries_.ForEach([&](unsigned index, Drawable* drawable)
-    {
-            for (const SourceBatch& sourceBatch : drawable->GetBatches())
-            {
-                Batch destBatch(sourceBatch);
-                auto tech = destBatch.material_->GetTechnique(0);
-                destBatch.zone_ = renderer->GetDefaultZone();
-                destBatch.pass_ = tech->GetSupportedPass(0);
-                destBatch.isBase_ = true;
-                destBatch.lightMask_ = 0xffffffff;
-                //renderer->SetBatchShaders(destBatch, tech, false, queue);
-                destBatch.vertexShader_ = graphics_->GetShader(VS, destBatch.pass_->GetVertexShader(), destBatch.pass_->GetEffectiveVertexShaderDefines());
-                destBatch.pixelShader_ = graphics_->GetShader(PS, destBatch.pass_->GetPixelShader(), destBatch.pass_->GetEffectivePixelShaderDefines());
+        ApplyPipelineState(graphics_, batch.pipelineState_->GetDesc());
 
-                destBatch.CalculateSortKey();
-                //queue.batches_.push_back(destBatch);
+        globalSharedParameters.ForEach(SharedParameterSetter{ graphics_ });
+        batchCollection.groupParameters_.ForEach(SharedParameterSetter{ graphics_ });
+        batchCollection.instanceParameters_.ForEach(SharedParameterSetter{ graphics_ });
+        ApplyShaderResources(graphics_, batchCollection.groupResources_);
 
-                //view->SetGlobalShaderParameters();
-                graphics_->SetShaderParameter(VSP_DELTATIME, frameInfo_.timeStep_);
-                graphics_->SetShaderParameter(PSP_DELTATIME, frameInfo_.timeStep_);
-
-                if (scene_)
-                {
-                    float elapsedTime = scene_->GetElapsedTime();
-                    graphics_->SetShaderParameter(VSP_ELAPSEDTIME, elapsedTime);
-                    graphics_->SetShaderParameter(PSP_ELAPSEDTIME, elapsedTime);
-                }
-
-                graphics_->SetShaders(destBatch.vertexShader_, destBatch.pixelShader_);
-                graphics_->SetBlendMode(BLEND_REPLACE, false);
-                renderer->SetCullMode(destBatch.material_->GetCullMode(), camera_);
-                graphics_->SetFillMode(FILL_SOLID);
-                graphics_->SetDepthTest(CMP_LESSEQUAL);
-                graphics_->SetDepthWrite(true);
-                if (graphics_->NeedParameterUpdate(SP_CAMERA, camera_))
-                {
-                    //view->SetCameraShaderParameters(camera_);
-                        Matrix3x4 cameraEffectiveTransform = camera_->GetEffectiveWorldTransform();
-
-    graphics_->SetShaderParameter(VSP_CAMERAPOS, cameraEffectiveTransform.Translation());
-    graphics_->SetShaderParameter(VSP_VIEWINV, cameraEffectiveTransform);
-    graphics_->SetShaderParameter(VSP_VIEW, camera_->GetView());
-    graphics_->SetShaderParameter(PSP_CAMERAPOS, cameraEffectiveTransform.Translation());
-
-    float nearClip = camera_->GetNearClip();
-    float farClip = camera_->GetFarClip();
-    graphics_->SetShaderParameter(VSP_NEARCLIP, nearClip);
-    graphics_->SetShaderParameter(VSP_FARCLIP, farClip);
-    graphics_->SetShaderParameter(PSP_NEARCLIP, nearClip);
-    graphics_->SetShaderParameter(PSP_FARCLIP, farClip);
-
-    Vector4 depthMode = Vector4::ZERO;
-    if (camera_->IsOrthographic())
-    {
-        depthMode.x_ = 1.0f;
-#ifdef URHO3D_OPENGL
-        depthMode.z_ = 0.5f;
-        depthMode.w_ = 0.5f;
-#else
-        depthMode.z_ = 1.0f;
-#endif
+        sourceBatch.geometry_->Draw(graphics_);
     }
-    else
-        depthMode.w_ = 1.0f / camera_->GetFarClip();
-
-    graphics_->SetShaderParameter(VSP_DEPTHMODE, depthMode);
-
-    Vector4 depthReconstruct
-        (farClip / (farClip - nearClip), -nearClip / (farClip - nearClip), camera_->IsOrthographic() ? 1.0f : 0.0f,
-            camera_->IsOrthographic() ? 0.0f : 1.0f);
-    graphics_->SetShaderParameter(PSP_DEPTHRECONSTRUCT, depthReconstruct);
-
-    Vector3 nearVector, farVector;
-    camera_->GetFrustumSize(nearVector, farVector);
-    graphics_->SetShaderParameter(VSP_FRUSTUMSIZE, farVector);
-
-    Matrix4 projection = camera_->GetGPUProjection();
-#ifdef URHO3D_OPENGL
-    // Add constant depth bias manually to the projection matrix due to glPolygonOffset() inconsistency
-    float constantBias = 2.0f * graphics_->GetDepthConstantBias();
-    projection.m22_ += projection.m32_ * constantBias;
-    projection.m23_ += projection.m33_ * constantBias;
-#endif
-
-    graphics_->SetShaderParameter(VSP_VIEWPROJ, projection * camera_->GetView());
-                    // During renderpath commands the G-Buffer or viewport texture is assumed to always be viewport-sized
-                    //view->SetGBufferShaderParameters(viewSize, IntRect(0, 0, viewSize.x_, viewSize.y_));
-                }
-                graphics_->SetShaderParameter(VSP_SHAR, destBatch.shaderParameters_.ambient_.Ar_);
-                graphics_->SetShaderParameter(VSP_SHAG, destBatch.shaderParameters_.ambient_.Ag_);
-                graphics_->SetShaderParameter(VSP_SHAB, destBatch.shaderParameters_.ambient_.Ab_);
-                graphics_->SetShaderParameter(VSP_SHBR, destBatch.shaderParameters_.ambient_.Br_);
-                graphics_->SetShaderParameter(VSP_SHBG, destBatch.shaderParameters_.ambient_.Bg_);
-                graphics_->SetShaderParameter(VSP_SHBB, destBatch.shaderParameters_.ambient_.Bb_);
-                graphics_->SetShaderParameter(VSP_SHC, destBatch.shaderParameters_.ambient_.C_);
-                graphics_->SetShaderParameter(VSP_MODEL, *destBatch.worldTransform_);
-                //graphics_->SetShaderParameter(VSP_AMBIENTSTARTCOLOR, destBatch.zone_->GetAmbientStartColor());
-                graphics_->SetShaderParameter(VSP_AMBIENTSTARTCOLOR, Color::WHITE);
-                graphics_->SetShaderParameter(VSP_AMBIENTENDCOLOR, Vector4::ZERO);
-                graphics_->SetShaderParameter(VSP_ZONE, Matrix3x4::IDENTITY);
-                //graphics_->SetShaderParameter(PSP_AMBIENTCOLOR, destBatch.zone_->GetAmbientColor());
-                graphics_->SetShaderParameter(PSP_AMBIENTCOLOR, Color::WHITE);
-                graphics_->SetShaderParameter(PSP_FOGCOLOR, destBatch.zone_->GetFogColor());
-
-                float farClip = camera_->GetFarClip();
-                float fogStart = Min(destBatch.zone_->GetFogStart(), farClip);
-                float fogEnd = Min(destBatch.zone_->GetFogEnd(), farClip);
-                if (fogStart >= fogEnd * (1.0f - M_LARGE_EPSILON))
-                    fogStart = fogEnd * (1.0f - M_LARGE_EPSILON);
-                float fogRange = Max(fogEnd - fogStart, M_EPSILON);
-                Vector4 fogParams(fogEnd / farClip, farClip / fogRange, 0.0f, 0.0f);
-
-                graphics_->SetShaderParameter(PSP_FOGPARAMS, fogParams);
-
-                // Set material-specific shader parameters and textures
-                if (destBatch.material_)
-                {
-                    if (graphics_->NeedParameterUpdate(SP_MATERIAL, reinterpret_cast<const void*>(destBatch.material_->GetShaderParameterHash())))
-                    {
-                        const ea::unordered_map<StringHash, MaterialShaderParameter>& parameters = destBatch.material_->GetShaderParameters();
-                        for (auto i = parameters.begin(); i !=
-                            parameters.end(); ++i)
-                            graphics_->SetShaderParameter(i->first, i->second.value_);
-                    }
-
-                    const ea::unordered_map<TextureUnit, SharedPtr<Texture> >& textures = destBatch.material_->GetTextures();
-                    for (auto i = textures.begin(); i !=
-                        textures.end(); ++i)
-                    {
-                        if (i->first == TU_EMISSIVE && destBatch.lightmapScaleOffset_)
-                            continue;
-
-                        if (graphics_->HasTextureUnit(i->first))
-                            graphics_->SetTexture(i->first, i->second.Get());
-                    }
-
-                    /*if (destBatch.lightmapScaleOffset_)
-                    {
-                        if (Scene* scene = view->GetScene())
-                            graphics_->SetTexture(TU_EMISSIVE, scene->GetLightmapTexture(destBatch.lightmapIndex_));
-                    }*/
-                    destBatch.geometry_->Draw(graphics_);
-                }
-            }
-    });
-#endif
 }
 
 }
