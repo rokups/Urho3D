@@ -25,6 +25,7 @@
 #include "../Container/Hash.h"
 #include "../Container/RefCounted.h"
 #include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/IndexBuffer.h"
 #include "../Graphics/VertexBuffer.h"
 
 #include <EASTL/algorithm.h>
@@ -34,14 +35,6 @@ namespace Urho3D
 {
 
 class ShaderVariation;
-
-/// Type of index buffer.
-enum IndexBufferType
-{
-    IBT_NONE = 0,
-    IBT_UINT16,
-    IBT_UINT32
-};
 
 /// Pipeline state description.
 struct PipelineStateDesc
@@ -142,13 +135,7 @@ struct PipelineStateDesc
         unsigned hash = 0;
         CombineHash(hash, vertexElements_.size());
         for (const VertexElement& element : vertexElements_)
-        {
-            CombineHash(hash, element.type_);
-            CombineHash(hash, element.semantic_);
-            CombineHash(hash, element.index_);
-            CombineHash(hash, element.perInstance_);
-            CombineHash(hash, element.offset_);
-        }
+            CombineHash(hash, element.ToHash());
 
         CombineHash(hash, MakeHash(vertexShader_));
         CombineHash(hash, MakeHash(pixelShader_));

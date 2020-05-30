@@ -153,7 +153,7 @@ private:
 };
 
 /// Describes how to render 3D geometries.
-class URHO3D_API Material : public Resource
+class URHO3D_API Material : public Resource, public PipelineStateTracker
 {
     URHO3D_OBJECT(Material, Resource);
 
@@ -362,6 +362,8 @@ private:
     void UpdateEventSubscription();
     /// Update shader parameter animations.
     void HandleAttributeAnimationUpdate(StringHash eventType, VariantMap& eventData);
+    /// Recalculate hash of pipeline state configuration.
+    unsigned RecalculatePipelineStateHash() const override;
 
     /// Techniques.
     ea::vector<TechniqueEntry> techniques_;

@@ -26,6 +26,7 @@
 
 #include "../Core/Context.h"
 #include "../Graphics/Graphics.h"
+#include "../Graphics/GraphicsEvents.h"
 #include "../Graphics/IndexBuffer.h"
 #include "../IO/Log.h"
 
@@ -88,6 +89,8 @@ bool IndexBuffer::SetSize(unsigned indexCount, bool largeIndices, bool dynamic)
     indexCount_ = indexCount;
     indexSize_ = (unsigned)(largeIndices ? sizeof(unsigned) : sizeof(unsigned short));
     dynamic_ = dynamic;
+
+    SendEvent(E_BUFFERFORMATCHANGED);
 
     if (shadowed_ && indexCount_ && indexSize_)
         shadowData_ = new unsigned char[indexCount_ * indexSize_];

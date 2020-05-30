@@ -26,6 +26,7 @@
 
 #include "../Container/Hash.h"
 #include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/PipelineStateTracker.h"
 #include "../Resource/Resource.h"
 
 namespace Urho3D
@@ -76,7 +77,7 @@ enum PassLightingMode
 };
 
 /// %Material rendering pass, which defines shaders and render state.
-class URHO3D_API Pass : public RefCounted
+class URHO3D_API Pass : public RefCounted, public PipelineStateTracker
 {
 public:
     /// Construct.
@@ -205,6 +206,9 @@ public:
     ea::string GetEffectivePixelShaderDefines() const;
 
 private:
+    /// Recalculate hash of pipeline state configuration.
+    unsigned RecalculatePipelineStateHash() const override;
+
     /// Pass index.
     unsigned index_;
     /// Blend mode.

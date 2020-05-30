@@ -26,6 +26,7 @@
 
 #include "../Core/Context.h"
 #include "../Graphics/Graphics.h"
+#include "../Graphics/GraphicsEvents.h"
 #include "../Graphics/VertexBuffer.h"
 #include "../Math/MathDefs.h"
 
@@ -160,6 +161,8 @@ bool VertexBuffer::SetSize(unsigned vertexCount, const ea::vector<VertexElement>
     dynamic_ = dynamic;
 
     UpdateOffsets();
+
+    SendEvent(E_BUFFERFORMATCHANGED);
 
     if (shadowed_ && vertexCount_ && vertexSize_)
         shadowData_ = new unsigned char[vertexCount_ * vertexSize_];

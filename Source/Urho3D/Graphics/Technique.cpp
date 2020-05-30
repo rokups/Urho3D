@@ -64,16 +64,19 @@ Pass::~Pass() = default;
 void Pass::SetBlendMode(BlendMode mode)
 {
     blendMode_ = mode;
+    MarkPipelineStateHashDirty();
 }
 
 void Pass::SetCullMode(CullMode mode)
 {
     cullMode_ = mode;
+    MarkPipelineStateHashDirty();
 }
 
 void Pass::SetDepthTestMode(CompareMode mode)
 {
     depthTestMode_ = mode;
+    MarkPipelineStateHashDirty();
 }
 
 void Pass::SetLightingMode(PassLightingMode mode)
@@ -84,11 +87,13 @@ void Pass::SetLightingMode(PassLightingMode mode)
 void Pass::SetDepthWrite(bool enable)
 {
     depthWrite_ = enable;
+    MarkPipelineStateHashDirty();
 }
 
 void Pass::SetAlphaToCoverage(bool enable)
 {
     alphaToCoverage_ = enable;
+    MarkPipelineStateHashDirty();
 }
 
 
@@ -101,36 +106,42 @@ void Pass::SetVertexShader(const ea::string& name)
 {
     vertexShaderName_ = name;
     ReleaseShaders();
+    MarkPipelineStateHashDirty();
 }
 
 void Pass::SetPixelShader(const ea::string& name)
 {
     pixelShaderName_ = name;
     ReleaseShaders();
+    MarkPipelineStateHashDirty();
 }
 
 void Pass::SetVertexShaderDefines(const ea::string& defines)
 {
     vertexShaderDefines_ = defines;
     ReleaseShaders();
+    MarkPipelineStateHashDirty();
 }
 
 void Pass::SetPixelShaderDefines(const ea::string& defines)
 {
     pixelShaderDefines_ = defines;
     ReleaseShaders();
+    MarkPipelineStateHashDirty();
 }
 
 void Pass::SetVertexShaderDefineExcludes(const ea::string& excludes)
 {
     vertexShaderDefineExcludes_ = excludes;
     ReleaseShaders();
+    MarkPipelineStateHashDirty();
 }
 
 void Pass::SetPixelShaderDefineExcludes(const ea::string& excludes)
 {
     pixelShaderDefineExcludes_ = excludes;
     ReleaseShaders();
+    MarkPipelineStateHashDirty();
 }
 
 void Pass::ReleaseShaders()
@@ -189,6 +200,23 @@ ea::vector<SharedPtr<ShaderVariation> >& Pass::GetPixelShaders(const StringHash&
         return pixelShaders_;
     else
         return extraPixelShaders_[extraDefinesHash];
+}
+
+unsigned Pass::RecalculatePipelineStateHash() const
+{
+    unsigned hash = 0;
+    CombineHash(hash, blendMode_);
+    CombineHash(hash, cullMode_);
+    CombineHash(hash, depthTestMode_);
+    CombineHash(hash, depthWrite_);
+    CombineHash(hash, alphaToCoverage_);
+    CombineHash(hash, MakeHash(vertexShaderName_));
+    CombineHash(hash, MakeHash(pixelShaderName_));
+    CombineHash(hash, MakeHash(vertexShaderDefines_));
+    CombineHash(hash, MakeHash(pixelShaderDefines_));
+    CombineHash(hash, MakeHash(vertexShaderDefineExcludes_));
+    CombineHash(hash, MakeHash(pixelShaderDefineExcludes_));
+    return hash;
 }
 
 unsigned Technique::basePassIndex = 0;

@@ -25,6 +25,7 @@
 #pragma once
 
 #include "../Container/FlagSet.h"
+#include "../Container/Hash.h"
 #include "../Math/StringHash.h"
 
 namespace Urho3D
@@ -207,6 +208,18 @@ struct URHO3D_API VertexElement
 
     /// Test for inequality with another vertex element.
     bool operator !=(const VertexElement& rhs) const { return !(*this == rhs); }
+
+    /// Return hash value of the vertex element.
+    unsigned ToHash() const
+    {
+        unsigned hash = 0;
+        CombineHash(hash, type_);
+        CombineHash(hash, semantic_);
+        CombineHash(hash, index_);
+        CombineHash(hash, perInstance_);
+        CombineHash(hash, offset_);
+        return hash;
+    }
 
     /// Data type of element.
     VertexElementType type_;

@@ -903,6 +903,7 @@ void Material::SetVertexShaderDefines(const ea::string& defines)
     {
         vertexShaderDefines_ = defines;
         ApplyShaderDefines();
+        MarkPipelineStateHashDirty();
     }
 }
 
@@ -912,6 +913,7 @@ void Material::SetPixelShaderDefines(const ea::string& defines)
     {
         pixelShaderDefines_ = defines;
         ApplyShaderDefines();
+        MarkPipelineStateHashDirty();
     }
 }
 
@@ -1039,27 +1041,32 @@ void Material::SetUVTransform(const Vector2& offset, float rotation, float repea
 void Material::SetCullMode(CullMode mode)
 {
     cullMode_ = mode;
+    MarkPipelineStateHashDirty();
 }
 
 void Material::SetShadowCullMode(CullMode mode)
 {
     shadowCullMode_ = mode;
+    MarkPipelineStateHashDirty();
 }
 
 void Material::SetFillMode(FillMode mode)
 {
     fillMode_ = mode;
+    MarkPipelineStateHashDirty();
 }
 
 void Material::SetDepthBias(const BiasParameters& parameters)
 {
     depthBias_ = parameters;
     depthBias_.Validate();
+    MarkPipelineStateHashDirty();
 }
 
 void Material::SetAlphaToCoverage(bool enable)
 {
     alphaToCoverage_ = enable;
+    MarkPipelineStateHashDirty();
 }
 
 void Material::SetLineAntiAlias(bool enable)
@@ -1345,6 +1352,20 @@ void Material::ApplyShaderDefines(unsigned index)
         techniques_[index].technique_ = techniques_[index].original_;
     else
         techniques_[index].technique_ = techniques_[index].original_->CloneWithDefines(vertexShaderDefines_, pixelShaderDefines_);
+}
+
+unsigned Material::RecalculatePipelineStateHash() const
+{
+    unsigned hash = 0;
+    CombineHash(hash, MakeHash(vertexShaderDefines_));
+    CombineHash(hash, MakeHash(pixelShaderDefines_));
+    CombineHash(hash, cullMode_);
+    CombineHash(hash, shadowCullMode_);
+    CombineHash(hash, fillMode_);
+    CombineHash(hash, depthBias_.constantBias_);
+    CombineHash(hash, depthBias_.slopeScaledBias_);
+    CombineHash(hash, alphaToCoverage_);
+    return hash;
 }
 
 }

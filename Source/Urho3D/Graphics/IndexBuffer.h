@@ -31,6 +31,14 @@
 namespace Urho3D
 {
 
+/// Type of index buffer.
+enum IndexBufferType
+{
+    IBT_NONE = 0,
+    IBT_UINT16,
+    IBT_UINT32
+};
+
 /// Hardware index buffer.
 class URHO3D_API IndexBuffer : public Object, public GPUObject
 {
@@ -107,6 +115,15 @@ public:
 
     /// Pack index data from unsigned int array into index buffer.
     static void PackIndexData(const unsigned source[], void* dest, bool largeIndices, unsigned start, unsigned count);
+
+    /// Return type of index buffer. Null is allowed.
+    static IndexBufferType GetIndexBufferType(IndexBuffer* indexBuffer)
+    {
+        if (!indexBuffer)
+            return IBT_NONE;
+        const bool largeIndices = indexBuffer->GetIndexSize() == 4;
+        return largeIndices ? IBT_UINT32 : IBT_UINT16;
+    }
 
 private:
     /// Create buffer.

@@ -143,4 +143,9 @@ URHO3D_EVENT(E_DEVICERESET, DeviceReset)
 {
 }
 
+/// Vertex or index buffer format has been changed.
+URHO3D_EVENT(E_BUFFERFORMATCHANGED, BufferFormatChanged)
+{
+}
+
 }

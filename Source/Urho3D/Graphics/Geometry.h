@@ -26,6 +26,7 @@
 
 #include "../Core/Object.h"
 #include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/PipelineStateTracker.h"
 
 namespace Urho3D
 {
@@ -36,7 +37,7 @@ class Graphics;
 class VertexBuffer;
 
 /// Defines one or more vertex buffers, an index buffer and a draw range.
-class URHO3D_API Geometry : public Object
+class URHO3D_API Geometry : public Object, public PipelineStateTracker
 {
     URHO3D_OBJECT(Geometry, Object);
 
@@ -132,6 +133,15 @@ public:
     bool IsEmpty() const { return indexCount_ == 0 && vertexCount_ == 0; }
 
 private:
+    /// Subscribe to buffer format changes.
+    void SubscribeToBufferFormatChange(Object* buffer);
+    /// Refresh subscriptions to buffer format changes.
+    void RefreshSubscriptions();
+    /// Called when vertex or index buffer format is changed.
+    void HandleBufferFormatChanged(StringHash eventType, VariantMap& eventData) { MarkPipelineStateHashDirty(); }
+    /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
+    unsigned RecalculatePipelineStateHash() const override;
+
     /// Vertex buffers.
     ea::vector<SharedPtr<VertexBuffer> > vertexBuffers_;
     /// Index buffer.
