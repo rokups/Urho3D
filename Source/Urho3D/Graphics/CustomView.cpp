@@ -26,6 +26,7 @@
 #include "../Core/IteratorRange.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/CustomView.h"
+#include "../Graphics/IndexBuffer.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Viewport.h"
 #include "../Scene/Scene.h"
@@ -40,7 +41,7 @@
 #include "../Graphics/Batch.h"
 #include "../Graphics/Renderer.h"
 #include "../Graphics/Zone.h"
-#include "../Graphics/PipelineStateCache.h"
+#include "../Graphics/PipelineState.h"
 #include "../Core/WorkQueue.h"
 
 #include "../DebugNew.h"
@@ -734,6 +735,80 @@ void ApplyShaderResources(Graphics* graphics, const ShaderResourceCollection& re
     }
 }
 
+CullMode GetEffectiveCullMode(CullMode mode, const Camera* camera)
+{
+    // If a camera is specified, check whether it reverses culling due to vertical flipping or reflection
+    if (camera && camera->GetReverseCulling())
+    {
+        if (mode == CULL_CW)
+            mode = CULL_CCW;
+        else if (mode == CULL_CCW)
+            mode = CULL_CW;
+    }
+
+    return mode;
+}
+
+void ApplyPipelineState(Graphics* graphics, const PipelineStateDesc& desc)
+{
+    graphics->SetShaders(desc.vertexShader_, desc.pixelShader_);
+    graphics->SetDepthWrite(desc.depthWrite_);
+    graphics->SetDepthTest(desc.depthMode_);
+    graphics->SetStencilTest(desc.stencilEnabled_, desc.stencilMode_,
+        desc.stencilPass_, desc.stencilFail_, desc.stencilDepthFail_,
+        desc.stencilRef_, desc.compareMask_, desc.writeMask_);
+
+    graphics->SetColorWrite(desc.colorWrite_);
+    graphics->SetBlendMode(desc.blendMode_, desc.alphaToCoverage_);
+
+    graphics->SetFillMode(desc.fillMode_);
+    graphics->SetCullMode(desc.cullMode_);
+    graphics->SetDepthBias(desc.constantDepthBias_, desc.slopeScaledDepthBias_);
+};
+
+/// Pipeline state cache.
+class PipelineStateCache : public Object
+{
+    URHO3D_OBJECT(PipelineStateCache, Object);
+
+public:
+    /// Construct.
+    explicit PipelineStateCache(Context* context) : Object(context) {}
+    /// Create new or return existing pipeline state.
+    PipelineState* GetPipelineState(const PipelineStateDesc& desc)
+    {
+        SharedPtr<PipelineState>& state = states_[desc];
+        if (!state)
+        {
+            state = MakeShared<PipelineState>(context_);
+            state->Create(desc);
+        }
+        return state;
+    }
+
+private:
+    /// Cached states.
+    ea::unordered_map<PipelineStateDesc, SharedPtr<PipelineState>> states_;
+};
+
+struct ForwardBaseBatch
+{
+    /// Drawable to be rendered.
+    Drawable* drawable_;
+    /// Source batch of the drawable.
+    const SourceBatch* sourceBatch_;
+    /// Material to be rendered.
+    Material* material_{};
+    /// Pipeline state.
+    PipelineState* pipelineState_{};
+    /// Main per-pixel directional light.
+    Light* directionalLight_{};
+    /// Array of per-vertex lights.
+    ea::array<Light*, 4> vertexLights_;
+    /// Accumulated SH lighting.
+    SphericalHarmonicsDot9 shLighting_;
+};
+
 }
 
 CustomView::CustomView(Context* context, CustomViewportScript* script)
@@ -862,14 +937,15 @@ void CustomView::Render()
     script_->Render(this);
 
     // Collect and process visible drawables
-    DrawableCollection drawablesInMainCamera;
+    static DrawableCollection drawablesInMainCamera;
+    drawablesInMainCamera.clear();
     CollectDrawables(drawablesInMainCamera, camera_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT);
 
-    DrawableViewportCache viewportCache;
+    static DrawableViewportCache viewportCache;
     ProcessPrimaryDrawables(viewportCache, drawablesInMainCamera, camera_);
 
     // Process visible lights
-    ea::vector<DrawableLightCache> globalLightCache;
+    static ea::vector<DrawableLightCache> globalLightCache;
     globalLightCache.resize(viewportCache.visibleLights_.Size());
     viewportCache.visibleLights_.ForEach([&](unsigned lightIndex, Light* light)
     {
@@ -882,7 +958,7 @@ void CustomView::Render()
     CompleteTasks();
 
     // Accumulate light
-    ea::vector<DrawableLightAccumulator<4>> lightAccumulator;
+    static ea::vector<DrawableLightAccumulator<4>> lightAccumulator;
     lightAccumulator.resize(numDrawables_);
 
     viewportCache.visibleLights_.ForEach([&](unsigned lightIndex, Light* light)
@@ -899,6 +975,9 @@ void CustomView::Render()
         }
     });
 
+    //
+    static PipelineStateCache pipelineStateCache(context_);
+
     // Collect batches
     ShaderParameterCollection globalSharedParameters;
     FillGlobalSharedParameters(globalSharedParameters, frameInfo_, camera_, octree_->GetZone(), scene_);
@@ -908,6 +987,7 @@ void CustomView::Render()
     {
         for (const SourceBatch& sourceBatch : drawable->GetBatches())
         {
+            auto geometry = sourceBatch.geometry_;
             auto tech = sourceBatch.material_->GetTechnique(0);
             auto pass = tech->GetSupportedPass(0);
             SphericalHarmonicsDot9 sh;
@@ -935,18 +1015,32 @@ void CustomView::Render()
             batchCollection.CommitInstance();
             batchCollection.CommitGroup();
 
-            //PipelineStateDesc pipelineStateDesc;
-            //pipelineStateDesc.vertexElements_.append(sourceBatch.geometry_->getve);
+            PipelineStateDesc pipelineStateDesc;
+            for (VertexBuffer* vertexBuffer : geometry->GetVertexBuffers())
+                pipelineStateDesc.vertexElements_.append(vertexBuffer->GetElements());
 
-            auto vertexShader = graphics_->GetShader(VS, pass->GetVertexShader(), pass->GetEffectiveVertexShaderDefines());
-            auto pixelShader = graphics_->GetShader(PS, pass->GetPixelShader(), pass->GetEffectivePixelShaderDefines());
+            pipelineStateDesc.vertexShader_ = graphics_->GetShader(
+                VS, pass->GetVertexShader(), pass->GetEffectiveVertexShaderDefines());
+            pipelineStateDesc.pixelShader_ = graphics_->GetShader(
+                PS, pass->GetPixelShader(), pass->GetEffectivePixelShaderDefines());
 
-            graphics_->SetShaders(vertexShader, pixelShader);
-            graphics_->SetBlendMode(BLEND_REPLACE, false);
-            renderer->SetCullMode(sourceBatch.material_->GetCullMode(), camera_);
-            graphics_->SetFillMode(FILL_SOLID);
-            graphics_->SetDepthTest(CMP_LESSEQUAL);
-            graphics_->SetDepthWrite(true);
+            pipelineStateDesc.primitiveType_ = geometry->GetPrimitiveType();
+            if (auto indexBuffer = geometry->GetIndexBuffer())
+                pipelineStateDesc.indexType_ = indexBuffer->GetIndexSize() == 2 ? IBT_UINT16 : IBT_UINT32;
+
+            pipelineStateDesc.depthWrite_ = true;
+            pipelineStateDesc.depthMode_ = CMP_LESSEQUAL;
+            pipelineStateDesc.stencilEnabled_ = false;
+            pipelineStateDesc.stencilMode_ = CMP_ALWAYS;
+
+            pipelineStateDesc.colorWrite_ = true;
+            pipelineStateDesc.blendMode_ = BLEND_REPLACE;
+            pipelineStateDesc.alphaToCoverage_ = false;
+
+            pipelineStateDesc.fillMode_ = FILL_SOLID;
+            pipelineStateDesc.cullMode_ = GetEffectiveCullMode(sourceBatch.material_->GetCullMode(), camera_);
+
+            ApplyPipelineState(graphics_, pipelineStateDesc);
 
             globalSharedParameters.ForEach(SharedParameterSetter{ graphics_ });
             batchCollection.groupParameters_.ForEach(SharedParameterSetter{ graphics_ });

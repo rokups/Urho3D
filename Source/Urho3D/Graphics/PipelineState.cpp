@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "../Graphics/PipelineStateCache.h"
+#include "../Graphics/PipelineState.h"
 
 namespace Urho3D
 {

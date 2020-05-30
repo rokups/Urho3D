@@ -25,7 +25,7 @@
 #include "../Core/ThreadedVector.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/Drawable.h"
-#include "../Graphics/PipelineStateCache.h"
+#include "../Graphics/PipelineState.h"
 #include "../Math/NumericRange.h"
 
 #include <EASTL/algorithm.h>
