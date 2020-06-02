@@ -467,6 +467,7 @@ void Octree::SetSize(const BoundingBox& box, unsigned numLevels)
 {
     URHO3D_PROFILE("ResizeOctree");
 
+    worldBoundingBox_ = box;
     rootOctant_.SetRootSize(box);
     numLevels_ = Max(numLevels, 1U);
 }

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2008-2020 the Urho3D project.
+// Copyright (c) 2017-2020 the rbfx project.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,8 @@
 #include "../Graphics/IndexBuffer.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Viewport.h"
+#include "../Graphics/Detail/RenderingQueries.h"
+#include "../Graphics/Detail/ShaderParameterCollection.h"
 #include "../Scene/Scene.h"
 
 #include <EASTL/fixed_vector.h>
@@ -246,316 +248,6 @@ void ProcessPrimaryDrawable(Drawable* drawable,
             cache.visibleLights_.Insert(threadIndex, light);
     }
 }
-
-/// Frustum Query for point light.
-struct PointLightLitGeometriesQuery : public SphereOctreeQuery
-{
-    /// Return light sphere for the query.
-    static Sphere GetLightSphere(Light* light)
-    {
-        return Sphere(light->GetNode()->GetWorldPosition(), light->GetRange());
-    }
-
-    /// Construct.
-    PointLightLitGeometriesQuery(ea::vector<Drawable*>& result,
-        const TransientDrawableDataIndex& transientData, Light* light)
-        : SphereOctreeQuery(result, GetLightSphere(light), DRAWABLE_GEOMETRY)
-        , transientData_(&transientData)
-        , lightMask_(light->GetLightMaskEffective())
-    {
-    }
-
-    void TestDrawables(Drawable** start, Drawable** end, bool inside) override
-    {
-        for (Drawable* drawable : MakeIteratorRange(start, end))
-        {
-            const unsigned drawableIndex = drawable->GetDrawableIndex();
-            const unsigned traits = transientData_->traits_[drawableIndex];
-            if (traits & TransientDrawableDataIndex::DrawableVisibleGeometry)
-            {
-                if (drawable->GetLightMask() & lightMask_)
-                {
-                    if (inside || sphere_.IsInsideFast(drawable->GetWorldBoundingBox()))
-                        result_.push_back(drawable);
-                }
-            }
-        }
-    }
-
-    /// Visiblity cache.
-    const TransientDrawableDataIndex* transientData_{};
-    /// Light mask to check.
-    unsigned lightMask_{};
-};
-
-/// Frustum Query for spot light.
-struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
-{
-    /// Construct.
-    SpotLightLitGeometriesQuery(ea::vector<Drawable*>& result,
-        const TransientDrawableDataIndex& transientData, Light* light)
-        : FrustumOctreeQuery(result, light->GetFrustum(), DRAWABLE_GEOMETRY)
-        , transientData_(&transientData)
-        , lightMask_(light->GetLightMaskEffective())
-    {
-    }
-
-    void TestDrawables(Drawable** start, Drawable** end, bool inside) override
-    {
-        for (Drawable* drawable : MakeIteratorRange(start, end))
-        {
-            const unsigned drawableIndex = drawable->GetDrawableIndex();
-            const unsigned traits = transientData_->traits_[drawableIndex];
-            if (traits & TransientDrawableDataIndex::DrawableVisibleGeometry)
-            {
-                if (drawable->GetLightMask() & lightMask_)
-                {
-                    if (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()))
-                        result_.push_back(drawable);
-                }
-            }
-        }
-    }
-
-    /// Visiblity cache.
-    const TransientDrawableDataIndex* transientData_{};
-    /// Light mask to check.
-    unsigned lightMask_{};
-};
-
-/// Collection of shader parameters.
-class ShaderParameterCollection
-{
-public:
-    /// Return next parameter offset.
-    unsigned GetNextParameterOffset() const
-    {
-        return names_.size();
-    }
-
-    /// Add new variant parameter.
-    void AddParameter(StringHash name, const Variant& value)
-    {
-        switch (value.GetType())
-        {
-        case VAR_BOOL:
-            AddParameter(name, value.GetBool() ? 1 : 0);
-            break;
-
-        case VAR_INT:
-            AddParameter(name, value.GetInt());
-            break;
-
-        case VAR_FLOAT:
-        case VAR_DOUBLE:
-            AddParameter(name, value.GetFloat());
-            break;
-
-        case VAR_VECTOR2:
-            AddParameter(name, value.GetVector2());
-            break;
-
-        case VAR_VECTOR3:
-            AddParameter(name, value.GetVector3());
-            break;
-
-        case VAR_VECTOR4:
-            AddParameter(name, value.GetVector4());
-            break;
-
-        case VAR_COLOR:
-            AddParameter(name, value.GetColor());
-            break;
-
-        case VAR_MATRIX3:
-            AddParameter(name, value.GetMatrix3());
-            break;
-
-        case VAR_MATRIX3X4:
-            AddParameter(name, value.GetMatrix3x4());
-            break;
-
-        case VAR_MATRIX4:
-            AddParameter(name, value.GetMatrix4());
-            break;
-
-        default:
-            // Unsupported parameter type, do nothing
-            break;
-        }
-    }
-
-    /// Add new int parameter.
-    void AddParameter(StringHash name, int value)
-    {
-        const int data[4]{ value, 0, 0, 0 };
-        AllocateParameter(name, VAR_INTRECT, 1, data, 4);
-    }
-
-    /// Add new float parameter.
-    void AddParameter(StringHash name, float value)
-    {
-        const Vector4 data{ value, 0.0f, 0.0f, 0.0f };
-        AllocateParameter(name, VAR_VECTOR4, 1, data.Data(), 4);
-    }
-
-    /// Add new Vector2 parameter.
-    void AddParameter(StringHash name, const Vector2& value)
-    {
-        const Vector4 data{ value.x_, value.y_, 0.0f, 0.0f };
-        AllocateParameter(name, VAR_VECTOR4, 1, data.Data(), 4);
-    }
-
-    /// Add new Vector3 parameter.
-    void AddParameter(StringHash name, const Vector3& value)
-    {
-        const Vector4 data{ value, 0.0f };
-        AllocateParameter(name, VAR_VECTOR4, 1, data.Data(), 4);
-    }
-
-    /// Add new Vector4 parameter.
-    void AddParameter(StringHash name, const Vector4& value)
-    {
-        AllocateParameter(name, VAR_VECTOR4, 1, value.Data(), 4);
-    }
-
-    /// Add new Color parameter.
-    void AddParameter(StringHash name, const Color& value)
-    {
-        AllocateParameter(name, VAR_VECTOR4, 1, value.Data(), 4);
-    }
-
-    /// Add new Matrix3 parameter.
-    void AddParameter(StringHash name, const Matrix3& value)
-    {
-        const Matrix3x4 data{ value };
-        AllocateParameter(name, VAR_MATRIX3X4, 1, data.Data(), 12);
-    }
-
-    /// Add new Matrix3x4 parameter.
-    void AddParameter(StringHash name, const Matrix3x4& value)
-    {
-        AllocateParameter(name, VAR_MATRIX3X4, 1, value.Data(), 12);
-    }
-
-    /// Add new Matrix4 parameter.
-    void AddParameter(StringHash name, const Matrix4& value)
-    {
-        AllocateParameter(name, VAR_MATRIX4, 1, value.Data(), 16);
-    }
-
-    /// Add new Vector4 array parameter.
-    void AddParameter(StringHash name, ea::span<const Vector4> values)
-    {
-        AllocateParameter(name, VAR_VECTOR4, values.size(), values.data()->Data(), 4 * values.size());
-    }
-
-    /// Iterate.
-    template <class T>
-    void ForEach(const T& callback) const
-    {
-        const unsigned numParameters = names_.size();
-        const unsigned char* dataPointer = data_.data();
-        for (unsigned i = 0; i < numParameters; ++i)
-        {
-            const void* rawData = &dataPointer[dataOffsets_[i]];
-            const StringHash name = names_[i];
-            const VariantType type = dataTypes_[i];
-            const unsigned arraySize = dataSizes_[i];
-            switch (type)
-            {
-            case VAR_INTRECT:
-            {
-                const auto data = reinterpret_cast<const int*>(rawData);
-                callback(name, data, arraySize);
-                break;
-            }
-            case VAR_VECTOR4:
-            {
-                const auto data = reinterpret_cast<const Vector4*>(rawData);
-                callback(name, data, arraySize);
-                break;
-            }
-            case VAR_MATRIX3X4:
-            {
-                const auto data = reinterpret_cast<const Matrix3x4*>(rawData);
-                callback(name, data, arraySize);
-                break;
-            }
-            case VAR_MATRIX4:
-            {
-                const auto data = reinterpret_cast<const Matrix4*>(rawData);
-                callback(name, data, arraySize);
-                break;
-            }
-            default:
-                break;
-            }
-        }
-    }
-
-private:
-    /// Add new parameter.
-    template <class T>
-    void AllocateParameter(StringHash name, VariantType type, unsigned arraySize, const T* srcData, unsigned count)
-    {
-        static const unsigned alignment = 4 * sizeof(float);
-        const unsigned alignedSize = (count * sizeof(T) + alignment - 1) / alignment * alignment;
-
-        const unsigned offset = data_.size();
-        names_.push_back(name);
-        dataOffsets_.push_back(offset);
-        dataSizes_.push_back(arraySize);
-        dataTypes_.push_back(type);
-        data_.resize(offset + alignedSize);
-
-        T* destData = reinterpret_cast<T*>(&data_[offset]);
-        // TODO: Use memcpy to make it a bit faster in Debug builds?
-        //memcpy(destData, srcData, count * sizeof(T));
-        ea::copy(srcData, srcData + count, destData);
-    }
-
-    /// Parameter names.
-    ea::vector<StringHash> names_;
-    /// Parameter offsets in data buffer.
-    ea::vector<unsigned> dataOffsets_;
-    /// Parameter array sizes in data buffer.
-    ea::vector<unsigned> dataSizes_;
-    /// Parameter types in data buffer.
-    ea::vector<VariantType> dataTypes_;
-    /// Data buffer.
-    ByteVector data_;
-};
-
-struct SharedParameterSetter
-{
-    Graphics* graphics_;
-    void operator()(const StringHash& name, const int* data, unsigned arraySize) const
-    {
-        graphics_->SetShaderParameter(name, *data);
-    }
-    void operator()(const StringHash& name, const Vector4* data, unsigned arraySize) const
-    {
-        if (arraySize != 1)
-            graphics_->SetShaderParameter(name, data->Data(), 4 * arraySize);
-        else
-            graphics_->SetShaderParameter(name, *data);
-    }
-    void operator()(const StringHash& name, const Matrix3x4* data, unsigned arraySize) const
-    {
-        if (arraySize != 1)
-            graphics_->SetShaderParameter(name, data->Data(), 12 * arraySize);
-        else
-            graphics_->SetShaderParameter(name, *data);
-    }
-    void operator()(const StringHash& name, const Matrix4* data, unsigned arraySize) const
-    {
-        if (arraySize != 1)
-            graphics_->SetShaderParameter(name, data->Data(), 16 * arraySize);
-        else
-            graphics_->SetShaderParameter(name, *data);
-    }
-};
 
 /// Collection of shader resources.
 using ShaderResourceCollection = ea::vector<ea::pair<TextureUnit, Texture*>>;
@@ -986,6 +678,7 @@ void CustomView::Update(const FrameInfo& frameInfo)
 {
     frameInfo_ = frameInfo;
     frameInfo_.camera_ = camera_;
+    numThreads_ = workQueue_->GetNumThreads() + 1;
 }
 
 void CustomView::PostTask(std::function<void(unsigned)> task)
@@ -1078,9 +771,25 @@ void CustomView::CollectLitGeometries(const DrawableViewportCache& viewportCache
 void CustomView::Render()
 {
     graphics_->SetRenderTarget(0, renderTarget_);
+    graphics_->SetDepthStencil((RenderSurface*)nullptr);
+    graphics_->SetViewport(viewport_->GetRect());
     graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_DEPTH, Color::RED * 0.5f);
 
     script_->Render(this);
+
+    if (renderTarget_)
+    {
+        // On OpenGL, flip the projection if rendering to a texture so that the texture can be addressed in the same way
+        // as a render texture produced on Direct3D9
+#ifdef URHO3D_OPENGL
+        if (camera_)
+            camera_->SetFlipVertical(true);
+#endif
+    }
+
+    // Set automatic aspect ratio if required
+    if (camera_ && camera_->GetAutoAspectRatio())
+        camera_->SetAspectRatioInternal((float)frameInfo_.viewSize_.x_ / (float)frameInfo_.viewSize_.y_);
 
     // Collect and process visible drawables
     static DrawableCollection drawablesInMainCamera;
@@ -1092,6 +801,7 @@ void CustomView::Render()
 
     // Process visible lights
     static ea::vector<DrawableLightCache> globalLightCache;
+    globalLightCache.clear();
     globalLightCache.resize(viewportCache.visibleLights_.Size());
     viewportCache.visibleLights_.ForEach([&](unsigned lightIndex, Light* light)
     {
@@ -1105,6 +815,7 @@ void CustomView::Render()
 
     // Accumulate light
     static ea::vector<DrawableLightAccumulator<4>> lightAccumulator;
+    lightAccumulator.clear();
     lightAccumulator.resize(numDrawables_);
 
     viewportCache.visibleLights_.ForEach([&](unsigned lightIndex, Light* light)
@@ -1151,6 +862,8 @@ void CustomView::Render()
             pipelineStateKey.material_ = baseBatch.material_;
             pipelineStateKey.pass_ = baseBatch.material_->GetTechnique(0)->GetSupportedPass("litbase");
             pipelineStateKey.light_ = baseBatch.mainDirectionalLight_;
+            if (!pipelineStateKey.pass_)
+                continue;
 
             baseBatch.pipelineState_ = batchPipelineStateCache.GetPipelineState(pipelineStateKey, camera_);
             baseBatch.shadersHash_ = 0;
@@ -1237,7 +950,7 @@ void CustomView::Render()
             }
             else
             {
-                cutoff = -1.0f;
+                cutoff = -2.0f;
                 invCutoff = 1.0f;
             }
 
@@ -1273,6 +986,17 @@ void CustomView::Render()
         ApplyShaderResources(graphics_, batchCollection.groupResources_);
 
         sourceBatch.geometry_->Draw(graphics_);
+    }
+
+
+    if (renderTarget_)
+    {
+        // On OpenGL, flip the projection if rendering to a texture so that the texture can be addressed in the same way
+        // as a render texture produced on Direct3D9
+#ifdef URHO3D_OPENGL
+        if (camera_)
+            camera_->SetFlipVertical(false);
+#endif
     }
 }
 
