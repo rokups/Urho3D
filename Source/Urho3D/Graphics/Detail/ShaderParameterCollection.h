@@ -157,13 +157,22 @@ public:
         AllocateParameter(name, VAR_VECTOR4, values.size(), values.data()->Data(), 4 * values.size());
     }
 
-    /// Iterate.
-    template <class T>
-    void ForEach(const T& callback) const
+    /// Clear.
+    void Clear()
     {
-        const unsigned numParameters = names_.size();
+        count_ = 0;
+        offset_ = 0;
+    }
+
+    /// Return size.
+    unsigned Size() const { return count_; }
+
+    /// Iterate subset.
+    template <class T>
+    void ForEach(unsigned from, unsigned to, const T& callback) const
+    {
         const unsigned char* dataPointer = data_.data();
-        for (unsigned i = 0; i < numParameters; ++i)
+        for (unsigned i = from; i < to; ++i)
         {
             const void* rawData = &dataPointer[dataOffsets_[i]];
             const StringHash name = names_[i];
@@ -201,6 +210,13 @@ public:
         }
     }
 
+    /// Iterate all.
+    template <class T>
+    void ForEach(const T& callback) const
+    {
+        ForEach(0, Size(), callback);
+    }
+
 private:
     /// Add new parameter.
     template <class T>
@@ -209,17 +225,32 @@ private:
         static const unsigned alignment = 4 * sizeof(float);
         const unsigned alignedSize = (count * sizeof(T) + alignment - 1) / alignment * alignment;
 
-        const unsigned offset = data_.size();
-        names_.push_back(name);
-        dataOffsets_.push_back(offset);
-        dataSizes_.push_back(arraySize);
-        dataTypes_.push_back(type);
-        data_.resize(offset + alignedSize);
+        // Resize data buffer
+        const unsigned dataSize = data_.size();
+        if (offset_ + alignedSize > dataSize)
+            data_.resize(dataSize > 0 ? dataSize * 2 + alignedSize : 64);
 
-        T* destData = reinterpret_cast<T*>(&data_[offset]);
-        // TODO: Use memcpy to make it a bit faster in Debug builds?
-        //memcpy(destData, srcData, count * sizeof(T));
-        ea::copy(srcData, srcData + count, destData);
+        // Resize metadata buffers
+        const unsigned metadataSize = names_.size();
+        if (count_ + 1 > metadataSize)
+        {
+            const unsigned newMetadataSize = metadataSize > 0 ? metadataSize * 2 : 16;
+            names_.resize(newMetadataSize);
+            dataOffsets_.resize(newMetadataSize);
+            dataSizes_.resize(newMetadataSize);
+            dataTypes_.resize(newMetadataSize);
+        }
+
+        // Store metadata
+        names_[count_] = name;
+        dataOffsets_[count_] = offset_;
+        dataSizes_[count_] = arraySize;
+        dataTypes_[count_] = type;
+
+        memcpy(&data_[offset_], srcData, count * sizeof(T));
+
+        offset_ += alignedSize;
+        ++count_;
     }
 
     /// Parameter names.
@@ -230,6 +261,10 @@ private:
     ea::vector<unsigned> dataSizes_;
     /// Parameter types in data buffer.
     ea::vector<VariantType> dataTypes_;
+    /// Number of variables in the buffer.
+    unsigned count_{};
+    /// Offset in data buffer.
+    unsigned offset_{};
     /// Data buffer.
     ByteVector data_;
 };

@@ -252,97 +252,267 @@ void ProcessPrimaryDrawable(Drawable* drawable,
 /// Collection of shader resources.
 using ShaderResourceCollection = ea::vector<ea::pair<TextureUnit, Texture*>>;
 
-/// Collection of batches.
-class BatchCollection
+/// Shader parameter group, range in array.
+using ShaderParameterRange = ea::pair<unsigned, unsigned>;
+
+/// Shader resource group, range in array.
+using ShaderResourceRange = ea::pair<unsigned, unsigned>;
+
+/// Description of draw operation.
+struct DrawOperationDescription
+{
+    /// Pipeline state.
+    PipelineState* pipelineState_{};
+    /// Index buffer.
+    IndexBuffer* indexBuffer_{};
+    /// Vertex buffers.
+    ea::array<VertexBuffer*, MAX_VERTEX_STREAMS> vertexBuffers_{};
+
+    /// Shader parameters bound to the command.
+    ea::array<ShaderParameterRange, MAX_SHADER_PARAMETER_GROUPS> shaderParameters_{};
+    /// Shader resources bound to the command.
+    ShaderResourceRange shaderResources_;
+
+    /// Start vertex/index.
+    unsigned indexStart_{};
+    /// Number of vertices/indices.
+    unsigned indexCount_{};
+    /// Base vertex.
+    unsigned baseVertexIndex_{};
+    /// Start instance.
+    unsigned instanceStart_{};
+    /// Number of instances.
+    unsigned instanceCount_{};
+};
+
+/// Queue of draw operations.
+class DrawOperationQueue
 {
 public:
-    /// Add group parameter.
+    /// Reset queue.
+    void Reset()
+    {
+        shaderParameters_.Clear();
+        shaderResources_.clear();
+        drawOps_.clear();
+
+        currentShaderParameterGroup_ = {};
+        currentShaderResourceGroup_ = {};
+        currentDrawOp_ = {};
+    }
+
+    /// Add shader parameter.
     template <class T>
-    void AddGroupParameter(StringHash name, const T& value)
+    void AddShaderParameter(StringHash name, const T& value)
     {
-        groupParameters_.AddParameter(name, value);
-        ++currentGroup_.numParameters_;
+        shaderParameters_.AddParameter(name, value);
+        ++currentShaderParameterGroup_.second;
     }
 
-    /// Add group texture.
-    void AddGroupResource(TextureUnit unit, Texture* texture)
+    /// Commit shader parameter group.
+    void CommitShaderParameterGroup(ShaderParameterGroup group)
     {
-        groupResources_.emplace_back(unit, texture);
-        ++currentGroup_.numResources_;
+        currentDrawOp_.shaderParameters_[static_cast<unsigned>(group)] = currentShaderParameterGroup_;
+        currentShaderParameterGroup_.first = shaderParameters_.Size();
+        currentShaderParameterGroup_.second = currentShaderParameterGroup_.first;
     }
 
-    /// Add instance parameter.
-    template <class T>
-    void AddInstanceParameter(StringHash name, const T& value)
+    /// Add shader resource.
+    void AddShaderResource(TextureUnit unit, Texture* texture)
     {
-        instanceParameters_.AddParameter(name, value);
-        ++currentInstance_.numParameters_;
+        shaderResources_.emplace_back(unit, texture);
+        ++currentShaderResourceGroup_.second;
     }
 
-    /// Commit instance.
-    void CommitInstance()
+    /// Commit shader resource group.
+    void CommitShaderResourceGroup()
     {
-        instances_.push_back(currentInstance_);
-        currentInstance_ = {};
-        currentInstance_.parameterOffset_ = instanceParameters_.GetNextParameterOffset();
+        currentDrawOp_.shaderResources_ = currentShaderResourceGroup_;
+        currentShaderResourceGroup_.first = shaderResources_.size();
+        currentShaderResourceGroup_.second = currentShaderResourceGroup_.first;
     }
 
-    /// Commit group.
-    void CommitGroup()
+    /// Set pipeline state.
+    void SetPipelineState(PipelineState* pipelineState) { currentDrawOp_.pipelineState_ = pipelineState; }
+
+    /// Set buffers.
+    void SetBuffers(ea::span<VertexBuffer*> vertexBuffers, IndexBuffer* indexBuffer)
     {
-        groups_.push_back(currentGroup_);
-        currentGroup_ = {};
-        currentGroup_.parameterOffset_ = groupParameters_.GetNextParameterOffset();
-        currentGroup_.instanceOffset_ = instances_.size();
-        currentGroup_.resourceOffset_ = groupResources_.size();
+        ea::copy(vertexBuffers.begin(), vertexBuffers.end(), currentDrawOp_.vertexBuffers_.begin());
+        currentDrawOp_.indexBuffer_ = indexBuffer;
+    }
+
+    /// Set buffers.
+    void SetBuffers(const ea::vector<SharedPtr<VertexBuffer>>& vertexBuffers, IndexBuffer* indexBuffer)
+    {
+        ea::copy(vertexBuffers.begin(), vertexBuffers.end(), currentDrawOp_.vertexBuffers_.begin());
+        currentDrawOp_.indexBuffer_ = indexBuffer;
+    }
+
+    /// Draw non-indexed geometry.
+    void Draw(unsigned vertexStart, unsigned vertexCount)
+    {
+        currentDrawOp_.indexBuffer_ = nullptr;
+        currentDrawOp_.indexStart_ = vertexStart;
+        currentDrawOp_.indexCount_ = vertexCount;
+        currentDrawOp_.baseVertexIndex_ = 0;
+        currentDrawOp_.instanceStart_ = 0;
+        currentDrawOp_.instanceCount_ = 0;
+        drawOps_.push_back(currentDrawOp_);
+    }
+
+    /// Draw indexed geometry.
+    void DrawIndexed(unsigned indexStart, unsigned indexCount)
+    {
+        assert(currentDrawOp_.indexBuffer_);
+        currentDrawOp_.indexStart_ = indexStart;
+        currentDrawOp_.indexCount_ = indexCount;
+        currentDrawOp_.baseVertexIndex_ = 0;
+        currentDrawOp_.instanceStart_ = 0;
+        currentDrawOp_.instanceCount_ = 0;
+        drawOps_.push_back(currentDrawOp_);
+    }
+
+    /// Draw indexed geometry with vertex index offset.
+    void DrawIndexed(unsigned indexStart, unsigned indexCount, unsigned baseVertexIndex)
+    {
+        assert(currentDrawOp_.indexBuffer_);
+        currentDrawOp_.indexStart_ = indexStart;
+        currentDrawOp_.indexCount_ = indexCount;
+        currentDrawOp_.baseVertexIndex_ = baseVertexIndex;
+        currentDrawOp_.instanceStart_ = 0;
+        currentDrawOp_.instanceCount_ = 0;
+        drawOps_.push_back(currentDrawOp_);
+    }
+
+    /// Draw indexed, instanced geometry.
+    void DrawIndexedInstanced(unsigned indexStart, unsigned indexCount, unsigned instanceStart, unsigned instanceCount)
+    {
+        assert(currentDrawOp_.indexBuffer_);
+        currentDrawOp_.indexStart_ = indexStart;
+        currentDrawOp_.indexCount_ = indexCount;
+        currentDrawOp_.baseVertexIndex_ = 0;
+        currentDrawOp_.instanceStart_ = instanceStart;
+        currentDrawOp_.instanceCount_ = instanceCount;
+        drawOps_.push_back(currentDrawOp_);
+    }
+
+    /// Draw indexed, instanced geometry with vertex index offset.
+    void DrawIndexedInstanced(unsigned indexStart, unsigned indexCount, unsigned baseVertexIndex,
+        unsigned instanceStart, unsigned instanceCount)
+    {
+        assert(currentDrawOp_.indexBuffer_);
+        currentDrawOp_.indexStart_ = indexStart;
+        currentDrawOp_.indexCount_ = indexCount;
+        currentDrawOp_.baseVertexIndex_ = baseVertexIndex;
+        currentDrawOp_.instanceStart_ = instanceStart;
+        currentDrawOp_.instanceCount_ = instanceCount;
+        drawOps_.push_back(currentDrawOp_);
+    }
+
+    /// Execute commands in the queue.
+    void Execute(Graphics* graphics)
+    {
+        graphics->ClearParameterSources();
+
+        const SharedParameterSetter shaderParameterSetter{ graphics };
+
+        PipelineState* currentPipelineState = nullptr;
+        IndexBuffer* currentIndexBuffer = nullptr;
+        ea::array<VertexBuffer*, MAX_VERTEX_STREAMS> currentVertexBuffers{};
+        unsigned currentShaderResources = M_MAX_UNSIGNED;
+        PrimitiveType currentPrimitiveType{};
+
+        ea::vector<VertexBuffer*> tempVertexBuffers;
+
+        for (const DrawOperationDescription& drawOp : drawOps_)
+        {
+            // Apply pipeline state
+            if (drawOp.pipelineState_ != currentPipelineState)
+            {
+                drawOp.pipelineState_->Apply();
+                currentPipelineState = drawOp.pipelineState_;
+                currentPrimitiveType = currentPipelineState->GetDesc().primitiveType_;
+            }
+
+            // Apply buffers
+            if (drawOp.indexBuffer_ != currentIndexBuffer)
+            {
+                graphics->SetIndexBuffer(drawOp.indexBuffer_);
+                currentIndexBuffer = drawOp.indexBuffer_;
+            }
+
+            if (drawOp.vertexBuffers_ != currentVertexBuffers || drawOp.instanceCount_ != 0)
+            {
+                tempVertexBuffers.clear();
+                tempVertexBuffers.assign(drawOp.vertexBuffers_.begin(), drawOp.vertexBuffers_.end());
+                graphics->SetVertexBuffers(tempVertexBuffers, drawOp.instanceStart_);
+                currentVertexBuffers = drawOp.vertexBuffers_;
+            }
+
+            // Apply shader resources
+            if (drawOp.shaderResources_.first != currentShaderResources)
+            {
+                for (unsigned i = drawOp.shaderResources_.first; i < drawOp.shaderResources_.second; ++i)
+                {
+                    const auto& unitAndResource = shaderResources_[i];
+                    if (graphics->HasTextureUnit(unitAndResource.first))
+                        graphics->SetTexture(unitAndResource.first, unitAndResource.second);
+                }
+                currentShaderResources = drawOp.shaderResources_.first;
+            }
+
+            // Apply shader parameters
+            for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
+            {
+                const auto group = static_cast<ShaderParameterGroup>(i);
+                const auto range = drawOp.shaderParameters_[i];
+                if (!graphics->NeedParameterUpdate(group, reinterpret_cast<void*>(range.first)))
+                    continue;
+
+                shaderParameters_.ForEach(range.first, range.second, shaderParameterSetter);
+            }
+
+            // Draw
+            if (drawOp.instanceCount_ != 0)
+            {
+                if (drawOp.baseVertexIndex_ == 0)
+                {
+                    graphics->DrawInstanced(currentPrimitiveType,
+                        drawOp.indexStart_, drawOp.indexCount_, 0, 0, drawOp.instanceCount_);
+                }
+                else
+                {
+                    graphics->DrawInstanced(currentPrimitiveType,
+                        drawOp.indexStart_, drawOp.indexCount_, drawOp.baseVertexIndex_, 0, 0, drawOp.instanceCount_);
+                }
+            }
+            else
+            {
+                if (!currentIndexBuffer)
+                    graphics->Draw(currentPrimitiveType, drawOp.indexStart_, drawOp.indexCount_);
+                else if (drawOp.baseVertexIndex_ == 0)
+                    graphics->Draw(currentPrimitiveType, drawOp.indexStart_, drawOp.indexCount_, 0, 0);
+                else
+                    graphics->Draw(currentPrimitiveType, drawOp.indexStart_, drawOp.indexCount_, drawOp.baseVertexIndex_, 0, 0);
+            }
+        }
     }
 
 private:
-    /// Group description.
-    struct GroupDesc
-    {
-        /// Group parameter offset.
-        unsigned parameterOffset_{};
-        /// Number of group parameters.
-        unsigned numParameters_{};
-        /// Group resource offset.
-        unsigned resourceOffset_{};
-        /// Number of group resources.
-        unsigned numResources_{};
-        /// Instance offset.
-        unsigned instanceOffset_{};
-        /// Number of instances.
-        unsigned numInstances_{};
-    };
+    /// Shader parameters
+    ShaderParameterCollection shaderParameters_;
+    /// Shader resources.
+    ShaderResourceCollection shaderResources_;
+    /// Draw operations.
+    ea::vector<DrawOperationDescription> drawOps_;
 
-    /// Instance description.
-    struct InstanceDesc
-    {
-        /// Parameter offset.
-        unsigned parameterOffset_{};
-        /// Number of parameters.
-        unsigned numParameters_{};
-    };
-
-public: // TODO: Remove this hack
-    /// Max number of per-instance elements.
-    unsigned maxPerInstanceElements_{};
-    /// Batch groups.
-    ea::vector<GroupDesc> groups_;
-    /// Instances.
-    ea::vector<InstanceDesc> instances_;
-
-    /// Group parameters.
-    ShaderParameterCollection groupParameters_;
-    /// Group resources.
-    ShaderResourceCollection groupResources_;
-    /// Instance parameters.
-    ShaderParameterCollection instanceParameters_;
-
-    /// Current group.
-    GroupDesc currentGroup_;
-    /// Current instance.
-    InstanceDesc currentInstance_;
+    /// Current draw operation.
+    DrawOperationDescription currentDrawOp_;
+    /// Current shader parameter group.
+    ShaderParameterRange currentShaderParameterGroup_;
+    /// Current shader resource group.
+    ShaderResourceRange currentShaderResourceGroup_;
 };
 
 Vector4 GetCameraDepthModeParameter(const Camera* camera)
@@ -404,44 +574,46 @@ Vector4 GetZoneFogParameter(const Zone* zone, const Camera* camera)
     };
 }
 
-void FillGlobalSharedParameters(ShaderParameterCollection& collection,
+void FillGlobalSharedParameters(DrawOperationQueue& drawQueue,
     const FrameInfo& frameInfo, const Camera* camera, const Zone* zone, const Scene* scene)
 {
-    collection.AddParameter(VSP_DELTATIME, frameInfo.timeStep_);
-    collection.AddParameter(PSP_DELTATIME, frameInfo.timeStep_);
+    drawQueue.AddShaderParameter(VSP_DELTATIME, frameInfo.timeStep_);
+    drawQueue.AddShaderParameter(PSP_DELTATIME, frameInfo.timeStep_);
 
     const float elapsedTime = scene->GetElapsedTime();
-    collection.AddParameter(VSP_ELAPSEDTIME, elapsedTime);
-    collection.AddParameter(PSP_ELAPSEDTIME, elapsedTime);
+    drawQueue.AddShaderParameter(VSP_ELAPSEDTIME, elapsedTime);
+    drawQueue.AddShaderParameter(PSP_ELAPSEDTIME, elapsedTime);
 
     const Matrix3x4 cameraEffectiveTransform = camera->GetEffectiveWorldTransform();
-    collection.AddParameter(VSP_CAMERAPOS, cameraEffectiveTransform.Translation());
-    collection.AddParameter(VSP_VIEWINV, cameraEffectiveTransform);
-    collection.AddParameter(VSP_VIEW, camera->GetView());
-    collection.AddParameter(PSP_CAMERAPOS, cameraEffectiveTransform.Translation());
+    drawQueue.AddShaderParameter(VSP_CAMERAPOS, cameraEffectiveTransform.Translation());
+    drawQueue.AddShaderParameter(VSP_VIEWINV, cameraEffectiveTransform);
+    drawQueue.AddShaderParameter(VSP_VIEW, camera->GetView());
+    drawQueue.AddShaderParameter(PSP_CAMERAPOS, cameraEffectiveTransform.Translation());
 
     const float nearClip = camera->GetNearClip();
     const float farClip = camera->GetFarClip();
-    collection.AddParameter(VSP_NEARCLIP, nearClip);
-    collection.AddParameter(VSP_FARCLIP, farClip);
-    collection.AddParameter(PSP_NEARCLIP, nearClip);
-    collection.AddParameter(PSP_FARCLIP, farClip);
+    drawQueue.AddShaderParameter(VSP_NEARCLIP, nearClip);
+    drawQueue.AddShaderParameter(VSP_FARCLIP, farClip);
+    drawQueue.AddShaderParameter(PSP_NEARCLIP, nearClip);
+    drawQueue.AddShaderParameter(PSP_FARCLIP, farClip);
 
-    collection.AddParameter(VSP_DEPTHMODE, GetCameraDepthModeParameter(camera));
-    collection.AddParameter(PSP_DEPTHRECONSTRUCT, GetCameraDepthReconstructParameter(camera));
+    drawQueue.AddShaderParameter(VSP_DEPTHMODE, GetCameraDepthModeParameter(camera));
+    drawQueue.AddShaderParameter(PSP_DEPTHRECONSTRUCT, GetCameraDepthReconstructParameter(camera));
 
     Vector3 nearVector, farVector;
     camera->GetFrustumSize(nearVector, farVector);
-    collection.AddParameter(VSP_FRUSTUMSIZE, farVector);
+    drawQueue.AddShaderParameter(VSP_FRUSTUMSIZE, farVector);
 
-    collection.AddParameter(VSP_VIEWPROJ, GetEffectiveCameraViewProj(camera));
+    drawQueue.AddShaderParameter(VSP_VIEWPROJ, GetEffectiveCameraViewProj(camera));
 
-    collection.AddParameter(VSP_AMBIENTSTARTCOLOR, Color::WHITE);
-    collection.AddParameter(VSP_AMBIENTENDCOLOR, Vector4::ZERO);
-    collection.AddParameter(VSP_ZONE, Matrix3x4::IDENTITY);
-    collection.AddParameter(PSP_AMBIENTCOLOR, Color::WHITE);
-    collection.AddParameter(PSP_FOGCOLOR, zone->GetFogColor());
-    collection.AddParameter(PSP_FOGPARAMS, GetZoneFogParameter(zone, camera));
+    drawQueue.AddShaderParameter(VSP_AMBIENTSTARTCOLOR, Color::WHITE);
+    drawQueue.AddShaderParameter(VSP_AMBIENTENDCOLOR, Vector4::ZERO);
+    drawQueue.AddShaderParameter(VSP_ZONE, Matrix3x4::IDENTITY);
+    drawQueue.AddShaderParameter(PSP_AMBIENTCOLOR, Color::WHITE);
+    drawQueue.AddShaderParameter(PSP_FOGCOLOR, zone->GetFogColor());
+    drawQueue.AddShaderParameter(PSP_FOGPARAMS, GetZoneFogParameter(zone, camera));
+
+    drawQueue.CommitShaderParameterGroup(SP_FRAME);
 }
 
 void ApplyShaderResources(Graphics* graphics, const ShaderResourceCollection& resources)
@@ -466,23 +638,6 @@ CullMode GetEffectiveCullMode(CullMode mode, const Camera* camera)
 
     return mode;
 }
-
-void ApplyPipelineState(Graphics* graphics, const PipelineStateDesc& desc)
-{
-    graphics->SetShaders(desc.vertexShader_, desc.pixelShader_);
-    graphics->SetDepthWrite(desc.depthWrite_);
-    graphics->SetDepthTest(desc.depthMode_);
-    graphics->SetStencilTest(desc.stencilEnabled_, desc.stencilMode_,
-        desc.stencilPass_, desc.stencilFail_, desc.stencilDepthFail_,
-        desc.stencilRef_, desc.compareMask_, desc.writeMask_);
-
-    graphics->SetColorWrite(desc.colorWrite_);
-    graphics->SetBlendMode(desc.blendMode_, desc.alphaToCoverage_);
-
-    graphics->SetFillMode(desc.fillMode_);
-    graphics->SetCullMode(desc.cullMode_);
-    graphics->SetDepthBias(desc.constantDepthBias_, desc.slopeScaledDepthBias_);
-};
 
 /// Pipeline state cache.
 class PipelineStateCache : public Object
@@ -838,7 +993,10 @@ void CustomView::Render()
 
     // Collect intermediate batches
     static ea::vector<ForwardBaseBatch> forwardBaseBatches;
+    auto renderer = context_->GetRenderer();
+    auto defaultMaterial = renderer->GetDefaultMaterial();
     forwardBaseBatches.clear();
+    auto passIndex = Technique::GetPassIndex("litbase");
     viewportCache.visibleGeometries_.ForEach([&](unsigned index, Drawable* drawable)
     {
         const unsigned drawableIndex = drawable->GetDrawableIndex();
@@ -847,9 +1005,9 @@ void CustomView::Render()
         {
             ForwardBaseBatch baseBatch;
             baseBatch.geometry_ = sourceBatch.geometry_;
-            baseBatch.material_ = sourceBatch.material_;
+            baseBatch.material_ = sourceBatch.material_ ? sourceBatch.material_ : defaultMaterial;
             baseBatch.distance_ = sourceBatch.distance_;
-            baseBatch.renderOrder_ = sourceBatch.material_->GetRenderOrder();
+            baseBatch.renderOrder_ = baseBatch.material_->GetRenderOrder();
 
             baseBatch.drawable_ = drawable;
             baseBatch.sourceBatch_ = &sourceBatch;
@@ -860,7 +1018,7 @@ void CustomView::Render()
             BatchPipelineStateKey pipelineStateKey;
             pipelineStateKey.geometry_ = baseBatch.geometry_;
             pipelineStateKey.material_ = baseBatch.material_;
-            pipelineStateKey.pass_ = baseBatch.material_->GetTechnique(0)->GetSupportedPass("litbase");
+            pipelineStateKey.pass_ = baseBatch.material_->GetTechnique(0)->GetSupportedPass(passIndex);
             pipelineStateKey.light_ = baseBatch.mainDirectionalLight_;
             if (!pipelineStateKey.pass_)
                 continue;
@@ -873,44 +1031,52 @@ void CustomView::Render()
     });
 
     // Collect batches
-    ShaderParameterCollection globalSharedParameters;
-    FillGlobalSharedParameters(globalSharedParameters, frameInfo_, camera_, octree_->GetZone(), scene_);
+    static DrawOperationQueue drawQueue;
+    drawQueue.Reset();
+    FillGlobalSharedParameters(drawQueue, frameInfo_, camera_, octree_->GetZone(), scene_);
 
-    auto renderer = context_->GetRenderer();
+    Material* currentMaterial = nullptr;
+    bool first = true;
     for (const ForwardBaseBatch& batch : forwardBaseBatches)
     {
         auto geometry = batch.geometry_;
         auto light = batch.mainDirectionalLight_;
         const SourceBatch& sourceBatch = *batch.sourceBatch_;
         SphericalHarmonicsDot9 sh;
-        BatchCollection batchCollection;
-        if (batch.material_)
+        if (batch.material_ != currentMaterial)
         {
+            currentMaterial = batch.material_;
             const auto& parameters = batch.material_->GetShaderParameters();
             for (const auto& item : parameters)
-                batchCollection.AddGroupParameter(item.first, item.second.value_);
+                drawQueue.AddShaderParameter(item.first, item.second.value_);
+            drawQueue.CommitShaderParameterGroup(SP_MATERIAL);
 
             const auto& textures = batch.material_->GetTextures();
             for (const auto& item : textures)
-                batchCollection.AddGroupResource(item.first, item.second);
+                drawQueue.AddShaderResource(item.first, item.second);
+            drawQueue.CommitShaderResourceGroup();
         }
 
-        batchCollection.AddInstanceParameter(VSP_SHAR, sh.Ar_);
-        batchCollection.AddInstanceParameter(VSP_SHAG, sh.Ag_);
-        batchCollection.AddInstanceParameter(VSP_SHAB, sh.Ab_);
-        batchCollection.AddInstanceParameter(VSP_SHBR, sh.Br_);
-        batchCollection.AddInstanceParameter(VSP_SHBG, sh.Bg_);
-        batchCollection.AddInstanceParameter(VSP_SHBB, sh.Bb_);
-        batchCollection.AddInstanceParameter(VSP_SHC, sh.C_);
-        batchCollection.AddInstanceParameter(VSP_MODEL, *sourceBatch.worldTransform_);
+        drawQueue.AddShaderParameter(VSP_SHAR, sh.Ar_);
+        drawQueue.AddShaderParameter(VSP_SHAG, sh.Ag_);
+        drawQueue.AddShaderParameter(VSP_SHAB, sh.Ab_);
+        drawQueue.AddShaderParameter(VSP_SHBR, sh.Br_);
+        drawQueue.AddShaderParameter(VSP_SHBG, sh.Bg_);
+        drawQueue.AddShaderParameter(VSP_SHBB, sh.Bb_);
+        drawQueue.AddShaderParameter(VSP_SHC, sh.C_);
+        drawQueue.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
+        drawQueue.CommitShaderParameterGroup(SP_OBJECT);
 
+        if (first)
+        {
+            first = false;
         Node* lightNode = light->GetNode();
         float atten = 1.0f / Max(light->GetRange(), M_EPSILON);
         Vector3 lightDir(lightNode->GetWorldRotation() * Vector3::BACK);
         Vector4 lightPos(lightNode->GetWorldPosition(), atten);
 
-        batchCollection.AddGroupParameter(VSP_LIGHTDIR, lightDir);
-        batchCollection.AddGroupParameter(VSP_LIGHTPOS, lightPos);
+        drawQueue.AddShaderParameter(VSP_LIGHTDIR, lightDir);
+        drawQueue.AddShaderParameter(VSP_LIGHTPOS, lightPos);
 
         float fade = 1.0f;
         float fadeEnd = light->GetDrawDistance();
@@ -921,12 +1087,12 @@ void CustomView::Render()
             fade = Min(1.0f - (light->GetDistance() - fadeStart) / (fadeEnd - fadeStart), 1.0f);
 
         // Negative lights will use subtract blending, so write absolute RGB values to the shader parameter
-        batchCollection.AddGroupParameter(PSP_LIGHTCOLOR, Color(light->GetEffectiveColor().Abs(),
+        drawQueue.AddShaderParameter(PSP_LIGHTCOLOR, Color(light->GetEffectiveColor().Abs(),
             light->GetEffectiveSpecularIntensity()) * fade);
-        batchCollection.AddGroupParameter(PSP_LIGHTDIR, lightDir);
-        batchCollection.AddGroupParameter(PSP_LIGHTPOS, lightPos);
-        batchCollection.AddGroupParameter(PSP_LIGHTRAD, light->GetRadius());
-        batchCollection.AddGroupParameter(PSP_LIGHTLENGTH, light->GetLength());
+        drawQueue.AddShaderParameter(PSP_LIGHTDIR, lightDir);
+        drawQueue.AddShaderParameter(PSP_LIGHTPOS, lightPos);
+        drawQueue.AddShaderParameter(PSP_LIGHTRAD, light->GetRadius());
+        drawQueue.AddShaderParameter(PSP_LIGHTLENGTH, light->GetLength());
 
         Vector4 vertexLights[MAX_VERTEX_LIGHTS * 3]{};
         for (unsigned i = 0; i < batch.vertexLights_.size(); ++i)
@@ -973,21 +1139,17 @@ void CustomView::Render()
             vertexLights[i * 3 + 2] = Vector4(vertexLightNode->GetWorldPosition(), invCutoff);
         }
 
-        batchCollection.AddGroupParameter(VSP_VERTEXLIGHTS, ea::span<const Vector4>{ vertexLights });
+        drawQueue.AddShaderParameter(VSP_VERTEXLIGHTS, ea::span<const Vector4>{ vertexLights });
+        drawQueue.CommitShaderParameterGroup(SP_LIGHT);
+        }
 
-        batchCollection.CommitInstance();
-        batchCollection.CommitGroup();
+        drawQueue.SetPipelineState(batch.pipelineState_);
+        drawQueue.SetBuffers(sourceBatch.geometry_->GetVertexBuffers(), sourceBatch.geometry_->GetIndexBuffer());
 
-        ApplyPipelineState(graphics_, batch.pipelineState_->GetDesc());
-
-        globalSharedParameters.ForEach(SharedParameterSetter{ graphics_ });
-        batchCollection.groupParameters_.ForEach(SharedParameterSetter{ graphics_ });
-        batchCollection.instanceParameters_.ForEach(SharedParameterSetter{ graphics_ });
-        ApplyShaderResources(graphics_, batchCollection.groupResources_);
-
-        sourceBatch.geometry_->Draw(graphics_);
+        drawQueue.DrawIndexed(sourceBatch.geometry_->GetIndexStart(), sourceBatch.geometry_->GetIndexCount());
     }
 
+    drawQueue.Execute(graphics_);
 
     if (renderTarget_)
     {

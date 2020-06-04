@@ -24,7 +24,33 @@
 
 #include "../Graphics/PipelineState.h"
 
+#include "../Core/Context.h"
+#include "../Graphics/Graphics.h"
+
 namespace Urho3D
 {
+
+PipelineState::PipelineState(Context* context)
+    : Object(context)
+    , graphics_(context_->GetGraphics())
+{
+}
+
+void PipelineState::Apply()
+{
+    graphics_->SetShaders(desc_.vertexShader_, desc_.pixelShader_);
+    graphics_->SetDepthWrite(desc_.depthWrite_);
+    graphics_->SetDepthTest(desc_.depthMode_);
+    graphics_->SetStencilTest(desc_.stencilEnabled_, desc_.stencilMode_,
+        desc_.stencilPass_, desc_.stencilFail_, desc_.stencilDepthFail_,
+        desc_.stencilRef_, desc_.compareMask_, desc_.writeMask_);
+
+    graphics_->SetColorWrite(desc_.colorWrite_);
+    graphics_->SetBlendMode(desc_.blendMode_, desc_.alphaToCoverage_);
+
+    graphics_->SetFillMode(desc_.fillMode_);
+    graphics_->SetCullMode(desc_.cullMode_);
+    graphics_->SetDepthBias(desc_.constantDepthBias_, desc_.slopeScaledDepthBias_);
+}
 
 }

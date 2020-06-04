@@ -176,14 +176,19 @@ class PipelineState : public Object
 
 public:
     /// Construct.
-    explicit PipelineState(Context* context) : Object(context) {}
+    explicit PipelineState(Context* context);
     /// Create cached state.
     void Create(const PipelineStateDesc& desc) { desc_ = desc; }
+
+    /// Apply cached state.
+    void Apply();
 
     /// Return description.
     const PipelineStateDesc& GetDesc() const { return desc_; }
 
 private:
+    /// Graphics subsystem.
+    Graphics* graphics_{};
     /// Description.
     PipelineStateDesc desc_;
 };
