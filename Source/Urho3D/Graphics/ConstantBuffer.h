@@ -60,6 +60,8 @@ public:
     void SetVector3ArrayParameter(unsigned offset, unsigned rows, const void* data);
     /// Apply to GPU.
     void Apply();
+    /// Set data to GPU directly.
+    void SetGPUData(const void* data);
 
     /// Return size.
     unsigned GetSize() const { return size_; }

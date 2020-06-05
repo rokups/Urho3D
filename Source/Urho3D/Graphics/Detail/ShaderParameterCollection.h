@@ -274,11 +274,13 @@ struct SharedParameterSetter
 {
     /// Graphics.
     Graphics* graphics_;
+
     /// Apply array of int vectors. Not fully supported.
     void operator()(const StringHash& name, const int* data, unsigned arraySize) const
     {
         graphics_->SetShaderParameter(name, *data);
     }
+
     /// Apply array of float vectors.
     void operator()(const StringHash& name, const Vector4* data, unsigned arraySize) const
     {
@@ -287,6 +289,7 @@ struct SharedParameterSetter
         else
             graphics_->SetShaderParameter(name, *data);
     }
+
     /// Apply array of 3x4 matrices.
     void operator()(const StringHash& name, const Matrix3x4* data, unsigned arraySize) const
     {
@@ -295,6 +298,7 @@ struct SharedParameterSetter
         else
             graphics_->SetShaderParameter(name, *data);
     }
+
     /// Apply array of 4x4 matrices.
     void operator()(const StringHash& name, const Matrix4* data, unsigned arraySize) const
     {
@@ -303,6 +307,151 @@ struct SharedParameterSetter
         else
             graphics_->SetShaderParameter(name, *data);
     }
+};
+
+/// Reference to constant buffer location.
+struct ConstantBufferRef
+{
+    /// Index of buffer in global collection.
+    unsigned constantBufferIndex_{};
+    /// Offset in the buffer.
+    unsigned offset_{};
+    /// Size of the chunk.
+    unsigned size_{};
+};
+
+/// Buffer of shader parameters ready to be uploaded.
+class ShaderParameterBufferCollection
+{
+public:
+    /// Construct.
+    ShaderParameterBufferCollection()
+    {
+        AllocateBuffer();
+    }
+
+    /// Clear.
+    void Clear()
+    {
+        currentBufferIndex_ = 0;
+        for (auto& buffer : buffers_)
+            buffer.second = 0;
+    }
+
+    /// Allocate new block.
+    ea::pair<ConstantBufferRef, unsigned char*> AddBlock(unsigned size)
+    {
+        assert(size <= bufferSize_);
+        if (bufferSize_ - buffers_[currentBufferIndex_].second < size)
+        {
+            ++currentBufferIndex_;
+            if (buffers_.size() >= currentBufferIndex_)
+                AllocateBuffer();
+        }
+
+        auto& currentBuffer = buffers_[currentBufferIndex_];
+        const unsigned offset = currentBuffer.second;
+        currentBuffer.second += size;
+
+        unsigned char* data = &currentBuffer.first[offset];
+        return {{ buffers_.size() - 1, offset, size }, data };
+    }
+
+    /// Return number of buffers.
+    unsigned GetNumBuffers() const { return currentBufferIndex_ + 1; }
+
+    /// Return size of the buffer.
+    unsigned GetBufferSize(unsigned index) const { return bufferSize_; }
+
+    /// Return buffer data.
+    const void* GetBufferData(unsigned index) const { return buffers_[index].first.data(); }
+
+    /// Copy variant parameter into storage.
+    static void StoreParameter(unsigned char* dest, const Variant& value)
+    {
+        switch (value.GetType())
+        {
+        case VAR_BOOL:
+            StoreParameter(dest, value.GetBool() ? 1 : 0);
+            break;
+
+        case VAR_INT:
+            StoreParameter(dest, value.GetInt());
+            break;
+
+        case VAR_FLOAT:
+        case VAR_DOUBLE:
+            StoreParameter(dest, value.GetFloat());
+            break;
+
+        case VAR_VECTOR2:
+            StoreParameter(dest, value.GetVector2());
+            break;
+
+        case VAR_VECTOR3:
+            StoreParameter(dest, value.GetVector3());
+            break;
+
+        case VAR_VECTOR4:
+            StoreParameter(dest, value.GetVector4());
+            break;
+
+        case VAR_COLOR:
+            StoreParameter(dest, value.GetColor());
+            break;
+
+        case VAR_MATRIX3:
+            StoreParameter(dest, value.GetMatrix3());
+            break;
+
+        case VAR_MATRIX3X4:
+            StoreParameter(dest, value.GetMatrix3x4());
+            break;
+
+        case VAR_MATRIX4:
+            StoreParameter(dest, value.GetMatrix4());
+            break;
+
+        default:
+            // Unsupported parameter type, do nothing
+            break;
+        }
+    }
+
+    /// Copy new simple parameter into storage.
+    template <class T>
+    static void StoreParameter(unsigned char* dest, const T& value)
+    {
+        memcpy(dest, &value, sizeof(T));
+    }
+
+    /// Copy new Matrix3 parameter into storage.
+    static void StoreParameter(unsigned char* dest, const Matrix3& value)
+    {
+        const Matrix3x4 data{ value };
+        memcpy(dest, data.Data(), sizeof(Matrix3x4));
+    }
+
+    /// Add new Vector4 array parameter.
+    static void StoreParameter(unsigned char* dest, ea::span<const Vector4> values)
+    {
+        memcpy(dest, values.data(), sizeof(Vector4) * values.size());
+    }
+
+private:
+    /// Allocate one more buffer.
+    void AllocateBuffer()
+    {
+        buffers_.emplace_back();
+        buffers_.back().first.resize(bufferSize_);
+    }
+
+    /// Size of buffers.
+    unsigned bufferSize_{ 16384 };
+    /// Buffers.
+    ea::vector<ea::pair<ByteVector, unsigned>> buffers_;
+    /// Current buffer index.
+    unsigned currentBufferIndex_{};
 };
 
 }

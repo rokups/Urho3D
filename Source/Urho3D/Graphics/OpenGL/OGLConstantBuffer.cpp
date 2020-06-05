@@ -98,4 +98,16 @@ void ConstantBuffer::Apply()
     }
 }
 
+void ConstantBuffer::SetGPUData(const void* data)
+{
+    if (object_.name_)
+    {
+#ifndef GL_ES_VERSION_2_0
+        graphics_->SetUBO(object_.name_);
+        glBufferData(GL_UNIFORM_BUFFER, size_, data, GL_DYNAMIC_DRAW);
+#endif
+        dirty_ = false;
+    }
+}
+
 }

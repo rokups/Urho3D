@@ -28,6 +28,7 @@
 #include "../../Graphics/GPUObject.h"
 #include "../../Graphics/GraphicsDefs.h"
 #include "../../Graphics/ShaderVariation.h"
+#include "../../Graphics/ConstantBufferLayout.h"
 
 namespace Urho3D
 {
@@ -36,7 +37,7 @@ class ConstantBuffer;
 class Graphics;
 
 /// Linked shader program on the GPU.
-class URHO3D_API ShaderProgram : public RefCounted, public GPUObject
+class URHO3D_API ShaderProgram : public ConstantBufferLayout, public GPUObject
 {
 public:
     /// Construct.

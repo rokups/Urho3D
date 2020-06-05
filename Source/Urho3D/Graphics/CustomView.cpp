@@ -25,6 +25,8 @@
 #include "../Core/Context.h"
 #include "../Core/IteratorRange.h"
 #include "../Graphics/Camera.h"
+#include "../Graphics/ConstantBuffer.h"
+#include "../Graphics/ConstantBufferLayout.h"
 #include "../Graphics/CustomView.h"
 #include "../Graphics/IndexBuffer.h"
 #include "../Graphics/Graphics.h"
@@ -270,6 +272,8 @@ struct DrawOperationDescription
 
     /// Shader parameters bound to the command.
     ea::array<ShaderParameterRange, MAX_SHADER_PARAMETER_GROUPS> shaderParameters_{};
+    /// Constant buffers bound to the command.
+    ea::array<ConstantBufferRef, MAX_SHADER_PARAMETER_GROUPS> constantBuffers_{};
     /// Shader resources bound to the command.
     ShaderResourceRange shaderResources_;
 
@@ -293,6 +297,7 @@ public:
     void Reset()
     {
         shaderParameters_.Clear();
+        constantBuffers_.Clear();
         shaderResources_.clear();
         drawOps_.clear();
 
@@ -301,12 +306,34 @@ public:
         currentDrawOp_ = {};
     }
 
+    /// Set pipeline state.
+    void SetPipelineState(PipelineState* pipelineState)
+    {
+        currentDrawOp_.pipelineState_ = pipelineState;
+        currentConstantBufferLayout_ = pipelineState->GetDesc().constantBufferLayout_;
+    }
+
+    /// Begin shader parameter group.
+    bool BeginShaderParameterGroup(ShaderParameterGroup group, bool force = false)
+    {
+        const unsigned size = currentConstantBufferLayout_->GetConstantBufferSize(group);
+        const auto& buffer = constantBuffers_.AddBlock(size);
+
+        currentDrawOp_.constantBuffers_[group] = buffer.first;
+        currentConstantBufferData_ = buffer.second;
+        return true;
+    }
+
     /// Add shader parameter.
     template <class T>
     void AddShaderParameter(StringHash name, const T& value)
     {
         shaderParameters_.AddParameter(name, value);
         ++currentShaderParameterGroup_.second;
+
+        const auto paramInfo = currentConstantBufferLayout_->GetConstantBufferParameter(name);
+        if (paramInfo.second != M_MAX_UNSIGNED)
+            ShaderParameterBufferCollection::StoreParameter(currentConstantBufferData_ + paramInfo.second, value);
     }
 
     /// Commit shader parameter group.
@@ -331,9 +358,6 @@ public:
         currentShaderResourceGroup_.first = shaderResources_.size();
         currentShaderResourceGroup_.second = currentShaderResourceGroup_.first;
     }
-
-    /// Set pipeline state.
-    void SetPipelineState(PipelineState* pipelineState) { currentDrawOp_.pipelineState_ = pipelineState; }
 
     /// Set buffers.
     void SetBuffers(ea::span<VertexBuffer*> vertexBuffers, IndexBuffer* indexBuffer)
@@ -413,6 +437,15 @@ public:
     /// Execute commands in the queue.
     void Execute(Graphics* graphics)
     {
+        const unsigned numConstantBuffers = constantBuffers_.GetNumBuffers();
+        ea::vector<SharedPtr<ConstantBuffer>> constantBuffers;
+        constantBuffers.resize(numConstantBuffers);
+        for (unsigned i = 0; i < numConstantBuffers; ++i)
+        {
+            constantBuffers[i] = graphics->GetOrCreateConstantBuffer(VS, i, constantBuffers_.GetBufferSize(i));
+            constantBuffers[i]->SetGPUData(constantBuffers_.GetBufferData(i));
+        }
+
         graphics->ClearParameterSources();
 
         const SharedParameterSetter shaderParameterSetter{ graphics };
@@ -502,6 +535,9 @@ public:
 private:
     /// Shader parameters
     ShaderParameterCollection shaderParameters_;
+    /// Constant buffers.
+    ShaderParameterBufferCollection constantBuffers_;
+
     /// Shader resources.
     ShaderResourceCollection shaderResources_;
     /// Draw operations.
@@ -513,6 +549,11 @@ private:
     ShaderParameterRange currentShaderParameterGroup_;
     /// Current shader resource group.
     ShaderResourceRange currentShaderResourceGroup_;
+
+    /// Current constant buffer layout.
+    ConstantBufferLayout* currentConstantBufferLayout_{};
+    /// Current pointer to constant buffer data.
+    unsigned char* currentConstantBufferData_{};
 };
 
 Vector4 GetCameraDepthModeParameter(const Camera* camera)
@@ -577,43 +618,56 @@ Vector4 GetZoneFogParameter(const Zone* zone, const Camera* camera)
 void FillGlobalSharedParameters(DrawOperationQueue& drawQueue,
     const FrameInfo& frameInfo, const Camera* camera, const Zone* zone, const Scene* scene)
 {
-    drawQueue.AddShaderParameter(VSP_DELTATIME, frameInfo.timeStep_);
-    drawQueue.AddShaderParameter(PSP_DELTATIME, frameInfo.timeStep_);
+    if (drawQueue.BeginShaderParameterGroup(SP_FRAME))
+    {
+        drawQueue.AddShaderParameter(VSP_DELTATIME, frameInfo.timeStep_);
+        drawQueue.AddShaderParameter(PSP_DELTATIME, frameInfo.timeStep_);
 
-    const float elapsedTime = scene->GetElapsedTime();
-    drawQueue.AddShaderParameter(VSP_ELAPSEDTIME, elapsedTime);
-    drawQueue.AddShaderParameter(PSP_ELAPSEDTIME, elapsedTime);
+        const float elapsedTime = scene->GetElapsedTime();
+        drawQueue.AddShaderParameter(VSP_ELAPSEDTIME, elapsedTime);
+        drawQueue.AddShaderParameter(PSP_ELAPSEDTIME, elapsedTime);
 
-    const Matrix3x4 cameraEffectiveTransform = camera->GetEffectiveWorldTransform();
-    drawQueue.AddShaderParameter(VSP_CAMERAPOS, cameraEffectiveTransform.Translation());
-    drawQueue.AddShaderParameter(VSP_VIEWINV, cameraEffectiveTransform);
-    drawQueue.AddShaderParameter(VSP_VIEW, camera->GetView());
-    drawQueue.AddShaderParameter(PSP_CAMERAPOS, cameraEffectiveTransform.Translation());
+        drawQueue.CommitShaderParameterGroup(SP_FRAME);
+    }
 
-    const float nearClip = camera->GetNearClip();
-    const float farClip = camera->GetFarClip();
-    drawQueue.AddShaderParameter(VSP_NEARCLIP, nearClip);
-    drawQueue.AddShaderParameter(VSP_FARCLIP, farClip);
-    drawQueue.AddShaderParameter(PSP_NEARCLIP, nearClip);
-    drawQueue.AddShaderParameter(PSP_FARCLIP, farClip);
+    if (drawQueue.BeginShaderParameterGroup(SP_CAMERA))
+    {
+        const Matrix3x4 cameraEffectiveTransform = camera->GetEffectiveWorldTransform();
+        drawQueue.AddShaderParameter(VSP_CAMERAPOS, cameraEffectiveTransform.Translation());
+        drawQueue.AddShaderParameter(VSP_VIEWINV, cameraEffectiveTransform);
+        drawQueue.AddShaderParameter(VSP_VIEW, camera->GetView());
+        drawQueue.AddShaderParameter(PSP_CAMERAPOS, cameraEffectiveTransform.Translation());
 
-    drawQueue.AddShaderParameter(VSP_DEPTHMODE, GetCameraDepthModeParameter(camera));
-    drawQueue.AddShaderParameter(PSP_DEPTHRECONSTRUCT, GetCameraDepthReconstructParameter(camera));
+        const float nearClip = camera->GetNearClip();
+        const float farClip = camera->GetFarClip();
+        drawQueue.AddShaderParameter(VSP_NEARCLIP, nearClip);
+        drawQueue.AddShaderParameter(VSP_FARCLIP, farClip);
+        drawQueue.AddShaderParameter(PSP_NEARCLIP, nearClip);
+        drawQueue.AddShaderParameter(PSP_FARCLIP, farClip);
 
-    Vector3 nearVector, farVector;
-    camera->GetFrustumSize(nearVector, farVector);
-    drawQueue.AddShaderParameter(VSP_FRUSTUMSIZE, farVector);
+        drawQueue.AddShaderParameter(VSP_DEPTHMODE, GetCameraDepthModeParameter(camera));
+        drawQueue.AddShaderParameter(PSP_DEPTHRECONSTRUCT, GetCameraDepthReconstructParameter(camera));
 
-    drawQueue.AddShaderParameter(VSP_VIEWPROJ, GetEffectiveCameraViewProj(camera));
+        Vector3 nearVector, farVector;
+        camera->GetFrustumSize(nearVector, farVector);
+        drawQueue.AddShaderParameter(VSP_FRUSTUMSIZE, farVector);
 
-    drawQueue.AddShaderParameter(VSP_AMBIENTSTARTCOLOR, Color::WHITE);
-    drawQueue.AddShaderParameter(VSP_AMBIENTENDCOLOR, Vector4::ZERO);
-    drawQueue.AddShaderParameter(VSP_ZONE, Matrix3x4::IDENTITY);
-    drawQueue.AddShaderParameter(PSP_AMBIENTCOLOR, Color::WHITE);
-    drawQueue.AddShaderParameter(PSP_FOGCOLOR, zone->GetFogColor());
-    drawQueue.AddShaderParameter(PSP_FOGPARAMS, GetZoneFogParameter(zone, camera));
+        drawQueue.AddShaderParameter(VSP_VIEWPROJ, GetEffectiveCameraViewProj(camera));
 
-    drawQueue.CommitShaderParameterGroup(SP_FRAME);
+        drawQueue.CommitShaderParameterGroup(SP_CAMERA);
+    }
+
+    if (drawQueue.BeginShaderParameterGroup(SP_ZONE))
+    {
+        drawQueue.AddShaderParameter(VSP_AMBIENTSTARTCOLOR, Color::WHITE);
+        drawQueue.AddShaderParameter(VSP_AMBIENTENDCOLOR, Vector4::ZERO);
+        drawQueue.AddShaderParameter(VSP_ZONE, Matrix3x4::IDENTITY);
+        drawQueue.AddShaderParameter(PSP_AMBIENTCOLOR, Color::WHITE);
+        drawQueue.AddShaderParameter(PSP_FOGCOLOR, zone->GetFogColor());
+        drawQueue.AddShaderParameter(PSP_FOGPARAMS, GetZoneFogParameter(zone, camera));
+
+        drawQueue.CommitShaderParameterGroup(SP_ZONE);
+    }
 }
 
 void ApplyShaderResources(Graphics* graphics, const ShaderResourceCollection& resources)
@@ -1033,23 +1087,26 @@ void CustomView::Render()
     // Collect batches
     static DrawOperationQueue drawQueue;
     drawQueue.Reset();
-    FillGlobalSharedParameters(drawQueue, frameInfo_, camera_, octree_->GetZone(), scene_);
 
     Material* currentMaterial = nullptr;
-    bool first = true;
     for (const ForwardBaseBatch& batch : forwardBaseBatches)
     {
         auto geometry = batch.geometry_;
         auto light = batch.mainDirectionalLight_;
         const SourceBatch& sourceBatch = *batch.sourceBatch_;
+        drawQueue.SetPipelineState(batch.pipelineState_);
+        FillGlobalSharedParameters(drawQueue, frameInfo_, camera_, octree_->GetZone(), scene_);
         SphericalHarmonicsDot9 sh;
         if (batch.material_ != currentMaterial)
         {
+            if (drawQueue.BeginShaderParameterGroup(SP_MATERIAL))
+            {
             currentMaterial = batch.material_;
             const auto& parameters = batch.material_->GetShaderParameters();
             for (const auto& item : parameters)
                 drawQueue.AddShaderParameter(item.first, item.second.value_);
             drawQueue.CommitShaderParameterGroup(SP_MATERIAL);
+            }
 
             const auto& textures = batch.material_->GetTextures();
             for (const auto& item : textures)
@@ -1057,6 +1114,8 @@ void CustomView::Render()
             drawQueue.CommitShaderResourceGroup();
         }
 
+        if (drawQueue.BeginShaderParameterGroup(SP_OBJECT))
+        {
         drawQueue.AddShaderParameter(VSP_SHAR, sh.Ar_);
         drawQueue.AddShaderParameter(VSP_SHAG, sh.Ag_);
         drawQueue.AddShaderParameter(VSP_SHAB, sh.Ab_);
@@ -1066,10 +1125,10 @@ void CustomView::Render()
         drawQueue.AddShaderParameter(VSP_SHC, sh.C_);
         drawQueue.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
         drawQueue.CommitShaderParameterGroup(SP_OBJECT);
+        }
 
-        if (first)
+        if (drawQueue.BeginShaderParameterGroup(SP_LIGHT))
         {
-            first = false;
         Node* lightNode = light->GetNode();
         float atten = 1.0f / Max(light->GetRange(), M_EPSILON);
         Vector3 lightDir(lightNode->GetWorldRotation() * Vector3::BACK);
@@ -1143,7 +1202,6 @@ void CustomView::Render()
         drawQueue.CommitShaderParameterGroup(SP_LIGHT);
         }
 
-        drawQueue.SetPipelineState(batch.pipelineState_);
         drawQueue.SetBuffers(sourceBatch.geometry_->GetVertexBuffers(), sourceBatch.geometry_->GetIndexBuffer());
 
         drawQueue.DrawIndexed(sourceBatch.geometry_->GetIndexStart(), sourceBatch.geometry_->GetIndexCount());

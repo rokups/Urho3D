@@ -35,6 +35,7 @@ namespace Urho3D
 {
 
 class ShaderVariation;
+class ConstantBufferLayout;
 
 /// Pipeline state description.
 struct PipelineStateDesc
@@ -46,6 +47,8 @@ struct PipelineStateDesc
     ShaderVariation* vertexShader_{};
     /// Pixel shader used.
     ShaderVariation* pixelShader_{};
+    /// Layout of constant buffers. Filled automatically.
+    ConstantBufferLayout* constantBufferLayout_{};
 
     /// Primitive type.
     PrimitiveType primitiveType_{};
@@ -178,7 +181,7 @@ public:
     /// Construct.
     explicit PipelineState(Context* context);
     /// Create cached state.
-    void Create(const PipelineStateDesc& desc) { desc_ = desc; }
+    void Create(const PipelineStateDesc& desc);
 
     /// Apply cached state.
     void Apply();

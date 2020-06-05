@@ -1,5 +1,5 @@
 // Use of constant buffers on OpenGL 3 commented out for now as it seems to be slower in practice
-//#define USE_CBUFFERS
+#define USE_CBUFFERS
 
 #if !defined(GL3) || !defined(USE_CBUFFERS)
 
@@ -105,15 +105,16 @@ uniform vec2 cVSMShadowParams;
 
 // OpenGL 3 uniforms (using constant buffers)
 
-#ifdef COMPILEVS
-
-uniform FrameVS
+uniform Frame
 {
     float cDeltaTime;
     float cElapsedTime;
+
+    float cDeltaTimePS;
+    float cElapsedTimePS;
 };
 
-uniform CameraVS
+uniform Camera
 {
     vec3 cCameraPos;
     float cNearClip;
@@ -125,16 +126,28 @@ uniform CameraVS
     mat4 cViewInv;
     mat4 cViewProj;
     vec4 cClipPlane;
+
+    vec3 cCameraPosPS;
+    vec4 cDepthReconstruct;
+    vec2 cGBufferInvSize;
+    float cNearClipPS;
+    float cFarClipPS;
 };
 
-uniform ZoneVS
+uniform Zone
 {
     vec3 cAmbientStartColor;
     vec3 cAmbientEndColor;
     mat4 cZone;
+
+    vec4 cAmbientColor;
+    vec4 cFogParams;
+    vec3 cFogColor;
+    vec3 cZoneMin;
+    vec3 cZoneMax;
 };
 
-uniform LightVS
+uniform Light
 {
     vec4 cLightPos;
     vec3 cLightDir;
@@ -144,69 +157,7 @@ uniform LightVS
 #else
     mat4 cLightMatrices[4];
 #endif
-};
 
-#ifndef CUSTOM_MATERIAL_CBUFFER
-uniform MaterialVS
-{
-    vec4 cUOffset;
-    vec4 cVOffset;
-};
-#endif
-
-uniform ObjectVS
-{
-    mat4 cModel;
-#ifdef SPHERICALHARMONICS
-    vec4 cSHAr;
-    vec4 cSHAg;
-    vec4 cSHAb;
-    vec4 cSHBr;
-    vec4 cSHBg;
-    vec4 cSHBb;
-    vec4 cSHC;
-#else
-    vec4 cAmbient;
-#endif
-#ifdef BILLBOARD
-    mat3 cBillboardRot;
-#endif
-#ifdef SKINNED
-    uniform vec4 cSkinMatrices[MAXBONES*3];
-#endif
-};
-
-#endif
-
-#ifdef COMPILEPS
-
-// Pixel shader uniforms
-uniform FramePS
-{
-    float cDeltaTimePS;
-    float cElapsedTimePS;
-};
-
-uniform CameraPS
-{
-    vec3 cCameraPosPS;
-    vec4 cDepthReconstruct;
-    vec2 cGBufferInvSize;
-    float cNearClipPS;
-    float cFarClipPS;
-};
-
-uniform ZonePS
-{
-    vec4 cAmbientColor;
-    vec4 cFogParams;
-    vec3 cFogColor;
-    vec3 cZoneMin;
-    vec3 cZoneMax;
-};
-
-uniform LightPS
-{
     vec4 cLightColor;
     vec4 cLightPosPS;
     vec3 cLightDirPS;
@@ -227,8 +178,12 @@ uniform LightPS
 };
 
 #ifndef CUSTOM_MATERIAL_CBUFFER
-uniform MaterialPS
+uniform Material
 {
+    vec4 cUOffset;
+    vec4 cVOffset;
+    vec4 cLMOffset;
+
     vec4 cMatDiffColor;
     vec3 cMatEmissiveColor;
     vec3 cMatEnvMapColor;
@@ -240,6 +195,26 @@ uniform MaterialPS
 };
 #endif
 
+uniform Object
+{
+    mat4 cModel;
+#ifdef SPHERICALHARMONICS
+    vec4 cSHAr;
+    vec4 cSHAg;
+    vec4 cSHAb;
+    vec4 cSHBr;
+    vec4 cSHBg;
+    vec4 cSHBb;
+    vec4 cSHC;
+#else
+    vec4 cAmbient;
 #endif
+#ifdef BILLBOARD
+    mat3 cBillboardRot;
+#endif
+#ifdef SKINNED
+    uniform vec4 cSkinMatrices[MAXBONES*3];
+#endif
+};
 
 #endif

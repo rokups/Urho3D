@@ -235,6 +235,9 @@ bool ShaderProgram::Link()
             if (!dataSize)
                 continue;
 
+            // Register in layout
+            AddConstantBuffer(static_cast<ShaderParameterGroup>(group), static_cast<unsigned>(dataSize));
+
             unsigned bindingIndex = group;
             // Vertex shader constant buffer bindings occupy slots starting from zero to maximum supported, pixel shader bindings
             // from that point onward
@@ -291,6 +294,11 @@ bool ShaderProgram::Link()
                     parameter.offset_ = blockOffset;
                     parameter.bufferPtr_ = constantBuffers_[blockToBinding[blockIndex]];
                     store = true;
+
+                    // Register in layout
+                    const unsigned parameterGroup = blockToBinding[blockIndex] % MAX_SHADER_PARAMETER_GROUPS;
+                    AddConstantBufferParameter(parameter.name_,
+                        static_cast<ShaderParameterGroup>(parameterGroup), parameter.offset_);
                 }
             }
 #endif
@@ -317,6 +325,7 @@ bool ShaderProgram::Link()
     vertexAttributes_.rehash(Max(2, NextPowerOfTwo(vertexAttributes_.size())));
     shaderParameters_.rehash(Max(2, NextPowerOfTwo(shaderParameters_.size())));
 
+    RecalculateLayoutHash();
     return true;
 }
 

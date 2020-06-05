@@ -40,6 +40,7 @@ namespace Urho3D
 {
 
 class ConstantBuffer;
+class ConstantBufferLayout;
 class File;
 class Image;
 class IndexBuffer;
@@ -136,6 +137,17 @@ struct WindowModeParams
     ScreenModeParams screenParams_;
 };
 
+/// Range of constant buffer to bind.
+struct ConstantBufferRange
+{
+    /// Constant buffer.
+    ConstantBuffer* constantBuffer_{};
+    /// Offset in buffer.
+    unsigned offset_{};
+    /// Size of region.
+    unsigned size_{};
+};
+
 /// %Graphics subsystem. Manages the application window, rendering state and GPU resources.
 class URHO3D_API Graphics : public Object
 {
@@ -229,8 +241,12 @@ public:
     bool SetVertexBuffers(const ea::vector<SharedPtr<VertexBuffer> >& buffers, unsigned instanceOffset = 0);
     /// Set index buffer.
     void SetIndexBuffer(IndexBuffer* buffer);
+    /// Return constant buffer layout for given shaders.
+    ConstantBufferLayout* GetConstantBufferLayout(ShaderVariation* vs, ShaderVariation* ps);
     /// Set shaders.
     void SetShaders(ShaderVariation* vs, ShaderVariation* ps);
+    /// Set shader constants.
+    void SetShaderConstantBuffers(ea::span<const ConstantBufferRange, MAX_SHADER_PARAMETER_GROUPS> constantBuffers);
     /// Set shader float constants.
     void SetShaderParameter(StringHash param, const float data[], unsigned count);
     /// Set shader float constant.
