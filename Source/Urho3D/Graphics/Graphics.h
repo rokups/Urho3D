@@ -23,7 +23,7 @@
 #pragma once
 
 #include <EASTL/unique_ptr.h>
-#include <EASTL/unique_ptr.h>
+#include <EASTL/span.h>
 
 #include "../Core/Mutex.h"
 #include "../Core/Object.h"
@@ -245,7 +245,7 @@ public:
     ConstantBufferLayout* GetConstantBufferLayout(ShaderVariation* vs, ShaderVariation* ps);
     /// Set shaders.
     void SetShaders(ShaderVariation* vs, ShaderVariation* ps);
-    /// Set shader constants.
+    /// Set shader constant buffers.
     void SetShaderConstantBuffers(ea::span<const ConstantBufferRange, MAX_SHADER_PARAMETER_GROUPS> constantBuffers);
     /// Set shader float constants.
     void SetShaderParameter(StringHash param, const float data[], unsigned count);

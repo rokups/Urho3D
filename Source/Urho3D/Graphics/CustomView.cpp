@@ -457,6 +457,7 @@ public:
         PrimitiveType currentPrimitiveType{};
 
         ea::vector<VertexBuffer*> tempVertexBuffers;
+        ConstantBufferRange constantBufferRanges[MAX_SHADER_PARAMETER_GROUPS]{};
 
         for (const DrawOperationDescription& drawOp : drawOps_)
         {
@@ -499,12 +500,23 @@ public:
             for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
             {
                 const auto group = static_cast<ShaderParameterGroup>(i);
-                const auto range = drawOp.shaderParameters_[i];
+                /*const auto range = drawOp.shaderParameters_[i];
                 if (!graphics->NeedParameterUpdate(group, reinterpret_cast<void*>(range.first)))
                     continue;
 
-                shaderParameters_.ForEach(range.first, range.second, shaderParameterSetter);
+                shaderParameters_.ForEach(range.first, range.second, shaderParameterSetter);*/
+                if (drawOp.constantBuffers_[i].size_ != 0)
+                {
+                    constantBufferRanges[i].constantBuffer_ = constantBuffers[drawOp.constantBuffers_[i].constantBufferIndex_];
+                    constantBufferRanges[i].offset_ = drawOp.constantBuffers_[i].offset_;
+                    constantBufferRanges[i].size_ = drawOp.constantBuffers_[i].size_;
+                }
+                else
+                {
+                    constantBufferRanges[i] = ConstantBufferRange{};
+                }
             }
+            graphics->SetShaderConstantBuffers(constantBufferRanges);
 
             // Draw
             if (drawOp.instanceCount_ != 0)

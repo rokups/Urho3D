@@ -242,11 +242,11 @@ bool ShaderProgram::Link()
             // Vertex shader constant buffer bindings occupy slots starting from zero to maximum supported, pixel shader bindings
             // from that point onward
             ShaderType shaderType = VS;
-            if (name.contains("PS", false))
+            /*if (name.contains("PS", false))
             {
                 bindingIndex += MAX_SHADER_PARAMETER_GROUPS;
                 shaderType = PS;
-            }
+            }*/
 
             glUniformBlockBinding(object_.name_, blockIndex, bindingIndex);
             blockToBinding[blockIndex] = bindingIndex;

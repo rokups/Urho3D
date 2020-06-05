@@ -1154,7 +1154,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 
     // Update the clip plane uniform on GL3, and set constant buffers
 #ifndef GL_ES_VERSION_2_0
-    if (gl3Support && impl_->shaderProgram_)
+    /*if (gl3Support && impl_->shaderProgram_)
     {
         const SharedPtr<ConstantBuffer>* constantBuffers = impl_->shaderProgram_->GetConstantBuffers();
         for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS * 2; ++i)
@@ -1172,7 +1172,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
         }
 
         SetShaderParameter(VSP_CLIPPLANE, useClipPlane_ ? clipPlane_ : Vector4(0.0f, 0.0f, 0.0f, 1.0f));
-    }
+    }*/
 #endif
 
     // Store shader combination if shader dumping in progress
@@ -1191,6 +1191,20 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
     }
 
     impl_->vertexBuffersDirty_ = true;
+}
+
+void Graphics::SetShaderConstantBuffers(ea::span<const ConstantBufferRange, MAX_SHADER_PARAMETER_GROUPS> constantBuffers)
+{
+    //GLint uniformBufferAlignSize = 0;
+    //glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &uniformBufferAlignSize);
+
+    for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
+    {
+        const ConstantBufferRange& range = constantBuffers[i];
+        const unsigned object = range.constantBuffer_ ? range.constantBuffer_->GetGPUObjectName() : 0;
+        glBindBufferRange(GL_UNIFORM_BUFFER, i, object, range.offset_, range.size_);
+        impl_->boundUBO_ = object;
+    }
 }
 
 void Graphics::SetShaderParameter(StringHash param, const float data[], unsigned count)
@@ -2925,13 +2939,13 @@ void Graphics::CheckFeatureSupport()
 void Graphics::PrepareDraw()
 {
 #ifndef GL_ES_VERSION_2_0
-    if (gl3Support)
+    /*if (gl3Support)
     {
         for (auto i = impl_->dirtyConstantBuffers_.begin(); i !=
             impl_->dirtyConstantBuffers_.end(); ++i)
             (*i)->Apply();
         impl_->dirtyConstantBuffers_.clear();
-    }
+    }*/
 #endif
 
     if (impl_->fboDirty_)
@@ -3321,9 +3335,9 @@ void Graphics::ResetCachedState()
         SetDepthWrite(true);
     }
 
-    for (auto& constantBuffer : impl_->constantBuffers_)
+    /*for (auto& constantBuffer : impl_->constantBuffers_)
         constantBuffer = nullptr;
-    impl_->dirtyConstantBuffers_.clear();
+    impl_->dirtyConstantBuffers_.clear();*/
 }
 
 void Graphics::SetTextureUnitMappings()

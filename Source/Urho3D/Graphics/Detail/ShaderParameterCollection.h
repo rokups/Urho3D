@@ -342,7 +342,9 @@ public:
     ea::pair<ConstantBufferRef, unsigned char*> AddBlock(unsigned size)
     {
         assert(size <= bufferSize_);
-        if (bufferSize_ - buffers_[currentBufferIndex_].second < size)
+        const unsigned alignedSize = (size + alignment_ - 1) / alignment_ * alignment_;
+
+        if (bufferSize_ - buffers_[currentBufferIndex_].second < alignedSize)
         {
             ++currentBufferIndex_;
             if (buffers_.size() >= currentBufferIndex_)
@@ -351,10 +353,10 @@ public:
 
         auto& currentBuffer = buffers_[currentBufferIndex_];
         const unsigned offset = currentBuffer.second;
-        currentBuffer.second += size;
+        currentBuffer.second += alignedSize;
 
         unsigned char* data = &currentBuffer.first[offset];
-        return {{ buffers_.size() - 1, offset, size }, data };
+        return {{ currentBufferIndex_, offset, size }, data };
     }
 
     /// Return number of buffers.
@@ -448,6 +450,8 @@ private:
 
     /// Size of buffers.
     unsigned bufferSize_{ 16384 };
+    /// Alignment of each block.
+    unsigned alignment_{ 256 };
     /// Buffers.
     ea::vector<ea::pair<ByteVector, unsigned>> buffers_;
     /// Current buffer index.
