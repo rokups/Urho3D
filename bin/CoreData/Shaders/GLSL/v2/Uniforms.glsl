@@ -1,220 +1,115 @@
-// Use of constant buffers on OpenGL 3 commented out for now as it seems to be slower in practice
-#define USE_CBUFFERS
-
 #if !defined(GL3) || !defined(USE_CBUFFERS)
-
-// OpenGL 2 uniforms (no constant buffers)
-
-#ifdef COMPILEVS
-
-// Vertex shader uniforms
-uniform vec3 cAmbientStartColor;
-uniform vec3 cAmbientEndColor;
-uniform mat3 cBillboardRot;
-uniform vec3 cCameraPos;
-uniform float cNearClip;
-uniform float cFarClip;
-uniform vec4 cDepthMode;
-uniform vec3 cFrustumSize;
-uniform float cDeltaTime;
-uniform float cElapsedTime;
-uniform vec4 cGBufferOffsets;
-uniform vec4 cLightPos;
-uniform vec3 cLightDir;
-uniform vec4 cNormalOffsetScale;
-uniform mat4 cModel;
-#ifdef SPHERICALHARMONICS
-uniform vec4 cSHAr;
-uniform vec4 cSHAg;
-uniform vec4 cSHAb;
-uniform vec4 cSHBr;
-uniform vec4 cSHBg;
-uniform vec4 cSHBb;
-uniform vec4 cSHC;
+    #define CBUFFER_BEGIN(name)
+    #define CBUFFER_UNIFORM(decl) uniform decl;
+    #define CBUFFER_END()
 #else
-uniform vec4 cAmbient;
+    #define CBUFFER_BEGIN(name) uniform name {
+    #define CBUFFER_UNIFORM(decl) decl;
+    #define CBUFFER_END() };
 #endif
-uniform mat4 cView;
-uniform mat4 cViewInv;
-uniform mat4 cViewProj;
-uniform vec4 cUOffset;
-uniform vec4 cVOffset;
-uniform vec4 cLMOffset;
-uniform mat4 cZone;
-#if !defined(GL_ES) || defined(WEBGL)
-    uniform mat4 cLightMatrices[4];
-#else
-    uniform highp mat4 cLightMatrices[2];
-#endif
-#ifdef SKINNED
-    uniform vec4 cSkinMatrices[MAXBONES*3];
-#endif
+
+CBUFFER_BEGIN(Frame)
+    CBUFFER_UNIFORM(float cDeltaTime)
+    CBUFFER_UNIFORM(float cElapsedTime)
+
+    CBUFFER_UNIFORM(float cDeltaTimePS)
+    CBUFFER_UNIFORM(float cElapsedTimePS)
+CBUFFER_END()
+
+CBUFFER_BEGIN(Camera)
+    CBUFFER_UNIFORM(vec3 cCameraPos)
+    CBUFFER_UNIFORM(float cNearClip)
+    CBUFFER_UNIFORM(float cFarClip)
+    CBUFFER_UNIFORM(vec4 cDepthMode)
+    CBUFFER_UNIFORM(vec3 cFrustumSize)
+    CBUFFER_UNIFORM(vec4 cGBufferOffsets)
+    CBUFFER_UNIFORM(mat4 cView)
+    CBUFFER_UNIFORM(mat4 cViewInv)
+    CBUFFER_UNIFORM(mat4 cViewProj)
+    CBUFFER_UNIFORM(vec4 cClipPlane)
+
+    CBUFFER_UNIFORM(vec3 cCameraPosPS)
+    CBUFFER_UNIFORM(vec4 cDepthReconstruct)
+    CBUFFER_UNIFORM(vec2 cGBufferInvSize)
+    CBUFFER_UNIFORM(float cNearClipPS)
+    CBUFFER_UNIFORM(float cFarClipPS)
+CBUFFER_END()
+
+CBUFFER_BEGIN(Zone)
+    CBUFFER_UNIFORM(vec3 cAmbientStartColor)
+    CBUFFER_UNIFORM(vec3 cAmbientEndColor)
+    CBUFFER_UNIFORM(mat4 cZone)
+
+    CBUFFER_UNIFORM(vec4 cAmbientColor)
+    CBUFFER_UNIFORM(vec4 cFogParams)
+    CBUFFER_UNIFORM(vec3 cFogColor)
+    CBUFFER_UNIFORM(vec3 cZoneMin)
+    CBUFFER_UNIFORM(vec3 cZoneMax)
+CBUFFER_END()
+
+CBUFFER_BEGIN(Light)
+    CBUFFER_UNIFORM(vec4 cLightPos)
+    CBUFFER_UNIFORM(vec3 cLightDir)
+    CBUFFER_UNIFORM(vec4 cNormalOffsetScale)
 #ifdef NUMVERTEXLIGHTS
-    uniform vec4 cVertexLights[4*3];
-#endif
-#ifdef GL3
-    uniform vec4 cClipPlane;
-#endif
-#endif
-
-#ifdef COMPILEPS
-
-// Fragment shader uniforms
-#ifdef GL_ES
-    precision mediump float;
-#endif
-
-uniform vec4 cAmbientColor;
-uniform vec3 cCameraPosPS;
-uniform float cDeltaTimePS;
-uniform vec4 cDepthReconstruct;
-uniform float cElapsedTimePS;
-uniform vec4 cFogParams;
-uniform vec3 cFogColor;
-uniform vec2 cGBufferInvSize;
-uniform vec4 cLightColor;
-uniform vec4 cLightPosPS;
-uniform vec3 cLightDirPS;
-uniform vec4 cNormalOffsetScalePS;
-uniform vec4 cMatDiffColor;
-uniform vec3 cMatEmissiveColor;
-uniform vec3 cMatEnvMapColor;
-uniform vec4 cMatSpecColor;
-#ifdef PBR
-    uniform float cRoughness;
-    uniform float cMetallic;
-    uniform float cLightRad;
-    uniform float cLightLength;
-#endif
-uniform vec3 cZoneMin;
-uniform vec3 cZoneMax;
-uniform float cNearClipPS;
-uniform float cFarClipPS;
-uniform vec4 cShadowCubeAdjust;
-uniform vec4 cShadowDepthFade;
-uniform vec2 cShadowIntensity;
-uniform vec2 cShadowMapInvSize;
-uniform vec4 cShadowSplits;
-uniform mat4 cLightMatricesPS[4];
-#ifdef VSM_SHADOW
-uniform vec2 cVSMShadowParams;
-#endif
-#endif
-
+    CBUFFER_UNIFORM(vec4 cVertexLights[4 * 3])
 #else
-
-// OpenGL 3 uniforms (using constant buffers)
-
-uniform Frame
-{
-    float cDeltaTime;
-    float cElapsedTime;
-
-    float cDeltaTimePS;
-    float cElapsedTimePS;
-};
-
-uniform Camera
-{
-    vec3 cCameraPos;
-    float cNearClip;
-    float cFarClip;
-    vec4 cDepthMode;
-    vec3 cFrustumSize;
-    vec4 cGBufferOffsets;
-    mat4 cView;
-    mat4 cViewInv;
-    mat4 cViewProj;
-    vec4 cClipPlane;
-
-    vec3 cCameraPosPS;
-    vec4 cDepthReconstruct;
-    vec2 cGBufferInvSize;
-    float cNearClipPS;
-    float cFarClipPS;
-};
-
-uniform Zone
-{
-    vec3 cAmbientStartColor;
-    vec3 cAmbientEndColor;
-    mat4 cZone;
-
-    vec4 cAmbientColor;
-    vec4 cFogParams;
-    vec3 cFogColor;
-    vec3 cZoneMin;
-    vec3 cZoneMax;
-};
-
-uniform Light
-{
-    vec4 cLightPos;
-    vec3 cLightDir;
-    vec4 cNormalOffsetScale;
-#ifdef NUMVERTEXLIGHTS
-    vec4 cVertexLights[4 * 3];
-#else
-    mat4 cLightMatrices[4];
+    CBUFFER_UNIFORM(mat4 cLightMatrices[4])
 #endif
 
-    vec4 cLightColor;
-    vec4 cLightPosPS;
-    vec3 cLightDirPS;
-    vec4 cNormalOffsetScalePS;
-    vec4 cShadowCubeAdjust;
-    vec4 cShadowDepthFade;
-    vec2 cShadowIntensity;
-    vec2 cShadowMapInvSize;
-    vec4 cShadowSplits;
-    mat4 cLightMatricesPS[4];
+    CBUFFER_UNIFORM(vec4 cLightColor)
+    CBUFFER_UNIFORM(vec4 cLightPosPS)
+    CBUFFER_UNIFORM(vec3 cLightDirPS)
+    CBUFFER_UNIFORM(vec4 cNormalOffsetScalePS)
+    CBUFFER_UNIFORM(vec4 cShadowCubeAdjust)
+    CBUFFER_UNIFORM(vec4 cShadowDepthFade)
+    CBUFFER_UNIFORM(vec2 cShadowIntensity)
+    CBUFFER_UNIFORM(vec2 cShadowMapInvSize)
+    CBUFFER_UNIFORM(vec4 cShadowSplits)
+    CBUFFER_UNIFORM(mat4 cLightMatricesPS[4])
 #ifdef VSM_SHADOW
-    vec2 cVSMShadowParams;
+    CBUFFER_UNIFORM(vec2 cVSMShadowParams)
 #endif
 #ifdef PBR
-    float cLightRad;
-    float cLightLength;
+    CBUFFER_UNIFORM(float cLightRad)
+    CBUFFER_UNIFORM(float cLightLength)
 #endif
-};
+CBUFFER_END()
 
 #ifndef CUSTOM_MATERIAL_CBUFFER
-uniform Material
-{
-    vec4 cUOffset;
-    vec4 cVOffset;
-    vec4 cLMOffset;
+CBUFFER_BEGIN(Material)
+    CBUFFER_UNIFORM(vec4 cUOffset)
+    CBUFFER_UNIFORM(vec4 cVOffset)
+    CBUFFER_UNIFORM(vec4 cLMOffset)
 
-    vec4 cMatDiffColor;
-    vec3 cMatEmissiveColor;
-    vec3 cMatEnvMapColor;
-    vec4 cMatSpecColor;
+    CBUFFER_UNIFORM(vec4 cMatDiffColor)
+    CBUFFER_UNIFORM(vec3 cMatEmissiveColor)
+    CBUFFER_UNIFORM(vec3 cMatEnvMapColor)
+    CBUFFER_UNIFORM(vec4 cMatSpecColor)
 #ifdef PBR
-    float cRoughness;
-    float cMetallic;
+    CBUFFER_UNIFORM(float cRoughness)
+    CBUFFER_UNIFORM(float cMetallic)
 #endif
-};
+CBUFFER_END()
 #endif
 
-uniform Object
-{
-    mat4 cModel;
+CBUFFER_BEGIN(Object)
+    CBUFFER_UNIFORM(mat4 cModel)
 #ifdef SPHERICALHARMONICS
-    vec4 cSHAr;
-    vec4 cSHAg;
-    vec4 cSHAb;
-    vec4 cSHBr;
-    vec4 cSHBg;
-    vec4 cSHBb;
-    vec4 cSHC;
+    CBUFFER_UNIFORM(vec4 cSHAr)
+    CBUFFER_UNIFORM(vec4 cSHAg)
+    CBUFFER_UNIFORM(vec4 cSHAb)
+    CBUFFER_UNIFORM(vec4 cSHBr)
+    CBUFFER_UNIFORM(vec4 cSHBg)
+    CBUFFER_UNIFORM(vec4 cSHBb)
+    CBUFFER_UNIFORM(vec4 cSHC)
 #else
-    vec4 cAmbient;
+    CBUFFER_UNIFORM(vec4 cAmbient)
 #endif
 #ifdef BILLBOARD
-    mat3 cBillboardRot;
+    CBUFFER_UNIFORM(mat3 cBillboardRot)
 #endif
 #ifdef SKINNED
-    uniform vec4 cSkinMatrices[MAXBONES*3];
+    CBUFFER_UNIFORM(vec4 cSkinMatrices[MAXBONES*3])
 #endif
-};
-
-#endif
+CBUFFER_END()

@@ -800,12 +800,13 @@ public:
             for (VertexBuffer* vertexBuffer : geometry->GetVertexBuffers())
                 desc.vertexElements_.append(vertexBuffer->GetElements());
 
-            ea::string vsDefines = "DIRLIGHT NUMVERTEXLIGHTS=4 ";
-            ea::string psDefines = "DIRLIGHT NUMVERTEXLIGHTS=4 ";
+            ea::string commonDefines = "DIRLIGHT NUMVERTEXLIGHTS=4 ";
+            if (graphics_->GetConstantBuffersEnabled())
+                commonDefines += "USE_CBUFFERS ";
             desc.vertexShader_ = graphics_->GetShader(
-                VS, "v2/" + pass->GetVertexShader(), vsDefines + pass->GetEffectiveVertexShaderDefines());
+                VS, "v2/" + pass->GetVertexShader(), commonDefines + pass->GetEffectiveVertexShaderDefines());
             desc.pixelShader_ = graphics_->GetShader(
-                PS, "v2/" + pass->GetPixelShader(), psDefines + pass->GetEffectivePixelShaderDefines());
+                PS, "v2/" + pass->GetPixelShader(), commonDefines + pass->GetEffectivePixelShaderDefines());
 
             desc.primitiveType_ = geometry->GetPrimitiveType();
             if (auto indexBuffer = geometry->GetIndexBuffer())
