@@ -294,10 +294,12 @@ class DrawOperationQueue
 {
 public:
     /// Reset queue.
-    void Reset()
+    void Reset(Graphics* graphics)
     {
+        useConstantBuffers_ = graphics->GetConstantBuffersEnabled();
+
         shaderParameters_.Clear();
-        constantBuffers_.Clear();
+        constantBuffers_.Clear(graphics->GetConstantBuffersOffsetAlignment());
         shaderResources_.clear();
         drawOps_.clear();
 
@@ -316,11 +318,14 @@ public:
     /// Begin shader parameter group.
     bool BeginShaderParameterGroup(ShaderParameterGroup group, bool force = false)
     {
-        const unsigned size = currentConstantBufferLayout_->GetConstantBufferSize(group);
-        const auto& buffer = constantBuffers_.AddBlock(size);
+        if (useConstantBuffers_)
+        {
+            const unsigned size = currentConstantBufferLayout_->GetConstantBufferSize(group);
+            const auto& buffer = constantBuffers_.AddBlock(size);
 
-        currentDrawOp_.constantBuffers_[group] = buffer.first;
-        currentConstantBufferData_ = buffer.second;
+            currentDrawOp_.constantBuffers_[group] = buffer.first;
+            currentConstantBufferData_ = buffer.second;
+        }
         return true;
     }
 
@@ -328,20 +333,31 @@ public:
     template <class T>
     void AddShaderParameter(StringHash name, const T& value)
     {
-        shaderParameters_.AddParameter(name, value);
-        ++currentShaderParameterGroup_.second;
-
-        const auto paramInfo = currentConstantBufferLayout_->GetConstantBufferParameter(name);
-        if (paramInfo.second != M_MAX_UNSIGNED)
-            ShaderParameterBufferCollection::StoreParameter(currentConstantBufferData_ + paramInfo.second, value);
+        if (useConstantBuffers_)
+        {
+            const auto paramInfo = currentConstantBufferLayout_->GetConstantBufferParameter(name);
+            if (paramInfo.second != M_MAX_UNSIGNED)
+                ShaderParameterBufferCollection::StoreParameter(currentConstantBufferData_ + paramInfo.second, value);
+        }
+        else
+        {
+            shaderParameters_.AddParameter(name, value);
+            ++currentShaderParameterGroup_.second;
+        }
     }
 
     /// Commit shader parameter group.
     void CommitShaderParameterGroup(ShaderParameterGroup group)
     {
-        currentDrawOp_.shaderParameters_[static_cast<unsigned>(group)] = currentShaderParameterGroup_;
-        currentShaderParameterGroup_.first = shaderParameters_.Size();
-        currentShaderParameterGroup_.second = currentShaderParameterGroup_.first;
+        if (useConstantBuffers_)
+        {
+        }
+        else
+        {
+            currentDrawOp_.shaderParameters_[static_cast<unsigned>(group)] = currentShaderParameterGroup_;
+            currentShaderParameterGroup_.first = shaderParameters_.Size();
+            currentShaderParameterGroup_.second = currentShaderParameterGroup_.first;
+        }
     }
 
     /// Add shader resource.
@@ -500,23 +516,32 @@ public:
             for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
             {
                 const auto group = static_cast<ShaderParameterGroup>(i);
-                /*const auto range = drawOp.shaderParameters_[i];
-                if (!graphics->NeedParameterUpdate(group, reinterpret_cast<void*>(range.first)))
-                    continue;
-
-                shaderParameters_.ForEach(range.first, range.second, shaderParameterSetter);*/
-                if (drawOp.constantBuffers_[i].size_ != 0)
+                if (useConstantBuffers_)
                 {
-                    constantBufferRanges[i].constantBuffer_ = constantBuffers[drawOp.constantBuffers_[i].constantBufferIndex_];
-                    constantBufferRanges[i].offset_ = drawOp.constantBuffers_[i].offset_;
-                    constantBufferRanges[i].size_ = drawOp.constantBuffers_[i].size_;
+                    if (drawOp.constantBuffers_[i].size_ != 0)
+                    {
+                        constantBufferRanges[i].constantBuffer_ = constantBuffers[drawOp.constantBuffers_[i].constantBufferIndex_];
+                        constantBufferRanges[i].offset_ = drawOp.constantBuffers_[i].offset_;
+                        constantBufferRanges[i].size_ = drawOp.constantBuffers_[i].size_;
+                    }
+                    else
+                    {
+                        constantBufferRanges[i] = ConstantBufferRange{};
+                    }
                 }
                 else
                 {
-                    constantBufferRanges[i] = ConstantBufferRange{};
+                    const auto range = drawOp.shaderParameters_[i];
+                    if (!graphics->NeedParameterUpdate(group, reinterpret_cast<void*>(range.first)))
+                        continue;
+
+                    shaderParameters_.ForEach(range.first, range.second, shaderParameterSetter);
                 }
             }
-            graphics->SetShaderConstantBuffers(constantBufferRanges);
+            if (useConstantBuffers_)
+            {
+                graphics->SetShaderConstantBuffers(constantBufferRanges);
+            }
 
             // Draw
             if (drawOp.instanceCount_ != 0)
@@ -545,6 +570,9 @@ public:
     }
 
 private:
+    /// Whether to use constant buffers.
+    bool useConstantBuffers_{};
+
     /// Shader parameters
     ShaderParameterCollection shaderParameters_;
     /// Constant buffers.
@@ -1099,7 +1127,7 @@ void CustomView::Render()
 
     // Collect batches
     static DrawOperationQueue drawQueue;
-    drawQueue.Reset();
+    drawQueue.Reset(graphics_);
 
     Material* currentMaterial = nullptr;
     for (const ForwardBaseBatch& batch : forwardBaseBatches)

@@ -331,8 +331,9 @@ public:
     }
 
     /// Clear.
-    void Clear()
+    void Clear(unsigned alignment)
     {
+        alignment_ = alignment;
         currentBufferIndex_ = 0;
         for (auto& buffer : buffers_)
             buffer.second = 0;

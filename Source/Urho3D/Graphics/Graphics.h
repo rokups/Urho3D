@@ -142,7 +142,7 @@ struct ConstantBufferRange
 {
     /// Constant buffer.
     ConstantBuffer* constantBuffer_{};
-    /// Offset in buffer.
+    /// Offset in buffer. Shall be multiply of constant buffer offset alignment.
     unsigned offset_{};
     /// Size of region.
     unsigned size_{};
@@ -518,6 +518,9 @@ public:
 
     /// Return whether constant buffers are enabled.
     bool GetConstantBuffersEnabled() const { return constantBuffersEnabled_; }
+
+    /// Return constant buffer offset alignment.
+    unsigned GetConstantBuffersOffsetAlignment() const { return constantBufferOffsetAlignment_; }
 
     /// Return supported fullscreen resolutions (third component is refreshRate). Will be empty if listing the resolutions is not supported on the platform (e.g. Web).
     /// @property
