@@ -151,10 +151,6 @@ private:
     unsigned textureTypes_[MAX_TEXTURE_UNITS]{};
     /// Constant buffer search map.
     ConstantBufferMap allConstantBuffers_;
-    /// Currently bound constant buffers.
-    ConstantBuffer* constantBuffers_[MAX_SHADER_PARAMETER_GROUPS * 2]{};
-    /// Dirty constant buffers.
-    ea::vector<ConstantBuffer*> dirtyConstantBuffers_;
     /// Last used instance data offset.
     unsigned lastInstanceOffset_{};
     /// Map for additional depth textures, to emulate Direct3D9 ability to mix render texture and backbuffer rendering.

@@ -443,7 +443,7 @@ public:
         for (unsigned i = 0; i < numConstantBuffers; ++i)
         {
             constantBuffers[i] = graphics->GetOrCreateConstantBuffer(VS, i, constantBuffers_.GetBufferSize(i));
-            constantBuffers[i]->SetGPUData(constantBuffers_.GetBufferData(i));
+            constantBuffers[i]->Update(constantBuffers_.GetBufferData(i));
         }
 
         graphics->ClearParameterSources();

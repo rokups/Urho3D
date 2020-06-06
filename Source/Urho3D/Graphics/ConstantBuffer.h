@@ -54,28 +54,15 @@ public:
 
     /// Set size and create GPU-side buffer. Return true on success.
     bool SetSize(unsigned size);
-    /// Set a generic parameter and mark buffer dirty.
-    void SetParameter(unsigned offset, unsigned size, const void* data);
-    /// Set a Vector3 array parameter and mark buffer dirty.
-    void SetVector3ArrayParameter(unsigned offset, unsigned rows, const void* data);
-    /// Apply to GPU.
-    void Apply();
-    /// Set data to GPU directly.
-    void SetGPUData(const void* data);
+    /// Update data on GPU.
+    void Update(const void* data);
 
     /// Return size.
     unsigned GetSize() const { return size_; }
 
-    /// Return whether has unapplied data.
-    bool IsDirty() const { return dirty_; }
-
 private:
-    /// Shadow data.
-    ea::unique_ptr<unsigned char[]> shadowData_;
     /// Buffer byte size.
     unsigned size_{};
-    /// Dirty flag.
-    bool dirty_{};
 };
 
 }

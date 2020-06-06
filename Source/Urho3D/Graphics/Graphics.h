@@ -146,6 +146,17 @@ struct ConstantBufferRange
     unsigned offset_{};
     /// Size of region.
     unsigned size_{};
+
+    /// Compare equal.
+    bool operator ==(const ConstantBufferRange& rhs) const
+    {
+        return constantBuffer_ == rhs.constantBuffer_
+            && offset_ == rhs.offset_
+            && size_ == rhs.size_;
+    }
+
+    /// Compare not equal.
+    bool operator !=(const ConstantBufferRange& rhs) const { return !(*this == rhs); }
 };
 
 /// %Graphics subsystem. Manages the application window, rendering state and GPU resources.
@@ -202,6 +213,8 @@ public:
     /// Set allowed screen orientations as a space-separated list of "LandscapeLeft", "LandscapeRight", "Portrait" and "PortraitUpsideDown". Affects currently only iOS platform.
     /// @property
     void SetOrientations(const ea::string& orientations);
+    /// Set whether constant buffers are enabled. Ignored if constant buffers are not supported.
+    void SetEnableConstantBuffers(bool enable);
     /// Toggle between full screen and windowed mode. Return true if successful.
     bool ToggleFullscreen();
     /// Close the window.
@@ -499,6 +512,12 @@ public:
 
     /// Return max pixel shader uniforms support.
     unsigned GetMaxPixelShaderUniforms() const { return maxPixelShaderUniforms_; }
+
+    /// Return whether constant buffers are support.
+    bool GetConstantBuffersSupport() const { return constantBuffersSupport_; }
+
+    /// Return whether constant buffers are enabled.
+    bool GetConstantBuffersEnabled() const { return constantBuffersEnabled_; }
 
     /// Return supported fullscreen resolutions (third component is refreshRate). Will be empty if listing the resolutions is not supported on the platform (e.g. Web).
     /// @property
@@ -848,6 +867,12 @@ private:
     unsigned maxVertexShaderUniforms_{};
     /// Max number of pixel shader uniforms.
     unsigned maxPixelShaderUniforms_{};
+	/// Constant buffers support flag.
+    bool constantBuffersSupport_{};
+    /// Whether the constant buffers are enabled.
+    bool constantBuffersEnabled_{};
+    /// Constant buffer offset alignment.
+    unsigned constantBufferOffsetAlignment_{};
     /// Number of primitives this frame.
     unsigned numPrimitives_{};
     /// Number of batches this frame.
@@ -882,6 +907,8 @@ private:
     ea::unordered_map<ea::string, TextureUnit> textureUnits_;
     /// Rendertargets in use.
     RenderSurface* renderTargets_[MAX_RENDERTARGETS]{};
+    /// Constan buffer ranges in use.
+    ConstantBufferRange constantBuffers_[MAX_SHADER_PARAMETER_GROUPS]{};
     /// Depth-stencil surface in use.
     RenderSurface* depthStencil_{};
     /// Viewport coordinates.

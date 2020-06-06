@@ -46,7 +46,6 @@ void ConstantBuffer::Release()
         object_.name_ = 0;
     }
 
-    shadowData_.reset();
     size_ = 0;
 }
 
@@ -69,9 +68,6 @@ bool ConstantBuffer::SetSize(unsigned size)
     size &= 0xfffffff0;
 
     size_ = size;
-    dirty_ = false;
-    shadowData_.reset(new unsigned char[size_]);
-    memset(shadowData_.get(), 0, size_);
 
     if (graphics_)
     {
@@ -79,26 +75,13 @@ bool ConstantBuffer::SetSize(unsigned size)
         if (!object_.name_)
             glGenBuffers(1, &object_.name_);
         graphics_->SetUBO(object_.name_);
-        glBufferData(GL_UNIFORM_BUFFER, size_, shadowData_.get(), GL_DYNAMIC_DRAW);
 #endif
     }
 
     return true;
 }
 
-void ConstantBuffer::Apply()
-{
-    if (dirty_ && object_.name_)
-    {
-#ifndef GL_ES_VERSION_2_0
-        graphics_->SetUBO(object_.name_);
-        glBufferData(GL_UNIFORM_BUFFER, size_, shadowData_.get(), GL_DYNAMIC_DRAW);
-#endif
-        dirty_ = false;
-    }
-}
-
-void ConstantBuffer::SetGPUData(const void* data)
+void ConstantBuffer::Update(const void* data)
 {
     if (object_.name_)
     {
@@ -106,7 +89,6 @@ void ConstantBuffer::SetGPUData(const void* data)
         graphics_->SetUBO(object_.name_);
         glBufferData(GL_UNIFORM_BUFFER, size_, data, GL_DYNAMIC_DRAW);
 #endif
-        dirty_ = false;
     }
 }
 

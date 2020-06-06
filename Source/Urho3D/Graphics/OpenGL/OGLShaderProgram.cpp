@@ -56,7 +56,6 @@ static unsigned NumberPostfix(const ea::string& str)
 }
 
 unsigned ShaderProgram::globalFrameNumber = 0;
-const void* ShaderProgram::globalParameterSources[MAX_SHADER_PARAMETER_GROUPS];
 
 ShaderProgram::ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, ShaderVariation* pixelShader) :
     GPUObject(graphics),
@@ -108,8 +107,6 @@ void ShaderProgram::Release()
 
         for (bool& useTextureUnit : useTextureUnits_)
             useTextureUnit = false;
-        for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
-            constantBuffers_[i].Reset();
     }
 }
 
@@ -238,20 +235,9 @@ bool ShaderProgram::Link()
             // Register in layout
             AddConstantBuffer(static_cast<ShaderParameterGroup>(group), static_cast<unsigned>(dataSize));
 
-            unsigned bindingIndex = group;
-            // Vertex shader constant buffer bindings occupy slots starting from zero to maximum supported, pixel shader bindings
-            // from that point onward
-            ShaderType shaderType = VS;
-            /*if (name.contains("PS", false))
-            {
-                bindingIndex += MAX_SHADER_PARAMETER_GROUPS;
-                shaderType = PS;
-            }*/
-
+            const unsigned bindingIndex = group;
             glUniformBlockBinding(object_.name_, blockIndex, bindingIndex);
             blockToBinding[blockIndex] = bindingIndex;
-
-            constantBuffers_[bindingIndex] = graphics_->GetOrCreateConstantBuffer(shaderType, bindingIndex, (unsigned)dataSize);
         }
     }
 #endif
@@ -280,7 +266,8 @@ bool ShaderProgram::Link()
             // Store constant uniform
             ea::string paramName = name.substr(1);
             ShaderParameter parameter{paramName, type, location};
-            bool store = location >= 0;
+            if (location >= 0)
+                shaderParameters_[StringHash(paramName)] = parameter;
 
 #ifndef GL_ES_VERSION_2_0
             // If running OpenGL 3, the uniform may be inside a constant buffer
@@ -291,20 +278,13 @@ bool ShaderProgram::Link()
                 glGetActiveUniformsiv(object_.name_, 1, (const GLuint*)&i, GL_UNIFORM_OFFSET, &blockOffset);
                 if (blockIndex >= 0)
                 {
-                    parameter.offset_ = blockOffset;
-                    parameter.bufferPtr_ = constantBuffers_[blockToBinding[blockIndex]];
-                    store = true;
-
                     // Register in layout
                     const unsigned parameterGroup = blockToBinding[blockIndex] % MAX_SHADER_PARAMETER_GROUPS;
-                    AddConstantBufferParameter(parameter.name_,
-                        static_cast<ShaderParameterGroup>(parameterGroup), parameter.offset_);
+                    AddConstantBufferParameter(paramName,
+                        static_cast<ShaderParameterGroup>(parameterGroup), blockOffset);
                 }
             }
 #endif
-
-            if (store)
-                shaderParameters_[StringHash(paramName)] = parameter;
         }
         else if (location >= 0 && name[0] == 's')
         {
@@ -363,26 +343,6 @@ bool ShaderProgram::NeedParameterUpdate(ShaderParameterGroup group, const void* 
         frameNumber_ = globalFrameNumber;
     }
 
-    // The shader program may use a mixture of constant buffers and individual uniforms even in the same group
-#ifndef GL_ES_VERSION_2_0
-    bool useBuffer = constantBuffers_[group] || constantBuffers_[group + MAX_SHADER_PARAMETER_GROUPS];
-    bool useIndividual = !constantBuffers_[group] || !constantBuffers_[group + MAX_SHADER_PARAMETER_GROUPS];
-    bool needUpdate = false;
-
-    if (useBuffer && globalParameterSources[group] != source)
-    {
-        globalParameterSources[group] = source;
-        needUpdate = true;
-    }
-
-    if (useIndividual && parameterSources_[group] != source)
-    {
-        parameterSources_[group] = source;
-        needUpdate = true;
-    }
-
-    return needUpdate;
-#else
     if (parameterSources_[group] != source)
     {
         parameterSources_[group] = source;
@@ -390,23 +350,11 @@ bool ShaderProgram::NeedParameterUpdate(ShaderParameterGroup group, const void* 
     }
     else
         return false;
-#endif
 }
 
 void ShaderProgram::ClearParameterSource(ShaderParameterGroup group)
 {
-    // The shader program may use a mixture of constant buffers and individual uniforms even in the same group
-#ifndef GL_ES_VERSION_2_0
-    bool useBuffer = constantBuffers_[group] || constantBuffers_[group + MAX_SHADER_PARAMETER_GROUPS];
-    bool useIndividual = !constantBuffers_[group] || !constantBuffers_[group + MAX_SHADER_PARAMETER_GROUPS];
-
-    if (useBuffer)
-        globalParameterSources[group] = (const void*)(uintptr_t)M_MAX_UNSIGNED;
-    if (useIndividual)
-        parameterSources_[group] = (const void*)(uintptr_t)M_MAX_UNSIGNED;
-#else
     parameterSources_[group] = (const void*)(uintptr_t)M_MAX_UNSIGNED;
-#endif
 }
 
 void ShaderProgram::ClearParameterSources()
@@ -414,16 +362,10 @@ void ShaderProgram::ClearParameterSources()
     ++globalFrameNumber;
     if (!globalFrameNumber)
         ++globalFrameNumber;
-
-#ifndef GL_ES_VERSION_2_0
-    for (auto& globalParameterSource : globalParameterSources)
-        globalParameterSource = (const void*)(uintptr_t)M_MAX_UNSIGNED;
-#endif
 }
 
 void ShaderProgram::ClearGlobalParameterSource(ShaderParameterGroup group)
 {
-    globalParameterSources[group] = (const void*)(uintptr_t)M_MAX_UNSIGNED;
 }
 
 }

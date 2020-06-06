@@ -75,9 +75,6 @@ public:
     /// Return attribute location use bitmask.
     unsigned GetUsedVertexAttributes() const { return usedVertexAttributes_; }
 
-    /// Return all constant buffers.
-    const SharedPtr<ConstantBuffer>* GetConstantBuffers() const { return &constantBuffers_[0]; }
-
     /// Check whether a shader parameter group needs update. Does not actually check whether parameters exist in the shaders.
     bool NeedParameterUpdate(ShaderParameterGroup group, const void* source);
     /// Clear a parameter source. Affects only the current shader program if appropriate.
@@ -101,8 +98,6 @@ private:
     ea::unordered_map<ea::pair<unsigned char, unsigned char>, unsigned> vertexAttributes_;
     /// Used vertex attribute location bitmask.
     unsigned usedVertexAttributes_{};
-    /// Constant buffers by binding index.
-    SharedPtr<ConstantBuffer> constantBuffers_[MAX_SHADER_PARAMETER_GROUPS * 2];
     /// Remembered shader parameter sources for individual uniform mode.
     const void* parameterSources_[MAX_SHADER_PARAMETER_GROUPS]{};
     /// Shader link error string.
@@ -112,8 +107,6 @@ private:
 
     /// Global shader parameter source framenumber.
     static unsigned globalFrameNumber;
-    /// Remembered global shader parameter sources for constant buffer mode.
-    static const void* globalParameterSources[MAX_SHADER_PARAMETER_GROUPS];
 };
 
 }
