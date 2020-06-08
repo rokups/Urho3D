@@ -79,6 +79,9 @@ protected:
             const unsigned offset = item.second.second;
             CombineHash(constantBufferHashes_[group], paramName.Value());
             CombineHash(constantBufferHashes_[group], offset);
+
+            if (constantBufferHashes_[group] == 0)
+                constantBufferHashes_[group] = 1;
         }
     }
 

@@ -306,6 +306,7 @@ public:
         currentShaderParameterGroup_ = {};
         currentShaderResourceGroup_ = {};
         currentDrawOp_ = {};
+        memset(currentConstantBufferHashes_, 0, sizeof(currentConstantBufferHashes_));
     }
 
     /// Set pipeline state.
@@ -320,13 +321,23 @@ public:
     {
         if (useConstantBuffers_)
         {
-            const unsigned size = currentConstantBufferLayout_->GetConstantBufferSize(group);
-            const auto& buffer = constantBuffers_.AddBlock(size);
+            const unsigned currentHash = currentConstantBufferLayout_->GetConstantBufferHash(group);
+            if (force || currentHash != currentConstantBufferHashes_[group])
+            {
+                const unsigned size = currentConstantBufferLayout_->GetConstantBufferSize(group);
+                const auto& buffer = constantBuffers_.AddBlock(size);
 
-            currentDrawOp_.constantBuffers_[group] = buffer.first;
-            currentConstantBufferData_ = buffer.second;
+                currentDrawOp_.constantBuffers_[group] = buffer.first;
+                currentConstantBufferData_ = buffer.second;
+                currentConstantBufferHashes_[group] = currentHash;
+                return true;
+            }
+            return false;
         }
-        return true;
+        else
+        {
+            return force || currentDrawOp_.shaderParameters_[group].first == currentDrawOp_.shaderParameters_[group].second;
+        }
     }
 
     /// Add shader parameter.
@@ -594,6 +605,8 @@ private:
     ConstantBufferLayout* currentConstantBufferLayout_{};
     /// Current pointer to constant buffer data.
     unsigned char* currentConstantBufferData_{};
+    /// Current constant buffer layout hashes.
+    unsigned currentConstantBufferHashes_[MAX_SHADER_PARAMETER_GROUPS]{};
 };
 
 Vector4 GetCameraDepthModeParameter(const Camera* camera)
@@ -1130,17 +1143,19 @@ void CustomView::Render()
     drawQueue.Reset(graphics_);
 
     Material* currentMaterial = nullptr;
+    bool first = true;
+    const auto zone = octree_->GetZone();
     for (const ForwardBaseBatch& batch : forwardBaseBatches)
     {
         auto geometry = batch.geometry_;
         auto light = batch.mainDirectionalLight_;
         const SourceBatch& sourceBatch = *batch.sourceBatch_;
         drawQueue.SetPipelineState(batch.pipelineState_);
-        FillGlobalSharedParameters(drawQueue, frameInfo_, camera_, octree_->GetZone(), scene_);
+        FillGlobalSharedParameters(drawQueue, frameInfo_, camera_, zone, scene_);
         SphericalHarmonicsDot9 sh;
         if (batch.material_ != currentMaterial)
         {
-            if (drawQueue.BeginShaderParameterGroup(SP_MATERIAL))
+            if (drawQueue.BeginShaderParameterGroup(SP_MATERIAL, true))
             {
             currentMaterial = batch.material_;
             const auto& parameters = batch.material_->GetShaderParameters();
@@ -1155,7 +1170,7 @@ void CustomView::Render()
             drawQueue.CommitShaderResourceGroup();
         }
 
-        if (drawQueue.BeginShaderParameterGroup(SP_OBJECT))
+        if (drawQueue.BeginShaderParameterGroup(SP_OBJECT, true))
         {
         drawQueue.AddShaderParameter(VSP_SHAR, sh.Ar_);
         drawQueue.AddShaderParameter(VSP_SHAG, sh.Ag_);
@@ -1168,8 +1183,9 @@ void CustomView::Render()
         drawQueue.CommitShaderParameterGroup(SP_OBJECT);
         }
 
-        if (drawQueue.BeginShaderParameterGroup(SP_LIGHT))
+        if (drawQueue.BeginShaderParameterGroup(SP_LIGHT, first))
         {
+            first = false;
         Node* lightNode = light->GetNode();
         float atten = 1.0f / Max(light->GetRange(), M_EPSILON);
         Vector3 lightDir(lightNode->GetWorldRotation() * Vector3::BACK);

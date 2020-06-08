@@ -348,7 +348,7 @@ public:
         if (bufferSize_ - buffers_[currentBufferIndex_].second < alignedSize)
         {
             ++currentBufferIndex_;
-            if (buffers_.size() >= currentBufferIndex_)
+            if (buffers_.size() <= currentBufferIndex_)
                 AllocateBuffer();
         }
 
