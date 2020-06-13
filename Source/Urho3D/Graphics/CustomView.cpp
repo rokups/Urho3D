@@ -809,7 +809,7 @@ void CustomView::Render()
             const auto& textures = batch.material_->GetTextures();
             for (const auto& item : textures)
                 drawQueue.AddShaderResource(item.first, item.second);
-            drawQueue.CommitShaderResourceGroup();
+            drawQueue.CommitShaderResources();
         }
 
         if (drawQueue.BeginShaderParameterGroup(SP_OBJECT, true))

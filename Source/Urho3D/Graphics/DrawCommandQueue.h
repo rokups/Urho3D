@@ -34,8 +34,8 @@ namespace Urho3D
 /// Collection of shader resources.
 using ShaderResourceCollection = ea::vector<ea::pair<TextureUnit, Texture*>>;
 
-/// Shader parameter group, range in array.
-using ShaderParameterRange = ea::pair<unsigned, unsigned>;
+/// Shader parameter group, range in array. Plain old data.
+struct ShaderParameterRange { unsigned first; unsigned second; };
 
 /// Shader resource group, range in array.
 using ShaderResourceRange = ea::pair<unsigned, unsigned>;
@@ -50,10 +50,14 @@ struct DrawCommandDescription
     /// Vertex buffers.
     ea::array<VertexBuffer*, MAX_VERTEX_STREAMS> vertexBuffers_{};
 
-    /// Shader parameters bound to the command.
-    ea::array<ShaderParameterRange, MAX_SHADER_PARAMETER_GROUPS> shaderParameters_{};
-    /// Constant buffers bound to the command.
-    ea::array<ConstantBufferRef, MAX_SHADER_PARAMETER_GROUPS> constantBuffers_{};
+    union
+    {
+        /// Shader parameters bound to the command.
+        ea::array<ShaderParameterRange, MAX_SHADER_PARAMETER_GROUPS> shaderParameters_;
+        /// Constant buffers bound to the command.
+        ea::array<ConstantBufferCollectionRef, MAX_SHADER_PARAMETER_GROUPS> constantBuffers_;
+    };
+
     /// Shader resources bound to the command.
     ShaderResourceRange shaderResources_;
 
@@ -78,76 +82,102 @@ public:
     {
         useConstantBuffers_ = graphics->GetConstantBuffersEnabled();
 
-        shaderParameters_.Clear();
-        constantBuffers_.Clear(graphics->GetConstantBuffersOffsetAlignment());
-        shaderResources_.clear();
-        drawOps_.clear();
-
-        currentShaderParameterGroup_ = {};
+        // Reset state accumulators
+        currentDrawCommand_ = {};
         currentShaderResourceGroup_ = {};
-        currentDrawOp_ = {};
-        memset(currentConstantBufferHashes_, 0, sizeof(currentConstantBufferHashes_));
+
+        // Clear shadep parameters
+        if (useConstantBuffers_)
+        {
+            constantBuffers_.collection_.ClearAndInitialize(graphics->GetConstantBuffersOffsetAlignment());
+            constantBuffers_.currentLayout_ = nullptr;
+            constantBuffers_.currentData_ = nullptr;
+            constantBuffers_.currentHashes_.fill(0);
+
+            currentDrawCommand_.constantBuffers_.fill({});
+        }
+        else
+        {
+            shaderParameters_.collection_.Clear();
+            shaderParameters_.currentGroupRange_ = {};
+
+            currentDrawCommand_.shaderParameters_.fill({});
+        }
+
+        // Clear arrays and draw commands
+        shaderResources_.clear();
+        drawCommands_.clear();
     }
 
-    /// Set pipeline state.
+    /// Set pipeline state. Must be called first.
     void SetPipelineState(PipelineState* pipelineState)
     {
-        currentDrawOp_.pipelineState_ = pipelineState;
-        currentConstantBufferLayout_ = pipelineState->GetDesc().constantBufferLayout_;
+        currentDrawCommand_.pipelineState_ = pipelineState;
+
+        if (useConstantBuffers_)
+        {
+            constantBuffers_.currentLayout_ = pipelineState->GetDesc().constantBufferLayout_;
+        }
     }
 
-    /// Begin shader parameter group.
-    bool BeginShaderParameterGroup(ShaderParameterGroup group, bool force = false)
+    /// Begin shader parameter group. All parameters shall be set for each draw command.
+    bool BeginShaderParameterGroup(ShaderParameterGroup group, bool differentFromPrevious = false)
     {
         if (useConstantBuffers_)
         {
-            const unsigned currentHash = currentConstantBufferLayout_->GetConstantBufferHash(group);
-            if (force || currentHash != currentConstantBufferHashes_[group])
+            // Allocate new block if buffer layout is different or new data arrived
+            const unsigned groupLayoutHash = constantBuffers_.currentLayout_->GetConstantBufferHash(group);
+            if (differentFromPrevious || groupLayoutHash != constantBuffers_.currentHashes_[group])
             {
-                const unsigned size = currentConstantBufferLayout_->GetConstantBufferSize(group);
-                const auto& buffer = constantBuffers_.AddBlock(size);
+                const unsigned size = constantBuffers_.currentLayout_->GetConstantBufferSize(group);
+                const auto& refAndData = constantBuffers_.collection_.AddBlock(size);
 
-                currentDrawOp_.constantBuffers_[group] = buffer.first;
-                currentConstantBufferData_ = buffer.second;
-                currentConstantBufferHashes_[group] = currentHash;
+                currentDrawCommand_.constantBuffers_[group] = refAndData.first;
+                constantBuffers_.currentData_ = refAndData.second;
+                constantBuffers_.currentHashes_[group] = groupLayoutHash;
                 return true;
             }
             return false;
         }
         else
         {
-            return force || currentDrawOp_.shaderParameters_[group].first == currentDrawOp_.shaderParameters_[group].second;
+            // Allocate new group if different from previous or group is not initialized yet
+            const ShaderParameterRange& groupRange = currentDrawCommand_.shaderParameters_[group];
+            const bool groupInitialized = groupRange.first == groupRange.second;
+            return differentFromPrevious || !groupInitialized;
         }
     }
 
-    /// Add shader parameter.
+    /// Add shader parameter. Shall be called only if BeginShaderParameterGroup returned true.
     template <class T>
     void AddShaderParameter(StringHash name, const T& value)
     {
         if (useConstantBuffers_)
         {
-            const auto paramInfo = currentConstantBufferLayout_->GetConstantBufferParameter(name);
+            const auto paramInfo = constantBuffers_.currentLayout_->GetConstantBufferParameter(name);
             if (paramInfo.second != M_MAX_UNSIGNED)
-                ConstantBufferCollection::StoreParameter(currentConstantBufferData_ + paramInfo.second, value);
+                ConstantBufferCollection::StoreParameter(constantBuffers_.currentData_ + paramInfo.second, value);
         }
         else
         {
-            shaderParameters_.AddParameter(name, value);
-            ++currentShaderParameterGroup_.second;
+            shaderParameters_.collection_.AddParameter(name, value);
+            ++shaderParameters_.currentGroupRange_.second;
         }
     }
 
-    /// Commit shader parameter group.
+    /// Commit shader parameter group. Shall be called only if BeginShaderParameterGroup returned true.
     void CommitShaderParameterGroup(ShaderParameterGroup group)
     {
         if (useConstantBuffers_)
         {
+            // All data is already stored, nothing to do
         }
         else
         {
-            currentDrawOp_.shaderParameters_[static_cast<unsigned>(group)] = currentShaderParameterGroup_;
-            currentShaderParameterGroup_.first = shaderParameters_.Size();
-            currentShaderParameterGroup_.second = currentShaderParameterGroup_.first;
+            // Store range in draw op
+            currentDrawCommand_.shaderParameters_[static_cast<unsigned>(group)] = shaderParameters_.currentGroupRange_;
+            shaderParameters_.currentGroupRange_.first = shaderParameters_.collection_.Size();
+            shaderParameters_.currentGroupRange_.second = shaderParameters_.currentGroupRange_.first;
         }
     }
 
@@ -158,87 +188,87 @@ public:
         ++currentShaderResourceGroup_.second;
     }
 
-    /// Commit shader resource group.
-    void CommitShaderResourceGroup()
+    /// Commit shader resources added since previous commit.
+    void CommitShaderResources()
     {
-        currentDrawOp_.shaderResources_ = currentShaderResourceGroup_;
+        currentDrawCommand_.shaderResources_ = currentShaderResourceGroup_;
         currentShaderResourceGroup_.first = shaderResources_.size();
         currentShaderResourceGroup_.second = currentShaderResourceGroup_.first;
     }
 
-    /// Set buffers.
+    /// Set vertex and index buffers.
     void SetBuffers(ea::span<VertexBuffer*> vertexBuffers, IndexBuffer* indexBuffer)
     {
-        ea::copy(vertexBuffers.begin(), vertexBuffers.end(), currentDrawOp_.vertexBuffers_.begin());
-        currentDrawOp_.indexBuffer_ = indexBuffer;
+        ea::copy(vertexBuffers.begin(), vertexBuffers.end(), currentDrawCommand_.vertexBuffers_.begin());
+        currentDrawCommand_.indexBuffer_ = indexBuffer;
     }
 
-    /// Set buffers.
+    /// Set vertex and index buffers.
     void SetBuffers(const ea::vector<SharedPtr<VertexBuffer>>& vertexBuffers, IndexBuffer* indexBuffer)
     {
-        ea::copy(vertexBuffers.begin(), vertexBuffers.end(), currentDrawOp_.vertexBuffers_.begin());
-        currentDrawOp_.indexBuffer_ = indexBuffer;
+        ea::copy(vertexBuffers.begin(), vertexBuffers.end(), currentDrawCommand_.vertexBuffers_.begin());
+        currentDrawCommand_.indexBuffer_ = indexBuffer;
     }
 
-    /// Draw non-indexed geometry.
+    /// Enqueue draw non-indexed geometry.
     void Draw(unsigned vertexStart, unsigned vertexCount)
     {
-        currentDrawOp_.indexBuffer_ = nullptr;
-        currentDrawOp_.indexStart_ = vertexStart;
-        currentDrawOp_.indexCount_ = vertexCount;
-        currentDrawOp_.baseVertexIndex_ = 0;
-        currentDrawOp_.instanceStart_ = 0;
-        currentDrawOp_.instanceCount_ = 0;
-        drawOps_.push_back(currentDrawOp_);
+        currentDrawCommand_.indexBuffer_ = nullptr;
+        currentDrawCommand_.indexStart_ = vertexStart;
+        currentDrawCommand_.indexCount_ = vertexCount;
+        currentDrawCommand_.baseVertexIndex_ = 0;
+        currentDrawCommand_.instanceStart_ = 0;
+        currentDrawCommand_.instanceCount_ = 0;
+        drawCommands_.push_back(currentDrawCommand_);
     }
 
-    /// Draw indexed geometry.
+    /// Enqueue draw indexed geometry.
     void DrawIndexed(unsigned indexStart, unsigned indexCount)
     {
-        assert(currentDrawOp_.indexBuffer_);
-        currentDrawOp_.indexStart_ = indexStart;
-        currentDrawOp_.indexCount_ = indexCount;
-        currentDrawOp_.baseVertexIndex_ = 0;
-        currentDrawOp_.instanceStart_ = 0;
-        currentDrawOp_.instanceCount_ = 0;
-        drawOps_.push_back(currentDrawOp_);
+        assert(currentDrawCommand_.indexBuffer_);
+        currentDrawCommand_.indexStart_ = indexStart;
+        currentDrawCommand_.indexCount_ = indexCount;
+        currentDrawCommand_.baseVertexIndex_ = 0;
+        currentDrawCommand_.instanceStart_ = 0;
+        currentDrawCommand_.instanceCount_ = 0;
+        drawCommands_.push_back(currentDrawCommand_);
     }
 
-    /// Draw indexed geometry with vertex index offset.
+    /// Enqueue draw indexed geometry with vertex index offset.
     void DrawIndexed(unsigned indexStart, unsigned indexCount, unsigned baseVertexIndex)
     {
-        assert(currentDrawOp_.indexBuffer_);
-        currentDrawOp_.indexStart_ = indexStart;
-        currentDrawOp_.indexCount_ = indexCount;
-        currentDrawOp_.baseVertexIndex_ = baseVertexIndex;
-        currentDrawOp_.instanceStart_ = 0;
-        currentDrawOp_.instanceCount_ = 0;
-        drawOps_.push_back(currentDrawOp_);
+        assert(currentDrawCommand_.indexBuffer_);
+        currentDrawCommand_.indexStart_ = indexStart;
+        currentDrawCommand_.indexCount_ = indexCount;
+        currentDrawCommand_.baseVertexIndex_ = baseVertexIndex;
+        currentDrawCommand_.instanceStart_ = 0;
+        currentDrawCommand_.instanceCount_ = 0;
+        drawCommands_.push_back(currentDrawCommand_);
     }
 
-    /// Draw indexed, instanced geometry.
+    /// Enqueue draw indexed, instanced geometry.
     void DrawIndexedInstanced(unsigned indexStart, unsigned indexCount, unsigned instanceStart, unsigned instanceCount)
     {
-        assert(currentDrawOp_.indexBuffer_);
-        currentDrawOp_.indexStart_ = indexStart;
-        currentDrawOp_.indexCount_ = indexCount;
-        currentDrawOp_.baseVertexIndex_ = 0;
-        currentDrawOp_.instanceStart_ = instanceStart;
-        currentDrawOp_.instanceCount_ = instanceCount;
-        drawOps_.push_back(currentDrawOp_);
+        assert(currentDrawCommand_.indexBuffer_);
+        currentDrawCommand_.indexStart_ = indexStart;
+        currentDrawCommand_.indexCount_ = indexCount;
+        currentDrawCommand_.baseVertexIndex_ = 0;
+        currentDrawCommand_.instanceStart_ = instanceStart;
+        currentDrawCommand_.instanceCount_ = instanceCount;
+        drawCommands_.push_back(currentDrawCommand_);
     }
 
-    /// Draw indexed, instanced geometry with vertex index offset.
+    /// Enqueue draw indexed, instanced geometry with vertex index offset.
     void DrawIndexedInstanced(unsigned indexStart, unsigned indexCount, unsigned baseVertexIndex,
         unsigned instanceStart, unsigned instanceCount)
     {
-        assert(currentDrawOp_.indexBuffer_);
-        currentDrawOp_.indexStart_ = indexStart;
-        currentDrawOp_.indexCount_ = indexCount;
-        currentDrawOp_.baseVertexIndex_ = baseVertexIndex;
-        currentDrawOp_.instanceStart_ = instanceStart;
-        currentDrawOp_.instanceCount_ = instanceCount;
-        drawOps_.push_back(currentDrawOp_);
+        assert(currentDrawCommand_.indexBuffer_);
+        currentDrawCommand_.indexStart_ = indexStart;
+        currentDrawCommand_.indexCount_ = indexCount;
+        currentDrawCommand_.baseVertexIndex_ = baseVertexIndex;
+        currentDrawCommand_.instanceStart_ = instanceStart;
+        currentDrawCommand_.instanceCount_ = instanceCount;
+        drawCommands_.push_back(currentDrawCommand_);
     }
 
     /// Execute commands in the queue.
@@ -248,29 +278,39 @@ private:
     /// Whether to use constant buffers.
     bool useConstantBuffers_{};
 
-    /// Shader parameters
-    ShaderParameterCollection shaderParameters_;
-    /// Constant buffers.
-    ConstantBufferCollection constantBuffers_;
+    /// Shader parameters data when constant buffers are not used.
+    struct ShaderParametersData
+    {
+        /// Shader parameters collection.
+        ShaderParameterCollection collection_;
+
+        /// Current shader parameter group range.
+        ShaderParameterRange currentGroupRange_;
+    } shaderParameters_;
+
+    /// Shader parameters data when constant buffers are used.
+    struct ConstantBuffersData
+    {
+        /// Constant buffers.
+        ConstantBufferCollection collection_;
+
+        /// Current constant buffer layout.
+        ConstantBufferLayout* currentLayout_{};
+        /// Current pointer to constant buffer data.
+        unsigned char* currentData_{};
+        /// Current constant buffer layout hashes.
+        ea::array<unsigned, MAX_SHADER_PARAMETER_GROUPS> currentHashes_{};
+    } constantBuffers_;
 
     /// Shader resources.
     ShaderResourceCollection shaderResources_;
     /// Draw operations.
-    ea::vector<DrawCommandDescription> drawOps_;
+    ea::vector<DrawCommandDescription> drawCommands_;
 
     /// Current draw operation.
-    DrawCommandDescription currentDrawOp_;
-    /// Current shader parameter group.
-    ShaderParameterRange currentShaderParameterGroup_;
+    DrawCommandDescription currentDrawCommand_;
     /// Current shader resource group.
     ShaderResourceRange currentShaderResourceGroup_;
-
-    /// Current constant buffer layout.
-    ConstantBufferLayout* currentConstantBufferLayout_{};
-    /// Current pointer to constant buffer data.
-    unsigned char* currentConstantBufferData_{};
-    /// Current constant buffer layout hashes.
-    unsigned currentConstantBufferHashes_[MAX_SHADER_PARAMETER_GROUPS]{};
 };
 
 }

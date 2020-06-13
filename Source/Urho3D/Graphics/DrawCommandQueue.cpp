@@ -32,118 +32,133 @@ namespace Urho3D
 
 void DrawCommandQueue::Execute(Graphics* graphics)
 {
-    const unsigned numConstantBuffers = constantBuffers_.GetNumBuffers();
+    // Constant buffers to store all shader parameters for queue
     ea::vector<SharedPtr<ConstantBuffer>> constantBuffers;
-    constantBuffers.resize(numConstantBuffers);
-    for (unsigned i = 0; i < numConstantBuffers; ++i)
-    {
-        constantBuffers[i] = graphics->GetOrCreateConstantBuffer(VS, i, constantBuffers_.GetBufferSize(i));
-        constantBuffers[i]->Update(constantBuffers_.GetBufferData(i));
-    }
 
-    graphics->ClearParameterSources();
-
+    // Utility to set shader parameters if constant buffers are not used
     const SharedParameterSetter shaderParameterSetter{ graphics };
 
+    // Prepare shader parameters
+    if (useConstantBuffers_)
+    {
+        const unsigned numConstantBuffers = constantBuffers_.collection_.GetNumBuffers();
+        constantBuffers.resize(numConstantBuffers);
+        for (unsigned i = 0; i < numConstantBuffers; ++i)
+        {
+            constantBuffers[i] = graphics->GetOrCreateConstantBuffer(VS, i, constantBuffers_.collection_.GetBufferSize(i));
+            constantBuffers[i]->Update(constantBuffers_.collection_.GetBufferData(i));
+        }
+    }
+    else
+    {
+        graphics->ClearParameterSources();
+    }
+
+    // Cached current state
     PipelineState* currentPipelineState = nullptr;
     IndexBuffer* currentIndexBuffer = nullptr;
     ea::array<VertexBuffer*, MAX_VERTEX_STREAMS> currentVertexBuffers{};
     unsigned currentShaderResources = M_MAX_UNSIGNED;
     PrimitiveType currentPrimitiveType{};
 
+    // Temporary collections
     ea::vector<VertexBuffer*> tempVertexBuffers;
-    ConstantBufferRange constantBufferRanges[MAX_SHADER_PARAMETER_GROUPS]{};
+    ea::array<ConstantBufferRange, MAX_SHADER_PARAMETER_GROUPS> constantBufferRanges{};
 
-    for (const DrawCommandDescription& drawOp : drawOps_)
+    for (const DrawCommandDescription& cmd : drawCommands_)
     {
-        // Apply pipeline state
-        if (drawOp.pipelineState_ != currentPipelineState)
+        // Set pipeline state
+        if (cmd.pipelineState_ != currentPipelineState)
         {
-            drawOp.pipelineState_->Apply();
-            currentPipelineState = drawOp.pipelineState_;
+            cmd.pipelineState_->Apply();
+            currentPipelineState = cmd.pipelineState_;
             currentPrimitiveType = currentPipelineState->GetDesc().primitiveType_;
         }
 
-        // Apply buffers
-        if (drawOp.indexBuffer_ != currentIndexBuffer)
+        // Set index buffer
+        if (cmd.indexBuffer_ != currentIndexBuffer)
         {
-            graphics->SetIndexBuffer(drawOp.indexBuffer_);
-            currentIndexBuffer = drawOp.indexBuffer_;
+            graphics->SetIndexBuffer(cmd.indexBuffer_);
+            currentIndexBuffer = cmd.indexBuffer_;
         }
 
-        if (drawOp.vertexBuffers_ != currentVertexBuffers || drawOp.instanceCount_ != 0)
+        // Set vertex buffers
+        if (cmd.vertexBuffers_ != currentVertexBuffers || cmd.instanceCount_ != 0)
         {
             tempVertexBuffers.clear();
-            tempVertexBuffers.assign(drawOp.vertexBuffers_.begin(), drawOp.vertexBuffers_.end());
-            graphics->SetVertexBuffers(tempVertexBuffers, drawOp.instanceStart_);
-            currentVertexBuffers = drawOp.vertexBuffers_;
+            tempVertexBuffers.assign(cmd.vertexBuffers_.begin(), cmd.vertexBuffers_.end());
+            graphics->SetVertexBuffers(tempVertexBuffers, cmd.instanceStart_);
+            currentVertexBuffers = cmd.vertexBuffers_;
         }
 
-        // Apply shader resources
-        if (drawOp.shaderResources_.first != currentShaderResources)
+        // Set shader resources
+        if (cmd.shaderResources_.first != currentShaderResources)
         {
-            for (unsigned i = drawOp.shaderResources_.first; i < drawOp.shaderResources_.second; ++i)
+            for (unsigned i = cmd.shaderResources_.first; i < cmd.shaderResources_.second; ++i)
             {
                 const auto& unitAndResource = shaderResources_[i];
                 if (graphics->HasTextureUnit(unitAndResource.first))
                     graphics->SetTexture(unitAndResource.first, unitAndResource.second);
             }
-            currentShaderResources = drawOp.shaderResources_.first;
+            currentShaderResources = cmd.shaderResources_.first;
         }
 
-        // Apply shader parameters
-        for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
-        {
-            const auto group = static_cast<ShaderParameterGroup>(i);
-            if (useConstantBuffers_)
-            {
-                if (drawOp.constantBuffers_[i].size_ != 0)
-                {
-                    constantBufferRanges[i].constantBuffer_ = constantBuffers[drawOp.constantBuffers_[i].constantBufferIndex_];
-                    constantBufferRanges[i].offset_ = drawOp.constantBuffers_[i].offset_;
-                    constantBufferRanges[i].size_ = drawOp.constantBuffers_[i].size_;
-                }
-                else
-                {
-                    constantBufferRanges[i] = ConstantBufferRange{};
-                }
-            }
-            else
-            {
-                const auto range = drawOp.shaderParameters_[i];
-                if (!graphics->NeedParameterUpdate(group, reinterpret_cast<void*>(range.first)))
-                    continue;
-
-                shaderParameters_.ForEach(range.first, range.second, shaderParameterSetter);
-            }
-        }
+        // Set shader parameters or constant buffers
         if (useConstantBuffers_)
         {
+            // Update used ranges for each group
+            for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
+            {
+                // If constant buffer is not needed, ignore
+                if (cmd.constantBuffers_[i].size_ == 0)
+                    continue;
+
+                constantBufferRanges[i].constantBuffer_ = constantBuffers[cmd.constantBuffers_[i].index_];
+                constantBufferRanges[i].offset_ = cmd.constantBuffers_[i].offset_;
+                constantBufferRanges[i].size_ = cmd.constantBuffers_[i].size_;
+            }
+
+            // Set all constant buffers at once
             graphics->SetShaderConstantBuffers(constantBufferRanges);
         }
-
-        // Draw
-        if (drawOp.instanceCount_ != 0)
+        else
         {
-            if (drawOp.baseVertexIndex_ == 0)
+            // Set parameters for each group if update needed
+            for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
+            {
+                const auto group = static_cast<ShaderParameterGroup>(i);
+                const auto range = cmd.shaderParameters_[i];
+
+                // If needed range is already bound to active shader program, ignore
+                if (!graphics->NeedParameterUpdate(group, reinterpret_cast<void *>(range.first)))
+                    continue;
+
+                shaderParameters_.collection_.ForEach(range.first, range.second, shaderParameterSetter);
+            }
+        }
+
+        // Invoke appropriate draw command
+        if (cmd.instanceCount_ != 0)
+        {
+            if (cmd.baseVertexIndex_ == 0)
             {
                 graphics->DrawInstanced(currentPrimitiveType,
-                    drawOp.indexStart_, drawOp.indexCount_, 0, 0, drawOp.instanceCount_);
+                    cmd.indexStart_, cmd.indexCount_, 0, 0, cmd.instanceCount_);
             }
             else
             {
                 graphics->DrawInstanced(currentPrimitiveType,
-                    drawOp.indexStart_, drawOp.indexCount_, drawOp.baseVertexIndex_, 0, 0, drawOp.instanceCount_);
+                    cmd.indexStart_, cmd.indexCount_, cmd.baseVertexIndex_, 0, 0, cmd.instanceCount_);
             }
         }
         else
         {
             if (!currentIndexBuffer)
-                graphics->Draw(currentPrimitiveType, drawOp.indexStart_, drawOp.indexCount_);
-            else if (drawOp.baseVertexIndex_ == 0)
-                graphics->Draw(currentPrimitiveType, drawOp.indexStart_, drawOp.indexCount_, 0, 0);
+                graphics->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_);
+            else if (cmd.baseVertexIndex_ == 0)
+                graphics->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_, 0, 0);
             else
-                graphics->Draw(currentPrimitiveType, drawOp.indexStart_, drawOp.indexCount_, drawOp.baseVertexIndex_, 0, 0);
+                graphics->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_, cmd.baseVertexIndex_, 0, 0);
         }
     }
 }

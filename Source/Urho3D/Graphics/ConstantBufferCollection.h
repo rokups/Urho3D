@@ -30,38 +30,35 @@
 namespace Urho3D
 {
 
-/// Reference to constant buffer location.
-struct ConstantBufferRef
+/// Reference to the region in constant buffer within collection. Plain old data.
+struct ConstantBufferCollectionRef
 {
-    /// Index of buffer in global collection.
-    unsigned constantBufferIndex_{};
+    /// Index of buffer in collection.
+    unsigned index_;
     /// Offset in the buffer.
-    unsigned offset_{};
+    unsigned offset_;
     /// Size of the chunk.
-    unsigned size_{};
+    unsigned size_;
 };
 
 /// Buffer of shader parameters ready to be uploaded.
 class ConstantBufferCollection
 {
 public:
-    /// Construct.
-    ConstantBufferCollection()
-    {
-        AllocateBuffer();
-    }
-
-    /// Clear.
-    void Clear(unsigned alignment)
+    /// Clear and/or initialize for work.
+    void ClearAndInitialize(unsigned alignment)
     {
         alignment_ = alignment;
         currentBufferIndex_ = 0;
         for (auto& buffer : buffers_)
             buffer.second = 0;
+
+        if (buffers_.empty())
+            AllocateBuffer();
     }
 
     /// Allocate new block.
-    ea::pair<ConstantBufferRef, unsigned char*> AddBlock(unsigned size)
+    ea::pair<ConstantBufferCollectionRef, unsigned char*> AddBlock(unsigned size)
     {
         assert(size <= bufferSize_);
         const unsigned alignedSize = (size + alignment_ - 1) / alignment_ * alignment_;
@@ -173,7 +170,7 @@ private:
     /// Size of buffers.
     unsigned bufferSize_{ 16384 };
     /// Alignment of each block.
-    unsigned alignment_{ 256 };
+    unsigned alignment_{ 1 };
     /// Buffers.
     ea::vector<ea::pair<ByteVector, unsigned>> buffers_;
     /// Current buffer index.
