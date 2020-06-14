@@ -143,7 +143,7 @@ public:
         {
             // Allocate new group if different from previous or group is not initialized yet
             const ShaderParameterRange& groupRange = currentDrawCommand_.shaderParameters_[group];
-            const bool groupInitialized = groupRange.first == groupRange.second;
+            const bool groupInitialized = groupRange.first != groupRange.second;
             return differentFromPrevious || !groupInitialized;
         }
     }
