@@ -99,6 +99,8 @@ struct TransientDrawableDataIndex
         DrawableUpdated = 1 << 1,
         /// Whether the drawable has geometry visible from the main camera.
         DrawableVisibleGeometry = 1 << 2,
+        /// Whether the drawable is lit using forward rendering.
+        ForwardLit = 1 << 3,
     };
 
     /// Traits.

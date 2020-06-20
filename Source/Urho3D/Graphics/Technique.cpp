@@ -521,6 +521,9 @@ SharedPtr<Technique> Technique::CloneWithDefines(const ea::string& vsDefines, co
 
 unsigned Technique::GetPassIndex(const ea::string& passName)
 {
+    if (passName.empty())
+        return M_MAX_UNSIGNED;
+
     // Initialize built-in pass indices on first call
     if (passIndices.empty())
     {

@@ -93,6 +93,7 @@ CBUFFER_BEGIN(Material)
 CBUFFER_END()
 #endif
 
+#ifdef COMPILEVS
 CBUFFER_BEGIN(Object)
     CBUFFER_UNIFORM(mat4 cModel)
 #ifdef SPHERICALHARMONICS
@@ -113,3 +114,4 @@ CBUFFER_BEGIN(Object)
     CBUFFER_UNIFORM(vec4 cSkinMatrices[MAXBONES*3])
 #endif
 CBUFFER_END()
+#endif

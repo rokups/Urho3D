@@ -53,6 +53,466 @@
 namespace Urho3D
 {
 
+/// For-each algorithm executed in parallel via WorkQueue. Callback accepts `ea::span<T const>`.
+template <class T, class U>
+void ForEachParallel(WorkQueue* workQueue, unsigned maxTasks, const ea::vector<T>& collection, const U& callback)
+{
+    if (collection.empty())
+        return;
+
+    const unsigned elementsPerTask = (collection.size() + maxTasks - 1) / maxTasks;
+    for (unsigned taskIndex = 0; taskIndex < maxTasks; ++taskIndex)
+    {
+        const unsigned fromIndex = ea::min(taskIndex * elementsPerTask, collection.size());
+        const unsigned toIndex = ea::min((taskIndex + 1) * elementsPerTask, collection.size());
+        if (fromIndex == toIndex)
+            continue;
+
+        const ea::span<const T> range{ &collection[fromIndex], toIndex - fromIndex };
+        workQueue_->AddWorkItem([callback, range](unsigned threadIndex)
+        {
+            callback(threadIndex, range);
+        }, M_MAX_UNSIGNED);
+    }
+    workQueue_->Complete(M_MAX_UNSIGNED);
+}
+
+/// Type of scene pass.
+enum class ScenePassType
+{
+    /// No forward lighting.
+    /// Object is rendered once in base pass.
+    Unlit,
+    /// Forward lighting pass.
+    /// Object with lighting from the first light rendered once in base pass.
+    /// Lighting from other lights is applied in additional passes.
+    ForwardLitBase,
+    /// Forward lighting pass.
+    /// Object is rendered once in base pass without lighting.
+    /// Lighting from all lights is applied in additional passes.
+    ForwardUnlitBase
+};
+
+/// Description of scene pass.
+struct ScenePassDescription
+{
+    /// Pass type.
+    ScenePassType type_{};
+    /// Material pass used to render materials that don't receive light.
+    ea::string basePassName_;
+    /// Material pass used for first light during forward rendering.
+    ea::string firstLightPassName_;
+    /// Material pass used for the rest of lights during forward rendering.
+    ea::string additionalLightPassName_;
+};
+
+/// Batch of drawable in scene.
+struct SceneBatch
+{
+    /// Geometry.
+    Drawable* geometry_{};
+    /// Index of source batch within geometry.
+    unsigned sourceBatchIndex_{};
+    /// Base material pass.
+    Pass* basePass_{};
+    /// Additional material pass for forward rendering.
+    Pass* additionalPass_{};
+};
+
+class SceneBatchCollector : public Object
+{
+    URHO3D_OBJECT(SceneBatchCollector, Object);
+public:
+    /// Construct.
+    SceneBatchCollector(Context* context);
+    /// Destruct.
+    ~SceneBatchCollector();
+
+    /// Process drawables in frame.
+    void Process(const FrameInfo& frameInfo,
+        ea::span<const ScenePassDescription> passes, const DrawableCollection& drawables)
+    {
+        InitializeFrame(frameInfo);
+        InitializePasses(passes);
+        UpdateAndCollectBatches(drawables);
+    }
+
+private:
+    /// Pass type.
+    enum class PassType;
+    /// Internal pass data.
+    struct PassData;
+    /// Helper class to evaluate min and max Z of the drawable.
+    struct DrawableZRangeEvaluator;
+    /// Internal light data.
+    struct LightData;
+
+    /// Return technique for given material and drawable.
+    Technique* FindTechnique(Drawable* drawable, Material* material) const;
+
+    /// Reset collection in the begining of the frame.
+    void InitializeFrame(const FrameInfo& frameInfo);
+    /// Initialize passes.
+    void InitializePasses(ea::span<const ScenePassDescription> passes);
+    /// Update source batches and collect pass batches.
+    void UpdateAndCollectBatches(const DrawableCollection& drawables);
+    /// Update source batches and collect pass batches for single thread.
+    void UpdateAndCollectBatchesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables);
+    /// Process lights.
+    void ProcessLights();
+
+    /// Min number of processed drawables in single task.
+    unsigned drawableWorkThreshold_{ 1 };
+
+    /// Work queue.
+    WorkQueue* workQueue_{};
+    /// Renderer.
+    Renderer* renderer_{};
+    /// Number of worker threads.
+    unsigned numThreads_{};
+    /// Material quality.
+    MaterialQuality materialQuality_{};
+
+    /// Frame info.
+    FrameInfo frameInfo_;
+    /// Octree.
+    Octree* octree_{};
+    /// Camera.
+    Camera* camera_{};
+    /// Number of drawables.
+    unsigned numDrawables_{};
+
+    /// Passes.
+    ea::vector<PassData> passes_;
+
+    /// Visible geometries.
+    ThreadedGeometryCollection visibleGeometries_;
+    /// Visible lights.
+    ThreadedLightCollection visibleLights_;
+    /// Scene Z range.
+    SceneZRange sceneZRange_;
+    /// Transient data index.
+    TransientDrawableDataIndex transient_;
+
+    /// Per-light caches.
+    ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<LightData>> lightData_;
+};
+
+struct SceneBatchCollector::PassData
+{
+    /// Pass description.
+    ScenePassDescription desc_;
+    /// Base pass index.
+    unsigned basePassIndex_{};
+    /// First light pass index.
+    unsigned firstLightPassIndex_{};
+    /// Additional light pass index.
+    unsigned additionalLightPassIndex_{};
+
+    /// Unlit batches.
+    ThreadedVector<SceneBatch> unlitBatches_;
+    /// Lit batches. Always empty for Unlit passes.
+    ThreadedVector<SceneBatch> litBatches_;
+
+    /// Return whether given subpasses are present.
+    bool CheckSubPasses(bool hasBase, bool hasFirstLight, bool hasAdditionalLight) const
+    {
+        return (basePassIndex_ != M_MAX_UNSIGNED) == hasBase
+            && (firstLightPassIndex_ != M_MAX_UNSIGNED) == hasFirstLight
+            && (additionalLightPassIndex_ != M_MAX_UNSIGNED) == hasAdditionalLight;
+    }
+
+    /// Return whether is valid.
+    bool IsValid() const
+    {
+        switch (desc_.type_)
+        {
+        case ScenePassType::Unlit:
+            return CheckSubPasses(true, false, false);
+        case ScenePassType::ForwardLitBase:
+            return CheckSubPasses(false, true, true) || CheckSubPasses(true, true, true);
+        case ScenePassType::ForwardUnlitBase:
+            return CheckSubPasses(true, false, true);
+        default:
+            return false;
+        }
+    }
+
+    /// Create scene batch. Batch is not added to any queue.
+    SceneBatch CreateSceneBatch(Drawable* geometry, unsigned sourceBatchIndex,
+        Pass* basePass, Pass* firstLightPass, Pass* additionalLightPass) const
+    {
+        if (desc_.type_ == ScenePassType::Unlit || !additionalLightPass)
+            return { geometry, sourceBatchIndex, basePass, nullptr };
+        else if (desc_.type_ == ScenePassType::ForwardUnlitBase && basePass && additionalLightPass)
+            return { geometry, sourceBatchIndex, basePass, additionalLightPass };
+        else if (desc_.type_ == ScenePassType::ForwardLitBase && firstLightPass && additionalLightPass)
+            return { geometry, sourceBatchIndex, firstLightPass, additionalLightPass };
+        else
+            return {};
+    }
+};
+
+struct SceneBatchCollector::DrawableZRangeEvaluator
+{
+    explicit DrawableZRangeEvaluator(Camera* camera)
+        : viewMatrix_(camera->GetView())
+        , viewZ_(viewMatrix_.m20_, viewMatrix_.m21_, viewMatrix_.m22_)
+        , absViewZ_(viewZ_.Abs())
+    {
+    }
+
+    DrawableZRange Evaluate(Drawable* drawable) const
+    {
+        const BoundingBox& boundingBox = drawable->GetWorldBoundingBox();
+        const Vector3 center = boundingBox.Center();
+        const Vector3 edge = boundingBox.Size() * 0.5f;
+
+        // Ignore "infinite" objects like skybox
+        if (edge.LengthSquared() >= M_LARGE_VALUE * M_LARGE_VALUE)
+            return {};
+
+        const float viewCenterZ = viewZ_.DotProduct(center) + viewMatrix_.m23_;
+        const float viewEdgeZ = absViewZ_.DotProduct(edge);
+        const float minZ = viewCenterZ - viewEdgeZ;
+        const float maxZ = viewCenterZ + viewEdgeZ;
+
+        return { minZ, maxZ };
+    }
+
+    Matrix3x4 viewMatrix_;
+    Vector3 viewZ_;
+    Vector3 absViewZ_;
+};
+
+SceneBatchCollector::SceneBatchCollector(Context* context)
+    : Object(context)
+    , workQueue_(context->GetWorkQueue())
+    , renderer_(context->GetRenderer())
+{}
+
+SceneBatchCollector::~SceneBatchCollector()
+{
+}
+
+Technique* SceneBatchCollector::FindTechnique(Drawable* drawable, Material* material) const
+{
+    const ea::vector<TechniqueEntry>& techniques = material->GetTechniques();
+
+    // If only one technique, no choice
+    if (techniques.size() == 1)
+        return techniques[0].technique_;
+
+    // TODO: Consider optimizing this loop
+    const float lodDistance = drawable->GetLodDistance();
+    for (unsigned i = 0; i < techniques.size(); ++i)
+    {
+        const TechniqueEntry& entry = techniques[i];
+        Technique* tech = entry.technique_;
+
+        if (!tech || (!tech->IsSupported()) || materialQuality_ < entry.qualityLevel_)
+            continue;
+        if (lodDistance >= entry.lodDistance_)
+            return tech;
+    }
+
+    // If no suitable technique found, fallback to the last
+    return techniques.size() ? techniques.back().technique_ : nullptr;
+}
+
+void SceneBatchCollector::InitializeFrame(const FrameInfo& frameInfo)
+{
+    numThreads_ = workQueue_->GetNumThreads() + 1;
+    materialQuality_ = renderer_->GetMaterialQuality();
+
+    frameInfo_ = frameInfo;
+    octree_ = frameInfo.octree_;
+    camera_ = frameInfo.camera_;
+    numDrawables_ = octree_->GetAllDrawables().size();
+
+    if (camera_->GetViewOverrideFlags() & VO_LOW_MATERIAL_QUALITY)
+        materialQuality_ = QUALITY_LOW;
+
+    visibleGeometries_.Clear(numThreads_);
+    visibleLights_.Clear(numThreads_);
+    sceneZRange_.Clear(numThreads_);
+    transient_.Reset(numDrawables_);
+}
+
+void SceneBatchCollector::InitializePasses(ea::span<const ScenePassDescription> passes)
+{
+    const unsigned numPasses = passes.size();
+    passes_.resize(numPasses);
+    for (unsigned i = 0; i < numPasses; ++i)
+    {
+        PassData& passData = passes_[i];
+        passData.desc_ = passes[i];
+
+        passData.basePassIndex_ = Technique::GetPassIndex(passData.desc_.basePassName_);
+        passData.firstLightPassIndex_ = Technique::GetPassIndex(passData.desc_.firstLightPassName_);
+        passData.additionalLightPassIndex_ = Technique::GetPassIndex(passData.desc_.additionalLightPassName_);
+
+        if (!passData.IsValid())
+        {
+            // TODO: Log error
+            assert(0);
+            continue;
+        }
+
+        passData.litBatches_.Clear(numThreads_);
+        passData.unlitBatches_.Clear(numThreads_);
+    }
+}
+
+void SceneBatchCollector::UpdateAndCollectBatches(const DrawableCollection& drawables)
+{
+    if (drawables.empty())
+        return;
+
+    const unsigned maxTasks = ea::max(1u, ea::min(drawables.size() / drawableWorkThreshold_, numThreads_));
+    const unsigned drawablesPerItem = (drawables.size() + maxTasks - 1) / maxTasks;
+
+    for (unsigned taskIndex = 0; taskIndex < maxTasks; ++taskIndex)
+    {
+        const unsigned fromIndex = ea::min(taskIndex * drawablesPerItem, drawables.size());
+        const unsigned toIndex = ea::min((taskIndex + 1) * drawablesPerItem, drawables.size());
+        if (fromIndex == toIndex)
+            continue;
+
+        workQueue_->AddWorkItem([this, &drawables, fromIndex, toIndex](unsigned threadIndex)
+        {
+            const ea::span<Drawable* const> drawablesSpan = drawables;
+            UpdateAndCollectBatchesForThread(threadIndex, drawablesSpan.subspan(fromIndex, toIndex - fromIndex));
+        }, M_MAX_UNSIGNED);
+    }
+    workQueue_->Complete(M_MAX_UNSIGNED);
+}
+
+void SceneBatchCollector::UpdateAndCollectBatchesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables)
+{
+    Material* defaultMaterial = renderer_->GetDefaultMaterial();
+    const DrawableZRangeEvaluator zRangeEvaluator{ camera_ };
+
+    for (Drawable* drawable : drawables)
+    {
+        // TODO: Add occlusion culling
+        const unsigned drawableIndex = drawable->GetDrawableIndex();
+
+        drawable->UpdateBatches(frameInfo_);
+        transient_.traits_[drawableIndex] |= TransientDrawableDataIndex::DrawableUpdated;
+
+        // Skip if too far
+        const float maxDistance = drawable->GetDrawDistance();
+        if (maxDistance > 0.0f)
+        {
+            if (drawable->GetDistance() > maxDistance)
+                return;
+        }
+
+        // For geometries, find zone, clear lights and calculate view space Z range
+        if (drawable->GetDrawableFlags() & DRAWABLE_GEOMETRY)
+        {
+            const DrawableZRange zRange = zRangeEvaluator.Evaluate(drawable);
+
+            // Do not add "infinite" objects like skybox to prevent shadow map focusing behaving erroneously
+            if (!zRange.IsValid())
+                transient_.zRange_[drawableIndex] = { M_LARGE_VALUE, M_LARGE_VALUE };
+            else
+            {
+                transient_.zRange_[drawableIndex] = zRange;
+                sceneZRange_.Accumulate(threadIndex, zRange);
+            }
+
+            visibleGeometries_.Insert(threadIndex, drawable);
+            transient_.traits_[drawableIndex] |= TransientDrawableDataIndex::DrawableVisibleGeometry;
+
+            // Collect batches
+            const auto& sourceBatches = drawable->GetBatches();
+            for (unsigned i = 0; i < sourceBatches.size(); ++i)
+            {
+                const SourceBatch& sourceBatch = sourceBatches[i];
+
+                // Find current technique
+                Material* material = sourceBatch.material_ ? sourceBatch.material_ : defaultMaterial;
+                Technique* technique = FindTechnique(drawable, material);
+                if (!technique)
+                    continue;
+
+                // Fill passes
+                for (PassData& pass : passes_)
+                {
+                    Pass* basePass = technique->GetPass(pass.basePassIndex_);
+                    Pass* firstLightPass = technique->GetPass(pass.firstLightPassIndex_);
+                    Pass* additionalLightPass = technique->GetPass(pass.additionalLightPassIndex_);
+
+                    const SceneBatch sceneBatch = pass.CreateSceneBatch(
+                        drawable, i, basePass, firstLightPass, additionalLightPass);
+
+                    if (sceneBatch.additionalPass_)
+                    {
+                        transient_.traits_[drawableIndex] |= TransientDrawableDataIndex::ForwardLit;
+                        pass.litBatches_.Insert(threadIndex, sceneBatch);
+                    }
+                    else if (sceneBatch.basePass_)
+                        pass.unlitBatches_.Insert(threadIndex, sceneBatch);
+                }
+            }
+        }
+        else if (drawable->GetDrawableFlags() & DRAWABLE_LIGHT)
+        {
+            auto light = static_cast<Light*>(drawable);
+            const Color lightColor = light->GetEffectiveColor();
+
+            // Skip lights with zero brightness or black color, skip baked lights too
+            if (!lightColor.Equals(Color::BLACK) && light->GetLightMaskEffective() != 0)
+                visibleLights_.Insert(threadIndex, light);
+        }
+    }
+}
+
+void SceneBatchCollector::ProcessLights()
+{
+    visibleLights_.ForEach([](unsigned lightIndex, Light* light)
+    {
+
+    });
+}
+
+        // Process visible lights
+        /*static ea::vector<DrawableLightCache> globalLightCache;
+        globalLightCache.clear();
+        globalLightCache.resize(viewportCache.visibleLights_.Size());
+        viewportCache.visibleLights_.ForEach([&](unsigned lightIndex, Light* light)
+        {
+            PostTask([&, this, light, lightIndex](unsigned threadIndex)
+            {
+                DrawableLightCache& lightCache = globalLightCache[lightIndex];
+                CollectLitGeometries(viewportCache, lightCache, light);
+            });
+        });
+        CompleteTasks();
+
+        // Accumulate light
+        static ea::vector<DrawableLightAccumulator<4>> lightAccumulator;
+        lightAccumulator.clear();
+        lightAccumulator.resize(numDrawables_);
+
+        viewportCache.visibleLights_.ForEach([&](unsigned lightIndex, Light* light)
+        {
+            DrawableLightAccumulatorContext ctx;
+            ctx.maxPixelLights_ = 1;
+
+            DrawableLightCache& lightCache = globalLightCache[lightIndex];
+            for (Drawable* litGeometry : lightCache.litGeometries_)
+            {
+                const unsigned drawableIndex = litGeometry->GetDrawableIndex();
+                const float lightPenalty = GetLightPenalty(light, litGeometry);
+                lightAccumulator[drawableIndex].AccumulateLight(ctx, lightPenalty, light);
+            }
+        });
+
+}*/
+
 namespace
 {
 
@@ -583,6 +1043,7 @@ void CustomView::Update(const FrameInfo& frameInfo)
 {
     frameInfo_ = frameInfo;
     frameInfo_.camera_ = camera_;
+    frameInfo_.octree_ = octree_;
     numThreads_ = workQueue_->GetNumThreads() + 1;
 }
 
@@ -700,6 +1161,17 @@ void CustomView::Render()
     static DrawableCollection drawablesInMainCamera;
     drawablesInMainCamera.clear();
     CollectDrawables(drawablesInMainCamera, camera_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT);
+
+    // Process batches
+    static SceneBatchCollector sceneBatchCollector(context_);
+    static ScenePassDescription passes[] = {
+        { ScenePassType::ForwardLitBase,   "base",  "litbase",  "light" },
+        { ScenePassType::ForwardUnlitBase, "alpha", "",         "litalpha" },
+        { ScenePassType::Unlit, "postopaque" },
+        { ScenePassType::Unlit, "refract" },
+        { ScenePassType::Unlit, "postalpha" },
+    };
+    sceneBatchCollector.Process(frameInfo_, passes, drawablesInMainCamera);
 
     static DrawableViewportCache viewportCache;
     ProcessPrimaryDrawables(viewportCache, drawablesInMainCamera, camera_);
@@ -825,7 +1297,7 @@ void CustomView::Render()
         drawQueue.CommitShaderParameterGroup(SP_OBJECT);
         }
 
-        if (drawQueue.BeginShaderParameterGroup(SP_LIGHT, first))
+        if (drawQueue.BeginShaderParameterGroup(SP_LIGHT, true))
         {
             first = false;
         Node* lightNode = light->GetNode();

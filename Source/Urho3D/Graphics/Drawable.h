@@ -55,6 +55,7 @@ class Geometry;
 class Light;
 class Material;
 class OcclusionBuffer;
+class Octree;
 class Octant;
 class RayOctreeQuery;
 class Zone;
@@ -73,13 +74,15 @@ enum UpdateGeometryType
 struct FrameInfo
 {
     /// Frame number.
-    unsigned frameNumber_;
+    unsigned frameNumber_{};
     /// Time elapsed since last frame.
-    float timeStep_;
+    float timeStep_{};
     /// Viewport size.
     IntVector2 viewSize_;
     /// Camera being used.
-    Camera* camera_;
+    Camera* camera_{};
+    /// Octree being used.
+    Octree* octree_{};
 };
 
 /// Source data for a 3D geometry draw call.

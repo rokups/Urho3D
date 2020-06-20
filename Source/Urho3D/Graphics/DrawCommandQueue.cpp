@@ -58,7 +58,7 @@ void DrawCommandQueue::Execute(Graphics* graphics)
     PipelineState* currentPipelineState = nullptr;
     IndexBuffer* currentIndexBuffer = nullptr;
     ea::array<VertexBuffer*, MAX_VERTEX_STREAMS> currentVertexBuffers{};
-    unsigned currentShaderResources = M_MAX_UNSIGNED;
+    ShaderResourceRange currentShaderResources;
     PrimitiveType currentPrimitiveType{};
 
     // Temporary collections
@@ -92,7 +92,7 @@ void DrawCommandQueue::Execute(Graphics* graphics)
         }
 
         // Set shader resources
-        if (cmd.shaderResources_.first != currentShaderResources)
+        if (cmd.shaderResources_ != currentShaderResources)
         {
             for (unsigned i = cmd.shaderResources_.first; i < cmd.shaderResources_.second; ++i)
             {
@@ -100,7 +100,7 @@ void DrawCommandQueue::Execute(Graphics* graphics)
                 if (graphics->HasTextureUnit(unitAndResource.first))
                     graphics->SetTexture(unitAndResource.first, unitAndResource.second);
             }
-            currentShaderResources = cmd.shaderResources_.first;
+            currentShaderResources = cmd.shaderResources_;
         }
 
         // Set shader parameters or constant buffers
