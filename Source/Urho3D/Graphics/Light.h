@@ -51,6 +51,14 @@ enum LightType
     LIGHT_POINT
 };
 
+/// Light importance.
+enum LightImportance
+{
+    LI_AUTO,
+    LI_IMPORTANT,
+    LI_NOT_IMPORTANT
+};
+
 static const float SHADOW_MIN_QUANTIZE = 0.1f;
 static const float SHADOW_MIN_VIEW = 1.0f;
 static const int MAX_LIGHT_SPLITS = 6;
@@ -277,6 +285,9 @@ public:
     /// Return light mode.
     LightMode GetLightMode() const { return lightMode_; }
 
+    /// Return light importance.
+    LightImportance GetLightImportance() const;
+
     /// Return effective light mask. Baked lights have zero light mask.
     unsigned GetLightMaskEffective() const { return lightMode_ == LM_BAKED ? 0 : GetLightMask(); }
 
@@ -388,6 +399,8 @@ public:
     Frustum GetFrustum() const;
     /// Return spotlight frustum in the specified view space.
     Frustum GetViewSpaceFrustum(const Matrix3x4& view) const;
+    /// Return distance from light to drawable.
+    float GetDistanceTo(Drawable* drawable) const;
 
     /// Return number of shadow map cascade splits for a directional light, considering also graphics API limitations.
     /// @property

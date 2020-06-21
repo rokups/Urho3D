@@ -87,6 +87,17 @@ public:
         }
     }
 
+    /// Copy content to vector.
+    void CopyTo(ea::vector<T>& dest) const
+    {
+        dest.clear();
+        for (const auto& threadCollection : elements_)
+            dest.append(threadCollection);
+    }
+
+    /// Return underlying collection.
+    const auto& GetUnderlyingCollection() const { return elements_; }
+
 private:
     /// Internal collection.
     ea::fixed_vector<ea::vector<T>, MaxThreads> elements_;

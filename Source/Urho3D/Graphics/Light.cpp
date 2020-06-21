@@ -416,6 +416,16 @@ void Light::SetShapeTexture(Texture* texture)
     MarkNetworkUpdate();
 }
 
+LightImportance Light::GetLightImportance() const
+{
+    if (IsNegative())
+        return LI_IMPORTANT;
+    else if (GetPerVertex())
+        return LI_NOT_IMPORTANT;
+    else
+        return LI_AUTO;
+}
+
 Color Light::GetColorFromTemperature() const
 {
     // Approximate Planckian locus in CIE 1960 UCS
@@ -473,6 +483,18 @@ Frustum Light::GetViewSpaceFrustum(const Matrix3x4& view) const
     Frustum ret;
     ret.Define(fov_, aspectRatio_, 1.0f, M_MIN_NEARCLIP, range_, view * frustumTransform);
     return ret;
+}
+
+float Light::GetDistanceTo(Drawable* drawable) const
+{
+    if (GetLightType() == LIGHT_DIRECTIONAL || !node_)
+        return 0.0f;
+
+    const BoundingBox boundingBox = drawable->GetWorldBoundingBox();
+    const Vector3 lightPosition = node_->GetWorldPosition();
+    const Vector3 minDelta = boundingBox.min_ - lightPosition;
+    const Vector3 maxDelta = lightPosition - boundingBox.max_;
+    return VectorMax(Vector3::ZERO, VectorMax(minDelta, maxDelta)).Length();
 }
 
 int Light::GetNumShadowSplits() const

@@ -53,9 +53,10 @@
 namespace Urho3D
 {
 
-/// For-each algorithm executed in parallel via WorkQueue. Callback accepts `ea::span<T const>`.
+/// For-each algorithm executed in parallel via WorkQueue over contiguous collection.
+/// Callback signature is `void(unsigned, ea::span<T const>)`.
 template <class T, class U>
-void ForEachParallel(WorkQueue* workQueue, unsigned maxTasks, const ea::vector<T>& collection, const U& callback)
+void ForEachParallel(WorkQueue* workQueue, unsigned maxTasks, ea::span<T> collection, const U& callback)
 {
     if (collection.empty())
         return;
@@ -68,13 +69,66 @@ void ForEachParallel(WorkQueue* workQueue, unsigned maxTasks, const ea::vector<T
         if (fromIndex == toIndex)
             continue;
 
-        const ea::span<const T> range{ &collection[fromIndex], toIndex - fromIndex };
-        workQueue_->AddWorkItem([callback, range](unsigned threadIndex)
+        const auto range = collection.subspan(fromIndex, toIndex - fromIndex);
+        workQueue->AddWorkItem([callback, range](unsigned threadIndex)
         {
             callback(threadIndex, range);
         }, M_MAX_UNSIGNED);
     }
-    workQueue_->Complete(M_MAX_UNSIGNED);
+    workQueue->Complete(M_MAX_UNSIGNED);
+}
+
+/// For-each algorithm executed in parallel via WorkQueue over vector.
+template <class T, class U>
+void ForEachParallel(WorkQueue* workQueue, unsigned maxTasks, const ea::vector<T>& collection, const U& callback)
+{
+    ForEachParallel(workQueue, maxTasks, ea::span<const T>(collection), callback);
+}
+
+/// For-each algorithm executed in parallel via WorkQueue over ThreadedVector.
+template <class T, class U>
+void ForEachParallel(WorkQueue* workQueue, unsigned maxTasks, const ThreadedVector<T>& collection, const U& callback)
+{
+    const unsigned numElements = collection.Size();
+    if (numElements == 0)
+        return;
+
+    const unsigned elementsPerTask = (numElements + maxTasks - 1) / maxTasks;
+    for (unsigned taskIndex = 0; taskIndex < maxTasks; ++taskIndex)
+    {
+        const unsigned fromIndex = ea::min(taskIndex * elementsPerTask, numElements);
+        const unsigned toIndex = ea::min((taskIndex + 1) * elementsPerTask, numElements);
+        if (fromIndex == toIndex)
+            continue;
+
+        workQueue->AddWorkItem([callback, &collection, fromIndex, toIndex](unsigned threadIndex)
+        {
+            const auto& threadedCollections = collection.GetUnderlyingCollection();
+            unsigned baseIndex = 0;
+            for (const auto& threadCollection : threadedCollections)
+            {
+                // Stop if whole range is processed
+                if (baseIndex >= toIndex)
+                    break;
+
+                // Skip if didn't get to the range yet
+                if (baseIndex + threadCollection.size() <= fromIndex)
+                    continue;
+
+                // Remap range
+                const unsigned fromSubIndex = ea::max(baseIndex, fromIndex) - baseIndex;
+                const unsigned toSubIndex = ea::min(toIndex - baseIndex, threadCollection.size());
+
+                // Invoke callback for desired range
+                const ea::span<const T> threadSpan(threadCollection);
+                callback(threadIndex, threadSpan.subspan(fromSubIndex, toSubIndex - fromSubIndex));
+
+                // Update base index
+                baseIndex += threadCollection.size();
+            }
+        }, M_MAX_UNSIGNED);
+    }
+    workQueue->Complete(M_MAX_UNSIGNED);
 }
 
 /// Type of scene pass.
@@ -119,6 +173,89 @@ struct SceneBatch
     Pass* additionalPass_{};
 };
 
+/// Context used for light accumulation.
+struct DrawableLightDataAccumulationContext
+{
+    /// Max number of pixel lights
+    unsigned maxPixelLights_{ 1 };
+    /// Light importance.
+    LightImportance lightImportance_{};
+    /// Light index.
+    unsigned lightIndex_{};
+    /// Array of lights to be indexed.
+    const ea::vector<Light*>* lights_;
+};
+
+/// Accumulated light data for drawable.
+/// MaxPixelLights: Max number of per-pixel lights supported. Important lights may override this limit.
+/// MaxVertexLights: Max number of per-vertex lights supported.
+template <unsigned MaxPixelLights, unsigned MaxVertexLights>
+struct DrawableLightData
+{
+    /// Max number of lights that don't require allocations.
+    static const unsigned NumElements = ea::max(MaxPixelLights + 1, 4u) + MaxVertexLights;
+    /// Container for lights.
+    using Container = ea::vector_map<float, unsigned, ea::less<float>, ea::allocator,
+        ea::fixed_vector<ea::pair<float, unsigned>, NumElements>>;
+    /// Container for vertex lights.
+    using VertexLightContainer = ea::array<Light*, MaxVertexLights>;
+
+    /// Reset accumulator.
+    void Reset()
+    {
+        lights_.clear();
+        numImportantLights_ = 0;
+    }
+
+    /// Accumulate light.
+    void AccumulateLight(const DrawableLightDataAccumulationContext& ctx, float penalty)
+    {
+        // Count important lights
+        if (ctx.lightImportance_ == LI_IMPORTANT)
+        {
+            penalty = -1.0f;
+            ++numImportantLights_;
+        }
+
+        // Add new light
+        lights_.emplace(penalty, ctx.lightIndex_);
+
+        // If too many lights, drop the least important one
+        firstVertexLight_ = ea::max(ctx.maxPixelLights_, numImportantLights_);
+        const unsigned maxLights = MaxVertexLights + firstVertexLight_;
+        if (lights_.size() > maxLights)
+        {
+            // TODO: Update SH
+            lights_.pop_back();
+        }
+    }
+
+    /// Return main directional per-pixel light.
+    /*Light* GetMainDirectionalLight() const
+    {
+        return lights_.empty() ? nullptr : lights_.front().second;
+    }
+
+    /// Return per-vertex lights.
+    VertexLightContainer GetVertexLights() const
+    {
+        VertexLightContainer vertexLights{};
+        for (unsigned i = firstVertexLight_; i < lights_.size(); ++i)
+            vertexLights[i - firstVertexLight_] = lights_.at(i).second;
+        return vertexLights;
+    }*/
+
+    /// Container of per-pixel and per-pixel lights.
+    Container lights_;
+    /// Accumulated SH lights.
+    SphericalHarmonicsDot9 sh_;
+    /// Number of important lights.
+    unsigned numImportantLights_{};
+    /// First vertex light.
+    unsigned firstVertexLight_{};
+};
+
+/// Utility class to collect batches from the scene for given frame.
 class SceneBatchCollector : public Object
 {
     URHO3D_OBJECT(SceneBatchCollector, Object);
@@ -135,6 +272,7 @@ public:
         InitializeFrame(frameInfo);
         InitializePasses(passes);
         UpdateAndCollectBatches(drawables);
+        ProcessVisibleLights();
     }
 
 private:
@@ -154,15 +292,25 @@ private:
     void InitializeFrame(const FrameInfo& frameInfo);
     /// Initialize passes.
     void InitializePasses(ea::span<const ScenePassDescription> passes);
+
     /// Update source batches and collect pass batches.
     void UpdateAndCollectBatches(const DrawableCollection& drawables);
     /// Update source batches and collect pass batches for single thread.
     void UpdateAndCollectBatchesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables);
-    /// Process lights.
-    void ProcessLights();
+
+    /// Process visible lights.
+    void ProcessVisibleLights();
+    /// Process light in worker thread.
+    void ProcessLightThreaded(Light* light, LightData& lightData);
+    /// Collect lit geometries.
+    void CollectLitGeometries(Light* light, LightData& lightData);
+    /// Accumulate forward lighting for given light.
+    void AccumulateForwardLighting(unsigned lightIndex);
 
     /// Min number of processed drawables in single task.
     unsigned drawableWorkThreshold_{ 1 };
+    /// Min number of processed lit geometries in single task.
+    unsigned litGeometriesWorkThreshold_{ 1 };
 
     /// Work queue.
     WorkQueue* workQueue_{};
@@ -187,15 +335,22 @@ private:
 
     /// Visible geometries.
     ThreadedGeometryCollection visibleGeometries_;
+    /// Temporary thread-safe collection of visible lights.
+    ThreadedLightCollection visibleLightsTemp_;
     /// Visible lights.
-    ThreadedLightCollection visibleLights_;
+    LightCollection visibleLights_;
     /// Scene Z range.
     SceneZRange sceneZRange_;
+
     /// Transient data index.
     TransientDrawableDataIndex transient_;
+    /// Drawable lighting data index.
+    ea::vector<DrawableLightData<4, 4>> drawableLighting_;
 
     /// Per-light caches.
-    ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<LightData>> lightData_;
+    ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<LightData>> cachedLightData_;
+    /// Per-light caches for visible lights.
+    ea::vector<LightData*> visibleLightsData_;
 };
 
 struct SceneBatchCollector::PassData
@@ -285,6 +440,19 @@ struct SceneBatchCollector::DrawableZRangeEvaluator
     Vector3 absViewZ_;
 };
 
+struct SceneBatchCollector::LightData
+{
+    /// Lit geometries.
+    // TODO: Ignore unlit geometries?
+    ea::vector<Drawable*> litGeometries_;
+
+    /// Clear.
+    void Clear()
+    {
+        litGeometries_.clear();
+    }
+};
+
 SceneBatchCollector::SceneBatchCollector(Context* context)
     : Object(context)
     , workQueue_(context->GetWorkQueue())
@@ -334,9 +502,11 @@ void SceneBatchCollector::InitializeFrame(const FrameInfo& frameInfo)
         materialQuality_ = QUALITY_LOW;
 
     visibleGeometries_.Clear(numThreads_);
-    visibleLights_.Clear(numThreads_);
+    visibleLightsTemp_.Clear(numThreads_);
     sceneZRange_.Clear(numThreads_);
+
     transient_.Reset(numDrawables_);
+    drawableLighting_.resize(numDrawables_);
 }
 
 void SceneBatchCollector::InitializePasses(ea::span<const ScenePassDescription> passes)
@@ -366,26 +536,15 @@ void SceneBatchCollector::InitializePasses(ea::span<const ScenePassDescription> 
 
 void SceneBatchCollector::UpdateAndCollectBatches(const DrawableCollection& drawables)
 {
-    if (drawables.empty())
-        return;
-
     const unsigned maxTasks = ea::max(1u, ea::min(drawables.size() / drawableWorkThreshold_, numThreads_));
-    const unsigned drawablesPerItem = (drawables.size() + maxTasks - 1) / maxTasks;
-
-    for (unsigned taskIndex = 0; taskIndex < maxTasks; ++taskIndex)
+    ForEachParallel(workQueue_, maxTasks, drawables,
+        [this](unsigned threadIndex, ea::span<Drawable* const> drawablesRange)
     {
-        const unsigned fromIndex = ea::min(taskIndex * drawablesPerItem, drawables.size());
-        const unsigned toIndex = ea::min((taskIndex + 1) * drawablesPerItem, drawables.size());
-        if (fromIndex == toIndex)
-            continue;
+        UpdateAndCollectBatchesForThread(threadIndex, drawablesRange);
+    });
 
-        workQueue_->AddWorkItem([this, &drawables, fromIndex, toIndex](unsigned threadIndex)
-        {
-            const ea::span<Drawable* const> drawablesSpan = drawables;
-            UpdateAndCollectBatchesForThread(threadIndex, drawablesSpan.subspan(fromIndex, toIndex - fromIndex));
-        }, M_MAX_UNSIGNED);
-    }
-    workQueue_->Complete(M_MAX_UNSIGNED);
+    // Copy results from intermediate collection
+    visibleLightsTemp_.CopyTo(visibleLights_);
 }
 
 void SceneBatchCollector::UpdateAndCollectBatchesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables)
@@ -457,6 +616,10 @@ void SceneBatchCollector::UpdateAndCollectBatchesForThread(unsigned threadIndex,
                         pass.unlitBatches_.Insert(threadIndex, sceneBatch);
                 }
             }
+
+            // Reset light accumulator
+            // TODO: Don't do it if unlit
+            drawableLighting_[drawableIndex].Reset();
         }
         else if (drawable->GetDrawableFlags() & DRAWABLE_LIGHT)
         {
@@ -465,53 +628,101 @@ void SceneBatchCollector::UpdateAndCollectBatchesForThread(unsigned threadIndex,
 
             // Skip lights with zero brightness or black color, skip baked lights too
             if (!lightColor.Equals(Color::BLACK) && light->GetLightMaskEffective() != 0)
-                visibleLights_.Insert(threadIndex, light);
+                visibleLightsTemp_.Insert(threadIndex, light);
         }
     }
 }
 
-void SceneBatchCollector::ProcessLights()
+void SceneBatchCollector::ProcessVisibleLights()
 {
-    visibleLights_.ForEach([](unsigned lightIndex, Light* light)
+    // Allocate internal storage for lights
+    visibleLightsData_.clear();
+    for (Light* light : visibleLights_)
     {
+        WeakPtr<Light> weakLight(light);
+        auto& lightData = cachedLightData_[weakLight];
+        if (!lightData)
+            lightData = ea::make_unique<LightData>();
 
-    });
+        lightData->Clear();
+        visibleLightsData_.push_back(lightData.get());
+    };
+
+    // Process lights in worker threads
+    for (unsigned i = 0; i < visibleLights_.size(); ++i)
+    {
+        workQueue_->AddWorkItem([this, i](unsigned threadIndex)
+        {
+            Light* light = visibleLights_[i];
+            LightData& lightData = *visibleLightsData_[i];
+            ProcessLightThreaded(light, lightData);
+        });
+    }
+    workQueue_->Complete(M_MAX_UNSIGNED);
+
+    // Accumulate lighting
+    for (unsigned i = 0; i < visibleLights_.size(); ++i)
+        AccumulateForwardLighting(i);
 }
 
-        // Process visible lights
-        /*static ea::vector<DrawableLightCache> globalLightCache;
-        globalLightCache.clear();
-        globalLightCache.resize(viewportCache.visibleLights_.Size());
-        viewportCache.visibleLights_.ForEach([&](unsigned lightIndex, Light* light)
+void SceneBatchCollector::ProcessLightThreaded(Light* light, LightData& lightData)
+{
+    CollectLitGeometries(light, lightData);
+}
+
+void SceneBatchCollector::CollectLitGeometries(Light* light, LightData& lightData)
+{
+    switch (light->GetLightType())
+    {
+    case LIGHT_SPOT:
+    {
+        SpotLightLitGeometriesQuery query(lightData.litGeometries_, transient_, light);
+        octree_->GetDrawables(query);
+        break;
+    }
+    case LIGHT_POINT:
+    {
+        PointLightLitGeometriesQuery query(lightData.litGeometries_, transient_, light);
+        octree_->GetDrawables(query);
+        break;
+    }
+    case LIGHT_DIRECTIONAL:
+    {
+        const unsigned lightMask = light->GetLightMask();
+        visibleGeometries_.ForEach([&](unsigned index, Drawable* drawable)
         {
-            PostTask([&, this, light, lightIndex](unsigned threadIndex)
-            {
-                DrawableLightCache& lightCache = globalLightCache[lightIndex];
-                CollectLitGeometries(viewportCache, lightCache, light);
-            });
+            if (drawable->GetLightMask() & lightMask)
+                lightData.litGeometries_.push_back(drawable);
         });
-        CompleteTasks();
+        break;
+    }
+    }
+}
 
-        // Accumulate light
-        static ea::vector<DrawableLightAccumulator<4>> lightAccumulator;
-        lightAccumulator.clear();
-        lightAccumulator.resize(numDrawables_);
+void SceneBatchCollector::AccumulateForwardLighting(unsigned lightIndex)
+{
+    Light* light = visibleLights_[lightIndex];
+    LightData& lightData = *visibleLightsData_[lightIndex];
 
-        viewportCache.visibleLights_.ForEach([&](unsigned lightIndex, Light* light)
+    ForEachParallel(workQueue_, litGeometriesWorkThreshold_, lightData.litGeometries_,
+        [&](unsigned /*threadIndex*/, ea::span<Drawable* const> geometries)
+    {
+        DrawableLightDataAccumulationContext accumContext;
+        accumContext.maxPixelLights_ = 1;
+        accumContext.lightImportance_ = light->GetLightImportance();
+        accumContext.lightIndex_ = lightIndex;
+        accumContext.lights_ = &visibleLights_;
+
+        const float lightIntensityPenalty = 1.0f / light->GetIntensityDivisor();
+
+        for (Drawable* geometry : geometries)
         {
-            DrawableLightAccumulatorContext ctx;
-            ctx.maxPixelLights_ = 1;
-
-            DrawableLightCache& lightCache = globalLightCache[lightIndex];
-            for (Drawable* litGeometry : lightCache.litGeometries_)
-            {
-                const unsigned drawableIndex = litGeometry->GetDrawableIndex();
-                const float lightPenalty = GetLightPenalty(light, litGeometry);
-                lightAccumulator[drawableIndex].AccumulateLight(ctx, lightPenalty, light);
-            }
-        });
-
-}*/
+            const unsigned drawableIndex = geometry->GetDrawableIndex();
+            const float distance = light->GetDistanceTo(geometry);
+            drawableLighting_[drawableIndex].AccumulateLight(accumContext, distance * lightIntensityPenalty);
+        }
+    });
+}
 
 namespace
 {
@@ -549,43 +760,10 @@ struct DrawableZRangeEvaluator
     Vector3 absViewZ_;
 };
 
-/// Light importance.
-enum LightImportance
-{
-    LI_AUTO,
-    LI_IMPORTANT,
-    LI_NOT_IMPORTANT
-};
-
-/// Return light importance.
-// TODO: Move it to Light
-LightImportance GetLightImportance(Light* light)
-{
-    if (light->IsNegative())
-        return LI_IMPORTANT;
-    else if (light->GetPerVertex())
-        return LI_NOT_IMPORTANT;
-    else
-        return LI_AUTO;
-}
-
-/// Return distance between light and geometry.
-float GetLightGeometryDistance(Light* light, Drawable* geometry)
-{
-    if (light->GetLightType() == LIGHT_DIRECTIONAL)
-        return 0.0f;
-
-    const BoundingBox boundingBox = geometry->GetWorldBoundingBox();
-    const Vector3 lightPosition = light->GetNode()->GetWorldPosition();
-    const Vector3 minDelta = boundingBox.min_ - lightPosition;
-    const Vector3 maxDelta = lightPosition - boundingBox.max_;
-    return VectorMax(Vector3::ZERO, VectorMax(minDelta, maxDelta)).Length();
-}
-
 /// Return light penalty.
 float GetLightPenalty(Light* light, Drawable* geometry)
 {
-    const float distance = GetLightGeometryDistance(light, geometry);
+    const float distance = light->GetDistanceTo(geometry);
     const float intensity = 1.0f / light->GetIntensityDivisor();
     return distance * intensity;
 }
@@ -623,7 +801,7 @@ struct DrawableLightAccumulator
     void AccumulateLight(DrawableLightAccumulatorContext& ctx, float penalty, Light* light)
     {
         // Count important lights
-        if (GetLightImportance(light) == LI_IMPORTANT)
+        if (light->GetLightImportance() == LI_IMPORTANT)
         {
             penalty = -1.0f;
             ++numImportantLights_;
