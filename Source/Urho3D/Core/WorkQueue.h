@@ -22,12 +22,12 @@
 
 #pragma once
 
-#include <EASTL/list.h>
-#include <atomic>
-
 #include "../Core/Mutex.h"
 #include "../Core/Object.h"
+#include "../Core/ThreadedVector.h"
 
+#include <EASTL/list.h>
+#include <EASTL/span.h>
 #include <atomic>
 
 namespace Urho3D
@@ -160,5 +160,93 @@ private:
     /// Maximum milliseconds per frame to spend on low-priority work, when there are no worker threads.
     int maxNonThreadedWorkMs_;
 };
+
+/// For-each algorithm executed in parallel via WorkQueue over contiguous collection.
+/// Callback signature is `void(unsigned threadIndex, unsigned offset, ea::span<T const> elements)`.
+template <class T, class U>
+void ForEachParallel(WorkQueue* workQueue, unsigned threshold, ea::span<T> collection, const U& callback)
+{
+    assert(threshold > 0);
+    if (collection.empty())
+        return;
+
+    const unsigned maxThreads = workQueue->GetNumThreads() + 1;
+    const unsigned maxTasks = ea::max(1u, ea::min(collection.size() / threshold, maxThreads));
+
+    const unsigned elementsPerTask = (collection.size() + maxTasks - 1) / maxTasks;
+    for (unsigned taskIndex = 0; taskIndex < maxTasks; ++taskIndex)
+    {
+        const unsigned fromIndex = ea::min(taskIndex * elementsPerTask, collection.size());
+        const unsigned toIndex = ea::min((taskIndex + 1) * elementsPerTask, collection.size());
+        if (fromIndex == toIndex)
+            continue;
+
+        const auto range = collection.subspan(fromIndex, toIndex - fromIndex);
+        workQueue->AddWorkItem([callback, fromIndex, range](unsigned threadIndex)
+        {
+            callback(threadIndex, fromIndex, range);
+        }, M_MAX_UNSIGNED);
+    }
+    workQueue->Complete(M_MAX_UNSIGNED);
+}
+
+/// For-each algorithm executed in parallel via WorkQueue over vector.
+template <class T, class U>
+void ForEachParallel(WorkQueue* workQueue, unsigned threshold, const ea::vector<T>& collection, const U& callback)
+{
+    ForEachParallel(workQueue, threshold, ea::span<const T>(collection), callback);
+}
+
+/// For-each algorithm executed in parallel via WorkQueue over ThreadedVector.
+template <class T, class U>
+void ForEachParallel(WorkQueue* workQueue, unsigned threshold, const ThreadedVector<T>& collection, const U& callback)
+{
+    assert(threshold > 0);
+    const unsigned numElements = collection.Size();
+    if (numElements == 0)
+        return;
+
+    const unsigned maxThreads = workQueue->GetNumThreads() + 1;
+    const unsigned maxTasks = ea::max(1u, ea::min(numElements / threshold, maxThreads));
+
+    const unsigned elementsPerTask = (numElements + maxTasks - 1) / maxTasks;
+    for (unsigned taskIndex = 0; taskIndex < maxTasks; ++taskIndex)
+    {
+        const unsigned fromIndex = ea::min(taskIndex * elementsPerTask, numElements);
+        const unsigned toIndex = ea::min((taskIndex + 1) * elementsPerTask, numElements);
+        if (fromIndex == toIndex)
+            continue;
+
+        workQueue->AddWorkItem([callback, &collection, fromIndex, toIndex](unsigned threadIndex)
+        {
+            const auto& threadedCollections = collection.GetUnderlyingCollection();
+            unsigned baseIndex = 0;
+            for (const auto& threadCollection : threadedCollections)
+            {
+                // Stop if whole range is processed
+                if (baseIndex >= toIndex)
+                    break;
+
+                // Skip if didn't get to the range yet
+                if (baseIndex + threadCollection.size() <= fromIndex)
+                    continue;
+
+                // Remap range
+                const unsigned fromSubIndex = ea::max(baseIndex, fromIndex) - baseIndex;
+                const unsigned toSubIndex = ea::min(toIndex - baseIndex, threadCollection.size());
+                if (fromSubIndex == toSubIndex)
+                    continue;
+
+                // Invoke callback for desired range
+                const ea::span<const T> elements(&threadCollection[fromSubIndex], toSubIndex - fromSubIndex);
+                callback(threadIndex, baseIndex + fromSubIndex, elements);
+
+                // Update base index
+                baseIndex += threadCollection.size();
+            }
+        }, M_MAX_UNSIGNED);
+    }
+    workQueue->Complete(M_MAX_UNSIGNED);
+}
 
 }

@@ -276,7 +276,8 @@ inline ea::vector<VertexElement> CreateInstancingBufferElements(unsigned numExtr
 
 Renderer::Renderer(Context* context) :
     Object(context),
-    defaultZone_(context->CreateObject<Zone>())
+    defaultZone_(context->CreateObject<Zone>()),
+    pipelineStateCache_(context)
 {
     SubscribeToEvent(E_SCREENMODE, URHO3D_HANDLER(Renderer, HandleScreenMode));
 
