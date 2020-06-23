@@ -29,6 +29,7 @@
 #include "../Core/Object.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/ShaderVariation.h"
+#include "../Graphics/PipelineState.h"
 #include "../Math/Color.h"
 #include "../Math/Plane.h"
 #include "../Math/Rect.h"

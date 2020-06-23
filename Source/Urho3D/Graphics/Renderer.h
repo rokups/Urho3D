@@ -27,6 +27,7 @@
 #include "../Core/Mutex.h"
 #include "../Graphics/Batch.h"
 #include "../Graphics/Drawable.h"
+#include "../Graphics/PipelineState.h"
 #include "../Graphics/Viewport.h"
 #include "../Math/Color.h"
 
@@ -304,6 +305,8 @@ public:
     /// @property
     unsigned GetNumViewports() const { return viewports_.size(); }
 
+    /// Return new or existing pipeline state.
+    PipelineState* GetOrCreatePipelineState(const PipelineStateDesc& desc);
     /// Return backbuffer viewport by index.
     /// @property{get_viewports}
     Viewport* GetViewport(unsigned index) const;
@@ -713,6 +716,8 @@ private:
     SkinningMode skinningMode_{};
     /// Number of bones used for software skinning.
     unsigned numSoftwareSkinningBones_{ 4 };
+    /// Pipeline state cache.
+    PipelineStateCache pipelineStateCache_;	
 };
 
 }

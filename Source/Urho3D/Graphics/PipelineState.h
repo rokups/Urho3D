@@ -196,4 +196,29 @@ private:
     PipelineStateDesc desc_;
 };
 
+/// Generic pipeline state cache.
+class PipelineStateCache : public Object
+{
+    URHO3D_OBJECT(PipelineStateCache, Object);
+
+public:
+    /// Construct.
+    explicit PipelineStateCache(Context* context) : Object(context) {}
+    /// Create new or return existing pipeline state.
+    PipelineState* GetPipelineState(const PipelineStateDesc& desc)
+    {
+        SharedPtr<PipelineState>& state = states_[desc];
+        if (!state)
+        {
+            state = MakeShared<PipelineState>(context_);
+            state->Create(desc);
+        }
+        return state;
+    }
+
+private:
+    /// Cached states.
+    ea::unordered_map<PipelineStateDesc, SharedPtr<PipelineState>> states_;
+};
+
 }

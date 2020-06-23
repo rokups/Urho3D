@@ -54,12 +54,16 @@ namespace Urho3D
 {
 
 /// For-each algorithm executed in parallel via WorkQueue over contiguous collection.
-/// Callback signature is `void(unsigned, ea::span<T const>)`.
+/// Callback signature is `void(unsigned threadIndex, unsigned offset, ea::span<T const> elements)`.
 template <class T, class U>
-void ForEachParallel(WorkQueue* workQueue, unsigned maxTasks, ea::span<T> collection, const U& callback)
+void ForEachParallel(WorkQueue* workQueue, unsigned threshold, ea::span<T> collection, const U& callback)
 {
+    assert(threshold > 0);
     if (collection.empty())
         return;
+
+    const unsigned maxThreads = workQueue->GetNumThreads() + 1;
+    const unsigned maxTasks = ea::max(1u, ea::min(collection.size() / threshold, maxThreads));
 
     const unsigned elementsPerTask = (collection.size() + maxTasks - 1) / maxTasks;
     for (unsigned taskIndex = 0; taskIndex < maxTasks; ++taskIndex)
@@ -70,9 +74,9 @@ void ForEachParallel(WorkQueue* workQueue, unsigned maxTasks, ea::span<T> collec
             continue;
 
         const auto range = collection.subspan(fromIndex, toIndex - fromIndex);
-        workQueue->AddWorkItem([callback, range](unsigned threadIndex)
+        workQueue->AddWorkItem([callback, fromIndex, range](unsigned threadIndex)
         {
-            callback(threadIndex, range);
+            callback(threadIndex, fromIndex, range);
         }, M_MAX_UNSIGNED);
     }
     workQueue->Complete(M_MAX_UNSIGNED);
@@ -80,18 +84,22 @@ void ForEachParallel(WorkQueue* workQueue, unsigned maxTasks, ea::span<T> collec
 
 /// For-each algorithm executed in parallel via WorkQueue over vector.
 template <class T, class U>
-void ForEachParallel(WorkQueue* workQueue, unsigned maxTasks, const ea::vector<T>& collection, const U& callback)
+void ForEachParallel(WorkQueue* workQueue, unsigned threshold, const ea::vector<T>& collection, const U& callback)
 {
-    ForEachParallel(workQueue, maxTasks, ea::span<const T>(collection), callback);
+    ForEachParallel(workQueue, threshold, ea::span<const T>(collection), callback);
 }
 
 /// For-each algorithm executed in parallel via WorkQueue over ThreadedVector.
 template <class T, class U>
-void ForEachParallel(WorkQueue* workQueue, unsigned maxTasks, const ThreadedVector<T>& collection, const U& callback)
+void ForEachParallel(WorkQueue* workQueue, unsigned threshold, const ThreadedVector<T>& collection, const U& callback)
 {
+    assert(threshold > 0);
     const unsigned numElements = collection.Size();
     if (numElements == 0)
         return;
+
+    const unsigned maxThreads = workQueue->GetNumThreads() + 1;
+    const unsigned maxTasks = ea::max(1u, ea::min(numElements / threshold, maxThreads));
 
     const unsigned elementsPerTask = (numElements + maxTasks - 1) / maxTasks;
     for (unsigned taskIndex = 0; taskIndex < maxTasks; ++taskIndex)
@@ -118,10 +126,12 @@ void ForEachParallel(WorkQueue* workQueue, unsigned maxTasks, const ThreadedVect
                 // Remap range
                 const unsigned fromSubIndex = ea::max(baseIndex, fromIndex) - baseIndex;
                 const unsigned toSubIndex = ea::min(toIndex - baseIndex, threadCollection.size());
+                if (fromSubIndex == toSubIndex)
+                    continue;
 
                 // Invoke callback for desired range
-                const ea::span<const T> threadSpan(threadCollection);
-                callback(threadIndex, threadSpan.subspan(fromSubIndex, toSubIndex - fromSubIndex));
+                const ea::span<const T> elements(&threadCollection[fromSubIndex], toSubIndex - fromSubIndex);
+                callback(threadIndex, baseIndex + fromSubIndex, elements);
 
                 // Update base index
                 baseIndex += threadCollection.size();
@@ -158,19 +168,6 @@ struct ScenePassDescription
     ea::string firstLightPassName_;
     /// Material pass used for the rest of lights during forward rendering.
     ea::string additionalLightPassName_;
-};
-
-/// Batch of drawable in scene.
-struct SceneBatch
-{
-    /// Geometry.
-    Drawable* geometry_{};
-    /// Index of source batch within geometry.
-    unsigned sourceBatchIndex_{};
-    /// Base material pass.
-    Pass* basePass_{};
-    /// Additional material pass for forward rendering.
-    Pass* additionalPass_{};
 };
 
 /// Context used for light accumulation.
@@ -255,6 +252,23 @@ struct DrawableLightData
     unsigned firstVertexLight_{};
 };
 
+/// Scene batch for specific sub-pass.
+struct SceneBatch
+{
+    /// Drawable index.
+    unsigned drawableIndex_{};
+    /// Source batch index.
+    unsigned sourceBatchIndex_{};
+    /// Drawable to be rendered.
+    Drawable* drawable_{};
+    /// Geometry to be rendered.
+    Geometry* geometry_{};
+    /// Material to be rendered.
+    Material* material_{};
+    /// Pipeline state.
+    PipelineState* pipelineState_{};
+};
+
 /// Utility class to collect batches from the scene for given frame.
 class SceneBatchCollector : public Object
 {
@@ -271,13 +285,14 @@ public:
     {
         InitializeFrame(frameInfo);
         InitializePasses(passes);
-        UpdateAndCollectBatches(drawables);
+        UpdateAndCollectSourceBatches(drawables);
         ProcessVisibleLights();
+        CollectSceneBatches();
     }
 
 private:
-    /// Pass type.
-    enum class PassType;
+    /// Batch of drawable in scene.
+    struct IntermediateSceneBatch;
     /// Internal pass data.
     struct PassData;
     /// Helper class to evaluate min and max Z of the drawable.
@@ -294,9 +309,9 @@ private:
     void InitializePasses(ea::span<const ScenePassDescription> passes);
 
     /// Update source batches and collect pass batches.
-    void UpdateAndCollectBatches(const DrawableCollection& drawables);
+    void UpdateAndCollectSourceBatches(const DrawableCollection& drawables);
     /// Update source batches and collect pass batches for single thread.
-    void UpdateAndCollectBatchesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables);
+    void UpdateAndCollectSourceBatchesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables);
 
     /// Process visible lights.
     void ProcessVisibleLights();
@@ -307,10 +322,15 @@ private:
     /// Accumulate forward lighting for given light.
     void AccumulateForwardLighting(unsigned lightIndex);
 
+    /// Collect scene batches.
+    void CollectSceneBatches();
+
     /// Min number of processed drawables in single task.
     unsigned drawableWorkThreshold_{ 1 };
     /// Min number of processed lit geometries in single task.
     unsigned litGeometriesWorkThreshold_{ 1 };
+    /// Min number of processed batches in single task.
+    unsigned batchWorkThreshold_{ 1 };
 
     /// Work queue.
     WorkQueue* workQueue_{};
@@ -353,6 +373,18 @@ private:
     ea::vector<LightData*> visibleLightsData_;
 };
 
+struct SceneBatchCollector::IntermediateSceneBatch
+{
+    /// Geometry.
+    Drawable* geometry_{};
+    /// Index of source batch within geometry.
+    unsigned sourceBatchIndex_{};
+    /// Base material pass.
+    Pass* basePass_{};
+    /// Additional material pass for forward rendering.
+    Pass* additionalPass_{};
+};
+
 struct SceneBatchCollector::PassData
 {
     /// Pass description.
@@ -364,10 +396,15 @@ struct SceneBatchCollector::PassData
     /// Additional light pass index.
     unsigned additionalLightPassIndex_{};
 
-    /// Unlit batches.
-    ThreadedVector<SceneBatch> unlitBatches_;
-    /// Lit batches. Always empty for Unlit passes.
-    ThreadedVector<SceneBatch> litBatches_;
+    /// Unlit intermediate batches.
+    ThreadedVector<IntermediateSceneBatch> unlitBatches_;
+    /// Lit intermediate batches. Always empty for Unlit passes.
+    ThreadedVector<IntermediateSceneBatch> litBatches_;
+
+    /// Unlit base scene batches.
+    ea::vector<SceneBatch> unlitBaseSceneBatches_;
+    /// Lit base scene batches.
+    ea::vector<SceneBatch> litBaseSceneBatches_;
 
     /// Return whether given subpasses are present.
     bool CheckSubPasses(bool hasBase, bool hasFirstLight, bool hasAdditionalLight) const
@@ -393,8 +430,8 @@ struct SceneBatchCollector::PassData
         }
     }
 
-    /// Create scene batch. Batch is not added to any queue.
-    SceneBatch CreateSceneBatch(Drawable* geometry, unsigned sourceBatchIndex,
+    /// Create intermediate scene batch. Batch is not added to any queue.
+    IntermediateSceneBatch CreateIntermediateSceneBatch(Drawable* geometry, unsigned sourceBatchIndex,
         Pass* basePass, Pass* firstLightPass, Pass* additionalLightPass) const
     {
         if (desc_.type_ == ScenePassType::Unlit || !additionalLightPass)
@@ -405,6 +442,13 @@ struct SceneBatchCollector::PassData
             return { geometry, sourceBatchIndex, firstLightPass, additionalLightPass };
         else
             return {};
+    }
+
+    /// Clear state before rendering.
+    void Clear(unsigned numThreads)
+    {
+        unlitBatches_.Clear(numThreads);
+        litBatches_.Clear(numThreads);
     }
 };
 
@@ -529,25 +573,23 @@ void SceneBatchCollector::InitializePasses(ea::span<const ScenePassDescription> 
             continue;
         }
 
-        passData.litBatches_.Clear(numThreads_);
-        passData.unlitBatches_.Clear(numThreads_);
+        passData.Clear(numThreads_);
     }
 }
 
-void SceneBatchCollector::UpdateAndCollectBatches(const DrawableCollection& drawables)
+void SceneBatchCollector::UpdateAndCollectSourceBatches(const DrawableCollection& drawables)
 {
-    const unsigned maxTasks = ea::max(1u, ea::min(drawables.size() / drawableWorkThreshold_, numThreads_));
-    ForEachParallel(workQueue_, maxTasks, drawables,
-        [this](unsigned threadIndex, ea::span<Drawable* const> drawablesRange)
+    ForEachParallel(workQueue_, drawableWorkThreshold_, drawables,
+        [this](unsigned threadIndex, unsigned /*offset*/, ea::span<Drawable* const> drawablesRange)
     {
-        UpdateAndCollectBatchesForThread(threadIndex, drawablesRange);
+        UpdateAndCollectSourceBatchesForThread(threadIndex, drawablesRange);
     });
 
     // Copy results from intermediate collection
     visibleLightsTemp_.CopyTo(visibleLights_);
 }
 
-void SceneBatchCollector::UpdateAndCollectBatchesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables)
+void SceneBatchCollector::UpdateAndCollectSourceBatchesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables)
 {
     Material* defaultMaterial = renderer_->GetDefaultMaterial();
     const DrawableZRangeEvaluator zRangeEvaluator{ camera_ };
@@ -604,7 +646,7 @@ void SceneBatchCollector::UpdateAndCollectBatchesForThread(unsigned threadIndex,
                     Pass* firstLightPass = technique->GetPass(pass.firstLightPassIndex_);
                     Pass* additionalLightPass = technique->GetPass(pass.additionalLightPassIndex_);
 
-                    const SceneBatch sceneBatch = pass.CreateSceneBatch(
+                    const IntermediateSceneBatch sceneBatch = pass.CreateIntermediateSceneBatch(
                         drawable, i, basePass, firstLightPass, additionalLightPass);
 
                     if (sceneBatch.additionalPass_)
@@ -705,7 +747,7 @@ void SceneBatchCollector::AccumulateForwardLighting(unsigned lightIndex)
     LightData& lightData = *visibleLightsData_[lightIndex];
 
     ForEachParallel(workQueue_, litGeometriesWorkThreshold_, lightData.litGeometries_,
-        [&](unsigned /*threadIndex*/, ea::span<Drawable* const> geometries)
+        [&](unsigned /*threadIndex*/, unsigned /*offset*/, ea::span<Drawable* const> geometries)
     {
         DrawableLightDataAccumulationContext accumContext;
         accumContext.maxPixelLights_ = 1;
@@ -722,6 +764,35 @@ void SceneBatchCollector::AccumulateForwardLighting(unsigned lightIndex)
             drawableLighting_[drawableIndex].AccumulateLight(accumContext, distance * lightIntensityPenalty);
         }
     });
+}
+
+void SceneBatchCollector::CollectSceneBatches()
+{
+    for (PassData& passData : passes_)
+    {
+        passData.unlitBaseSceneBatches_.resize(passData.unlitBatches_.Size());
+        passData.litBaseSceneBatches_.resize(passData.litBatches_.Size());
+
+        ForEachParallel(workQueue_, batchWorkThreshold_, passData.unlitBatches_,
+            [&](unsigned /*threadIndex*/, unsigned offset, ea::span<IntermediateSceneBatch const> batches)
+        {
+            Material* defaultMaterial = renderer_->GetDefaultMaterial();
+            for (unsigned i = 0; i < batches.size(); ++i)
+            {
+                const IntermediateSceneBatch& intermediateBatch = batches[i];
+                SceneBatch& sceneBatch = passData.unlitBaseSceneBatches_[i + offset];
+
+                Drawable* drawable = intermediateBatch.geometry_;
+                const SourceBatch& sourceBatch = drawable->GetBatches()[intermediateBatch.sourceBatchIndex_];
+
+                sceneBatch.drawable_ = drawable;
+                sceneBatch.drawableIndex_ = drawable->GetDrawableIndex();
+                sceneBatch.sourceBatchIndex_ = intermediateBatch.sourceBatchIndex_;
+                sceneBatch.geometry_ = sourceBatch.geometry_;
+                sceneBatch.material_ = sourceBatch.material_ ? sourceBatch.material_ : defaultMaterial;
+            }
+        });
+    }
 }
 
 namespace
@@ -1025,31 +1096,6 @@ CullMode GetEffectiveCullMode(CullMode mode, const Camera* camera)
 
     return mode;
 }
-
-/// Pipeline state cache.
-class PipelineStateCache : public Object
-{
-    URHO3D_OBJECT(PipelineStateCache, Object);
-
-public:
-    /// Construct.
-    explicit PipelineStateCache(Context* context) : Object(context) {}
-    /// Create new or return existing pipeline state.
-    PipelineState* GetPipelineState(const PipelineStateDesc& desc)
-    {
-        SharedPtr<PipelineState>& state = states_[desc];
-        if (!state)
-        {
-            state = MakeShared<PipelineState>(context_);
-            state->Create(desc);
-        }
-        return state;
-    }
-
-private:
-    /// Cached states.
-    ea::unordered_map<PipelineStateDesc, SharedPtr<PipelineState>> states_;
-};
 
 struct BatchPipelineStateKey
 {
