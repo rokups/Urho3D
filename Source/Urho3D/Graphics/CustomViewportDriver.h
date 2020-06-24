@@ -26,7 +26,6 @@
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/Drawable.h"
 #include "../Graphics/PipelineState.h"
-#include "../Graphics/Detail/RenderingContainers.h"
 #include "../Math/NumericRange.h"
 
 #include <EASTL/algorithm.h>
@@ -35,51 +34,6 @@
 
 namespace Urho3D
 {
-
-class Light;
-class RenderSurface;
-class VertexShader;
-class PixelShader;
-
-/// Per-viewport result of drawable processing.
-struct DrawableViewportCache
-{
-    /// Visible geometries.
-    ThreadedGeometryCollection visibleGeometries_;
-    /// Visible lights.
-    ThreadedLightCollection visibleLights_;
-    /// Scene Z range.
-    SceneZRange sceneZRange_;
-    /// Transient data index.
-    TransientDrawableDataIndex transient_;
-};
-
-/// Per-viewport per-light cache.
-struct DrawableLightCache
-{
-    /// Lit geometries.
-    // TODO: Optimize for the case when all visible geometries are lit
-    ea::vector<Drawable*> litGeometries_;
-};
-
-struct MaterialCacheKey
-{
-    Material* material_{};
-    Geometry* geometry_{};
-    Light* light_{};
-};
-
-/*class PipelineStateFactory
-{
-public:
-    virtual PipelineState* CreatePipelineState()
-};*/
-
-class MaterialCachePerPass
-{
-public:
-    PipelineState* GetPipelineState();
-};
 
 class CustomViewportDriver
 {
@@ -93,13 +47,7 @@ public:
     //virtual void ClearViewport(ClearTargetFlags flags, const Color& color, float depth, unsigned stencil) = 0;
 
     /// Collect drawables potentially visible from given camera.
-    virtual void CollectDrawables(DrawableCollection& drawables, Camera* camera, DrawableFlags flags) = 0;
-    /// Process drawables visible by the primary viewport camera.
-    virtual void ProcessPrimaryDrawables(DrawableViewportCache& viewportCache,
-        const DrawableCollection& drawables, Camera* camera) = 0;
-    /// Collect lit geometries.
-    virtual void CollectLitGeometries(const DrawableViewportCache& viewportCache,
-        DrawableLightCache& lightCache, Light* light) = 0;
+    virtual void CollectDrawables(ea::vector<Drawable*>& drawables, Camera* camera, DrawableFlags flags) = 0;
 
 };
 

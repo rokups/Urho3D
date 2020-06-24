@@ -67,11 +67,7 @@ protected:
     void CompleteTasks() override;
 
     //void ClearViewport(ClearTargetFlags flags, const Color& color, float depth, unsigned stencil) override;
-    void CollectDrawables(DrawableCollection& drawables, Camera* camera, DrawableFlags flags) override;
-    void ProcessPrimaryDrawables(DrawableViewportCache& viewportCache,
-        const DrawableCollection& drawables, Camera* camera) override;
-    void CollectLitGeometries(const DrawableViewportCache& viewportCache,
-        DrawableLightCache& lightCache, Light* light) override;
+    void CollectDrawables(ea::vector<Drawable*>& drawables, Camera* camera, DrawableFlags flags) override;
 
 private:
     Graphics* graphics_{};
