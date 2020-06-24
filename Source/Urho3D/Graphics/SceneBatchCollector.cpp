@@ -26,6 +26,7 @@
 #include "../Core/IteratorRange.h"
 #include "../Core/WorkQueue.h"
 #include "../Graphics/Camera.h"
+#include "../Graphics/Geometry.h"
 #include "../Graphics/Material.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/OctreeQuery.h"
@@ -128,6 +129,106 @@ struct SceneBatchCollector::IntermediateSceneBatch
     Pass* basePass_{};
     /// Additional material pass for forward rendering.
     Pass* additionalPass_{};
+};
+
+struct SceneBatchCollector::SubPassPipelineStateKey
+{
+    /// Cached state of the drawable.
+    unsigned drawableHash_{};
+    /// Geometry to be rendered.
+    Geometry* geometry_{};
+    /// Material to be rendered.
+    Material* material_{};
+    /// Pass of the material technique to be used.
+    Pass* pass_{};
+
+    /// Compare.
+    bool operator ==(const SubPassPipelineStateKey& rhs) const
+    {
+        return drawableHash_ == rhs.drawableHash_
+            && geometry_ == rhs.geometry_
+            && material_ == rhs.material_
+            && pass_ == rhs.pass_;
+    }
+
+    /// Return hash.
+    unsigned ToHash() const
+    {
+        unsigned hash = 0;
+        CombineHash(hash, MakeHash(drawableHash_));
+        CombineHash(hash, MakeHash(geometry_));
+        CombineHash(hash, MakeHash(material_));
+        CombineHash(hash, MakeHash(pass_));
+        return hash;
+    }
+};
+
+struct SceneBatchCollector::SubPassPipelineStateEntry
+{
+    /// Cached state of the geometry.
+    unsigned geometryHash_{};
+    /// Cached state of the material.
+    unsigned materialHash_{};
+    /// Cached state of the pass.
+    unsigned passHash_{};
+
+    /// Pipeline state.
+    SharedPtr<PipelineState> pipelineState_;
+    /// Whether the state is invalidated.
+    mutable std::atomic_bool invalidated_;
+};
+
+struct SceneBatchCollector::SubPassPipelineStateContext
+{
+    /// Cull camera.
+    Camera* camera_{};
+    /// Light.
+    Light* light_{};
+};
+
+struct SceneBatchCollector::SubPassPipelineStateCache
+{
+public:
+    /// Return existing pipeline state. Thread-safe.
+    PipelineState* GetPipelineState(Drawable* drawable, const SubPassPipelineStateKey& key) const
+    {
+        const auto iter = cache_.find(key);
+        if (iter == cache_.end() || iter->second.invalidated_.load(std::memory_order_relaxed))
+            return nullptr;
+
+        const SubPassPipelineStateEntry& entry = iter->second;
+        if (key.geometry_->GetPipelineStateHash() != entry.geometryHash_
+            || key.material_->GetPipelineStateHash() != entry.materialHash_
+            || key.pass_->GetPipelineStateHash() != entry.passHash_)
+        {
+            entry.invalidated_.store(true, std::memory_order_relaxed);
+            return false;
+        }
+
+        return entry.pipelineState_;
+    }
+
+    /// Return existing or create new pipeline state. Not thread safe.
+    PipelineState* GetOrCreatePipelineState(Drawable* drawable, const SubPassPipelineStateKey& key,
+        SubPassPipelineStateContext& factoryContext, ScenePipelineStateFactory& factory)
+    {
+        SubPassPipelineStateEntry& entry = cache_[key];
+        if (!entry.pipelineState_ || entry.invalidated_.load(std::memory_order_relaxed)
+            || key.geometry_->GetPipelineStateHash() != entry.geometryHash_
+            || key.material_->GetPipelineStateHash() != entry.materialHash_
+            || key.pass_->GetPipelineStateHash() != entry.passHash_)
+        {
+            entry.pipelineState_ = factory.CreatePipelineState(factoryContext.camera_, drawable,
+                key.geometry_, key.material_, key.pass_);
+            entry.invalidated_.store(false, std::memory_order_relaxed);
+        }
+
+        return entry.pipelineState_;
+    }
+
+private:
+    /// Cached states, possibly invalid.
+    ea::unordered_map<SubPassPipelineStateKey, SubPassPipelineStateEntry> cache_;
 };
 
 struct SceneBatchCollector::PassData
@@ -422,6 +523,22 @@ void SceneBatchCollector::UpdateAndCollectSourceBatchesForThread(unsigned thread
 
 void SceneBatchCollector::ProcessVisibleLights()
 {
+    // Find main light
+    float mainLightScore = 0.0f;
+    mainLight_ = nullptr;
+    for (Light* light : visibleLights_)
+    {
+        if (light->GetLightType() != LIGHT_DIRECTIONAL)
+            continue;
+
+        const float score = light->GetIntensityDivisor();
+        if (score > mainLightScore)
+        {
+            mainLightScore = score;
+            mainLight_ = light;
+        }
+    }
+
     // Allocate internal storage for lights
     visibleLightsData_.clear();
     for (Light* light : visibleLights_)
@@ -505,8 +622,9 @@ void SceneBatchCollector::AccumulateForwardLighting(unsigned lightIndex)
         for (Drawable* geometry : geometries)
         {
             const unsigned drawableIndex = geometry->GetDrawableIndex();
-            const float distance = light->GetDistanceTo(geometry);
-            drawableLighting_[drawableIndex].AccumulateLight(accumContext, distance * lightIntensityPenalty);
+            const float distance = ea::max(light->GetDistanceTo(geometry), M_LARGE_EPSILON);
+            const float penalty = light == mainLight_ ? -M_LARGE_VALUE : distance * lightIntensityPenalty;
+            drawableLighting_[drawableIndex].AccumulateLight(accumContext, penalty);
         }
     });
 }
@@ -515,29 +633,34 @@ void SceneBatchCollector::CollectSceneBatches()
 {
     for (PassData& passData : passes_)
     {
-        passData.unlitBaseSceneBatches_.resize(passData.unlitBatches_.Size());
-        passData.litBaseSceneBatches_.resize(passData.litBatches_.Size());
-
-        ForEachParallel(workQueue_, batchWorkThreshold_, passData.unlitBatches_,
-            [&](unsigned /*threadIndex*/, unsigned offset, ea::span<IntermediateSceneBatch const> batches)
-        {
-            Material* defaultMaterial = renderer_->GetDefaultMaterial();
-            for (unsigned i = 0; i < batches.size(); ++i)
-            {
-                const IntermediateSceneBatch& intermediateBatch = batches[i];
-                SceneBatch& sceneBatch = passData.unlitBaseSceneBatches_[i + offset];
-
-                Drawable* drawable = intermediateBatch.geometry_;
-                const SourceBatch& sourceBatch = drawable->GetBatches()[intermediateBatch.sourceBatchIndex_];
-
-                sceneBatch.drawable_ = drawable;
-                sceneBatch.drawableIndex_ = drawable->GetDrawableIndex();
-                sceneBatch.sourceBatchIndex_ = intermediateBatch.sourceBatchIndex_;
-                sceneBatch.geometry_ = sourceBatch.geometry_;
-                sceneBatch.material_ = sourceBatch.material_ ? sourceBatch.material_ : defaultMaterial;
-            }
-        });
+        CollectSceneBaseBatches(passData.unlitBatches_, passData.unlitBaseSceneBatches_);
+        CollectSceneBaseBatches(passData.litBatches_, passData.litBaseSceneBatches_);
     }
 }
 
+void SceneBatchCollector::CollectSceneBaseBatches(const ThreadedVector<IntermediateSceneBatch>& intermediateBatches,
+    ea::vector<SceneBatch>& sceneBatches)
+{
+    sceneBatches.resize(intermediateBatches.Size());
+    ForEachParallel(workQueue_, batchWorkThreshold_, intermediateBatches,
+        [&](unsigned /*threadIndex*/, unsigned offset, ea::span<IntermediateSceneBatch const> batches)
+    {
+        Material* defaultMaterial = renderer_->GetDefaultMaterial();
+        for (unsigned i = 0; i < batches.size(); ++i)
+        {
+            const IntermediateSceneBatch& intermediateBatch = batches[i];
+            SceneBatch& sceneBatch = sceneBatches[i + offset];
+
+            Drawable* drawable = intermediateBatch.geometry_;
+            const SourceBatch& sourceBatch = drawable->GetBatches()[intermediateBatch.sourceBatchIndex_];
+
+            sceneBatch.drawable_ = drawable;
+            sceneBatch.drawableIndex_ = drawable->GetDrawableIndex();
+            sceneBatch.sourceBatchIndex_ = intermediateBatch.sourceBatchIndex_;
+            sceneBatch.geometry_ = sourceBatch.geometry_;
+            sceneBatch.material_ = sourceBatch.material_ ? sourceBatch.material_ : defaultMaterial;
+            //sceneBatch.pipelineState_ = ;
+        }
+    });
+}
 }

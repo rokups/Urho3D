@@ -57,6 +57,72 @@ namespace Urho3D
 namespace
 {
 
+class TestFactory : public ScenePipelineStateFactory, public Object
+{
+    URHO3D_OBJECT(TestFactory, Object);
+
+public:
+    explicit TestFactory(Context* context)
+        : Object(context)
+        , graphics_(context->GetGraphics())
+        , renderer_(context->GetRenderer())
+    {}
+
+    PipelineState* CreatePipelineState(Camera* camera, Drawable* drawable,
+        Geometry* geometry, Material* material, Pass* pass) override
+    {
+        PipelineStateDesc desc;
+
+        for (VertexBuffer* vertexBuffer : geometry->GetVertexBuffers())
+            desc.vertexElements_.append(vertexBuffer->GetElements());
+
+        ea::string commonDefines = "DIRLIGHT NUMVERTEXLIGHTS=4 ";
+        if (graphics_->GetConstantBuffersEnabled())
+            commonDefines += "USE_CBUFFERS ";
+        desc.vertexShader_ = graphics_->GetShader(
+            VS, "v2/" + pass->GetVertexShader(), commonDefines + pass->GetEffectiveVertexShaderDefines());
+        desc.pixelShader_ = graphics_->GetShader(
+            PS, "v2/" + pass->GetPixelShader(), commonDefines + pass->GetEffectivePixelShaderDefines());
+
+        desc.primitiveType_ = geometry->GetPrimitiveType();
+        if (auto indexBuffer = geometry->GetIndexBuffer())
+            desc.indexType_ = indexBuffer->GetIndexSize() == 2 ? IBT_UINT16 : IBT_UINT32;
+
+        desc.depthWrite_ = true;
+        desc.depthMode_ = CMP_LESSEQUAL;
+        desc.stencilEnabled_ = false;
+        desc.stencilMode_ = CMP_ALWAYS;
+
+        desc.colorWrite_ = true;
+        desc.blendMode_ = BLEND_REPLACE;
+        desc.alphaToCoverage_ = false;
+
+        desc.fillMode_ = FILL_SOLID;
+        desc.cullMode_ = GetEffectiveCullMode(material->GetCullMode(), camera);
+
+        return renderer_->GetOrCreatePipelineState(desc);
+    }
+
+private:
+    static CullMode GetEffectiveCullMode(CullMode mode, const Camera* camera)
+    {
+        // If a camera is specified, check whether it reverses culling due to vertical flipping or reflection
+        if (camera && camera->GetReverseCulling())
+        {
+            if (mode == CULL_CW)
+                mode = CULL_CCW;
+            else if (mode == CULL_CCW)
+                mode = CULL_CW;
+        }
+
+        return mode;
+    }
+
+    Graphics* graphics_{};
+    Renderer* renderer_{};
+};
+
+
 /// Helper class to evaluate min and max Z of the drawable.
 struct DrawableZRangeEvaluator
 {
@@ -646,6 +712,7 @@ void CustomView::Render()
     CollectDrawables(drawablesInMainCamera, camera_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT);
 
     // Process batches
+    static TestFactory scenePipelineStateFactory(context_);
     static SceneBatchCollector sceneBatchCollector(context_);
     static ScenePassDescription passes[] = {
         { ScenePassType::ForwardLitBase,   "base",  "litbase",  "light" },
@@ -654,7 +721,7 @@ void CustomView::Render()
         { ScenePassType::Unlit, "refract" },
         { ScenePassType::Unlit, "postalpha" },
     };
-    sceneBatchCollector.Process(frameInfo_, passes, drawablesInMainCamera);
+    sceneBatchCollector.Process(frameInfo_, scenePipelineStateFactory, passes, drawablesInMainCamera);
 
     static DrawableViewportCache viewportCache;
     ProcessPrimaryDrawables(viewportCache, drawablesInMainCamera, camera_);

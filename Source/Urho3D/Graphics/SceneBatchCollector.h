@@ -239,6 +239,15 @@ struct SceneBatch
     PipelineState* pipelineState_{};
 };
 
+/// Pipeline state factory for scene.
+class ScenePipelineStateFactory
+{
+public:
+    /// Create pipeline state. Only fields that constribute to pipeline state hashes are safe to use.
+    virtual PipelineState* CreatePipelineState(Camera* camera, Drawable* drawable,
+        Geometry* geometry, Material* material, Pass* pass) = 0;
+};
+
 /// Utility class to collect batches from the scene for given frame.
 class SceneBatchCollector : public Object
 {
@@ -250,7 +259,7 @@ public:
     ~SceneBatchCollector();
 
     /// Process drawables in frame.
-    void Process(const FrameInfo& frameInfo,
+    void Process(const FrameInfo& frameInfo, ScenePipelineStateFactory& pipelineStateFactory,
         ea::span<const ScenePassDescription> passes, const ea::vector<Drawable*>& drawables)
     {
         InitializeFrame(frameInfo);
@@ -263,6 +272,14 @@ public:
 private:
     /// Batch of drawable in scene.
     struct IntermediateSceneBatch;
+    /// Sub-pass pipeline state cache context.
+    struct SubPassPipelineStateContext;
+    /// Sub-pass pipeline state cache key.
+    struct SubPassPipelineStateKey;
+    /// Sub-pass pipeline state cache entry.
+    struct SubPassPipelineStateEntry;
+    /// Sub-pass pipeline state cache.
+    struct SubPassPipelineStateCache;
     /// Internal pass data.
     struct PassData;
     /// Helper class to evaluate min and max Z of the drawable.
@@ -294,6 +311,9 @@ private:
 
     /// Collect scene batches.
     void CollectSceneBatches();
+    /// Convert scene batches from intermediate batches to base batches.
+    void CollectSceneBaseBatches(const ThreadedVector<IntermediateSceneBatch>& intermediateBatches,
+        ea::vector<SceneBatch>& sceneBatches);
 
     /// Min number of processed drawables in single task.
     unsigned drawableWorkThreshold_{ 1 };
@@ -329,6 +349,8 @@ private:
     ThreadedVector<Light*> visibleLightsTemp_;
     /// Visible lights.
     ea::vector<Light*> visibleLights_;
+    /// Main directional light.
+    Light* mainLight_{};
     /// Scene Z range.
     SceneZRange sceneZRange_;
 

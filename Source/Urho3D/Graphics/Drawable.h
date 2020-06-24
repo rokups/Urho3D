@@ -25,6 +25,7 @@
 #pragma once
 
 #include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/PipelineStateTracker.h"
 #include "../Math/BoundingBox.h"
 #include "../Scene/Component.h"
 
@@ -135,7 +136,7 @@ struct URHO3D_API SourceBatch
 };
 
 /// Base class for visible components.
-class URHO3D_API Drawable : public Component
+class URHO3D_API Drawable : public Component, public PipelineStateTracker
 {
     URHO3D_OBJECT(Drawable, Component);
 
@@ -366,6 +367,9 @@ public:
     }
 
 protected:
+    /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
+    unsigned RecalculatePipelineStateHash() const override {}
+
     /// Handle node being assigned.
     void OnNodeSet(Node* node) override;
     /// Handle scene being assigned.
