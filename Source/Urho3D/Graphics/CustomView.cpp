@@ -809,11 +809,13 @@ void CustomView::Render()
     Material* currentMaterial = nullptr;
     bool first = true;
     const auto zone = octree_->GetZone();
-    for (const ForwardBaseBatch& batch : forwardBaseBatches)
+
+    const auto& baseBatches = sceneBatchCollector.GetBaseBatches("litbase");
+    Light* mainLight = sceneBatchCollector.GetMainLight();
+    for (const SceneBatch& batch : baseBatches)
     {
         auto geometry = batch.geometry_;
-        auto light = batch.mainDirectionalLight_;
-        const SourceBatch& sourceBatch = *batch.sourceBatch_;
+        const SourceBatch& sourceBatch = batch.drawable_->GetBatches()[batch.sourceBatchIndex_];
         drawQueue.SetPipelineState(batch.pipelineState_);
         FillGlobalSharedParameters(drawQueue, frameInfo_, camera_, zone, scene_);
         SphericalHarmonicsDot9 sh;
@@ -849,6 +851,8 @@ void CustomView::Render()
 
         if (drawQueue.BeginShaderParameterGroup(SP_LIGHT, true))
         {
+            Light* light = mainLight;
+            const auto batchVertexLights = sceneBatchCollector.GetVertexLights(batch.drawableIndex_);
             first = false;
         Node* lightNode = light->GetNode();
         float atten = 1.0f / Max(light->GetRange(), M_EPSILON);
@@ -875,9 +879,9 @@ void CustomView::Render()
         drawQueue.AddShaderParameter(PSP_LIGHTLENGTH, light->GetLength());
 
         Vector4 vertexLights[MAX_VERTEX_LIGHTS * 3]{};
-        for (unsigned i = 0; i < batch.vertexLights_.size(); ++i)
+        for (unsigned i = 0; i < batchVertexLights.size(); ++i)
         {
-            Light* vertexLight = batch.vertexLights_[i];
+            Light* vertexLight = batchVertexLights[i];
             if (!vertexLight)
                 continue;
             Node* vertexLightNode = vertexLight->GetNode();

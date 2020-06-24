@@ -228,18 +228,18 @@ void ForEachParallel(WorkQueue* workQueue, unsigned threshold, const ThreadedVec
                     break;
 
                 // Skip if didn't get to the range yet
-                if (baseIndex + threadCollection.size() <= fromIndex)
-                    continue;
-
-                // Remap range
-                const unsigned fromSubIndex = ea::max(baseIndex, fromIndex) - baseIndex;
-                const unsigned toSubIndex = ea::min(toIndex - baseIndex, threadCollection.size());
-                if (fromSubIndex == toSubIndex)
-                    continue;
-
-                // Invoke callback for desired range
-                const ea::span<const T> elements(&threadCollection[fromSubIndex], toSubIndex - fromSubIndex);
-                callback(threadIndex, baseIndex + fromSubIndex, elements);
+                if (baseIndex + threadCollection.size() > fromIndex)
+                {
+                    // Remap range
+                    const unsigned fromSubIndex = ea::max(baseIndex, fromIndex) - baseIndex;
+                    const unsigned toSubIndex = ea::min(toIndex - baseIndex, threadCollection.size());
+                    if (fromSubIndex != toSubIndex)
+                    {
+                        // Invoke callback for desired range
+                        const ea::span<const T> elements(&threadCollection[fromSubIndex], toSubIndex - fromSubIndex);
+                        callback(threadIndex, baseIndex + fromSubIndex, elements);
+                    }
+                }
 
                 // Update base index
                 baseIndex += threadCollection.size();

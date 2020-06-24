@@ -368,7 +368,7 @@ public:
 
 protected:
     /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
-    unsigned RecalculatePipelineStateHash() const override {}
+    unsigned RecalculatePipelineStateHash() const override { return 0; }
 
     /// Handle node being assigned.
     void OnNodeSet(Node* node) override;

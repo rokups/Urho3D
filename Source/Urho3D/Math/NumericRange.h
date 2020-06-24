@@ -40,13 +40,13 @@ struct NumericRange : ea::pair<T, T>
     NumericRange(const T& minValue, const T& maxValue) : ea::pair<T, T>(minValue, maxValue) { }
 
     /// Return whether the range is valid.
-    bool IsValid() const { return first <= second; }
+    bool IsValid() const { return this->first <= this->second; }
 
     /// Accumulate range.
     NumericRange<T>& operator |= (const NumericRange& rhs)
     {
-        first = ea::min(first, rhs.first);
-        second = ea::max(second, rhs.second);
+        this->first = ea::min(this->first, rhs.first);
+        this->second = ea::max(this->second, rhs.second);
         return *this;
     }
 

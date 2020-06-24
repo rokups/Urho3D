@@ -131,9 +131,9 @@ struct ScenePassDescription
     /// Pass type.
     ScenePassType type_{};
     /// Material pass used to render materials that don't receive light.
-    ea::string basePassName_;
+    ea::string unlitBasePassName_;
     /// Material pass used for first light during forward rendering.
-    ea::string firstLightPassName_;
+    ea::string litBasePassName_;
     /// Material pass used for the rest of lights during forward rendering.
     ea::string additionalLightPassName_;
 };
@@ -163,7 +163,7 @@ struct DrawableLightData
     using Container = ea::vector_map<float, unsigned, ea::less<float>, ea::allocator,
         ea::fixed_vector<ea::pair<float, unsigned>, NumElements>>;
     /// Container for vertex lights.
-    using VertexLightContainer = ea::array<Light*, MaxVertexLights>;
+    using VertexLightContainer = ea::array<unsigned, MaxVertexLights>;
 
     /// Reset accumulator.
     void Reset()
@@ -195,20 +195,17 @@ struct DrawableLightData
         }
     }
 
-    /// Return main directional per-pixel light.
-    /*Light* GetMainDirectionalLight() const
-    {
-        return lights_.empty() ? nullptr : lights_.front().second;
-    }
-
     /// Return per-vertex lights.
     VertexLightContainer GetVertexLights() const
     {
-        VertexLightContainer vertexLights{};
-        for (unsigned i = firstVertexLight_; i < lights_.size(); ++i)
-            vertexLights[i - firstVertexLight_] = lights_.at(i).second;
+        VertexLightContainer vertexLights;
+        for (unsigned i = 0; i < 4; ++i)
+        {
+            const unsigned index = i + firstVertexLight_;
+            vertexLights[i] = index < lights_.size() ? lights_.at(index).second : M_MAX_UNSIGNED;
+        }
         return vertexLights;
-    }*/
+    }
 
     /// Container of per-pixel and per-pixel lights.
     Container lights_;
@@ -253,6 +250,11 @@ class SceneBatchCollector : public Object
 {
     URHO3D_OBJECT(SceneBatchCollector, Object);
 public:
+    /// Max number of vertex lights.
+    static const unsigned MaxVertexLights = 4;
+    /// Max optimal number of pixel lights.
+    static const unsigned MaxPixelLights = 4;
+
     /// Construct.
     SceneBatchCollector(Context* context);
     /// Destruct.
@@ -262,12 +264,21 @@ public:
     void Process(const FrameInfo& frameInfo, ScenePipelineStateFactory& pipelineStateFactory,
         ea::span<const ScenePassDescription> passes, const ea::vector<Drawable*>& drawables)
     {
-        InitializeFrame(frameInfo);
+        InitializeFrame(frameInfo, pipelineStateFactory);
         InitializePasses(passes);
         UpdateAndCollectSourceBatches(drawables);
         ProcessVisibleLights();
         CollectSceneBatches();
     }
+
+    /// Return main light.
+    Light* GetMainLight() const { return mainLight_; }
+    /// Return base batches for given pass.
+    const ea::vector<SceneBatch>& GetBaseBatches(const ea::string& pass) const;
+    /// Return vertex lights for drawable (as indices in the array of visible lights).
+    ea::array<unsigned, MaxVertexLights> GetVertexLightIndices(unsigned drawableIndex) const { return drawableLighting_[drawableIndex].GetVertexLights(); }
+    /// Return vertex lights for drawable (as pointers).
+    ea::array<Light*, MaxVertexLights> GetVertexLights(unsigned drawableIndex) const;
 
 private:
     /// Batch of drawable in scene.
@@ -291,7 +302,7 @@ private:
     Technique* FindTechnique(Drawable* drawable, Material* material) const;
 
     /// Reset collection in the begining of the frame.
-    void InitializeFrame(const FrameInfo& frameInfo);
+    void InitializeFrame(const FrameInfo& frameInfo, ScenePipelineStateFactory& pipelineStateFactory);
     /// Initialize passes.
     void InitializePasses(ea::span<const ScenePassDescription> passes);
 
@@ -312,8 +323,8 @@ private:
     /// Collect scene batches.
     void CollectSceneBatches();
     /// Convert scene batches from intermediate batches to base batches.
-    void CollectSceneBaseBatches(const ThreadedVector<IntermediateSceneBatch>& intermediateBatches,
-        ea::vector<SceneBatch>& sceneBatches);
+    void CollectSceneBaseBatches(SubPassPipelineStateCache& subPassCache, bool isLit,
+        const ThreadedVector<IntermediateSceneBatch>& intermediateBatches, ea::vector<SceneBatch>& sceneBatches);
 
     /// Min number of processed drawables in single task.
     unsigned drawableWorkThreshold_{ 1 };
@@ -326,6 +337,8 @@ private:
     WorkQueue* workQueue_{};
     /// Renderer.
     Renderer* renderer_{};
+    /// Pipeline state factory.
+    ScenePipelineStateFactory* pipelineStateFactory_{};
     /// Number of worker threads.
     unsigned numThreads_{};
     /// Material quality.
@@ -342,6 +355,8 @@ private:
 
     /// Passes.
     ea::vector<PassData> passes_;
+    /// Base batches lookup table.
+    ea::unordered_map<unsigned, ea::vector<SceneBatch>*> baseBatchesLookup_;
 
     /// Visible geometries.
     ThreadedVector<Drawable*> visibleGeometries_;
@@ -357,12 +372,15 @@ private:
     /// Transient data index.
     TransientDrawableIndex transient_;
     /// Drawable lighting data index.
-    ea::vector<DrawableLightData<4, 4>> drawableLighting_;
+    ea::vector<DrawableLightData<MaxPixelLights, MaxVertexLights>> drawableLighting_;
 
     /// Per-light caches.
     ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<LightData>> cachedLightData_;
     /// Per-light caches for visible lights.
     ea::vector<LightData*> visibleLightsData_;
+
+    /// Temporary collection for pipeline state cache misses.
+    ThreadedVector<SceneBatch*> sceneBatchesWithoutPipelineStates_;
 };
 
 }
