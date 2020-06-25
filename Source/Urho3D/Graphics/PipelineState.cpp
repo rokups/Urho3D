@@ -20,8 +20,6 @@
 // THE SOFTWARE.
 //
 
-#pragma once
-
 #include "../Graphics/PipelineState.h"
 
 #include "../Core/Context.h"

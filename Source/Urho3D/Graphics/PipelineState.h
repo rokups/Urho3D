@@ -189,6 +189,15 @@ public:
     /// Return description.
     const PipelineStateDesc& GetDesc() const { return desc_; }
 
+    /// Return hash of used shaders.
+    unsigned GetShaderHash() const
+    {
+        unsigned hash = 0;
+        CombineHash(hash, MakeHash(desc_.vertexShader_));
+        CombineHash(hash, MakeHash(desc_.pixelShader_));
+        return hash;
+    }
+
 private:
     /// Graphics subsystem.
     Graphics* graphics_{};

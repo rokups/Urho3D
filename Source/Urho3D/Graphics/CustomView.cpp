@@ -339,10 +339,12 @@ void CustomView::Render()
     bool first = true;
     const auto zone = octree_->GetZone();
 
-    const auto& baseBatches = sceneBatchCollector.GetBaseBatches("litbase");
+    static ea::vector<SceneBatchSortedByState> baseBatches;
+    sceneBatchCollector.GetSortedBaseBatches("litbase", baseBatches);
     Light* mainLight = sceneBatchCollector.GetMainLight();
-    for (const SceneBatch& batch : baseBatches)
+    for (const SceneBatchSortedByState& sortedBatch : baseBatches)
     {
+        const SceneBatch& batch = *sortedBatch.sceneBatch_;
         auto geometry = batch.geometry_;
         const SourceBatch& sourceBatch = batch.drawable_->GetBatches()[batch.sourceBatchIndex_];
         drawQueue.SetPipelineState(batch.pipelineState_);

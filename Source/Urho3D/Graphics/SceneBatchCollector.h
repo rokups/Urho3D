@@ -25,11 +25,13 @@
 #include "../Core/ThreadedVector.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Light.h"
+#include "../Graphics/Material.h"
 #include "../Graphics/Technique.h"
 #include "../Math/NumericRange.h"
 #include "../Math/SphericalHarmonics.h"
 
 #include <EASTL/fixed_vector.h>
+#include <EASTL/sort.h>
 #include <EASTL/vector_map.h>
 
 namespace Urho3D
@@ -234,6 +236,91 @@ struct SceneBatch
     Pass* pass_{};
     /// Pipeline state.
     PipelineState* pipelineState_{};
+
+    /// Return source batch.
+    const SourceBatch& GetSourceBatch() const { return drawable_->GetBatches()[sourceBatchIndex_]; }
+};
+
+/// Scene batch sorted by pipeline state, material and geometry. Also sorted front to back.
+struct SceneBatchSortedByState
+{
+    /// Sorting value for pipeline state.
+    unsigned long long pipelineStateKey_{};
+    /// Sorting value for material and geometry.
+    unsigned long long materialGeometryKey_{};
+    /// Sorting distance.
+    float distance_{};
+    /// Batch to be sorted.
+    const SceneBatch* sceneBatch_{};
+
+    /// Construct default.
+    SceneBatchSortedByState() = default;
+
+    /// Construct from batch.
+    explicit SceneBatchSortedByState(const SceneBatch* batch)
+        : sceneBatch_(batch)
+    {
+        const SourceBatch& sourceBatch = batch->GetSourceBatch();
+
+        // 8: render order
+        // 32: shader variation
+        // 24: pipeline state
+        const unsigned long long renderOrder = batch->material_->GetRenderOrder();
+        const unsigned long long shaderHash = batch->pipelineState_->GetShaderHash();
+        const unsigned pipelineStateHash = MakeHash(batch->pipelineState_);
+        pipelineStateKey_ |= renderOrder << 56;
+        pipelineStateKey_ |= shaderHash << 24;
+        pipelineStateKey_ |= (pipelineStateHash & 0xffffff) ^ (pipelineStateHash >> 24);
+
+        // 32: material
+        // 32: geometry
+        unsigned long long materialHash = MakeHash(batch->material_);
+        materialGeometryKey_ |= (materialHash ^ sourceBatch.lightmapIndex_) << 32;
+        materialGeometryKey_ |= MakeHash(batch->geometry_);
+
+        distance_ = sourceBatch.distance_;
+    }
+
+    /// Compare sorted batches.
+    bool operator < (const SceneBatchSortedByState& rhs) const
+    {
+        if (pipelineStateKey_ != rhs.pipelineStateKey_)
+            return pipelineStateKey_ < rhs.pipelineStateKey_;
+        if (materialGeometryKey_ != rhs.materialGeometryKey_)
+            return materialGeometryKey_ < rhs.materialGeometryKey_;
+        return distance_ > rhs.distance_;
+    }
+};
+
+/// Scene batch sorted by render order and back to front.
+struct SceneBatchSortedBackToFront
+{
+    /// Render order.
+    unsigned char renderOrder_{};
+    /// Sorting distance.
+    float distance_{};
+    /// Batch to be sorted.
+    const SceneBatch* sceneBatch_{};
+
+    /// Construct default.
+    SceneBatchSortedBackToFront() = default;
+
+    /// Construct from batch.
+    explicit SceneBatchSortedBackToFront(const SceneBatch* batch)
+        : renderOrder_(batch->material_->GetRenderOrder())
+        , sceneBatch_(batch)
+    {
+        const SourceBatch& sourceBatch = batch->GetSourceBatch();
+        distance_ = sourceBatch.distance_;
+    }
+
+    /// Compare sorted batches.
+    bool operator < (const SceneBatchSortedBackToFront& rhs) const
+    {
+        if (renderOrder_ != rhs.renderOrder_)
+            return renderOrder_ < rhs.renderOrder_;
+        return distance_ < rhs.distance_;
+    }
 };
 
 /// Pipeline state factory for scene.
@@ -254,6 +341,8 @@ public:
     static const unsigned MaxVertexLights = 4;
     /// Max optimal number of pixel lights.
     static const unsigned MaxPixelLights = 4;
+    /// Collection of vertex lights used (indices).
+    using VertexLightCollection = ea::array<unsigned, MaxVertexLights>;
 
     /// Construct.
     SceneBatchCollector(Context* context);
@@ -275,8 +364,11 @@ public:
     Light* GetMainLight() const { return mainLight_; }
     /// Return base batches for given pass.
     const ea::vector<SceneBatch>& GetBaseBatches(const ea::string& pass) const;
+    /// Return sorted base batches for given pass.
+    template <class T> void GetSortedBaseBatches(const ea::string& pass, ea::vector<T>& sortedBatches) const;
+
     /// Return vertex lights for drawable (as indices in the array of visible lights).
-    ea::array<unsigned, MaxVertexLights> GetVertexLightIndices(unsigned drawableIndex) const { return drawableLighting_[drawableIndex].GetVertexLights(); }
+    VertexLightCollection GetVertexLightIndices(unsigned drawableIndex) const { return drawableLighting_[drawableIndex].GetVertexLights(); }
     /// Return vertex lights for drawable (as pointers).
     ea::array<Light*, MaxVertexLights> GetVertexLights(unsigned drawableIndex) const;
 
@@ -382,5 +474,16 @@ private:
     /// Temporary collection for pipeline state cache misses.
     ThreadedVector<SceneBatch*> sceneBatchesWithoutPipelineStates_;
 };
+
+template <class T>
+void SceneBatchCollector::GetSortedBaseBatches(const ea::string& pass, ea::vector<T>& sortedBatches) const
+{
+    const ea::vector<SceneBatch>& baseBatches = GetBaseBatches(pass);
+    const unsigned numBatches = baseBatches.size();
+    sortedBatches.resize(numBatches);
+    for (unsigned i = 0; i < numBatches; ++i)
+        sortedBatches[i] = T{ &baseBatches[i] };
+    ea::sort(sortedBatches.begin(), sortedBatches.end());
+}
 
 }

@@ -27,7 +27,6 @@
 #include "../Core/WorkQueue.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/Geometry.h"
-#include "../Graphics/Material.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/OctreeQuery.h"
 #include "../Graphics/Renderer.h"
@@ -214,7 +213,7 @@ public:
             || key.pass_->GetPipelineStateHash() != entry.passHash_)
         {
             entry.invalidated_.store(true, std::memory_order_relaxed);
-            return false;
+            return nullptr;
         }
 
         return entry.pipelineState_;
@@ -232,6 +231,9 @@ public:
         {
             entry.pipelineState_ = factory.CreatePipelineState(factoryContext.camera_, drawable,
                 key.geometry_, key.material_, key.pass_);
+            entry.geometryHash_ = key.geometry_->GetPipelineStateHash();
+            entry.materialHash_ = key.material_->GetPipelineStateHash();
+            entry.passHash_ = key.pass_->GetPipelineStateHash();
             entry.invalidated_.store(false, std::memory_order_relaxed);
         }
 
