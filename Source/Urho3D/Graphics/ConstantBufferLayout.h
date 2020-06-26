@@ -31,7 +31,7 @@ namespace Urho3D
 {
 
 /// Description of constant buffer layout of shader program.
-class ConstantBufferLayout : public RefCounted
+class URHO3D_API ConstantBufferLayout : public RefCounted
 {
 public:
     /// Return constant buffer size for given group.

@@ -167,17 +167,18 @@ template <class T, class U>
 void ForEachParallel(WorkQueue* workQueue, unsigned threshold, ea::span<T> collection, const U& callback)
 {
     assert(threshold > 0);
-    if (collection.empty())
+    const unsigned numElements = collection.size();
+    if (numElements == 0)
         return;
 
     const unsigned maxThreads = workQueue->GetNumThreads() + 1;
-    const unsigned maxTasks = ea::max(1u, ea::min(collection.size() / threshold, maxThreads));
+    const unsigned maxTasks = ea::max(1u, ea::min(numElements / threshold, maxThreads));
 
-    const unsigned elementsPerTask = (collection.size() + maxTasks - 1) / maxTasks;
+    const unsigned elementsPerTask = (numElements + maxTasks - 1) / maxTasks;
     for (unsigned taskIndex = 0; taskIndex < maxTasks; ++taskIndex)
     {
-        const unsigned fromIndex = ea::min(taskIndex * elementsPerTask, collection.size());
-        const unsigned toIndex = ea::min((taskIndex + 1) * elementsPerTask, collection.size());
+        const unsigned fromIndex = ea::min(taskIndex * elementsPerTask, numElements);
+        const unsigned toIndex = ea::min((taskIndex + 1) * elementsPerTask, numElements);
         if (fromIndex == toIndex)
             continue;
 
@@ -228,11 +229,12 @@ void ForEachParallel(WorkQueue* workQueue, unsigned threshold, const ThreadedVec
                     break;
 
                 // Skip if didn't get to the range yet
-                if (baseIndex + threadCollection.size() > fromIndex)
+                const unsigned numElementsInCollection = threadCollection.size();
+                if (baseIndex + numElementsInCollection > fromIndex)
                 {
                     // Remap range
                     const unsigned fromSubIndex = ea::max(baseIndex, fromIndex) - baseIndex;
-                    const unsigned toSubIndex = ea::min(toIndex - baseIndex, threadCollection.size());
+                    const unsigned toSubIndex = ea::min(toIndex - baseIndex, numElementsInCollection);
                     if (fromSubIndex != toSubIndex)
                     {
                         // Invoke callback for desired range
