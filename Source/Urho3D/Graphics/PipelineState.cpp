@@ -37,7 +37,7 @@ PipelineState::PipelineState(Context* context)
 void PipelineState::Create(const PipelineStateDesc& desc)
 {
     desc_ = desc;
-    desc_.constantBufferLayout_ = graphics_->GetConstantBufferLayout(desc_.vertexShader_, desc_.pixelShader_);
+    constantBufferLayout_ = graphics_->GetConstantBufferLayout(desc_.vertexShader_, desc_.pixelShader_);
 }
 
 void PipelineState::Apply()

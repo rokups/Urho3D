@@ -116,7 +116,7 @@ public:
 
         if (useConstantBuffers_)
         {
-            constantBuffers_.currentLayout_ = pipelineState->GetDesc().constantBufferLayout_;
+            constantBuffers_.currentLayout_ = pipelineState->GetConstantBufferLayout();
         }
     }
 

@@ -45,9 +45,12 @@ public:
     }
 
     /// Insert element into collection.
-    void Insert(unsigned threadIndex, const T& value)
+    unsigned Insert(unsigned threadIndex, const T& value)
     {
-        elements_[threadIndex].push_back(value);
+        auto& threadCollection = elements_[threadIndex];
+        const unsigned index = threadCollection.size();
+        threadCollection.push_back(value);
+        return index;
     }
 
     /// Get size.
@@ -62,27 +65,29 @@ public:
     /// Iterate (mutable).
     template <class Callback> void ForEach(const Callback& callback)
     {
-        unsigned index = 0;
+        unsigned threadIndex = 0;
+        unsigned elementIndex = 0;
         for (auto& threadCollection : elements_)
         {
             for (T& element : threadCollection)
             {
-                callback(index, element);
-                ++index;
+                callback(threadIndex, elementIndex, element);
+                ++elementIndex;
             }
+            ++threadIndex;
         }
     }
 
     /// Iterate (const).
     template <class Callback> void ForEach(const Callback& callback) const
     {
-        unsigned index = 0;
+        unsigned elementIndex = 0;
         for (const auto& threadCollection : elements_)
         {
             for (const T& element : threadCollection)
             {
-                callback(index, element);
-                ++index;
+                callback(elementIndex, element);
+                ++elementIndex;
             }
         }
     }
@@ -97,6 +102,12 @@ public:
 
     /// Return underlying collection.
     const auto& GetUnderlyingCollection() const { return elements_; }
+
+    /// Return element.
+    T& Get(unsigned threadIndex, unsigned elementIndex) { return elements_[threadIndex][elementIndex]; }
+
+    /// Return element.
+    const T& Get(unsigned threadIndex, unsigned elementIndex) const { return elements_[threadIndex][elementIndex]; }
 
 private:
     /// Internal collection.

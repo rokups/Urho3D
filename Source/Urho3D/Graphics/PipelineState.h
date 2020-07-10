@@ -47,8 +47,6 @@ struct PipelineStateDesc
     ShaderVariation* vertexShader_{};
     /// Pixel shader used.
     ShaderVariation* pixelShader_{};
-    /// Layout of constant buffers. Filled automatically.
-    ConstantBufferLayout* constantBufferLayout_{};
 
     /// Primitive type.
     PrimitiveType primitiveType_{};
@@ -189,6 +187,9 @@ public:
     /// Return description.
     const PipelineStateDesc& GetDesc() const { return desc_; }
 
+    /// Return constant buffer layout.
+    ConstantBufferLayout* GetConstantBufferLayout() const { return constantBufferLayout_; }
+
     /// Return hash of used shaders.
     unsigned GetShaderHash() const
     {
@@ -203,6 +204,8 @@ private:
     Graphics* graphics_{};
     /// Description.
     PipelineStateDesc desc_;
+    /// Layout of constant buffers.
+    ConstantBufferLayout* constantBufferLayout_{};
 };
 
 /// Generic pipeline state cache.

@@ -68,7 +68,7 @@ public:
     {}
 
     PipelineState* CreatePipelineState(Camera* camera, Drawable* drawable,
-        Geometry* geometry, Material* material, Pass* pass) override
+        Geometry* geometry, GeometryType geometryType, Material* material, Pass* pass, Light* light) override
     {
         PipelineStateDesc desc;
 
@@ -84,8 +84,7 @@ public:
             PS, "v2/" + pass->GetPixelShader(), commonDefines + pass->GetEffectivePixelShaderDefines());
 
         desc.primitiveType_ = geometry->GetPrimitiveType();
-        if (auto indexBuffer = geometry->GetIndexBuffer())
-            desc.indexType_ = indexBuffer->GetIndexSize() == 2 ? IBT_UINT16 : IBT_UINT32;
+        desc.indexType_ = IndexBuffer::GetIndexBufferType(geometry->GetIndexBuffer());
 
         desc.depthWrite_ = true;
         desc.depthMode_ = CMP_LESSEQUAL;
@@ -329,6 +328,7 @@ void CustomView::Render()
         { ScenePassType::Unlit, "refract" },
         { ScenePassType::Unlit, "postalpha" },
     };
+    sceneBatchCollector.SetMaxPixelLights(2);
     sceneBatchCollector.Process(frameInfo_, scenePipelineStateFactory, passes, drawablesInMainCamera);
 
     // Collect batches
