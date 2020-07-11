@@ -81,14 +81,16 @@ public:
     /// Iterate (const).
     template <class Callback> void ForEach(const Callback& callback) const
     {
+        unsigned threadIndex = 0;
         unsigned elementIndex = 0;
         for (const auto& threadCollection : elements_)
         {
             for (const T& element : threadCollection)
             {
-                callback(elementIndex, element);
+                callback(threadIndex, elementIndex, element);
                 ++elementIndex;
             }
+            ++threadIndex;
         }
     }
 

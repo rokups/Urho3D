@@ -31,6 +31,7 @@
 #include "../Graphics/DrawCommandQueue.h"
 #include "../Graphics/IndexBuffer.h"
 #include "../Graphics/Graphics.h"
+#include "../Graphics/Texture2D.h"
 #include "../Graphics/Viewport.h"
 #include "../Graphics/SceneBatchCollector.h"
 #include "../Scene/Scene.h"
@@ -75,7 +76,19 @@ public:
         for (VertexBuffer* vertexBuffer : geometry->GetVertexBuffers())
             desc.vertexElements_.append(vertexBuffer->GetElements());
 
-        ea::string commonDefines = "DIRLIGHT NUMVERTEXLIGHTS=4 ";
+        ea::string commonDefines;
+        switch (light->GetLightType())
+        {
+        case LIGHT_DIRECTIONAL:
+            commonDefines += "DIRLIGHT NUMVERTEXLIGHTS=4 ";
+            break;
+        case LIGHT_POINT:
+            commonDefines += "POINTLIGHT ";
+            break;
+        case LIGHT_SPOT:
+            commonDefines += "SPOTLIGHT ";
+            break;
+        }
         if (graphics_->GetConstantBuffersEnabled())
             commonDefines += "USE_CBUFFERS ";
         desc.vertexShader_ = graphics_->GetShader(
@@ -86,14 +99,14 @@ public:
         desc.primitiveType_ = geometry->GetPrimitiveType();
         desc.indexType_ = IndexBuffer::GetIndexBufferType(geometry->GetIndexBuffer());
 
-        desc.depthWrite_ = true;
-        desc.depthMode_ = CMP_LESSEQUAL;
+        desc.depthWrite_ = pass->GetDepthWrite();
+        desc.depthMode_ = pass->GetDepthTestMode();
         desc.stencilEnabled_ = false;
         desc.stencilMode_ = CMP_ALWAYS;
 
         desc.colorWrite_ = true;
-        desc.blendMode_ = BLEND_REPLACE;
-        desc.alphaToCoverage_ = false;
+        desc.blendMode_ = pass->GetBlendMode();
+        desc.alphaToCoverage_ = pass->GetAlphaToCoverage();
 
         desc.fillMode_ = FILL_SOLID;
         desc.cullMode_ = GetEffectiveCullMode(material->GetCullMode(), camera);
@@ -331,6 +344,12 @@ void CustomView::Render()
     sceneBatchCollector.SetMaxPixelLights(2);
     sceneBatchCollector.Process(frameInfo_, scenePipelineStateFactory, passes, drawablesInMainCamera);
 
+    static ea::vector<SceneBatchSortedByState> baseBatches;
+    sceneBatchCollector.GetSortedBaseBatches("litbase", baseBatches);
+
+    static ea::vector<LightBatchSortedByState> lightBatches;
+    sceneBatchCollector.GetSortedLightBatches("light", lightBatches);
+
     // Collect batches
     static DrawCommandQueue drawQueue;
     drawQueue.Reset(graphics_);
@@ -339,8 +358,7 @@ void CustomView::Render()
     bool first = true;
     const auto zone = octree_->GetZone();
 
-    static ea::vector<SceneBatchSortedByState> baseBatches;
-    sceneBatchCollector.GetSortedBaseBatches("litbase", baseBatches);
+
     Light* mainLight = sceneBatchCollector.GetMainLight();
     for (const SceneBatchSortedByState& sortedBatch : baseBatches)
     {
@@ -455,6 +473,82 @@ void CustomView::Render()
         }
 
         drawQueue.AddShaderParameter(VSP_VERTEXLIGHTS, ea::span<const Vector4>{ vertexLights });
+        drawQueue.CommitShaderParameterGroup(SP_LIGHT);
+        }
+
+        drawQueue.SetBuffers(sourceBatch.geometry_->GetVertexBuffers(), sourceBatch.geometry_->GetIndexBuffer());
+
+        drawQueue.DrawIndexed(sourceBatch.geometry_->GetIndexStart(), sourceBatch.geometry_->GetIndexCount());
+    }
+
+    auto renderer = context_->GetRenderer();
+    for (const LightBatchSortedByState& sortedBatch : lightBatches)
+    {
+        Light* light = sortedBatch.light_;
+        const SceneBatch& batch = *sortedBatch.sceneBatch_;
+        auto geometry = batch.geometry_;
+        const SourceBatch& sourceBatch = batch.drawable_->GetBatches()[batch.sourceBatchIndex_];
+        drawQueue.SetPipelineState(sortedBatch.lightBatch_->pipelineState_);
+        FillGlobalSharedParameters(drawQueue, frameInfo_, camera_, zone, scene_);
+        SphericalHarmonicsDot9 sh;
+        if (batch.material_ != currentMaterial || true)
+        {
+            if (drawQueue.BeginShaderParameterGroup(SP_MATERIAL, true))
+            {
+            currentMaterial = batch.material_;
+            const auto& parameters = batch.material_->GetShaderParameters();
+            for (const auto& item : parameters)
+                drawQueue.AddShaderParameter(item.first, item.second.value_);
+            drawQueue.CommitShaderParameterGroup(SP_MATERIAL);
+            }
+
+            const auto& textures = batch.material_->GetTextures();
+            for (const auto& item : textures)
+                drawQueue.AddShaderResource(item.first, item.second);
+            drawQueue.AddShaderResource(TU_LIGHTRAMP, renderer->GetDefaultLightRamp());
+            drawQueue.CommitShaderResources();
+        }
+
+        if (drawQueue.BeginShaderParameterGroup(SP_OBJECT, true))
+        {
+        drawQueue.AddShaderParameter(VSP_SHAR, sh.Ar_);
+        drawQueue.AddShaderParameter(VSP_SHAG, sh.Ag_);
+        drawQueue.AddShaderParameter(VSP_SHAB, sh.Ab_);
+        drawQueue.AddShaderParameter(VSP_SHBR, sh.Br_);
+        drawQueue.AddShaderParameter(VSP_SHBG, sh.Bg_);
+        drawQueue.AddShaderParameter(VSP_SHBB, sh.Bb_);
+        drawQueue.AddShaderParameter(VSP_SHC, sh.C_);
+        drawQueue.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
+        drawQueue.CommitShaderParameterGroup(SP_OBJECT);
+        }
+
+        if (drawQueue.BeginShaderParameterGroup(SP_LIGHT, true))
+        {
+
+        Node* lightNode = light->GetNode();
+        float atten = 1.0f / Max(light->GetRange(), M_EPSILON);
+        Vector3 lightDir(lightNode->GetWorldRotation() * Vector3::BACK);
+        Vector4 lightPos(lightNode->GetWorldPosition(), atten);
+
+        drawQueue.AddShaderParameter(VSP_LIGHTDIR, lightDir);
+        drawQueue.AddShaderParameter(VSP_LIGHTPOS, lightPos);
+
+        float fade = 1.0f;
+        float fadeEnd = light->GetDrawDistance();
+        float fadeStart = light->GetFadeDistance();
+
+        // Do fade calculation for light if both fade & draw distance defined
+        if (light->GetLightType() != LIGHT_DIRECTIONAL && fadeEnd > 0.0f && fadeStart > 0.0f && fadeStart < fadeEnd)
+            fade = Min(1.0f - (light->GetDistance() - fadeStart) / (fadeEnd - fadeStart), 1.0f);
+
+        // Negative lights will use subtract blending, so write absolute RGB values to the shader parameter
+        drawQueue.AddShaderParameter(PSP_LIGHTCOLOR, Color(light->GetEffectiveColor().Abs(),
+            light->GetEffectiveSpecularIntensity()) * fade);
+        drawQueue.AddShaderParameter(PSP_LIGHTDIR, lightDir);
+        drawQueue.AddShaderParameter(PSP_LIGHTPOS, lightPos);
+        drawQueue.AddShaderParameter(PSP_LIGHTRAD, light->GetRadius());
+        drawQueue.AddShaderParameter(PSP_LIGHTLENGTH, light->GetLength());
+
         drawQueue.CommitShaderParameterGroup(SP_LIGHT);
         }
 

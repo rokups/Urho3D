@@ -427,6 +427,19 @@ const ea::vector<SceneBatch>& SceneBatchCollector::GetBaseBatches(const ea::stri
     return *baseBatchesIter->second;
 }
 
+const ThreadedVector<LightSceneBatch>& SceneBatchCollector::GetLightBatches(const ea::string& pass) const
+{
+    // TODO: Do we need to optimize it?
+    const unsigned passIndex = Technique::GetPassIndex(pass);
+    const auto baseBatchesIter = lightBatchesLookup_.find(passIndex);
+
+    static const ThreadedVector<LightSceneBatch> noBatches;
+    if (baseBatchesIter == lightBatchesLookup_.end())
+        return noBatches;
+
+    return *baseBatchesIter->second;
+}
+
 ea::array<Light*, SceneBatchCollector::MaxVertexLights> SceneBatchCollector::GetVertexLights(unsigned drawableIndex) const
 {
     const auto indices = GetVertexLightIndices(drawableIndex);
@@ -507,12 +520,15 @@ void SceneBatchCollector::InitializePasses(ea::span<const ScenePassDescription> 
     }
 
     baseBatchesLookup_.clear();
+    lightBatchesLookup_.clear();
     for (PassData& passData : passes_)
     {
         if (passData.unlitBasePassIndex_ != M_MAX_UNSIGNED)
             baseBatchesLookup_[passData.unlitBasePassIndex_] = &passData.unlitBaseSceneBatches_;
         if (passData.litBasePassIndex_ != M_MAX_UNSIGNED)
             baseBatchesLookup_[passData.litBasePassIndex_] = &passData.litBaseSceneBatches_;
+        if (passData.additionalLightPassIndex_ != M_MAX_UNSIGNED)
+            lightBatchesLookup_[passData.additionalLightPassIndex_] = &passData.additionalLightSceneBatches_;
     }
 }
 
@@ -845,7 +861,7 @@ void SceneBatchCollector::CollectSceneLitBaseBatches(
                 lightBatch.pipelineState_ = lightSubPassCache.GetPipelineState(lightKey);
 
                 const unsigned batchIndex = lightSceneBatches.Insert(threadIndex, lightBatch);
-                if (!sceneBatch.pipelineState_)
+                if (!lightBatch.pipelineState_)
                     lightSceneBatchesWithoutPipelineStates_.Insert(threadIndex, batchIndex);
             }
         }
@@ -876,8 +892,10 @@ void SceneBatchCollector::CollectSceneLitBaseBatches(
             LightSceneBatch& lightBatch = lightSceneBatches.Get(threadIndex, batchIndex);
             lightSubPassContext.light_ = lightBatch.light_;
             lightSubPassContext.shadowed_ = false;
+            // TODO: fixme
+            auto additionalLightIndex = visibleLights_.index_of(lightBatch.light_);
 
-            const SubPassPipelineStateKey lightKey{ lightBatch, baseLightHash };
+            const SubPassPipelineStateKey lightKey{ lightBatch, visibleLightsData_[additionalLightIndex]->pipelineStateHash_ };
             lightBatch.pipelineState_ = lightSubPassCache.GetOrCreatePipelineState(
                 lightBatch.sceneBatch_->drawable_, lightKey, lightSubPassContext, *pipelineStateFactory_);
         });

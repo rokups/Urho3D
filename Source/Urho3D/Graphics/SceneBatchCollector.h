@@ -344,6 +344,36 @@ struct SceneBatchSortedBackToFront
     }
 };
 
+/// Light batch sorted by light, pipeline state, material and geometry.
+struct LightBatchSortedByState : public SceneBatchSortedByState
+{
+    /// Light batch.
+    const LightSceneBatch* lightBatch_{};
+    /// Light.
+    Light* light_{};
+
+    /// Construct default.
+    LightBatchSortedByState() = default;
+
+    /// Construct from batch.
+    explicit LightBatchSortedByState(const LightSceneBatch* lightBatch)
+        : SceneBatchSortedByState(lightBatch->sceneBatch_)
+        , lightBatch_(lightBatch)
+        , light_(lightBatch->light_)
+    {
+    }
+
+    /// Compare sorted batches.
+    bool operator < (const LightBatchSortedByState& rhs) const
+    {
+        if (light_ != rhs.light_)
+            return light_ < rhs.light_;
+        if (pipelineStateKey_ != rhs.pipelineStateKey_)
+            return pipelineStateKey_ < rhs.pipelineStateKey_;
+        return materialGeometryKey_ < rhs.materialGeometryKey_;
+    }
+};
+
 /// Pipeline state factory for scene.
 class ScenePipelineStateFactory
 {
@@ -392,6 +422,10 @@ public:
     const ea::vector<SceneBatch>& GetBaseBatches(const ea::string& pass) const;
     /// Return sorted base batches for given pass.
     template <class T> void GetSortedBaseBatches(const ea::string& pass, ea::vector<T>& sortedBatches) const;
+    /// Return light batches for given pass.
+    const ThreadedVector<LightSceneBatch>& GetLightBatches(const ea::string& pass) const;
+    /// Return sorted light batches for given pass.
+    template <class T> void GetSortedLightBatches(const ea::string& pass, ea::vector<T>& sortedBatches) const;
 
     /// Return vertex lights for drawable (as indices in the array of visible lights).
     VertexLightCollection GetVertexLightIndices(unsigned drawableIndex) const { return drawableLighting_[drawableIndex].GetVertexLights(); }
@@ -484,6 +518,8 @@ private:
     ea::vector<PassData> passes_;
     /// Base batches lookup table.
     ea::unordered_map<unsigned, ea::vector<SceneBatch>*> baseBatchesLookup_;
+    /// Light batches lookup table.
+    ea::unordered_map<unsigned, ThreadedVector<LightSceneBatch>*> lightBatchesLookup_;
 
     /// Visible geometries.
     ThreadedVector<Drawable*> visibleGeometries_;
@@ -520,6 +556,19 @@ void SceneBatchCollector::GetSortedBaseBatches(const ea::string& pass, ea::vecto
     sortedBatches.resize(numBatches);
     for (unsigned i = 0; i < numBatches; ++i)
         sortedBatches[i] = T{ &baseBatches[i] };
+    ea::sort(sortedBatches.begin(), sortedBatches.end());
+}
+
+template <class T>
+void SceneBatchCollector::GetSortedLightBatches(const ea::string& pass, ea::vector<T>& sortedBatches) const
+{
+    const ThreadedVector<LightSceneBatch>& lightBatches = GetLightBatches(pass);
+    const unsigned numBatches = lightBatches.Size();
+    sortedBatches.resize(numBatches);
+    lightBatches.ForEach([&](unsigned, unsigned elementIndex, const LightSceneBatch& lightBatch)
+    {
+        sortedBatches[elementIndex] = T{ &lightBatch };
+    });
     ea::sort(sortedBatches.begin(), sortedBatches.end());
 }
 
