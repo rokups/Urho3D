@@ -344,7 +344,7 @@ void CustomView::Render()
     sceneBatchCollector.SetMaxPixelLights(2);
     sceneBatchCollector.Process(frameInfo_, scenePipelineStateFactory, passes, drawablesInMainCamera);
 
-    static ea::vector<SceneBatchSortedByState> baseBatches;
+    static ea::vector<BaseSceneBatchSortedByState> baseBatches;
     sceneBatchCollector.GetSortedBaseBatches("litbase", baseBatches);
 
     static ea::vector<LightBatchSortedByState> lightBatches;
@@ -360,9 +360,9 @@ void CustomView::Render()
 
 
     Light* mainLight = sceneBatchCollector.GetMainLight();
-    for (const SceneBatchSortedByState& sortedBatch : baseBatches)
+    for (const BaseSceneBatchSortedByState& sortedBatch : baseBatches)
     {
-        const SceneBatch& batch = *sortedBatch.sceneBatch_;
+        const BaseSceneBatch& batch = *sortedBatch.sceneBatch_;
         auto geometry = batch.geometry_;
         const SourceBatch& sourceBatch = batch.drawable_->GetBatches()[batch.sourceBatchIndex_];
         drawQueue.SetPipelineState(batch.pipelineState_);
@@ -485,10 +485,10 @@ void CustomView::Render()
     for (const LightBatchSortedByState& sortedBatch : lightBatches)
     {
         Light* light = sortedBatch.light_;
-        const SceneBatch& batch = *sortedBatch.sceneBatch_;
+        const BaseSceneBatch& batch = *sortedBatch.sceneBatch_;
         auto geometry = batch.geometry_;
         const SourceBatch& sourceBatch = batch.drawable_->GetBatches()[batch.sourceBatchIndex_];
-        drawQueue.SetPipelineState(sortedBatch.lightBatch_->pipelineState_);
+        drawQueue.SetPipelineState(batch.pipelineState_);
         FillGlobalSharedParameters(drawQueue, frameInfo_, camera_, zone, scene_);
         SphericalHarmonicsDot9 sh;
         if (batch.material_ != currentMaterial || true)

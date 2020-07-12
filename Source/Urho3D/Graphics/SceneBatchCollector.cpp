@@ -161,25 +161,14 @@ struct SceneBatchCollector::SubPassPipelineStateKey
     /// Construct default.
     SubPassPipelineStateKey() = default;
 
-    /// Construct from base batch.
-    SubPassPipelineStateKey(const SceneBatch& sceneBatch, unsigned lightHash)
+    /// Construct from base, litbase or light batch.
+    SubPassPipelineStateKey(const BaseSceneBatch& sceneBatch, unsigned lightHash)
         : drawableHash_(sceneBatch.drawable_->GetPipelineStateHash())
         , lightHash_(lightHash)
         , geometryType_(sceneBatch.geometryType_)
         , geometry_(sceneBatch.geometry_)
         , material_(sceneBatch.material_)
         , pass_(sceneBatch.pass_)
-    {
-    }
-
-    /// Construct from light batch.
-    SubPassPipelineStateKey(const LightSceneBatch& lightBatch, unsigned lightHash)
-        : drawableHash_(lightBatch.sceneBatch_->drawable_->GetPipelineStateHash())
-        , lightHash_(lightHash)
-        , geometryType_(lightBatch.sceneBatch_->geometryType_)
-        , geometry_(lightBatch.sceneBatch_->geometry_)
-        , material_(lightBatch.sceneBatch_->material_)
-        , pass_(lightBatch.pass_)
     {
     }
 
@@ -298,9 +287,9 @@ struct SceneBatchCollector::PassData
     ThreadedVector<IntermediateSceneBatch> litBatches_;
 
     /// Unlit base scene batches.
-    ea::vector<SceneBatch> unlitBaseSceneBatches_;
+    ea::vector<BaseSceneBatch> unlitBaseSceneBatches_;
     /// Lit base scene batches.
-    ea::vector<SceneBatch> litBaseSceneBatches_;
+    ea::vector<BaseSceneBatch> litBaseSceneBatches_;
     /// Additional forward light batches.
     ThreadedVector<LightSceneBatch> additionalLightSceneBatches_;
 
@@ -414,13 +403,13 @@ SceneBatchCollector::~SceneBatchCollector()
 {
 }
 
-const ea::vector<SceneBatch>& SceneBatchCollector::GetBaseBatches(const ea::string& pass) const
+const ea::vector<BaseSceneBatch>& SceneBatchCollector::GetBaseBatches(const ea::string& pass) const
 {
     // TODO: Do we need to optimize it?
     const unsigned passIndex = Technique::GetPassIndex(pass);
     const auto baseBatchesIter = baseBatchesLookup_.find(passIndex);
 
-    static const ea::vector<SceneBatch> noBatches;
+    static const ea::vector<BaseSceneBatch> noBatches;
     if (baseBatchesIter == baseBatchesLookup_.end())
         return noBatches;
 
@@ -760,7 +749,7 @@ void SceneBatchCollector::CollectSceneBatches()
 }
 
 void SceneBatchCollector::CollectSceneUnlitBaseBatches(SubPassPipelineStateCache& subPassCache,
-    const ThreadedVector<IntermediateSceneBatch>& intermediateBatches, ea::vector<SceneBatch>& sceneBatches)
+    const ThreadedVector<IntermediateSceneBatch>& intermediateBatches, ea::vector<BaseSceneBatch>& sceneBatches)
 {
     baseSceneBatchesWithoutPipelineStates_.Clear(numThreads_);
     sceneBatches.resize(intermediateBatches.Size());
@@ -771,7 +760,7 @@ void SceneBatchCollector::CollectSceneUnlitBaseBatches(SubPassPipelineStateCache
         for (unsigned i = 0; i < batches.size(); ++i)
         {
             const IntermediateSceneBatch& intermediateBatch = batches[i];
-            SceneBatch& sceneBatch = sceneBatches[i + offset];
+            BaseSceneBatch& sceneBatch = sceneBatches[i + offset];
 
             Drawable* drawable = intermediateBatch.geometry_;
             const SourceBatch& sourceBatch = drawable->GetBatches()[intermediateBatch.sourceBatchIndex_];
@@ -795,7 +784,7 @@ void SceneBatchCollector::CollectSceneUnlitBaseBatches(SubPassPipelineStateCache
     subPassContext.light_ = nullptr;
     subPassContext.shadowed_ = false;
 
-    baseSceneBatchesWithoutPipelineStates_.ForEach([&](unsigned, unsigned, SceneBatch* sceneBatch)
+    baseSceneBatchesWithoutPipelineStates_.ForEach([&](unsigned, unsigned, BaseSceneBatch* sceneBatch)
     {
         const SubPassPipelineStateKey key{ *sceneBatch, 0 };
         sceneBatch->pipelineState_ = subPassCache.GetOrCreatePipelineState(
@@ -805,7 +794,7 @@ void SceneBatchCollector::CollectSceneUnlitBaseBatches(SubPassPipelineStateCache
 
 void SceneBatchCollector::CollectSceneLitBaseBatches(
     SubPassPipelineStateCache& baseSubPassCache, SubPassPipelineStateCache& lightSubPassCache,
-    const ThreadedVector<IntermediateSceneBatch>& intermediateBatches, ea::vector<SceneBatch>& baseSceneBatches,
+    const ThreadedVector<IntermediateSceneBatch>& intermediateBatches, ea::vector<BaseSceneBatch>& baseSceneBatches,
     ThreadedVector<LightSceneBatch>& lightSceneBatches)
 {
     const unsigned baseLightHash = mainLightIndex_ != M_MAX_UNSIGNED
@@ -825,7 +814,7 @@ void SceneBatchCollector::CollectSceneLitBaseBatches(
         for (unsigned i = 0; i < batches.size(); ++i)
         {
             const IntermediateSceneBatch& intermediateBatch = batches[i];
-            SceneBatch& sceneBatch = baseSceneBatches[i + offset];
+            BaseSceneBatch& sceneBatch = baseSceneBatches[i + offset];
 
             Drawable* drawable = intermediateBatch.geometry_;
             const SourceBatch& sourceBatch = drawable->GetBatches()[intermediateBatch.sourceBatchIndex_];
@@ -853,7 +842,12 @@ void SceneBatchCollector::CollectSceneLitBaseBatches(
                 const unsigned additionalLightIndex = pixelLights[j].second;
 
                 LightSceneBatch lightBatch;
-                lightBatch.sceneBatch_ = &sceneBatch;
+                lightBatch.drawable_ = sceneBatch.drawable_;
+                lightBatch.drawableIndex_ = sceneBatch.drawableIndex_;
+                lightBatch.sourceBatchIndex_ = sceneBatch.sourceBatchIndex_;
+                lightBatch.geometryType_ = sceneBatch.geometryType_;
+                lightBatch.geometry_ = sceneBatch.geometry_;
+                lightBatch.material_ = sceneBatch.material_;
                 lightBatch.light_ = visibleLights_[additionalLightIndex];
                 lightBatch.pass_ = intermediateBatch.additionalPass_;
 
@@ -874,7 +868,7 @@ void SceneBatchCollector::CollectSceneLitBaseBatches(
         baseSubPassContext.light_ = mainLightIndex_ != M_MAX_UNSIGNED ? visibleLights_[mainLightIndex_] : nullptr;
         baseSubPassContext.shadowed_ = false;
 
-        baseSceneBatchesWithoutPipelineStates_.ForEach([&](unsigned, unsigned, SceneBatch* sceneBatch)
+        baseSceneBatchesWithoutPipelineStates_.ForEach([&](unsigned, unsigned, BaseSceneBatch* sceneBatch)
         {
             const SubPassPipelineStateKey baseKey{ *sceneBatch, baseLightHash };
             sceneBatch->pipelineState_ = baseSubPassCache.GetOrCreatePipelineState(
@@ -897,7 +891,7 @@ void SceneBatchCollector::CollectSceneLitBaseBatches(
 
             const SubPassPipelineStateKey lightKey{ lightBatch, visibleLightsData_[additionalLightIndex]->pipelineStateHash_ };
             lightBatch.pipelineState_ = lightSubPassCache.GetOrCreatePipelineState(
-                lightBatch.sceneBatch_->drawable_, lightKey, lightSubPassContext, *pipelineStateFactory_);
+                lightBatch.drawable_, lightKey, lightSubPassContext, *pipelineStateFactory_);
         });
     }
 }
