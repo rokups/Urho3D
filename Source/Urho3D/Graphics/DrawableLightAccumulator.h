@@ -84,7 +84,7 @@ struct DrawableLightAccumulator
         const unsigned maxLights = MaxVertexLights + firstVertexLight_;
         if (lights_.size() > maxLights)
         {
-            // TODO: Update SH
+            // TODO(renderer): Update SH
             lights_.pop_back();
         }
     }

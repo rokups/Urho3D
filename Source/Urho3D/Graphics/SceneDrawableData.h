@@ -72,7 +72,7 @@ private:
     bool sceneRangeDirty_{};
 };
 
-/// Per-scene drawable data. Indexed via drawable index. Invalidated between frames.
+/// Per-viewport drawable data. Indexed via drawable index. Invalidated between frames.
 struct SceneDrawableData
 {
     /// Underlying type of traits.

@@ -38,99 +38,6 @@
 namespace Urho3D
 {
 
-namespace
-{
-
-/// Frustum Query for point light.
-struct PointLightLitGeometriesQuery : public SphereOctreeQuery
-{
-    /// Return light sphere for the query.
-    static Sphere GetLightSphere(Light* light)
-    {
-        return Sphere(light->GetNode()->GetWorldPosition(), light->GetRange());
-    }
-
-    /// Construct.
-    PointLightLitGeometriesQuery(ea::vector<Drawable*>& result,
-        const SceneDrawableData& transientData, Light* light)
-        : SphereOctreeQuery(result, GetLightSphere(light), DRAWABLE_GEOMETRY)
-        , transientData_(&transientData)
-        , lightMask_(light->GetLightMaskEffective())
-    {
-    }
-
-    void TestDrawables(Drawable** start, Drawable** end, bool inside) override
-    {
-        for (Drawable* drawable : MakeIteratorRange(start, end))
-        {
-            const unsigned drawableIndex = drawable->GetDrawableIndex();
-            const unsigned traits = transientData_->traits_[drawableIndex];
-            if (traits & SceneDrawableData::DrawableVisibleGeometry)
-            {
-                if (drawable->GetLightMask() & lightMask_)
-                {
-                    if (inside || sphere_.IsInsideFast(drawable->GetWorldBoundingBox()))
-                        result_.push_back(drawable);
-                }
-            }
-        }
-    }
-
-    /// Visiblity cache.
-    const SceneDrawableData* transientData_{};
-    /// Light mask to check.
-    unsigned lightMask_{};
-};
-
-/// Frustum Query for spot light.
-struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
-{
-    /// Construct.
-    SpotLightLitGeometriesQuery(ea::vector<Drawable*>& result,
-        const SceneDrawableData& transientData, Light* light)
-        : FrustumOctreeQuery(result, light->GetFrustum(), DRAWABLE_GEOMETRY)
-        , transientData_(&transientData)
-        , lightMask_(light->GetLightMaskEffective())
-    {
-    }
-
-    void TestDrawables(Drawable** start, Drawable** end, bool inside) override
-    {
-        for (Drawable* drawable : MakeIteratorRange(start, end))
-        {
-            const unsigned drawableIndex = drawable->GetDrawableIndex();
-            const unsigned traits = transientData_->traits_[drawableIndex];
-            if (traits & SceneDrawableData::DrawableVisibleGeometry)
-            {
-                if (drawable->GetLightMask() & lightMask_)
-                {
-                    if (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()))
-                        result_.push_back(drawable);
-                }
-            }
-        }
-    }
-
-    /// Visiblity cache.
-    const SceneDrawableData* transientData_{};
-    /// Light mask to check.
-    unsigned lightMask_{};
-};
-
-/// Return light parameters important for pipeline state.
-unsigned GetLightPipelineStateHash(Light* light, bool hasShadow)
-{
-    unsigned hash = 0;
-    hash |= light->GetLightType() & 0x3;
-    hash |= static_cast<unsigned>(hasShadow) << 2;
-    hash |= static_cast<unsigned>(!!light->GetShapeTexture()) << 3;
-    hash |= static_cast<unsigned>(light->GetSpecularIntensity() > 0.0f) << 4;
-    hash |= static_cast<unsigned>(light->GetShadowBias().normalOffset_ > 0.0f) << 5;
-    return hash;
-}
-
-}
-
 struct SceneBatchCollector::IntermediateSceneBatch
 {
     /// Geometry.
@@ -391,7 +298,7 @@ SceneBatchCollector::~SceneBatchCollector()
 
 const ea::vector<BaseSceneBatch>& SceneBatchCollector::GetBaseBatches(const ea::string& pass) const
 {
-    // TODO: Do we need to optimize it?
+    // TODO(renderer): Do we need to optimize it?
     const unsigned passIndex = Technique::GetPassIndex(pass);
     const auto baseBatchesIter = baseBatchesLookup_.find(passIndex);
 
@@ -404,7 +311,7 @@ const ea::vector<BaseSceneBatch>& SceneBatchCollector::GetBaseBatches(const ea::
 
 const ThreadedVector<LightSceneBatch>& SceneBatchCollector::GetLightBatches(const ea::string& pass) const
 {
-    // TODO: Do we need to optimize it?
+    // TODO(renderer): Do we need to optimize it?
     const unsigned passIndex = Technique::GetPassIndex(pass);
     const auto baseBatchesIter = lightBatchesLookup_.find(passIndex);
 
@@ -420,7 +327,7 @@ ea::array<Light*, SceneBatchCollector::MaxVertexLights> SceneBatchCollector::Get
     const auto indices = GetVertexLightIndices(drawableIndex);
     ea::array<Light*, MaxVertexLights> lights;
     for (unsigned i = 0; i < MaxVertexLights; ++i)
-        lights[i] = indices[i] != M_MAX_UNSIGNED ? visibleLights_[indices[i]]->light_ : nullptr;
+        lights[i] = indices[i] != M_MAX_UNSIGNED ? visibleLights_[indices[i]]->GetLight() : nullptr;
     return lights;
 }
 
@@ -432,7 +339,7 @@ Technique* SceneBatchCollector::FindTechnique(Drawable* drawable, Material* mate
     if (techniques.size() == 1)
         return techniques[0].technique_;
 
-    // TODO: Consider optimizing this loop
+    // TODO(renderer): Consider optimizing this loop
     const float lodDistance = drawable->GetLodDistance();
     for (unsigned i = 0; i < techniques.size(); ++i)
     {
@@ -486,7 +393,7 @@ void SceneBatchCollector::InitializePasses(ea::span<const ScenePassDescription> 
 
         if (!passData.IsValid())
         {
-            // TODO: Log error
+            // TODO(renderer): Log error
             assert(0);
             continue;
         }
@@ -523,7 +430,7 @@ void SceneBatchCollector::UpdateAndCollectSourceBatchesForThread(unsigned thread
 
     for (Drawable* drawable : drawables)
     {
-        // TODO: Add occlusion culling
+        // TODO(renderer): Add occlusion culling
         const unsigned drawableIndex = drawable->GetDrawableIndex();
 
         drawable->UpdateBatches(frameInfo_);
@@ -587,7 +494,7 @@ void SceneBatchCollector::UpdateAndCollectSourceBatchesForThread(unsigned thread
             }
 
             // Reset light accumulator
-            // TODO: Don't do it if unlit
+            // TODO(renderer): Don't do it if unlit
             drawableLighting_[drawableIndex].Reset();
         }
         else if (drawable->GetDrawableFlags() & DRAWABLE_LIGHT)
@@ -612,7 +519,6 @@ void SceneBatchCollector::ProcessVisibleLights()
         auto& sceneLight = cachedSceneLights_[weakLight];
         if (!sceneLight)
             sceneLight = ea::make_unique<SceneLight>(light);
-        sceneLight->Clear();
         visibleLights_.push_back(sceneLight.get());
     });
 
@@ -621,16 +527,14 @@ void SceneBatchCollector::ProcessVisibleLights()
 
     // Process lights in main thread
     for (SceneLight* sceneLight : visibleLights_)
-    {
-        sceneLight->pipelineStateHash_ = GetLightPipelineStateHash(sceneLight->light_, false);
-    };
+        sceneLight->BeginFrame(false);
 
     // Process lights in worker threads
     for (unsigned i = 0; i < visibleLights_.size(); ++i)
     {
         workQueue_->AddWorkItem([this, i](unsigned threadIndex)
         {
-            ProcessLightThreaded(*visibleLights_[i]);
+            visibleLights_[i]->Process(octree_, visibleGeometries_, transient_);
         }, M_MAX_UNSIGNED);
         workQueue_->Complete(M_MAX_UNSIGNED);
     }
@@ -646,7 +550,7 @@ unsigned SceneBatchCollector::FindMainLight() const
     unsigned mainLightIndex = M_MAX_UNSIGNED;
     for (unsigned i = 0; i < visibleLights_.size(); ++i)
     {
-        Light* light = visibleLights_[i]->light_;
+        Light* light = visibleLights_[i]->GetLight();
         if (light->GetLightType() != LIGHT_DIRECTIONAL)
             continue;
 
@@ -660,61 +564,27 @@ unsigned SceneBatchCollector::FindMainLight() const
     return mainLightIndex;
 }
 
-void SceneBatchCollector::ProcessLightThreaded(SceneLight& sceneLight)
-{
-    CollectLitGeometries(sceneLight);
-}
-
-void SceneBatchCollector::CollectLitGeometries(SceneLight& sceneLight)
-{
-    Light* light = sceneLight.light_;
-    switch (light->GetLightType())
-    {
-    case LIGHT_SPOT:
-    {
-        SpotLightLitGeometriesQuery query(sceneLight.litGeometries_, transient_, light);
-        octree_->GetDrawables(query);
-        break;
-    }
-    case LIGHT_POINT:
-    {
-        PointLightLitGeometriesQuery query(sceneLight.litGeometries_, transient_, light);
-        octree_->GetDrawables(query);
-        break;
-    }
-    case LIGHT_DIRECTIONAL:
-    {
-        const unsigned lightMask = light->GetLightMask();
-        visibleGeometries_.ForEach([&](unsigned, unsigned, Drawable* drawable)
-        {
-            if (drawable->GetLightMask() & lightMask)
-                sceneLight.litGeometries_.push_back(drawable);
-        });
-        break;
-    }
-    }
-}
-
 void SceneBatchCollector::AccumulateForwardLighting(unsigned lightIndex)
 {
     SceneLight& sceneLight = *visibleLights_[lightIndex];
+    Light* light = sceneLight.GetLight();
 
-    ForEachParallel(workQueue_, litGeometriesWorkThreshold_, sceneLight.litGeometries_,
+    ForEachParallel(workQueue_, litGeometriesWorkThreshold_, sceneLight.GetLitGeometries(),
         [&](unsigned /*threadIndex*/, unsigned /*offset*/, ea::span<Drawable* const> geometries)
     {
         DrawableLightDataAccumulationContext accumContext;
         accumContext.maxPixelLights_ = maxPixelLights_;
-        accumContext.lightImportance_ = sceneLight.light_->GetLightImportance();
+        accumContext.lightImportance_ = light->GetLightImportance();
         accumContext.lightIndex_ = lightIndex;
-        // TODO: fixme
+        // TODO(renderer): fixme
         //accumContext.lights_ = &visibleLights_;
 
-        const float lightIntensityPenalty = 1.0f / sceneLight.light_->GetIntensityDivisor();
+        const float lightIntensityPenalty = 1.0f / light->GetIntensityDivisor();
 
         for (Drawable* geometry : geometries)
         {
             const unsigned drawableIndex = geometry->GetDrawableIndex();
-            const float distance = ea::max(sceneLight.light_->GetDistanceTo(geometry), M_LARGE_EPSILON);
+            const float distance = ea::max(light->GetDistanceTo(geometry), M_LARGE_EPSILON);
             const float penalty = lightIndex == mainLightIndex_ ? -M_LARGE_VALUE : distance * lightIntensityPenalty;
             drawableLighting_[drawableIndex].AccumulateLight(accumContext, penalty);
         }
@@ -783,7 +653,7 @@ void SceneBatchCollector::CollectSceneLitBaseBatches(
     ThreadedVector<LightSceneBatch>& lightSceneBatches)
 {
     const unsigned baseLightHash = mainLightIndex_ != M_MAX_UNSIGNED
-        ? visibleLights_[mainLightIndex_]->pipelineStateHash_
+        ? visibleLights_[mainLightIndex_]->GetPipelineStateHash()
         : 0;
 
     baseSceneBatchesWithoutPipelineStates_.Clear(numThreads_);
@@ -836,7 +706,7 @@ void SceneBatchCollector::CollectSceneLitBaseBatches(
                 lightBatch.lightIndex_ = additionalLightIndex;
                 lightBatch.pass_ = intermediateBatch.additionalPass_;
 
-                const SubPassPipelineStateKey lightKey{ lightBatch, visibleLights_[additionalLightIndex]->pipelineStateHash_ };
+                const SubPassPipelineStateKey lightKey{ lightBatch, visibleLights_[additionalLightIndex]->GetPipelineStateHash() };
                 lightBatch.pipelineState_ = lightSubPassCache.GetPipelineState(lightKey);
 
                 const unsigned batchIndex = lightSceneBatches.Insert(threadIndex, lightBatch);
@@ -850,7 +720,7 @@ void SceneBatchCollector::CollectSceneLitBaseBatches(
     {
         SubPassPipelineStateContext baseSubPassContext;
         baseSubPassContext.camera_ = camera_;
-        baseSubPassContext.light_ = mainLightIndex_ != M_MAX_UNSIGNED ? visibleLights_[mainLightIndex_]->light_ : nullptr;
+        baseSubPassContext.light_ = mainLightIndex_ != M_MAX_UNSIGNED ? visibleLights_[mainLightIndex_]->GetLight() : nullptr;
         baseSubPassContext.shadowed_ = false;
 
         baseSceneBatchesWithoutPipelineStates_.ForEach([&](unsigned, unsigned, BaseSceneBatch* sceneBatch)
@@ -870,10 +740,10 @@ void SceneBatchCollector::CollectSceneLitBaseBatches(
         {
             LightSceneBatch& lightBatch = lightSceneBatches.Get(threadIndex, batchIndex);
             SceneLight& sceneLight = *visibleLights_[lightBatch.lightIndex_];
-            lightSubPassContext.light_ = sceneLight.light_;
+            lightSubPassContext.light_ = sceneLight.GetLight();
             lightSubPassContext.shadowed_ = false;
 
-            const SubPassPipelineStateKey lightKey{ lightBatch, sceneLight.pipelineStateHash_ };
+            const SubPassPipelineStateKey lightKey{ lightBatch, sceneLight.GetPipelineStateHash() };
             lightBatch.pipelineState_ = lightSubPassCache.GetOrCreatePipelineState(
                 lightBatch.drawable_, lightKey, lightSubPassContext, *pipelineStateFactory_);
         });

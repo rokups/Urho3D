@@ -30,6 +30,7 @@
 #include "../Graphics/Technique.h"
 #include "../Graphics/SceneBatch.h"
 #include "../Graphics/SceneDrawableData.h"
+#include "../Graphics/SceneLight.h"
 #include "../Math/NumericRange.h"
 #include "../Math/SphericalHarmonics.h"
 
@@ -39,29 +40,6 @@
 
 namespace Urho3D
 {
-
-/// Scene light data.
-struct SceneLight
-{
-    /// Light.
-    Light* light_{};
-    /// Whether the light has shadow.
-    bool hasShadow_{};
-    /// Light pipeline state hash.
-    unsigned pipelineStateHash_{};
-
-    /// Lit geometries.
-    // TODO: Skip unlit geometries?
-    ea::vector<Drawable*> litGeometries_;
-
-    /// Construct.
-    explicit SceneLight(Light* light) : light_(light) {}
-    /// Clear.
-    void Clear()
-    {
-        litGeometries_.clear();
-    }
-};
 
 /// Type of scene pass.
 enum class ScenePassType
@@ -135,7 +113,7 @@ public:
     }
 
     /// Return main light.
-    Light* GetMainLight() const { return mainLightIndex_ != M_MAX_UNSIGNED ? visibleLights_[mainLightIndex_]->light_ : nullptr; }
+    Light* GetMainLight() const { return mainLightIndex_ != M_MAX_UNSIGNED ? visibleLights_[mainLightIndex_]->GetLight() : nullptr; }
     /// Return visible light by index.
     const SceneLight* GetVisibleLight(unsigned i) const { return visibleLights_[i]; }
     /// Return base batches for given pass.
@@ -185,10 +163,6 @@ private:
     void ProcessVisibleLights();
     /// Find main light.
     unsigned FindMainLight() const;
-    /// Process light in worker thread.
-    void ProcessLightThreaded(SceneLight& sceneLight);
-    /// Collect lit geometries.
-    void CollectLitGeometries(SceneLight& sceneLight);
     /// Accumulate forward lighting for given light.
     void AccumulateForwardLighting(unsigned lightIndex);
 
