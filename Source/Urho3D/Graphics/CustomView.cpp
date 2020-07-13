@@ -484,7 +484,8 @@ void CustomView::Render()
     auto renderer = context_->GetRenderer();
     for (const LightBatchSortedByState& sortedBatch : lightBatches)
     {
-        Light* light = sortedBatch.light_;
+        const SceneLight* sceneLight = sceneBatchCollector.GetVisibleLight(sortedBatch.lightIndex_);
+        Light* light = sceneLight->light_;
         const BaseSceneBatch& batch = *sortedBatch.sceneBatch_;
         auto geometry = batch.geometry_;
         const SourceBatch& sourceBatch = batch.drawable_->GetBatches()[batch.sourceBatchIndex_];

@@ -113,6 +113,29 @@ struct TransientDrawableIndex
     }
 };
 
+/// Scene light data.
+struct SceneLight
+{
+    /// Light.
+    Light* light_{};
+    /// Whether the light has shadow.
+    bool hasShadow_{};
+    /// Light pipeline state hash.
+    unsigned pipelineStateHash_{};
+
+    /// Lit geometries.
+    // TODO: Skip unlit geometries?
+    ea::vector<Drawable*> litGeometries_;
+
+    /// Construct.
+    explicit SceneLight(Light* light) : light_(light) {}
+    /// Clear.
+    void Clear()
+    {
+        litGeometries_.clear();
+    }
+};
+
 /// Type of scene pass.
 enum class ScenePassType
 {
@@ -185,7 +208,9 @@ public:
     }
 
     /// Return main light.
-    Light* GetMainLight() const { return mainLightIndex_ != M_MAX_UNSIGNED ? visibleLights_[mainLightIndex_] : nullptr; }
+    Light* GetMainLight() const { return mainLightIndex_ != M_MAX_UNSIGNED ? visibleLights_[mainLightIndex_]->light_ : nullptr; }
+    /// Return visible light by index.
+    const SceneLight* GetVisibleLight(unsigned i) const { return visibleLights_[i]; }
     /// Return base batches for given pass.
     const ea::vector<BaseSceneBatch>& GetBaseBatches(const ea::string& pass) const;
     /// Return sorted base batches for given pass.
@@ -215,8 +240,6 @@ private:
     struct PassData;
     /// Helper class to evaluate min and max Z of the drawable.
     struct DrawableZRangeEvaluator;
-    /// Internal light data.
-    struct LightData;
 
     /// Return technique for given material and drawable.
     Technique* FindTechnique(Drawable* drawable, Material* material) const;
@@ -236,9 +259,9 @@ private:
     /// Find main light.
     unsigned FindMainLight() const;
     /// Process light in worker thread.
-    void ProcessLightThreaded(Light* light, LightData& lightData);
+    void ProcessLightThreaded(SceneLight& sceneLight);
     /// Collect lit geometries.
-    void CollectLitGeometries(Light* light, LightData& lightData);
+    void CollectLitGeometries(SceneLight& sceneLight);
     /// Accumulate forward lighting for given light.
     void AccumulateForwardLighting(unsigned lightIndex);
 
@@ -294,7 +317,7 @@ private:
     /// Temporary thread-safe collection of visible lights.
     ThreadedVector<Light*> visibleLightsTemp_;
     /// Visible lights.
-    ea::vector<Light*> visibleLights_;
+    ea::vector<SceneLight*> visibleLights_;
     /// Index of main directional light in visible lights collection.
     unsigned mainLightIndex_{ M_MAX_UNSIGNED };
     /// Scene Z range.
@@ -306,9 +329,7 @@ private:
     ea::vector<DrawableLightAccumulator<MaxPixelLights, MaxVertexLights>> drawableLighting_;
 
     /// Per-light caches.
-    ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<LightData>> cachedLightData_;
-    /// Per-light caches for visible lights.
-    ea::vector<LightData*> visibleLightsData_;
+    ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<SceneLight>> cachedSceneLights_;
 
     /// Temporary collection for pipeline state cache misses (base batches).
     ThreadedVector<BaseSceneBatch*> baseSceneBatchesWithoutPipelineStates_;

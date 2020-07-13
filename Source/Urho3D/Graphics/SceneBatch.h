@@ -56,8 +56,8 @@ struct BaseSceneBatch
 /// Additional light scene batch for specific sub-pass.
 struct LightSceneBatch : public BaseSceneBatch
 {
-    /// Light.
-    Light* light_{};
+    /// Index of light in the array of visible lights.
+    unsigned lightIndex_{ M_MAX_UNSIGNED };
 };
 
 /// Scene batch sorted by pipeline state, material and geometry. Also sorted front to back.
@@ -145,8 +145,8 @@ struct BaseSceneBatchSortedBackToFront
 /// Light batch sorted by light, pipeline state, material and geometry.
 struct LightBatchSortedByState : public BaseSceneBatchSortedByState
 {
-    /// Light.
-    Light* light_{};
+    /// Index of light in the array of visible lights.
+    unsigned lightIndex_{ M_MAX_UNSIGNED };
 
     /// Construct default.
     LightBatchSortedByState() = default;
@@ -154,15 +154,15 @@ struct LightBatchSortedByState : public BaseSceneBatchSortedByState
     /// Construct from batch.
     explicit LightBatchSortedByState(const LightSceneBatch* lightBatch)
         : BaseSceneBatchSortedByState(lightBatch)
-        , light_(lightBatch->light_)
+        , lightIndex_(lightBatch->lightIndex_)
     {
     }
 
     /// Compare sorted batches.
     bool operator < (const LightBatchSortedByState& rhs) const
     {
-        if (light_ != rhs.light_)
-            return light_ < rhs.light_;
+        if (lightIndex_ != rhs.lightIndex_)
+            return lightIndex_ < rhs.lightIndex_;
         if (pipelineStateKey_ != rhs.pipelineStateKey_)
             return pipelineStateKey_ < rhs.pipelineStateKey_;
         return materialGeometryKey_ < rhs.materialGeometryKey_;
