@@ -29,6 +29,7 @@
 #include "../Graphics/Material.h"
 #include "../Graphics/Technique.h"
 #include "../Graphics/SceneBatch.h"
+#include "../Graphics/SceneDrawableData.h"
 #include "../Math/NumericRange.h"
 #include "../Math/SphericalHarmonics.h"
 
@@ -38,80 +39,6 @@
 
 namespace Urho3D
 {
-
-/// Min and max Z value of drawable(s).
-using DrawableZRange = NumericRange<float>;
-
-/// Min and max Z value of scene. Can be used from multiple threads.
-class SceneZRange
-{
-public:
-    /// Clear in the beginning of the frame.
-    void Clear(unsigned numThreads)
-    {
-        threadRanges_.clear();
-        threadRanges_.resize(numThreads);
-        sceneRangeDirty_ = true;
-    }
-
-    /// Accumulate min and max Z value.
-    void Accumulate(unsigned threadIndex, const DrawableZRange& range)
-    {
-        threadRanges_[threadIndex] |= range;
-    }
-
-    /// Get value.
-    const DrawableZRange& Get()
-    {
-        if (sceneRangeDirty_)
-        {
-            sceneRangeDirty_ = false;
-            sceneRange_ = {};
-            for (const DrawableZRange& range : threadRanges_)
-                sceneRange_ |= range;
-        }
-        return sceneRange_;
-    }
-
-private:
-    /// Min and max Z value per thread.
-    ea::vector<DrawableZRange> threadRanges_;
-    /// Min and max Z value for Scene.
-    DrawableZRange sceneRange_;
-    /// Whether the Scene range is dirty.
-    bool sceneRangeDirty_{};
-};
-
-/// Transient drawable data, indexed via drawable index. Doesn't persist across frames.
-struct TransientDrawableIndex
-{
-    /// Underlying type of traits.
-    using TraitType = unsigned char;
-    /// Traits.
-    enum Trait : TraitType
-    {
-        /// Whether the drawable is updated.
-        DrawableUpdated = 1 << 1,
-        /// Whether the drawable has geometry visible from the main camera.
-        DrawableVisibleGeometry = 1 << 2,
-        /// Whether the drawable is lit using forward rendering.
-        ForwardLit = 1 << 3,
-    };
-
-    /// Traits.
-    ea::vector<TraitType> traits_;
-    /// Drawable min and max Z values. Invalid if drawable is not updated.
-    ea::vector<DrawableZRange> zRange_;
-
-    /// Reset cache in the beginning of the frame.
-    void Reset(unsigned numDrawables)
-    {
-        traits_.resize(numDrawables);
-        ea::fill(traits_.begin(), traits_.end(), TraitType{});
-
-        zRange_.resize(numDrawables);
-    }
-};
 
 /// Scene light data.
 struct SceneLight
@@ -323,8 +250,8 @@ private:
     /// Scene Z range.
     SceneZRange sceneZRange_;
 
-    /// Transient data index.
-    TransientDrawableIndex transient_;
+    /// Common drawable data index.
+    SceneDrawableData transient_;
     /// Drawable lighting data index.
     ea::vector<DrawableLightAccumulator<MaxPixelLights, MaxVertexLights>> drawableLighting_;
 

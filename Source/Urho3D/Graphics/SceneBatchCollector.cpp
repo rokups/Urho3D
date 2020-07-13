@@ -52,7 +52,7 @@ struct PointLightLitGeometriesQuery : public SphereOctreeQuery
 
     /// Construct.
     PointLightLitGeometriesQuery(ea::vector<Drawable*>& result,
-        const TransientDrawableIndex& transientData, Light* light)
+        const SceneDrawableData& transientData, Light* light)
         : SphereOctreeQuery(result, GetLightSphere(light), DRAWABLE_GEOMETRY)
         , transientData_(&transientData)
         , lightMask_(light->GetLightMaskEffective())
@@ -65,7 +65,7 @@ struct PointLightLitGeometriesQuery : public SphereOctreeQuery
         {
             const unsigned drawableIndex = drawable->GetDrawableIndex();
             const unsigned traits = transientData_->traits_[drawableIndex];
-            if (traits & TransientDrawableIndex::DrawableVisibleGeometry)
+            if (traits & SceneDrawableData::DrawableVisibleGeometry)
             {
                 if (drawable->GetLightMask() & lightMask_)
                 {
@@ -77,7 +77,7 @@ struct PointLightLitGeometriesQuery : public SphereOctreeQuery
     }
 
     /// Visiblity cache.
-    const TransientDrawableIndex* transientData_{};
+    const SceneDrawableData* transientData_{};
     /// Light mask to check.
     unsigned lightMask_{};
 };
@@ -87,7 +87,7 @@ struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
 {
     /// Construct.
     SpotLightLitGeometriesQuery(ea::vector<Drawable*>& result,
-        const TransientDrawableIndex& transientData, Light* light)
+        const SceneDrawableData& transientData, Light* light)
         : FrustumOctreeQuery(result, light->GetFrustum(), DRAWABLE_GEOMETRY)
         , transientData_(&transientData)
         , lightMask_(light->GetLightMaskEffective())
@@ -100,7 +100,7 @@ struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
         {
             const unsigned drawableIndex = drawable->GetDrawableIndex();
             const unsigned traits = transientData_->traits_[drawableIndex];
-            if (traits & TransientDrawableIndex::DrawableVisibleGeometry)
+            if (traits & SceneDrawableData::DrawableVisibleGeometry)
             {
                 if (drawable->GetLightMask() & lightMask_)
                 {
@@ -112,7 +112,7 @@ struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
     }
 
     /// Visiblity cache.
-    const TransientDrawableIndex* transientData_{};
+    const SceneDrawableData* transientData_{};
     /// Light mask to check.
     unsigned lightMask_{};
 };
@@ -527,7 +527,7 @@ void SceneBatchCollector::UpdateAndCollectSourceBatchesForThread(unsigned thread
         const unsigned drawableIndex = drawable->GetDrawableIndex();
 
         drawable->UpdateBatches(frameInfo_);
-        transient_.traits_[drawableIndex] |= TransientDrawableIndex::DrawableUpdated;
+        transient_.traits_[drawableIndex] |= SceneDrawableData::DrawableUpdated;
 
         // Skip if too far
         const float maxDistance = drawable->GetDrawDistance();
@@ -552,7 +552,7 @@ void SceneBatchCollector::UpdateAndCollectSourceBatchesForThread(unsigned thread
             }
 
             visibleGeometries_.Insert(threadIndex, drawable);
-            transient_.traits_[drawableIndex] |= TransientDrawableIndex::DrawableVisibleGeometry;
+            transient_.traits_[drawableIndex] |= SceneDrawableData::DrawableVisibleGeometry;
 
             // Collect batches
             const auto& sourceBatches = drawable->GetBatches();
@@ -578,7 +578,7 @@ void SceneBatchCollector::UpdateAndCollectSourceBatchesForThread(unsigned thread
 
                     if (sceneBatch.additionalPass_)
                     {
-                        transient_.traits_[drawableIndex] |= TransientDrawableIndex::ForwardLit;
+                        transient_.traits_[drawableIndex] |= SceneDrawableData::ForwardLit;
                         pass.litBatches_.Insert(threadIndex, sceneBatch);
                     }
                     else if (sceneBatch.basePass_)
