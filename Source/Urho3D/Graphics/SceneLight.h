@@ -42,7 +42,8 @@ public:
     /// Clear in the beginning of the frame.
     void BeginFrame(bool hasShadow);
     /// Process light in working thread.
-    void Process(Octree* octree, const ThreadedVector<Drawable*>& visibleGeometries, SceneDrawableData& drawableData);
+    void Process(Octree* octree, Camera* cullCamera, const DrawableZRange& sceneZRange,
+        const ThreadedVector<Drawable*>& visibleGeometries, SceneDrawableData& drawableData);
 
     /// Return light.
     Light* GetLight() const { return light_; }
@@ -52,6 +53,18 @@ public:
 private:
     /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
     unsigned RecalculatePipelineStateHash() const override;
+    /// Return or create shadow camera for split.
+    Camera* GetOrCreateShadowCamera(unsigned split);
+    /// Setup shadow cameras.
+    void SetupShadowCameras(Camera* cullCamera, const DrawableZRange& sceneZRange,
+        const ThreadedVector<Drawable*>& visibleGeometries, SceneDrawableData& drawableData);
+    /// Setup shadow camera for directional light split.
+    void SetupDirLightShadowCamera(Camera* cullCamera, Camera* shadowCamera,
+        Light* light, float nearSplit, float farSplit, const DrawableZRange& sceneZRange,
+        const ThreadedVector<Drawable*>& visibleGeometries, SceneDrawableData& drawableData);
+    /// Quantize a directional light shadow camera view to eliminate swimming.
+    void QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport,
+        const BoundingBox& viewBox);
 
     /// Light.
     Light* light_{};
@@ -61,6 +74,25 @@ private:
     /// Lit geometries.
     // TODO(renderer): Skip unlit geometries?
     ea::vector<Drawable*> litGeometries_;
+
+    /// Shadow casters.
+    ea::vector<Drawable*> shadowCasters_;
+    /// Shadow camera nodes.
+    SharedPtr<Node> shadowCameraNodes_[MAX_LIGHT_SPLITS];
+    /// Shadow cameras.
+    SharedPtr<Camera> shadowCameras_[MAX_LIGHT_SPLITS];
+    /// Shadow caster start indices.
+    unsigned shadowCasterBegin_[MAX_LIGHT_SPLITS]{};
+    /// Shadow caster end indices.
+    unsigned shadowCasterEnd_[MAX_LIGHT_SPLITS]{};
+    /// Combined bounding box of shadow casters in light projection space. Only used for focused spot lights.
+    BoundingBox shadowCasterBox_[MAX_LIGHT_SPLITS]{};
+    /// Shadow camera near splits (directional lights only).
+    float shadowNearSplits_[MAX_LIGHT_SPLITS]{};
+    /// Shadow camera far splits (directional lights only).
+    float shadowFarSplits_[MAX_LIGHT_SPLITS]{};
+    /// Shadow map split count.
+    unsigned numSplits_{};
 };
 
 }

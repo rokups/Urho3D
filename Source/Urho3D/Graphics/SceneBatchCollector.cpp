@@ -527,14 +527,14 @@ void SceneBatchCollector::ProcessVisibleLights()
 
     // Process lights in main thread
     for (SceneLight* sceneLight : visibleLights_)
-        sceneLight->BeginFrame(false);
+        sceneLight->BeginFrame(true);
 
     // Process lights in worker threads
     for (unsigned i = 0; i < visibleLights_.size(); ++i)
     {
         workQueue_->AddWorkItem([this, i](unsigned threadIndex)
         {
-            visibleLights_[i]->Process(octree_, visibleGeometries_, transient_);
+            visibleLights_[i]->Process(octree_, camera_, sceneZRange_.Get(), visibleGeometries_, transient_);
         }, M_MAX_UNSIGNED);
         workQueue_->Complete(M_MAX_UNSIGNED);
     }
