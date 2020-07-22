@@ -32,6 +32,19 @@
 namespace Urho3D
 {
 
+/// Scene light processing context.
+struct SceneLightProcessContext
+{
+    /// Frame info.
+    FrameInfo frameInfo_;
+    /// Z range of visible scene.
+    DrawableZRange sceneZRange_{};
+    /// All visible geometries.
+    const ThreadedVector<Drawable*>* visibleGeometries_{};
+    /// Drawable data.
+    SceneDrawableData* drawableData_{};
+};
+
 /// Per-viewport light data.
 class SceneLight : public PipelineStateTracker
 {
@@ -42,8 +55,7 @@ public:
     /// Clear in the beginning of the frame.
     void BeginFrame(bool hasShadow);
     /// Process light in working thread.
-    void Process(Octree* octree, Camera* cullCamera, const DrawableZRange& sceneZRange,
-        const ThreadedVector<Drawable*>& visibleGeometries, SceneDrawableData& drawableData);
+    void Process(SceneLightProcessContext& ctx);
 
     /// Return light.
     Light* GetLight() const { return light_; }
@@ -56,15 +68,20 @@ private:
     /// Return or create shadow camera for split.
     Camera* GetOrCreateShadowCamera(unsigned split);
     /// Setup shadow cameras.
-    void SetupShadowCameras(Camera* cullCamera, const DrawableZRange& sceneZRange,
-        const ThreadedVector<Drawable*>& visibleGeometries, SceneDrawableData& drawableData);
+    void SetupShadowCameras(SceneLightProcessContext& ctx);
     /// Setup shadow camera for directional light split.
-    void SetupDirLightShadowCamera(Camera* cullCamera, Camera* shadowCamera,
-        Light* light, float nearSplit, float farSplit, const DrawableZRange& sceneZRange,
-        const ThreadedVector<Drawable*>& visibleGeometries, SceneDrawableData& drawableData);
+    void SetupDirLightShadowCamera(SceneLightProcessContext& ctx,
+        Camera* shadowCamera, float nearSplit, float farSplit);
     /// Quantize a directional light shadow camera view to eliminate swimming.
-    void QuantizeDirLightShadowCamera(Camera* shadowCamera, Light* light, const IntRect& shadowViewport,
-        const BoundingBox& viewBox);
+    void QuantizeDirLightShadowCamera(SceneLightProcessContext& ctx,
+        Camera* shadowCamera, const IntRect& shadowViewport, const BoundingBox& viewBox);
+    /// Check visibility of one shadow caster.
+    bool IsShadowCasterVisible(SceneLightProcessContext& ctx,
+        Drawable* drawable, BoundingBox lightViewBox, Camera* shadowCamera, const Matrix3x4& lightView,
+        const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox);
+    /// Process shadow casters' visibilities and build their combined view- or projection-space bounding box.
+    void ProcessShadowCasters(SceneLightProcessContext& ctx,
+        const ea::vector<Drawable*>& drawables, unsigned splitIndex);
 
     /// Light.
     Light* light_{};
@@ -74,6 +91,8 @@ private:
     /// Lit geometries.
     // TODO(renderer): Skip unlit geometries?
     ea::vector<Drawable*> litGeometries_;
+    /// Shadow caster candidates.
+    ea::vector<Drawable*> tempShadowCasters_;
 
     /// Shadow casters.
     ea::vector<Drawable*> shadowCasters_;

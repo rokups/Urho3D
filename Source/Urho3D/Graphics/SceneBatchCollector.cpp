@@ -530,11 +530,16 @@ void SceneBatchCollector::ProcessVisibleLights()
         sceneLight->BeginFrame(true);
 
     // Process lights in worker threads
+    SceneLightProcessContext sceneLightProcessContext;
+    sceneLightProcessContext.frameInfo_ = frameInfo_;
+    sceneLightProcessContext.sceneZRange_ = sceneZRange_.Get();
+    sceneLightProcessContext.visibleGeometries_ = &visibleGeometries_;
+    sceneLightProcessContext.drawableData_ = &transient_;
     for (unsigned i = 0; i < visibleLights_.size(); ++i)
     {
-        workQueue_->AddWorkItem([this, i](unsigned threadIndex)
+        workQueue_->AddWorkItem([this, i, &sceneLightProcessContext](unsigned threadIndex)
         {
-            visibleLights_[i]->Process(octree_, camera_, sceneZRange_.Get(), visibleGeometries_, transient_);
+            visibleLights_[i]->Process(sceneLightProcessContext);
         }, M_MAX_UNSIGNED);
         workQueue_->Complete(M_MAX_UNSIGNED);
     }
