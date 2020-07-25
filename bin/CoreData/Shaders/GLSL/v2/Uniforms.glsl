@@ -53,9 +53,8 @@ CBUFFER_BEGIN(Light)
     CBUFFER_UNIFORM(vec4 cNormalOffsetScale)
 #ifdef NUMVERTEXLIGHTS
     CBUFFER_UNIFORM(vec4 cVertexLights[4 * 3])
-#else
-    CBUFFER_UNIFORM(mat4 cLightMatrices[4])
 #endif
+    CBUFFER_UNIFORM(mat4 cLightMatrices[4])
 
     CBUFFER_UNIFORM(vec4 cLightColor)
     CBUFFER_UNIFORM(vec4 cLightPosPS)

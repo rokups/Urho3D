@@ -151,6 +151,12 @@ public:
         AllocateParameter(name, VAR_VECTOR4, values.size(), values.data()->Data(), 4 * values.size());
     }
 
+    /// Add new Matrix4 array parameter.
+    void AddParameter(StringHash name, ea::span<const Matrix4> values)
+    {
+        AllocateParameter(name, VAR_MATRIX4, values.size(), values.data()->Data(), 4 * values.size());
+    }
+
     /// Clear.
     void Clear()
     {

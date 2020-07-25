@@ -22,12 +22,14 @@
 
 #include "../Precompiled.h"
 
+#include "../Core/Context.h"
 #include "../Core/IteratorRange.h"
 #include "../Math/Polyhedron.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/SceneLight.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/OctreeQuery.h"
+#include "../Graphics/Renderer.h"
 #include "../Scene/Node.h"
 
 #include "../DebugNew.h"
@@ -575,7 +577,31 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
                 lightProjBox = lightViewBox.Projected(lightProj);
                 shadowCasterBox_[splitIndex].Merge(lightProjBox);
             }
-            shadowCasters_.push_back(drawable);
+
+            const auto& sourceBatches = drawable->GetBatches();
+            for (unsigned j = 0; j < sourceBatches.size(); ++j)
+            {
+                // TODO(renderer): Optimize
+                const SourceBatch& sourceBatch = sourceBatches[j];
+                Renderer* renderer = light_->GetContext()->GetRenderer();
+                Material* material = sourceBatch.material_ ? sourceBatch.material_ : renderer->GetDefaultMaterial();
+                const ea::vector<TechniqueEntry>& techniques = material->GetTechniques();
+                Technique* tech = techniques[0].technique_;
+                Pass* pass = tech->GetSupportedPass(Technique::shadowPassIndex);
+                if (!pass)
+                    continue;
+
+                BaseSceneBatch batch;
+                batch.drawableIndex_ = drawable->GetDrawableIndex();
+                batch.sourceBatchIndex_ = j;
+                batch.geometryType_ = sourceBatch.geometryType_;
+                batch.drawable_ = drawable;
+                batch.geometry_ = sourceBatch.geometry_;
+                batch.material_ = sourceBatch.material_;
+                batch.pass_ = pass;
+                shadowCasters_.push_back(batch);
+                //shadowCasters_.push_back(drawable);
+            }
         }
     }
 

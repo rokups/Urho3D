@@ -159,6 +159,12 @@ public:
         memcpy(dest, values.data(), sizeof(Vector4) * values.size());
     }
 
+    /// Add new Matrix4 array parameter.
+    static void StoreParameter(unsigned char* dest, ea::span<const Matrix4> values)
+    {
+        memcpy(dest, values.data(), sizeof(Matrix4) * values.size());
+    }
+
 private:
     /// Allocate one more buffer.
     void AllocateBuffer()

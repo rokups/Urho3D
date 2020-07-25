@@ -104,7 +104,7 @@ struct DrawableLightAccumulator
     /// Return per-pixel lights.
     ea::span<const ea::pair<float, unsigned>> GetPixelLights() const
     {
-        return { lights_.data(), firstVertexLight_ };
+        return { lights_.data(), ea::min(lights_.size(), firstVertexLight_) };
     }
 
     /// Container of per-pixel and per-pixel lights.

@@ -112,10 +112,14 @@ public:
         CollectSceneBatches();
     }
 
+    /// Return main light index.
+    unsigned GetMainLightIndex() const { return mainLightIndex_; }
     /// Return main light.
     Light* GetMainLight() const { return mainLightIndex_ != M_MAX_UNSIGNED ? visibleLights_[mainLightIndex_]->GetLight() : nullptr; }
     /// Return visible light by index.
     const SceneLight* GetVisibleLight(unsigned i) const { return visibleLights_[i]; }
+    /// Return all visible lights.
+    const ea::vector<SceneLight*>& GetVisibleLights() const { return visibleLights_; }
     /// Return base batches for given pass.
     const ea::vector<BaseSceneBatch>& GetBaseBatches(const ea::string& pass) const;
     /// Return sorted base batches for given pass.

@@ -24,6 +24,7 @@
 
 #include "../Core/ThreadedVector.h"
 #include "../Graphics/Light.h"
+#include "../Graphics/SceneBatch.h"
 #include "../Graphics/SceneDrawableData.h"
 #include "../Graphics/PipelineStateTracker.h"
 
@@ -60,7 +61,9 @@ public:
     /// Return light.
     Light* GetLight() const { return light_; }
     /// Return lit geometries.
-    const ea::vector<Drawable*>& GetLitGeometries() const { return litGeometries_; };
+    const ea::vector<Drawable*>& GetLitGeometries() const { return litGeometries_; }
+    Camera* GetShadowCamera() const { return shadowCameras_[0]; }
+    const ea::vector<BaseSceneBatch>& GetShadowCasters() const { return shadowCasters_; }
 
 private:
     /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
@@ -95,7 +98,7 @@ private:
     ea::vector<Drawable*> tempShadowCasters_;
 
     /// Shadow casters.
-    ea::vector<Drawable*> shadowCasters_;
+    ea::vector<BaseSceneBatch> shadowCasters_;
     /// Shadow camera nodes.
     SharedPtr<Node> shadowCameraNodes_[MAX_LIGHT_SPLITS];
     /// Shadow cameras.

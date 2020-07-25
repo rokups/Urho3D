@@ -77,6 +77,13 @@ void VS()
                 vVertexLight += GetVertexLight(i, worldPos, vNormal) * cVertexLights[i * 3].rgb;
         #endif
     #endif
+
+    vec4 projWorldPos = vec4(worldPos, 1.0);
+    #ifdef SHADOW
+        // Shadow projection: transform from world space to shadow space
+        for (int i = 0; i < NUMCASCADES; i++)
+            vShadowPos[i] = GetShadowPos(i, vNormal, projWorldPos);
+    #endif
 }
 
 void PS()
