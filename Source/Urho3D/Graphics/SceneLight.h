@@ -27,6 +27,8 @@
 #include "../Graphics/SceneBatch.h"
 #include "../Graphics/SceneDrawableData.h"
 #include "../Graphics/PipelineStateTracker.h"
+#include "../Graphics/Camera.h"
+#include "../Scene/Node.h"
 
 #include <EASTL/vector.h>
 

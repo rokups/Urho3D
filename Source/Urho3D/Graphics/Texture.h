@@ -99,6 +99,9 @@ public:
     /// Return size.
     IntVector2 GetSize() const { return IntVector2(width_, height_); }
 
+    /// Return viewport rectange.
+    IntRect GetRect() const { return { 0, 0, width_, height_ }; }
+
     /// Return depth.
     int GetDepth() const { return depth_; }
 

@@ -34,6 +34,7 @@
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Viewport.h"
 #include "../Graphics/SceneBatchCollector.h"
+#include "../Graphics/ShadowMapAllocator.h"
 #include "../Scene/Scene.h"
 
 #include <EASTL/fixed_vector.h>
@@ -313,6 +314,9 @@ void CustomView::CollectDrawables(ea::vector<Drawable*>& drawables, Camera* came
 
 void CustomView::Render()
 {
+    static auto shadowMapAllocator = MakeShared<ShadowMapAllocator>(context_);
+    shadowMapAllocator->Reset();
+
     /*graphics_->SetRenderTarget(0, renderTarget_);
     graphics_->SetDepthStencil((RenderSurface*)nullptr);
     //graphics_->SetViewport(viewport_->GetRect() == IntRect::ZERO ? graphics_->GetViewport() : viewport_->GetRect());
@@ -374,12 +378,10 @@ void CustomView::Render()
         SceneLight* sceneLight = visibleLights[i];
         if (!sceneLight->GetLight()->GetCastShadows())
             continue;
-        shadowMaps[i] = renderer->GetShadowMap(sceneLight->GetLight(), camera_, 1024, 1024);
+        auto sm = shadowMapAllocator->AllocateShadowMap({ 1024, 1024 });
+        shadowMaps[i] = sm.texture_;
         drawQueue.Reset(graphics_);
-        graphics_->SetRenderTarget(0, (RenderSurface*)nullptr);
-        graphics_->SetDepthStencil(shadowMaps[i]);
-        graphics_->SetViewport({ IntVector2::ZERO, shadowMaps[i]->GetSize() });
-        graphics_->Clear(CLEAR_DEPTH);
+        shadowMapAllocator->BeginShadowMap(sm);
         const auto& shadowCasters = sceneLight->GetShadowCasters();
         auto shadowCamera = sceneLight->GetShadowCamera();
         for (BaseSceneBatch batch : shadowCasters)
