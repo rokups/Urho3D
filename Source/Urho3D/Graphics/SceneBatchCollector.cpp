@@ -153,7 +153,7 @@ public:
 
     /// Return existing or create new pipeline state. Not thread safe.
     PipelineState* GetOrCreatePipelineState(Drawable* drawable, const SubPassPipelineStateKey& key,
-        SubPassPipelineStateContext& factoryContext, ScenePipelineStateFactory& factory)
+        SubPassPipelineStateContext& factoryContext, SceneBatchCollectorCallback& factory)
     {
         SubPassPipelineStateEntry& entry = cache_[key];
         if (!entry.pipelineState_ || entry.invalidated_.load(std::memory_order_relaxed)
@@ -356,10 +356,12 @@ Technique* SceneBatchCollector::FindTechnique(Drawable* drawable, Material* mate
     return techniques.size() ? techniques.back().technique_ : nullptr;
 }
 
-void SceneBatchCollector::InitializeFrame(const FrameInfo& frameInfo, ScenePipelineStateFactory& pipelineStateFactory)
+void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchCollectorCallback& callback,
+    ea::span<const ScenePassDescription> passes)
 {
+    // Initialize context
     numThreads_ = workQueue_->GetNumThreads() + 1;
-    pipelineStateFactory_ = &pipelineStateFactory;
+    callback_ = &callback;
     materialQuality_ = renderer_->GetMaterialQuality();
 
     frameInfo_ = frameInfo;
@@ -370,16 +372,15 @@ void SceneBatchCollector::InitializeFrame(const FrameInfo& frameInfo, ScenePipel
     if (camera_->GetViewOverrideFlags() & VO_LOW_MATERIAL_QUALITY)
         materialQuality_ = QUALITY_LOW;
 
+    // Reset containers
     visibleGeometries_.Clear(numThreads_);
     visibleLightsTemp_.Clear(numThreads_);
     sceneZRange_.Clear(numThreads_);
 
     transient_.Reset(numDrawables_);
     drawableLighting_.resize(numDrawables_);
-}
 
-void SceneBatchCollector::InitializePasses(ea::span<const ScenePassDescription> passes)
-{
+    // Initialize passes
     const unsigned numPasses = passes.size();
     passes_.resize(numPasses);
     for (unsigned i = 0; i < numPasses; ++i)
@@ -401,6 +402,7 @@ void SceneBatchCollector::InitializePasses(ea::span<const ScenePassDescription> 
         passData.Clear(numThreads_);
     }
 
+    // Setup passes lookup
     baseBatchesLookup_.clear();
     lightBatchesLookup_.clear();
     for (PassData& passData : passes_)
@@ -414,16 +416,26 @@ void SceneBatchCollector::InitializePasses(ea::span<const ScenePassDescription> 
     }
 }
 
-void SceneBatchCollector::UpdateAndCollectSourceBatches(const ea::vector<Drawable*>& drawables)
+void SceneBatchCollector::ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables)
 {
     ForEachParallel(workQueue_, drawableWorkThreshold_, drawables,
         [this](unsigned threadIndex, unsigned /*offset*/, ea::span<Drawable* const> drawablesRange)
     {
-        UpdateAndCollectSourceBatchesForThread(threadIndex, drawablesRange);
+        ProcessVisibleDrawablesForThread(threadIndex, drawablesRange);
+    });
+
+    visibleLights_.clear();
+    visibleLightsTemp_.ForEach([&](unsigned, unsigned, Light* light)
+    {
+        WeakPtr<Light> weakLight(light);
+        auto& sceneLight = cachedSceneLights_[weakLight];
+        if (!sceneLight)
+            sceneLight = ea::make_unique<SceneLight>(light);
+        visibleLights_.push_back(sceneLight.get());
     });
 }
 
-void SceneBatchCollector::UpdateAndCollectSourceBatchesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables)
+void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables)
 {
     Material* defaultMaterial = renderer_->GetDefaultMaterial();
     const DrawableZRangeEvaluator zRangeEvaluator{ camera_ };
@@ -511,23 +523,12 @@ void SceneBatchCollector::UpdateAndCollectSourceBatchesForThread(unsigned thread
 
 void SceneBatchCollector::ProcessVisibleLights()
 {
-    // Allocate or clear scene lights
-    visibleLights_.clear();
-    visibleLightsTemp_.ForEach([&](unsigned, unsigned, Light* light)
-    {
-        WeakPtr<Light> weakLight(light);
-        auto& sceneLight = cachedSceneLights_[weakLight];
-        if (!sceneLight)
-            sceneLight = ea::make_unique<SceneLight>(light);
-        visibleLights_.push_back(sceneLight.get());
-    });
+    // Process lights in main thread
+    for (SceneLight* sceneLight : visibleLights_)
+        sceneLight->BeginFrame(callback_->HasShadow(sceneLight->GetLight()));
 
     // Find main light
     mainLightIndex_ = FindMainLight();
-
-    // Process lights in main thread
-    for (SceneLight* sceneLight : visibleLights_)
-        sceneLight->BeginFrame(true);
 
     // Process lights in worker threads
     SceneLightProcessContext sceneLightProcessContext;
@@ -648,7 +649,7 @@ void SceneBatchCollector::CollectSceneUnlitBaseBatches(SubPassPipelineStateCache
     {
         const SubPassPipelineStateKey key{ *sceneBatch, 0 };
         sceneBatch->pipelineState_ = subPassCache.GetOrCreatePipelineState(
-            sceneBatch->drawable_, key, subPassContext, *pipelineStateFactory_);
+            sceneBatch->drawable_, key, subPassContext, *callback_);
     });
 }
 
@@ -732,7 +733,7 @@ void SceneBatchCollector::CollectSceneLitBaseBatches(
         {
             const SubPassPipelineStateKey baseKey{ *sceneBatch, baseLightHash };
             sceneBatch->pipelineState_ = baseSubPassCache.GetOrCreatePipelineState(
-                sceneBatch->drawable_, baseKey, baseSubPassContext, *pipelineStateFactory_);
+                sceneBatch->drawable_, baseKey, baseSubPassContext, *callback_);
         });
     }
 
@@ -750,7 +751,7 @@ void SceneBatchCollector::CollectSceneLitBaseBatches(
 
             const SubPassPipelineStateKey lightKey{ lightBatch, sceneLight.GetPipelineStateHash() };
             lightBatch.pipelineState_ = lightSubPassCache.GetOrCreatePipelineState(
-                lightBatch.drawable_, lightKey, lightSubPassContext, *pipelineStateFactory_);
+                lightBatch.drawable_, lightKey, lightSubPassContext, *callback_);
         });
     }
 }

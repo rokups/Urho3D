@@ -58,7 +58,7 @@ namespace Urho3D
 namespace
 {
 
-class TestFactory : public ScenePipelineStateFactory, public Object
+class TestFactory : public SceneBatchCollectorCallback, public Object
 {
     URHO3D_OBJECT(TestFactory, Object);
 
@@ -121,6 +121,28 @@ public:
         desc.cullMode_ = GetEffectiveCullMode(material->GetCullMode(), camera);
 
         return renderer_->GetOrCreatePipelineState(desc);
+    }
+
+    bool HasShadow(Light* light) override
+    {
+        const bool shadowsEnabled = renderer_->GetDrawShadows()
+            && light->GetCastShadows()
+            && light->GetLightImportance() != LI_NOT_IMPORTANT
+            && light->GetShadowIntensity() < 1.0f;
+
+        if (!shadowsEnabled)
+            return false;
+
+        if (light->GetShadowDistance() > 0.0f && light->GetDistance() > light->GetShadowDistance())
+            return false;
+
+        // OpenGL ES can not support point light shadows
+#ifdef GL_ES_VERSION_2_0
+        if (light->GetLightType() == LIGHT_POINT)
+            return false;
+#endif
+
+        return true;
     }
 
 private:
@@ -354,7 +376,10 @@ void CustomView::Render()
         { ScenePassType::Unlit, "postalpha" },
     };
     sceneBatchCollector.SetMaxPixelLights(2);
-    sceneBatchCollector.Process(frameInfo_, scenePipelineStateFactory, passes, drawablesInMainCamera);
+    sceneBatchCollector.BeginFrame(frameInfo_, scenePipelineStateFactory, passes);
+    sceneBatchCollector.ProcessVisibleDrawables(drawablesInMainCamera);
+    sceneBatchCollector.ProcessVisibleLights();
+    sceneBatchCollector.CollectSceneBatches();
 
     static ea::vector<BaseSceneBatchSortedByState> baseBatches;
     sceneBatchCollector.GetSortedBaseBatches("litbase", baseBatches);

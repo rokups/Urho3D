@@ -70,13 +70,15 @@ struct ScenePassDescription
     ea::string additionalLightPassName_;
 };
 
-/// Pipeline state factory for scene.
-class ScenePipelineStateFactory
+/// Callback interface for SceneBatchCollector.
+class SceneBatchCollectorCallback
 {
 public:
     /// Create pipeline state. Only fields that constribute to pipeline state hashes are safe to use.
     virtual PipelineState* CreatePipelineState(Camera* camera, Drawable* drawable,
         Geometry* geometry, GeometryType geometryType, Material* material, Pass* pass, Light* light) = 0;
+    /// Return whether the light has shadow.
+    virtual bool HasShadow(Light* light) = 0;
 };
 
 /// Utility class to collect batches from the scene for given frame.
@@ -101,16 +103,15 @@ public:
     /// Set max number of pixel lights per drawable. Important lights may override this limit.
     void SetMaxPixelLights(unsigned count) { maxPixelLights_ = count; }
 
-    /// Process drawables in frame.
-    void Process(const FrameInfo& frameInfo, ScenePipelineStateFactory& pipelineStateFactory,
-        ea::span<const ScenePassDescription> passes, const ea::vector<Drawable*>& drawables)
-    {
-        InitializeFrame(frameInfo, pipelineStateFactory);
-        InitializePasses(passes);
-        UpdateAndCollectSourceBatches(drawables);
-        ProcessVisibleLights();
-        CollectSceneBatches();
-    }
+    /// Begin frame processing.
+    void BeginFrame(const FrameInfo& frameInfo, SceneBatchCollectorCallback& callback,
+        ea::span<const ScenePassDescription> passes);
+    /// Process visible drawables.
+    void ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables);
+    /// Process visible lights.
+    void ProcessVisibleLights();
+    /// Collect scene batches.
+    void CollectSceneBatches();
 
     /// Return main light index.
     unsigned GetMainLightIndex() const { return mainLightIndex_; }
@@ -153,25 +154,16 @@ private:
     /// Return technique for given material and drawable.
     Technique* FindTechnique(Drawable* drawable, Material* material) const;
 
-    /// Reset collection in the begining of the frame.
-    void InitializeFrame(const FrameInfo& frameInfo, ScenePipelineStateFactory& pipelineStateFactory);
-    /// Initialize passes.
-    void InitializePasses(ea::span<const ScenePassDescription> passes);
-
     /// Update source batches and collect pass batches.
     void UpdateAndCollectSourceBatches(const ea::vector<Drawable*>& drawables);
     /// Update source batches and collect pass batches for single thread.
-    void UpdateAndCollectSourceBatchesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables);
+    void ProcessVisibleDrawablesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables);
 
-    /// Process visible lights.
-    void ProcessVisibleLights();
     /// Find main light.
     unsigned FindMainLight() const;
     /// Accumulate forward lighting for given light.
     void AccumulateForwardLighting(unsigned lightIndex);
 
-    /// Collect scene batches.
-    void CollectSceneBatches();
     /// Convert scene batches from intermediate batches to unlit base batches.
     void CollectSceneUnlitBaseBatches(SubPassPipelineStateCache& subPassCache,
         const ThreadedVector<IntermediateSceneBatch>& intermediateBatches, ea::vector<BaseSceneBatch>& sceneBatches);
@@ -195,7 +187,7 @@ private:
     /// Renderer.
     Renderer* renderer_{};
     /// Pipeline state factory.
-    ScenePipelineStateFactory* pipelineStateFactory_{};
+    SceneBatchCollectorCallback* callback_{};
     /// Number of worker threads.
     unsigned numThreads_{};
     /// Material quality.

@@ -165,7 +165,7 @@ public:
 void SceneLight::BeginFrame(bool hasShadow)
 {
     litGeometries_.clear();
-    hasShadow_ = hasShadow && light_->GetCastShadows();
+    hasShadow_ = hasShadow;
     MarkPipelineStateHashDirty();
 }
 
