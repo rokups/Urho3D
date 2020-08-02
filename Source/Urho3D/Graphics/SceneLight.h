@@ -48,6 +48,25 @@ struct SceneLightProcessContext
     SceneDrawableData* drawableData_{};
 };
 
+/// Scene light shadow split.
+struct SceneLightShadowSplit
+{
+    /// Shadow camera node.
+    SharedPtr<Node> shadowCameraNode_;
+    /// Shadow camera.
+    SharedPtr<Camera> shadowCamera_;
+    /// Shadow caster start index.
+    unsigned shadowCasterBegin_{};
+    /// Shadow caster end index.
+    unsigned shadowCasterEnd_{};
+    /// Combined bounding box of shadow casters in light projection space. Only used for focused spot lights.
+    BoundingBox shadowCasterBox_{};
+    /// Shadow camera near split (directional lights only).
+    float zNear_{};
+    /// Shadow camera far split (directional lights only).
+    float zFar_{};
+};
+
 /// Per-viewport light data.
 class SceneLight : public PipelineStateTracker
 {
@@ -64,7 +83,7 @@ public:
     Light* GetLight() const { return light_; }
     /// Return lit geometries.
     const ea::vector<Drawable*>& GetLitGeometries() const { return litGeometries_; }
-    Camera* GetShadowCamera() const { return shadowCameras_[0]; }
+    Camera* GetShadowCamera() const { return splits_[0].shadowCamera_; }
     const ea::vector<BaseSceneBatch>& GetShadowCasters() const { return shadowCasters_; }
 
 private:
@@ -105,20 +124,8 @@ private:
 
     /// Shadow casters.
     ea::vector<BaseSceneBatch> shadowCasters_;
-    /// Shadow camera nodes.
-    SharedPtr<Node> shadowCameraNodes_[MAX_LIGHT_SPLITS];
-    /// Shadow cameras.
-    SharedPtr<Camera> shadowCameras_[MAX_LIGHT_SPLITS];
-    /// Shadow caster start indices.
-    unsigned shadowCasterBegin_[MAX_LIGHT_SPLITS]{};
-    /// Shadow caster end indices.
-    unsigned shadowCasterEnd_[MAX_LIGHT_SPLITS]{};
-    /// Combined bounding box of shadow casters in light projection space. Only used for focused spot lights.
-    BoundingBox shadowCasterBox_[MAX_LIGHT_SPLITS]{};
-    /// Shadow camera near splits (directional lights only).
-    float shadowNearSplits_[MAX_LIGHT_SPLITS]{};
-    /// Shadow camera far splits (directional lights only).
-    float shadowFarSplits_[MAX_LIGHT_SPLITS]{};
+    /// Splits.
+    SceneLightShadowSplit splits_[MAX_LIGHT_SPLITS];
     /// Shadow map split count.
     unsigned numSplits_{};
 };

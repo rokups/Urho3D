@@ -193,6 +193,7 @@ public:
 void SceneLight::BeginFrame(bool hasShadow)
 {
     litGeometries_.clear();
+    tempShadowCasters_.clear();
     hasShadow_ = hasShadow;
     MarkPipelineStateHashDirty();
 }
@@ -214,9 +215,9 @@ void SceneLight::Process(SceneLightProcessContext& ctx)
         shadowCasters_.clear();
         for (unsigned i = 0; i < numSplits_; ++i)
         {
-            Camera* shadowCamera = shadowCameras_[i];
+            Camera* shadowCamera = splits_[i].shadowCamera_;
             const Frustum& shadowCameraFrustum = shadowCamera->GetFrustum();
-            shadowCasterBegin_[i] = shadowCasterEnd_[i] = shadowCasters_.size();
+            splits_[i].shadowCasterBegin_ = splits_[i].shadowCasterEnd_ = shadowCasters_.size();
 
             // For point light check that the face is visible: if not, can skip the split
             if (lightType == LIGHT_POINT && frustum.IsInsideFast(BoundingBox(shadowCameraFrustum)) == OUTSIDE)
@@ -225,9 +226,9 @@ void SceneLight::Process(SceneLightProcessContext& ctx)
             // For directional light check that the split is inside the visible scene: if not, can skip the split
             if (lightType == LIGHT_DIRECTIONAL)
             {
-                if (ctx.sceneZRange_.first > shadowFarSplits_[i])
+                if (ctx.sceneZRange_.first > splits_[i].zFar_)
                     continue;
-                if (ctx.sceneZRange_.second < shadowNearSplits_[i])
+                if (ctx.sceneZRange_.second < splits_[i].zNear_)
                     continue;
 
                 // Reuse lit geometry query for all except directional lights
@@ -288,16 +289,16 @@ void SceneLight::CollectLitGeometriesAndMaybeShadowCasters(SceneLightProcessCont
 
 Camera* SceneLight::GetOrCreateShadowCamera(unsigned split)
 {
-    if (!shadowCameras_[split])
+    if (!splits_[split].shadowCamera_)
     {
         auto node = MakeShared<Node>(light_->GetContext());
         auto camera = node->CreateComponent<Camera>();
         camera->SetOrthographic(false);
         camera->SetZoom(1.0f);
-        shadowCameraNodes_[split] = node;
-        shadowCameras_[split] = camera;
+        splits_[split].shadowCameraNode_ = node;
+        splits_[split].shadowCamera_ = camera;
     }
-    return shadowCameras_[split];
+    return splits_[split].shadowCamera_;
 }
 
 void SceneLight::SetupShadowCameras(SceneLightProcessContext& ctx)
@@ -320,14 +321,14 @@ void SceneLight::SetupShadowCameras(SceneLightProcessContext& ctx)
             if (nearSplit > cullCamera->GetFarClip())
                 break;
 
-            const float farSplit = Min(cullCamera->GetFarClip(), cascade.splits_[numSplits_]);
+            const float farSplit = Min(cullCamera->GetFarClip(), cascade.splits_[i]);
             if (farSplit <= nearSplit)
                 break;
 
             // Setup the shadow camera for the split
-            Camera* shadowCamera = GetOrCreateShadowCamera(numSplits_);
-            shadowNearSplits_[numSplits_] = nearSplit;
-            shadowFarSplits_[numSplits_] = farSplit;
+            Camera* shadowCamera = GetOrCreateShadowCamera(i);
+            splits_[i].zNear_ = nearSplit;
+            splits_[i].zFar_ = farSplit;
             SetupDirLightShadowCamera(ctx, shadowCamera, nearSplit, farSplit);
 
             nearSplit = farSplit;
@@ -544,13 +545,13 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
     unsigned lightMask = light_->GetLightMaskEffective();
     Camera* cullCamera = ctx.frameInfo_.camera_;
 
-    Camera* shadowCamera = shadowCameras_[splitIndex];
+    Camera* shadowCamera = splits_[splitIndex].shadowCamera_;
     const Frustum& shadowCameraFrustum = shadowCamera->GetFrustum();
     const Matrix3x4& lightView = shadowCamera->GetView();
     const Matrix4& lightProj = shadowCamera->GetProjection();
     LightType type = light_->GetLightType();
 
-    shadowCasterBox_[splitIndex].Clear();
+    splits_[splitIndex].shadowCasterBox_.Clear();
 
     // Transform scene frustum into shadow camera's view space for shadow caster visibility check. For point & spot lights,
     // we can use the whole scene frustum. For directional lights, use the intersection of the scene frustum and the split
@@ -559,8 +560,8 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
     if (type != LIGHT_DIRECTIONAL)
         lightViewFrustum = cullCamera->GetSplitFrustum(ctx.sceneZRange_.first, ctx.sceneZRange_.second).Transformed(lightView);
     else
-        lightViewFrustum = cullCamera->GetSplitFrustum(Max(ctx.sceneZRange_.first, shadowNearSplits_[splitIndex]),
-            Min(ctx.sceneZRange_.second, shadowFarSplits_[splitIndex])).Transformed(lightView);
+        lightViewFrustum = cullCamera->GetSplitFrustum(Max(ctx.sceneZRange_.first, splits_[splitIndex].zNear_),
+            Min(ctx.sceneZRange_.second, splits_[splitIndex].zFar_)).Transformed(lightView);
 
     BoundingBox lightViewFrustumBox(lightViewFrustum);
 
@@ -607,7 +608,7 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
             if (type == LIGHT_SPOT && light_->GetShadowFocus().focus_)
             {
                 lightProjBox = lightViewBox.Projected(lightProj);
-                shadowCasterBox_[splitIndex].Merge(lightProjBox);
+                splits_[splitIndex].shadowCasterBox_.Merge(lightProjBox);
             }
 
             const auto& sourceBatches = drawable->GetBatches();
@@ -637,7 +638,7 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
         }
     }
 
-    shadowCasterEnd_[splitIndex] = shadowCasters_.size();
+    splits_[splitIndex].shadowCasterEnd_ = shadowCasters_.size();
 }
 
 }
