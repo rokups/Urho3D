@@ -24,6 +24,7 @@
 
 #include "../Core/Context.h"
 #include "../Core/IteratorRange.h"
+#include "../Core/WorkQueue.h"
 #include "../Math/Polyhedron.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/SceneLight.h"
@@ -198,7 +199,7 @@ void SceneLight::BeginFrame(bool hasShadow)
     MarkPipelineStateHashDirty();
 }
 
-void SceneLight::Process(SceneLightProcessContext& ctx)
+void SceneLight::UpdateLitGeometriesAndShadowCasters(SceneLightProcessContext& ctx)
 {
     CollectLitGeometriesAndMaybeShadowCasters(ctx);
 
@@ -212,12 +213,12 @@ void SceneLight::Process(SceneLightProcessContext& ctx)
         SetupShadowCameras(ctx);
 
         // Process each split for shadow casters
-        shadowCasters_.clear();
         for (unsigned i = 0; i < numSplits_; ++i)
         {
             Camera* shadowCamera = splits_[i].shadowCamera_;
             const Frustum& shadowCameraFrustum = shadowCamera->GetFrustum();
-            splits_[i].shadowCasterBegin_ = splits_[i].shadowCasterEnd_ = shadowCasters_.size();
+            splits_[i].shadowCasters_.clear();
+            splits_[i].shadowCasterBatches_.clear();
 
             // For point light check that the face is visible: if not, can skip the split
             if (lightType == LIGHT_POINT && frustum.IsInsideFast(BoundingBox(shadowCameraFrustum)) == OUTSIDE)
@@ -542,6 +543,7 @@ bool SceneLight::IsShadowCasterVisible(SceneLightProcessContext& ctx,
 void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
     const ea::vector<Drawable*>& drawables, unsigned splitIndex)
 {
+    const unsigned workerThreadIndex = WorkQueue::GetWorkerThreadIndex();
     unsigned lightMask = light_->GetLightMaskEffective();
     Camera* cullCamera = ctx.frameInfo_.camera_;
 
@@ -590,14 +592,9 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
         // Note: as lights are processed threaded, it is possible a drawable's UpdateBatches() function is called several
         // times. However, this should not cause problems as no scene modification happens at this point.
         const unsigned drawableIndex = drawable->GetDrawableIndex();
-        if (!(ctx.drawableData_->traits_[drawableIndex] & SceneDrawableData::DrawableVisibleGeometry))
-            drawable->UpdateBatches(ctx.frameInfo_);
-        float maxShadowDistance = drawable->GetShadowDistance();
-        float drawDistance = drawable->GetDrawDistance();
-        if (drawDistance > 0.0f && (maxShadowDistance <= 0.0f || drawDistance < maxShadowDistance))
-            maxShadowDistance = drawDistance;
-        if (maxShadowDistance > 0.0f && drawable->GetDistance() > maxShadowDistance)
-            continue;
+        const bool isUpdated = ctx.drawableData_->isUpdated_[drawableIndex].test_and_set(std::memory_order_relaxed);
+        if (!isUpdated)
+            ctx.geometriesToBeUpdates_->Insert(workerThreadIndex, drawable);
 
         // Project shadow caster bounding box to light view space for visibility check
         lightViewBox = drawable->GetWorldBoundingBox().Transformed(lightView);
@@ -611,34 +608,9 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
                 splits_[splitIndex].shadowCasterBox_.Merge(lightProjBox);
             }
 
-            const auto& sourceBatches = drawable->GetBatches();
-            for (unsigned j = 0; j < sourceBatches.size(); ++j)
-            {
-                // TODO(renderer): Optimize
-                const SourceBatch& sourceBatch = sourceBatches[j];
-                Renderer* renderer = light_->GetContext()->GetRenderer();
-                Material* material = sourceBatch.material_ ? sourceBatch.material_ : renderer->GetDefaultMaterial();
-                const ea::vector<TechniqueEntry>& techniques = material->GetTechniques();
-                Technique* tech = techniques[0].technique_;
-                Pass* pass = tech->GetSupportedPass(Technique::shadowPassIndex);
-                if (!pass)
-                    continue;
-
-                BaseSceneBatch batch;
-                batch.drawableIndex_ = drawable->GetDrawableIndex();
-                batch.sourceBatchIndex_ = j;
-                batch.geometryType_ = sourceBatch.geometryType_;
-                batch.drawable_ = drawable;
-                batch.geometry_ = sourceBatch.geometry_;
-                batch.material_ = sourceBatch.material_;
-                batch.pass_ = pass;
-                shadowCasters_.push_back(batch);
-                //shadowCasters_.push_back(drawable);
-            }
+            splits_[splitIndex].shadowCasters_.push_back(drawable);
         }
     }
-
-    splits_[splitIndex].shadowCasterEnd_ = shadowCasters_.size();
 }
 
 }

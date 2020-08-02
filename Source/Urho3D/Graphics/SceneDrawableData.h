@@ -25,6 +25,7 @@
 #include "../Math/NumericRange.h"
 
 #include <EASTL/vector.h>
+#include <atomic>
 
 namespace Urho3D
 {
@@ -72,6 +73,14 @@ private:
     bool sceneRangeDirty_{};
 };
 
+/// Drawable updated flag. Technically copyable to allow storage in vector, but is invalidated on copying.
+struct DrawableUpdatedFlag : public std::atomic_flag
+{
+    DrawableUpdatedFlag() = default;
+    DrawableUpdatedFlag(const DrawableUpdatedFlag& other) {}
+    DrawableUpdatedFlag(DrawableUpdatedFlag&& other) {}
+};
+
 /// Per-viewport drawable data. Indexed via drawable index. Invalidated between frames.
 struct SceneDrawableData
 {
@@ -80,14 +89,14 @@ struct SceneDrawableData
     /// Traits.
     enum Trait : TraitType
     {
-        /// Whether the drawable is updated.
-        DrawableUpdated = 1 << 1,
         /// Whether the drawable has geometry visible from the main camera.
-        DrawableVisibleGeometry = 1 << 2,
+        DrawableVisibleGeometry = 1 << 0,
         /// Whether the drawable is lit using forward rendering.
-        ForwardLit = 1 << 3,
+        ForwardLit = 1 << 1,
     };
 
+    /// Whether the drawable batches have been updated in this frame.
+    ea::vector<DrawableUpdatedFlag> isUpdated_;
     /// Traits.
     ea::vector<TraitType> traits_;
     /// Drawable min and max Z values. Invalid if drawable is not updated.
@@ -98,6 +107,10 @@ struct SceneDrawableData
     {
         traits_.resize(numDrawables);
         ea::fill(traits_.begin(), traits_.end(), TraitType{});
+
+        isUpdated_.resize(numDrawables);
+        for (std::atomic_flag& updated : isUpdated_)
+            updated.clear(std::memory_order_relaxed);
 
         zRange_.resize(numDrawables);
     }

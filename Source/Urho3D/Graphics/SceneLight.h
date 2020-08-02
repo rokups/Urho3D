@@ -46,6 +46,8 @@ struct SceneLightProcessContext
     const ThreadedVector<Drawable*>* visibleGeometries_{};
     /// Drawable data.
     SceneDrawableData* drawableData_{};
+    /// Geometries that has to be updated.
+    ThreadedVector<Drawable*>* geometriesToBeUpdates_{};
 };
 
 /// Scene light shadow split.
@@ -55,10 +57,10 @@ struct SceneLightShadowSplit
     SharedPtr<Node> shadowCameraNode_;
     /// Shadow camera.
     SharedPtr<Camera> shadowCamera_;
-    /// Shadow caster start index.
-    unsigned shadowCasterBegin_{};
-    /// Shadow caster end index.
-    unsigned shadowCasterEnd_{};
+    /// Shadow casters.
+    ea::vector<Drawable*> shadowCasters_;
+    /// Shadow caster batches.
+    ea::vector<BaseSceneBatch> shadowCasterBatches_;
     /// Combined bounding box of shadow casters in light projection space. Only used for focused spot lights.
     BoundingBox shadowCasterBox_{};
     /// Shadow camera near split (directional lights only).
@@ -76,15 +78,26 @@ public:
 
     /// Clear in the beginning of the frame.
     void BeginFrame(bool hasShadow);
-    /// Process light in working thread.
-    void Process(SceneLightProcessContext& ctx);
+
+    /// Update lit geometries and shadow casters. May be called from worker thread.
+    void UpdateLitGeometriesAndShadowCasters(SceneLightProcessContext& ctx);
+    /// Return lit geometries.
+    const ea::vector<Drawable*>& GetLitGeometries() const { return litGeometries_; }
+    /// Return number of splits.
+    unsigned GetNumSplits() const { return numSplits_; }
+    /// Return shadow split.
+    const SceneLightShadowSplit& GetSplit(unsigned splitIndex) const { return splits_[splitIndex]; }
+    /// Return shadow casters for given split.
+    const ea::vector<Drawable*>& GetShadowCasters(unsigned splitIndex) const { return splits_[splitIndex].shadowCasters_; }
+    /// Return mutable shadow batches for given split.
+    ea::vector<BaseSceneBatch>& GetMutableShadowBatches(unsigned splitIndex) { return splits_[splitIndex].shadowCasterBatches_; }
+    /// Return shadow batches for given split.
+    const ea::vector<BaseSceneBatch>& GetShadowBatches(unsigned splitIndex) const { return splits_[splitIndex].shadowCasterBatches_; }
 
     /// Return light.
     Light* GetLight() const { return light_; }
-    /// Return lit geometries.
-    const ea::vector<Drawable*>& GetLitGeometries() const { return litGeometries_; }
     Camera* GetShadowCamera() const { return splits_[0].shadowCamera_; }
-    const ea::vector<BaseSceneBatch>& GetShadowCasters() const { return shadowCasters_; }
+    //const ea::vector<BaseSceneBatch>& GetShadowCasters() const { return shadowCasters_; }
 
 private:
     /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
@@ -122,8 +135,6 @@ private:
     /// Directional lights: all possible shadows casters for currently processed split
     ea::vector<Drawable*> tempShadowCasters_;
 
-    /// Shadow casters.
-    ea::vector<BaseSceneBatch> shadowCasters_;
     /// Splits.
     SceneLightShadowSplit splits_[MAX_LIGHT_SPLITS];
     /// Shadow map split count.

@@ -220,6 +220,9 @@ private:
     /// Scene Z range.
     SceneZRange sceneZRange_;
 
+    /// Shadow caster geometries to be updated.
+    ThreadedVector<Drawable*> shadowCastersToBeUpdated_;
+
     /// Common drawable data index.
     SceneDrawableData transient_;
     /// Drawable lighting data index.

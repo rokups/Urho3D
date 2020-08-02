@@ -407,9 +407,9 @@ void CustomView::Render()
         shadowMaps[i] = sm.texture_;
         drawQueue.Reset(graphics_);
         shadowMapAllocator->BeginShadowMap(sm);
-        const auto& shadowCasters = sceneLight->GetShadowCasters();
+        const auto& shadowBatches = sceneLight->GetShadowBatches(0);
         auto shadowCamera = sceneLight->GetShadowCamera();
-        for (BaseSceneBatch batch : shadowCasters)
+        for (BaseSceneBatch batch : shadowBatches)
         {
             auto geometry = batch.geometry_;
             const SourceBatch& sourceBatch = batch.drawable_->GetBatches()[batch.sourceBatchIndex_];

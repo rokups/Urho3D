@@ -376,6 +376,7 @@ void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchColle
     visibleGeometries_.Clear(numThreads_);
     visibleLightsTemp_.Clear(numThreads_);
     sceneZRange_.Clear(numThreads_);
+    shadowCastersToBeUpdated_.Clear(numThreads_);
 
     transient_.Reset(numDrawables_);
     drawableLighting_.resize(numDrawables_);
@@ -446,7 +447,7 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
         const unsigned drawableIndex = drawable->GetDrawableIndex();
 
         drawable->UpdateBatches(frameInfo_);
-        transient_.traits_[drawableIndex] |= SceneDrawableData::DrawableUpdated;
+        transient_.isUpdated_[drawableIndex].test_and_set(std::memory_order_relaxed);
 
         // Skip if too far
         const float maxDistance = drawable->GetDrawDistance();
@@ -530,20 +531,79 @@ void SceneBatchCollector::ProcessVisibleLights()
     // Find main light
     mainLightIndex_ = FindMainLight();
 
-    // Process lights in worker threads
+    // Update lit geometries and shadow casters
     SceneLightProcessContext sceneLightProcessContext;
     sceneLightProcessContext.frameInfo_ = frameInfo_;
     sceneLightProcessContext.sceneZRange_ = sceneZRange_.Get();
     sceneLightProcessContext.visibleGeometries_ = &visibleGeometries_;
     sceneLightProcessContext.drawableData_ = &transient_;
+    sceneLightProcessContext.geometriesToBeUpdates_ = &shadowCastersToBeUpdated_;
     for (unsigned i = 0; i < visibleLights_.size(); ++i)
     {
         workQueue_->AddWorkItem([this, i, &sceneLightProcessContext](unsigned threadIndex)
         {
-            visibleLights_[i]->Process(sceneLightProcessContext);
+            visibleLights_[i]->UpdateLitGeometriesAndShadowCasters(sceneLightProcessContext);
         }, M_MAX_UNSIGNED);
-        workQueue_->Complete(M_MAX_UNSIGNED);
     }
+    workQueue_->Complete(M_MAX_UNSIGNED);
+
+    // Finalize scene lights
+
+    // Update batches for shadow casters
+    ForEachParallel(workQueue_, 1u, shadowCastersToBeUpdated_,
+        [&](unsigned /*threadIndex*/, unsigned /*offset*/, ea::span<Drawable* const> geometries)
+    {
+        for (Drawable* drawable : geometries)
+            drawable->UpdateBatches(frameInfo_);
+    });
+
+    // Collect shadow caster batches
+    for (SceneLight* sceneLight : visibleLights_)
+    {
+        const unsigned numSplits = sceneLight->GetNumSplits();
+        for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
+        {
+            workQueue_->AddWorkItem([=, &sceneLightProcessContext](unsigned threadIndex)
+            {
+                Material* defaultMaterial = renderer_->GetDefaultMaterial();
+                const auto& shadowCasters = sceneLight->GetShadowCasters(splitIndex);
+                auto& shadowBatches = sceneLight->GetMutableShadowBatches(splitIndex);
+                for (Drawable* drawable : shadowCasters)
+                {
+                    // Check shadow distance
+                    float maxShadowDistance = drawable->GetShadowDistance();
+                    const float drawDistance = drawable->GetDrawDistance();
+                    if (drawDistance > 0.0f && (maxShadowDistance <= 0.0f || drawDistance < maxShadowDistance))
+                        maxShadowDistance = drawDistance;
+                    if (maxShadowDistance > 0.0f && drawable->GetDistance() > maxShadowDistance)
+                        continue;
+
+                    // Add batches
+                    const auto& sourceBatches = drawable->GetBatches();
+                    for (unsigned j = 0; j < sourceBatches.size(); ++j)
+                    {
+                        const SourceBatch& sourceBatch = sourceBatches[j];
+                        Material* material = sourceBatch.material_ ? sourceBatch.material_ : defaultMaterial;
+                        Technique* tech = FindTechnique(drawable, material);
+                        Pass* pass = tech->GetSupportedPass(Technique::shadowPassIndex);
+                        if (!pass)
+                            continue;
+
+                        BaseSceneBatch batch;
+                        batch.drawableIndex_ = drawable->GetDrawableIndex();
+                        batch.sourceBatchIndex_ = j;
+                        batch.geometryType_ = sourceBatch.geometryType_;
+                        batch.drawable_ = drawable;
+                        batch.geometry_ = sourceBatch.geometry_;
+                        batch.material_ = sourceBatch.material_;
+                        batch.pass_ = pass;
+                        shadowBatches.push_back(batch);
+                    }
+                }
+            }, M_MAX_UNSIGNED);
+        }
+    }
+    workQueue_->Complete(M_MAX_UNSIGNED);
 
     // Accumulate lighting
     for (unsigned i = 0; i < visibleLights_.size(); ++i)
