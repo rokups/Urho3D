@@ -33,6 +33,9 @@
 namespace Urho3D
 {
 
+/// Thread index.
+static thread_local unsigned workerThreadIndex_;
+
 /// Worker thread managed by the work queue.
 class WorkerThread : public Thread, public RefCounted
 {
@@ -48,6 +51,7 @@ public:
     void ThreadFunction() override
     {
         URHO3D_PROFILE_THREAD(Format("WorkerThread {}", (uint64_t)GetCurrentThreadID()).c_str());
+        workerThreadIndex_ = index_;
         // Init FPU state first
         InitFPU();
         owner_->ProcessItems(index_);
@@ -73,6 +77,7 @@ WorkQueue::WorkQueue(Context* context) :
     lastSize_(0),
     maxNonThreadedWorkMs_(5)
 {
+    workerThreadIndex_ = 0;
     SubscribeToEvent(E_BEGINFRAME, URHO3D_HANDLER(WorkQueue, HandleBeginFrame));
 }
 
@@ -445,6 +450,11 @@ void WorkQueue::HandleBeginFrame(StringHash eventType, VariantMap& eventData)
     // Complete and signal items down to the lowest priority
     PurgeCompleted(0);
     PurgePool();
+}
+
+unsigned WorkQueue::GetWorkerThreadIndex()
+{
+    return workerThreadIndex_;
 }
 
 }

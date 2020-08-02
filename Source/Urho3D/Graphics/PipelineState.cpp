@@ -23,6 +23,7 @@
 #include "../Graphics/PipelineState.h"
 
 #include "../Core/Context.h"
+#include "../IO/Log.h"
 #include "../Graphics/Graphics.h"
 
 namespace Urho3D
@@ -36,6 +37,12 @@ PipelineState::PipelineState(Context* context)
 
 void PipelineState::Create(const PipelineStateDesc& desc)
 {
+    if (!desc.IsValid())
+    {
+        URHO3D_LOGERROR("Pipeline state is missing one or more shaders");
+        return;
+    }
+
     desc_ = desc;
     constantBufferLayout_ = graphics_->GetConstantBufferLayout(desc_.vertexShader_, desc_.pixelShader_);
 }

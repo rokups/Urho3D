@@ -123,6 +123,9 @@ public:
     /// Return how many milliseconds maximum to spend on non-threaded low-priority work.
     int GetNonThreadedWorkMs() const { return maxNonThreadedWorkMs_; }
 
+    /// Return current worker thread.
+    static unsigned GetWorkerThreadIndex();
+
 private:
     /// Process work items until shut down. Called by the worker threads.
     void ProcessItems(unsigned threadIndex);

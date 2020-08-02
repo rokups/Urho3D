@@ -130,6 +130,9 @@ struct PipelineStateDesc
             && slopeScaledDepthBias_ == rhs.slopeScaledDepthBias_;
     }
 
+    /// Return whether the state is valid.
+    bool IsValid() const { return vertexShader_ && pixelShader_; }
+
     /// Recalculate hash.
     void RecalculateHash()
     {
@@ -222,6 +225,8 @@ public:
         SharedPtr<PipelineState>& state = states_[desc];
         if (!state)
         {
+            if (!desc.IsValid())
+                return nullptr;
             state = MakeShared<PipelineState>(context_);
             state->Create(desc);
         }
