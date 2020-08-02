@@ -70,6 +70,8 @@ public:
 private:
     /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
     unsigned RecalculatePipelineStateHash() const override;
+    /// Collect lit geometries (for all light types) and shadow casters (for shadowed spot and point lights).
+    void CollectLitGeometriesAndMaybeShadowCasters(SceneLightProcessContext& ctx);
     /// Return or create shadow camera for split.
     Camera* GetOrCreateShadowCamera(unsigned split);
     /// Setup shadow cameras.
@@ -97,6 +99,8 @@ private:
     // TODO(renderer): Skip unlit geometries?
     ea::vector<Drawable*> litGeometries_;
     /// Shadow caster candidates.
+    /// Point and spot lights: all possible shadow casters.
+    /// Directional lights: all possible shadows casters for currently processed split
     ea::vector<Drawable*> tempShadowCasters_;
 
     /// Shadow casters.

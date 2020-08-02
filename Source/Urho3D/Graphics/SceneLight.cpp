@@ -51,8 +51,8 @@ struct PointLightLitGeometriesQuery : public SphereOctreeQuery
 
     /// Construct.
     PointLightLitGeometriesQuery(ea::vector<Drawable*>& result, ea::vector<Drawable*>* shadowCasters,
-        const SceneDrawableData& transientData, Light* light)
-        : SphereOctreeQuery(result, GetLightSphere(light), DRAWABLE_GEOMETRY)
+        const SceneDrawableData& transientData, Light* light, unsigned viewMask)
+        : SphereOctreeQuery(result, GetLightSphere(light), DRAWABLE_GEOMETRY, viewMask)
         , shadowCasters_(shadowCasters)
         , transientData_(&transientData)
         , lightMask_(light->GetLightMaskEffective())
@@ -65,21 +65,30 @@ struct PointLightLitGeometriesQuery : public SphereOctreeQuery
     {
         for (Drawable* drawable : MakeIteratorRange(start, end))
         {
-            const unsigned drawableIndex = drawable->GetDrawableIndex();
-            const unsigned traits = transientData_->traits_[drawableIndex];
-            if (traits & SceneDrawableData::DrawableVisibleGeometry)
-            {
-                if (drawable->GetLightMask() & lightMask_)
-                {
-                    if (inside || sphere_.IsInsideFast(drawable->GetWorldBoundingBox()))
-                    {
-                        result_.push_back(drawable);
-                        if (shadowCasters_ && drawable->GetCastShadows())
-                            shadowCasters_->push_back(drawable);
-                    }
-                }
-            }
+            const auto isLitOrShadowCaster = IsLitOrShadowCaster(drawable, inside);
+            if (isLitOrShadowCaster.first)
+                result_.push_back(drawable);
+            if (isLitOrShadowCaster.second)
+                shadowCasters_->push_back(drawable);
         }
+    }
+
+    /// Return whether the drawable is lit and/or shadow caster.
+    ea::pair<bool, bool> IsLitOrShadowCaster(Drawable* drawable, bool inside) const
+    {
+        const unsigned drawableIndex = drawable->GetDrawableIndex();
+        const unsigned traits = transientData_->traits_[drawableIndex];
+
+        const bool isInside = (drawable->GetDrawableFlags() & drawableFlags_)
+            && (drawable->GetViewMask() & viewMask_)
+            && (inside || sphere_.IsInsideFast(drawable->GetWorldBoundingBox()));
+        const bool isLit = isInside
+            && (traits & SceneDrawableData::DrawableVisibleGeometry)
+            && (drawable->GetLightMask() & lightMask_);
+        const bool isShadowCaster = shadowCasters_ && isInside
+            && drawable->GetCastShadows()
+            && (drawable->GetShadowMask() & lightMask_);
+        return { isLit, isShadowCaster };
     }
 
     /// Result array of shadow casters, if applicable.
@@ -95,8 +104,8 @@ struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
 {
     /// Construct.
     SpotLightLitGeometriesQuery(ea::vector<Drawable*>& result, ea::vector<Drawable*>* shadowCasters,
-        const SceneDrawableData& transientData, Light* light)
-        : FrustumOctreeQuery(result, light->GetFrustum(), DRAWABLE_GEOMETRY)
+        const SceneDrawableData& transientData, Light* light, unsigned viewMask)
+        : FrustumOctreeQuery(result, light->GetFrustum(), DRAWABLE_GEOMETRY, viewMask)
         , shadowCasters_(shadowCasters)
         , transientData_(&transientData)
         , lightMask_(light->GetLightMaskEffective())
@@ -109,21 +118,30 @@ struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
     {
         for (Drawable* drawable : MakeIteratorRange(start, end))
         {
-            const unsigned drawableIndex = drawable->GetDrawableIndex();
-            const unsigned traits = transientData_->traits_[drawableIndex];
-            if (traits & SceneDrawableData::DrawableVisibleGeometry)
-            {
-                if (drawable->GetLightMask() & lightMask_)
-                {
-                    if (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()))
-                    {
-                        result_.push_back(drawable);
-                        if (shadowCasters_ && drawable->GetCastShadows())
-                            shadowCasters_->push_back(drawable);
-                    }
-                }
-            }
+            const auto isLitOrShadowCaster = IsLitOrShadowCaster(drawable, inside);
+            if (isLitOrShadowCaster.first)
+                result_.push_back(drawable);
+            if (isLitOrShadowCaster.second)
+                shadowCasters_->push_back(drawable);
         }
+    }
+
+    /// Return whether the drawable is lit and/or shadow caster.
+    ea::pair<bool, bool> IsLitOrShadowCaster(Drawable* drawable, bool inside) const
+    {
+        const unsigned drawableIndex = drawable->GetDrawableIndex();
+        const unsigned traits = transientData_->traits_[drawableIndex];
+
+        const bool isInside = (drawable->GetDrawableFlags() & drawableFlags_)
+            && (drawable->GetViewMask() & viewMask_)
+            && (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()));
+        const bool isLit = isInside
+            && (traits & SceneDrawableData::DrawableVisibleGeometry)
+            && (drawable->GetLightMask() & lightMask_);
+        const bool isShadowCaster = shadowCasters_ && isInside
+            && drawable->GetCastShadows()
+            && (drawable->GetShadowMask() & lightMask_);
+        return { isLit, isShadowCaster };
     }
 
     /// Result array of shadow casters, if applicable.
@@ -140,8 +158,9 @@ class DirectionalLightShadowCasterOctreeQuery : public FrustumOctreeQuery
 public:
     /// Construct with frustum and query parameters.
     DirectionalLightShadowCasterOctreeQuery(ea::vector<Drawable*>& result,
-        const Frustum& frustum, DrawableFlags drawableFlags, unsigned viewMask)
+        const Frustum& frustum, DrawableFlags drawableFlags, Light* light, unsigned viewMask)
         : FrustumOctreeQuery(result, frustum, drawableFlags, viewMask)
+        , lightMask_(light->GetLightMask())
     {
     }
 
@@ -150,14 +169,23 @@ public:
     {
         for (Drawable* drawable : MakeIteratorRange(start, end))
         {
-            if (drawable->GetCastShadows() && (drawable->GetDrawableFlags() & drawableFlags_) &&
-                (drawable->GetViewMask() & viewMask_))
-            {
-                if (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()))
-                    result_.push_back(drawable);
-            }
+            if (IsShadowCaster(drawable, inside))
+                result_.push_back(drawable);
         }
     }
+
+    /// Return whether the drawable is shadow caster.
+    bool IsShadowCaster(Drawable* drawable, bool inside) const
+    {
+        return drawable->GetCastShadows()
+            && (drawable->GetDrawableFlags() & drawableFlags_)
+            && (drawable->GetViewMask() & viewMask_)
+            && (drawable->GetShadowMask() & lightMask_)
+            && (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()));
+    }
+
+    /// Light mask to check.
+    unsigned lightMask_{};
 };
 
 }
@@ -171,39 +199,12 @@ void SceneLight::BeginFrame(bool hasShadow)
 
 void SceneLight::Process(SceneLightProcessContext& ctx)
 {
+    CollectLitGeometriesAndMaybeShadowCasters(ctx);
+
     const LightType lightType = light_->GetLightType();
     Camera* cullCamera = ctx.frameInfo_.camera_;
     Octree* octree = ctx.frameInfo_.octree_;
     const Frustum& frustum = cullCamera->GetFrustum();
-
-    // Update lit geometries
-    switch (lightType)
-    {
-    case LIGHT_SPOT:
-    {
-        SpotLightLitGeometriesQuery query(
-            litGeometries_, hasShadow_ ? &tempShadowCasters_ : nullptr, *ctx.drawableData_, light_);
-        octree->GetDrawables(query);
-        break;
-    }
-    case LIGHT_POINT:
-    {
-        PointLightLitGeometriesQuery query(
-            litGeometries_, hasShadow_ ? &tempShadowCasters_ : nullptr, *ctx.drawableData_, light_);
-        octree->GetDrawables(query);
-        break;
-    }
-    case LIGHT_DIRECTIONAL:
-    {
-        const unsigned lightMask = light_->GetLightMask();
-        ctx.visibleGeometries_->ForEach([&](unsigned, unsigned, Drawable* drawable)
-        {
-            if (drawable->GetLightMask() & lightMask)
-                litGeometries_.push_back(drawable);
-        });
-        break;
-    }
-    }
 
     if (hasShadow_)
     {
@@ -231,7 +232,7 @@ void SceneLight::Process(SceneLightProcessContext& ctx)
 
                 // Reuse lit geometry query for all except directional lights
                 DirectionalLightShadowCasterOctreeQuery query(
-                    tempShadowCasters_, shadowCameraFrustum, DRAWABLE_GEOMETRY, cullCamera->GetViewMask());
+                    tempShadowCasters_, shadowCameraFrustum, DRAWABLE_GEOMETRY, light_, cullCamera->GetViewMask());
                 octree->GetDrawables(query);
             }
 
@@ -253,6 +254,38 @@ unsigned SceneLight::RecalculatePipelineStateHash() const
     return hash;
 }
 
+void SceneLight::CollectLitGeometriesAndMaybeShadowCasters(SceneLightProcessContext& ctx)
+{
+    Octree* octree = ctx.frameInfo_.octree_;
+    switch (light_->GetLightType())
+    {
+    case LIGHT_SPOT:
+    {
+        SpotLightLitGeometriesQuery query(litGeometries_, hasShadow_ ? &tempShadowCasters_ : nullptr,
+            *ctx.drawableData_, light_, ctx.frameInfo_.camera_->GetViewMask());
+        octree->GetDrawables(query);
+        break;
+    }
+    case LIGHT_POINT:
+    {
+        PointLightLitGeometriesQuery query(litGeometries_, hasShadow_ ? &tempShadowCasters_ : nullptr,
+            *ctx.drawableData_, light_, ctx.frameInfo_.camera_->GetViewMask());
+        octree->GetDrawables(query);
+        break;
+    }
+    case LIGHT_DIRECTIONAL:
+    {
+        const unsigned lightMask = light_->GetLightMask();
+        ctx.visibleGeometries_->ForEach([&](unsigned, unsigned, Drawable* drawable)
+        {
+            if (drawable->GetLightMask() & lightMask)
+                litGeometries_.push_back(drawable);
+        });
+        break;
+    }
+    }
+}
+
 Camera* SceneLight::GetOrCreateShadowCamera(unsigned split)
 {
     if (!shadowCameras_[split])
@@ -270,7 +303,6 @@ Camera* SceneLight::GetOrCreateShadowCamera(unsigned split)
 void SceneLight::SetupShadowCameras(SceneLightProcessContext& ctx)
 {
     Camera* cullCamera = ctx.frameInfo_.camera_;
-    numSplits_ = 0;
 
     switch (light_->GetLightType())
     {
@@ -279,16 +311,16 @@ void SceneLight::SetupShadowCameras(SceneLightProcessContext& ctx)
         const CascadeParameters& cascade = light_->GetShadowCascade();
 
         float nearSplit = cullCamera->GetNearClip();
-        float farSplit;
-        int numSplits = light_->GetNumShadowSplits();
+        const int numSplits = light_->GetNumShadowSplits();
 
-        while (numSplits_ < numSplits)
+        numSplits_ = 0;
+        for (unsigned i = 0; i < numSplits; ++i)
         {
             // If split is completely beyond camera far clip, we are done
             if (nearSplit > cullCamera->GetFarClip())
                 break;
 
-            farSplit = Min(cullCamera->GetFarClip(), cascade.splits_[numSplits_]);
+            const float farSplit = Min(cullCamera->GetFarClip(), cascade.splits_[numSplits_]);
             if (farSplit <= nearSplit)
                 break;
 
