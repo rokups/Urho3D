@@ -404,60 +404,62 @@ void CustomView::Render()
     auto renderer = context_->GetRenderer();
     renderer->SetReuseShadowMaps(false);
     const auto& visibleLights = sceneBatchCollector.GetVisibleLights();
-    ea::vector<Texture2D*> shadowMaps(visibleLights.size());
-    for (unsigned i = 0; i < shadowMaps.size(); ++i)
+    for (SceneLight* sceneLight : visibleLights)
     {
-        SceneLight* sceneLight = visibleLights[i];
-        if (!sceneLight->GetLight()->GetCastShadows())
-            continue;
-        auto sm = shadowMapAllocator->AllocateShadowMap({ 1024, 1024 });
-        shadowMaps[i] = sm.texture_;
-        drawQueue.Reset(graphics_);
-        shadowMapAllocator->BeginShadowMap(sm);
-        const auto& shadowBatches = sceneLight->GetShadowBatches(0);
-        auto shadowCamera = sceneLight->GetShadowCamera();
-        for (BaseSceneBatch batch : shadowBatches)
+        const unsigned numSplits = sceneLight->GetNumSplits();
+        for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
         {
-            auto geometry = batch.geometry_;
-            const SourceBatch& sourceBatch = batch.drawable_->GetBatches()[batch.sourceBatchIndex_];
-            batch.pipelineState_ = scenePipelineStateFactory.CreatePipelineState(
-                shadowCamera, batch.drawable_, batch.geometry_, batch.geometryType_, batch.material_, batch.pass_, nullptr);
-            drawQueue.SetPipelineState(batch.pipelineState_);
-            FillGlobalSharedParameters(drawQueue, frameInfo_, shadowCamera, zone, scene_);
-            SphericalHarmonicsDot9 sh;
-            if (batch.material_ != currentMaterial)
+            const SceneLightShadowSplit& split = sceneLight->GetSplit(splitIndex);
+            const auto& shadowBatches = sceneLight->GetShadowBatches(splitIndex);
+
+            drawQueue.Reset(graphics_);
+            shadowMapAllocator->BeginShadowMap(split.shadowMap_);
+
+            for (BaseSceneBatch batch : shadowBatches)
             {
-                if (drawQueue.BeginShaderParameterGroup(SP_MATERIAL, true))
+                auto geometry = batch.geometry_;
+                const SourceBatch& sourceBatch = batch.drawable_->GetBatches()[batch.sourceBatchIndex_];
+                batch.pipelineState_ = scenePipelineStateFactory.CreatePipelineState(
+                    split.shadowCamera_, batch.drawable_, batch.geometry_, batch.geometryType_, batch.material_, batch.pass_, nullptr);
+                drawQueue.SetPipelineState(batch.pipelineState_);
+                FillGlobalSharedParameters(drawQueue, frameInfo_, split.shadowCamera_, zone, scene_);
+                SphericalHarmonicsDot9 sh;
+                if (batch.material_ != currentMaterial)
                 {
-                currentMaterial = batch.material_;
-                const auto& parameters = batch.material_->GetShaderParameters();
-                for (const auto& item : parameters)
-                    drawQueue.AddShaderParameter(item.first, item.second.value_);
-                drawQueue.CommitShaderParameterGroup(SP_MATERIAL);
+                    if (drawQueue.BeginShaderParameterGroup(SP_MATERIAL, true))
+                    {
+                    currentMaterial = batch.material_;
+                    const auto& parameters = batch.material_->GetShaderParameters();
+                    for (const auto& item : parameters)
+                        drawQueue.AddShaderParameter(item.first, item.second.value_);
+                    drawQueue.CommitShaderParameterGroup(SP_MATERIAL);
+                    }
+
+                    const auto& textures = batch.material_->GetTextures();
+                    for (const auto& item : textures)
+                        drawQueue.AddShaderResource(item.first, item.second);
+                    drawQueue.CommitShaderResources();
                 }
 
-                const auto& textures = batch.material_->GetTextures();
-                for (const auto& item : textures)
-                    drawQueue.AddShaderResource(item.first, item.second);
-                drawQueue.CommitShaderResources();
+                if (drawQueue.BeginShaderParameterGroup(SP_OBJECT, true))
+                {
+                drawQueue.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
+                drawQueue.CommitShaderParameterGroup(SP_OBJECT);
+                }
+
+                drawQueue.SetBuffers(sourceBatch.geometry_->GetVertexBuffers(), sourceBatch.geometry_->GetIndexBuffer());
+
+                drawQueue.DrawIndexed(sourceBatch.geometry_->GetIndexStart(), sourceBatch.geometry_->GetIndexCount());
             }
-
-            if (drawQueue.BeginShaderParameterGroup(SP_OBJECT, true))
-            {
-            drawQueue.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
-            drawQueue.CommitShaderParameterGroup(SP_OBJECT);
-            }
-
-            drawQueue.SetBuffers(sourceBatch.geometry_->GetVertexBuffers(), sourceBatch.geometry_->GetIndexBuffer());
-
-            drawQueue.DrawIndexed(sourceBatch.geometry_->GetIndexStart(), sourceBatch.geometry_->GetIndexCount());
+            drawQueue.Execute(graphics_);
         }
-        drawQueue.Execute(graphics_);
     }
 
     graphics_->SetRenderTarget(0, renderTarget_);
     graphics_->SetDepthStencil((RenderSurface*)nullptr);
-    graphics_->SetViewport(viewport_->GetRect() == IntRect::ZERO ? graphics_->GetViewport() : viewport_->GetRect());
+    const IntVector2 rtSizeNow = graphics_->GetRenderTargetDimensions();
+    const IntRect viewport = viewport_->GetRect() != IntRect::ZERO ? viewport_->GetRect() : IntRect(0, 0, rtSizeNow.x_, rtSizeNow.y_);
+    graphics_->SetViewport(viewport);
     graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, Color::RED * 0.5f);
 
     drawQueue.Reset(graphics_);
@@ -465,13 +467,11 @@ void CustomView::Render()
     currentMaterial = nullptr;
     first = true;
 
-
-    unsigned mainLightIndex = sceneBatchCollector.GetMainLightIndex();
-    Light* mainLight = sceneBatchCollector.GetMainLight();
+    SceneLight* mainLight = sceneBatchCollector.GetMainLight();
+    const SceneLightShaderParameters& mainLightParams = mainLight->GetShaderParams();
     for (const BaseSceneBatchSortedByState& sortedBatch : baseBatches)
     {
-        auto shadowMap = shadowMaps[mainLightIndex];
-        auto shadowCamera = visibleLights[mainLightIndex]->GetShadowCamera();
+        auto shadowMap = mainLight->GetShadowMap().texture_;
 
         const BaseSceneBatch& batch = *sortedBatch.sceneBatch_;
         auto geometry = batch.geometry_;
@@ -515,126 +515,48 @@ void CustomView::Render()
 
         if (drawQueue.BeginShaderParameterGroup(SP_LIGHT, true))
         {
-            Light* light = mainLight;
             const auto batchVertexLights = sceneBatchCollector.GetVertexLights(batch.drawableIndex_);
             first = false;
-        Node* lightNode = light->GetNode();
-        float atten = 1.0f / Max(light->GetRange(), M_EPSILON);
-        Vector3 lightDir(lightNode->GetWorldRotation() * Vector3::BACK);
-        Vector4 lightPos(lightNode->GetWorldPosition(), atten);
 
-        drawQueue.AddShaderParameter(VSP_LIGHTDIR, lightDir);
-        drawQueue.AddShaderParameter(VSP_LIGHTPOS, lightPos);
+            drawQueue.AddShaderParameter(VSP_LIGHTDIR, mainLightParams.direction_);
+            drawQueue.AddShaderParameter(VSP_LIGHTPOS, Vector4{ mainLightParams.position_, mainLightParams.invRange_ });
+            drawQueue.AddShaderParameter(PSP_LIGHTCOLOR, Vector4{ mainLightParams.color_, mainLightParams.specularIntensity_ });
 
-        float fade = 1.0f;
-        float fadeEnd = light->GetDrawDistance();
-        float fadeStart = light->GetFadeDistance();
+            drawQueue.AddShaderParameter(PSP_LIGHTDIR, mainLightParams.direction_);
+            drawQueue.AddShaderParameter(PSP_LIGHTPOS, Vector4{ mainLightParams.position_, mainLightParams.invRange_ });
+            drawQueue.AddShaderParameter(PSP_LIGHTRAD, mainLightParams.radius_);
+            drawQueue.AddShaderParameter(PSP_LIGHTLENGTH, mainLightParams.length_);
 
-        // Do fade calculation for light if both fade & draw distance defined
-        if (light->GetLightType() != LIGHT_DIRECTIONAL && fadeEnd > 0.0f && fadeStart > 0.0f && fadeStart < fadeEnd)
-            fade = Min(1.0f - (light->GetDistance() - fadeStart) / (fadeEnd - fadeStart), 1.0f);
-
-        // Negative lights will use subtract blending, so write absolute RGB values to the shader parameter
-        drawQueue.AddShaderParameter(PSP_LIGHTCOLOR, Color(light->GetEffectiveColor().Abs(),
-            light->GetEffectiveSpecularIntensity()) * fade);
-        drawQueue.AddShaderParameter(PSP_LIGHTDIR, lightDir);
-        drawQueue.AddShaderParameter(PSP_LIGHTPOS, lightPos);
-        drawQueue.AddShaderParameter(PSP_LIGHTRAD, light->GetRadius());
-        drawQueue.AddShaderParameter(PSP_LIGHTLENGTH, light->GetLength());
-
-        Vector4 vertexLights[MAX_VERTEX_LIGHTS * 3]{};
-        for (unsigned i = 0; i < batchVertexLights.size(); ++i)
-        {
-            Light* vertexLight = batchVertexLights[i];
-            if (!vertexLight)
-                continue;
-            Node* vertexLightNode = vertexLight->GetNode();
-            LightType type = vertexLight->GetLightType();
-
-            // Attenuation
-            float invRange, cutoff, invCutoff;
-            if (type == LIGHT_DIRECTIONAL)
-                invRange = 0.0f;
-            else
-                invRange = 1.0f / Max(vertexLight->GetRange(), M_EPSILON);
-            if (type == LIGHT_SPOT)
+            Vector4 vertexLights[MAX_VERTEX_LIGHTS * 3]{};
+            for (unsigned i = 0; i < batchVertexLights.size(); ++i)
             {
-                cutoff = Cos(vertexLight->GetFov() * 0.5f);
-                invCutoff = 1.0f / (1.0f - cutoff);
+                SceneLight* vertexLight = batchVertexLights[i];
+                if (!vertexLight)
+                    continue;
+
+                const SceneLightShaderParameters& vertexLightParams = vertexLight->GetShaderParams();
+                vertexLights[i * 3] = { vertexLightParams.color_, vertexLightParams.invRange_ };
+                vertexLights[i * 3 + 1] = { vertexLightParams.direction_, vertexLightParams.cutoff_ };
+                vertexLights[i * 3 + 2] = { vertexLightParams.position_, vertexLightParams.invCutoff_ };
             }
-            else
+            drawQueue.AddShaderParameter(VSP_VERTEXLIGHTS, ea::span<const Vector4>{ vertexLights });
+
+            if (shadowMap)
             {
-                cutoff = -2.0f;
-                invCutoff = 1.0f;
+                ea::span<const Matrix4> shadowMatricesSpan = mainLightParams.shadowMatrices_;
+                drawQueue.AddShaderParameter(VSP_LIGHTMATRICES, shadowMatricesSpan);
+                drawQueue.AddShaderParameter(PSP_LIGHTMATRICES, shadowMatricesSpan);
+                drawQueue.AddShaderParameter(PSP_SHADOWDEPTHFADE, mainLightParams.shadowDepthFade_);
+                drawQueue.AddShaderParameter(PSP_SHADOWINTENSITY, mainLightParams.shadowIntensity_);
+                drawQueue.AddShaderParameter(PSP_SHADOWMAPINVSIZE, mainLightParams.shadowMapInvSize_);
+                drawQueue.AddShaderParameter(PSP_SHADOWSPLITS, mainLightParams.shadowSplits_);
+                drawQueue.AddShaderParameter(PSP_SHADOWCUBEADJUST, mainLightParams.shadowCubeAdjust_);
+                drawQueue.AddShaderParameter(VSP_NORMALOFFSETSCALE, mainLightParams.normalOffsetScale_);
+                drawQueue.AddShaderParameter(PSP_NORMALOFFSETSCALE, mainLightParams.normalOffsetScale_);
+                drawQueue.AddShaderParameter(PSP_VSMSHADOWPARAMS, renderer->GetVSMShadowParameters());
             }
 
-            // Color
-            float fade = 1.0f;
-            float fadeEnd = vertexLight->GetDrawDistance();
-            float fadeStart = vertexLight->GetFadeDistance();
-
-            // Do fade calculation for light if both fade & draw distance defined
-            if (vertexLight->GetLightType() != LIGHT_DIRECTIONAL && fadeEnd > 0.0f && fadeStart > 0.0f && fadeStart < fadeEnd)
-                fade = Min(1.0f - (vertexLight->GetDistance() - fadeStart) / (fadeEnd - fadeStart), 1.0f);
-
-            Color color = vertexLight->GetEffectiveColor() * fade;
-            vertexLights[i * 3] = Vector4(color.r_, color.g_, color.b_, invRange);
-
-            // Direction
-            vertexLights[i * 3 + 1] = Vector4(-(vertexLightNode->GetWorldDirection()), cutoff);
-
-            // Position
-            vertexLights[i * 3 + 2] = Vector4(vertexLightNode->GetWorldPosition(), invCutoff);
-        }
-
-        drawQueue.AddShaderParameter(VSP_VERTEXLIGHTS, ea::span<const Vector4>{ vertexLights });
-
-        if (shadowMap)
-        {
-            const Matrix3x4& shadowView(shadowCamera->GetView());
-            Matrix4 shadowProj(shadowCamera->GetGPUProjection());
-            Matrix4 texAdjust(Matrix4::IDENTITY);
-
-            auto width = (float)shadowMap->GetWidth();
-            auto height = (float)shadowMap->GetHeight();
-
-            Vector3 offset;
-            Vector3 scale(
-                0.5f ,
-                0.5f ,
-                1.0f
-            );
-
-            // Add pixel-perfect offset if needed by the graphics API
-            const Vector2& pixelUVOffset = Graphics::GetPixelUVOffset();
-            offset.x_ += scale.x_ + pixelUVOffset.x_ / width;
-            offset.y_ += scale.y_ + pixelUVOffset.y_ / height;
-
-        #ifdef URHO3D_OPENGL
-            offset.z_ = 0.5f;
-            scale.z_ = 0.5f;
-            offset.y_ = 1.0f - offset.y_;
-        #else
-            scale.y_ = -scale.y_;
-        #endif
-            texAdjust.SetTranslation(offset);
-            texAdjust.SetScale(scale);
-
-            Matrix4 shadowMatrices[4] = { texAdjust * shadowProj * shadowView };
-            shadowMatrices[1] = shadowMatrices[2] = shadowMatrices[3] = shadowMatrices[0];
-            ea::span<const Matrix4> shadowMatricesSpan = shadowMatrices;
-            drawQueue.AddShaderParameter(VSP_LIGHTMATRICES, shadowMatricesSpan);
-            drawQueue.AddShaderParameter(PSP_LIGHTMATRICES, shadowMatricesSpan);
-            drawQueue.AddShaderParameter(PSP_SHADOWDEPTHFADE, Vector4(1.0f, 0.0f, 0.5f, 7.0f));
-            drawQueue.AddShaderParameter(PSP_SHADOWINTENSITY, Vector4(1.0f, 0.0f, 0.0f, 0.0f));
-            float sizeX = 1.0f / (float)shadowMap->GetWidth();
-            float sizeY = 1.0f / (float)shadowMap->GetHeight();
-            drawQueue.AddShaderParameter(PSP_SHADOWMAPINVSIZE, Vector2(sizeX, sizeY));
-            Vector4 lightSplits(M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE);
-            drawQueue.AddShaderParameter(PSP_SHADOWSPLITS, lightSplits);
-        }
-
-        drawQueue.CommitShaderParameterGroup(SP_LIGHT);
+            drawQueue.CommitShaderParameterGroup(SP_LIGHT);
         }
 
         drawQueue.SetBuffers(sourceBatch.geometry_->GetVertexBuffers(), sourceBatch.geometry_->GetIndexBuffer());
@@ -644,8 +566,8 @@ void CustomView::Render()
 
     for (const LightBatchSortedByState& sortedBatch : lightBatches)
     {
-        auto shadowMap = shadowMaps[sortedBatch.lightIndex_];
-        auto shadowCamera = visibleLights[sortedBatch.lightIndex_]->GetShadowCamera();
+        //auto shadowMap = shadowMaps[sortedBatch.lightIndex_];
+        //auto shadowCamera = visibleLights[sortedBatch.lightIndex_]->GetShadowCamera();
         const SceneLight* sceneLight = sceneBatchCollector.GetVisibleLight(sortedBatch.lightIndex_);
         Light* light = sceneLight->GetLight();
         const BaseSceneBatch& batch = *sortedBatch.sceneBatch_;
@@ -669,8 +591,8 @@ void CustomView::Render()
             for (const auto& item : textures)
                 drawQueue.AddShaderResource(item.first, item.second);
             drawQueue.AddShaderResource(TU_LIGHTRAMP, renderer->GetDefaultLightRamp());
-            if (shadowMap)
-                drawQueue.AddShaderResource(TU_SHADOWMAP, shadowMap);
+            //if (shadowMap)
+            //    drawQueue.AddShaderResource(TU_SHADOWMAP, shadowMap);
             drawQueue.CommitShaderResources();
         }
 
@@ -714,14 +636,14 @@ void CustomView::Render()
         drawQueue.AddShaderParameter(PSP_LIGHTRAD, light->GetRadius());
         drawQueue.AddShaderParameter(PSP_LIGHTLENGTH, light->GetLength());
 
-        if (shadowMap)
+        /*if (shadowMap)
         {
             const Matrix3x4& shadowView(shadowCamera->GetView());
             Matrix4 shadowProj(shadowCamera->GetGPUProjection());
             Matrix4 shadowMatrices = shadowProj * shadowView;
             drawQueue.AddShaderParameter(VSP_LIGHTMATRICES, shadowMatrices);
             drawQueue.AddShaderParameter(PSP_LIGHTMATRICES, shadowMatrices);
-        }
+        }*/
 
         drawQueue.CommitShaderParameterGroup(SP_LIGHT);
         }

@@ -322,12 +322,12 @@ const ThreadedVector<LightSceneBatch>& SceneBatchCollector::GetLightBatches(cons
     return *baseBatchesIter->second;
 }
 
-ea::array<Light*, SceneBatchCollector::MaxVertexLights> SceneBatchCollector::GetVertexLights(unsigned drawableIndex) const
+ea::array<SceneLight*, SceneBatchCollector::MaxVertexLights> SceneBatchCollector::GetVertexLights(unsigned drawableIndex) const
 {
     const auto indices = GetVertexLightIndices(drawableIndex);
-    ea::array<Light*, MaxVertexLights> lights;
+    ea::array<SceneLight*, MaxVertexLights> lights;
     for (unsigned i = 0; i < MaxVertexLights; ++i)
-        lights[i] = indices[i] != M_MAX_UNSIGNED ? visibleLights_[indices[i]]->GetLight() : nullptr;
+        lights[i] = indices[i] != M_MAX_UNSIGNED ? visibleLights_[indices[i]] : nullptr;
     return lights;
 }
 
@@ -559,11 +559,12 @@ void SceneBatchCollector::ProcessVisibleLights()
     for (SceneLight* sceneLight : visibleLights_)
     {
         const IntVector2 shadowMapSize = sceneLight->GetShadowMapSize();
-        if (shadowMapSize == IntVector2::ZERO)
-            continue;
-
-        const ShadowMap shadowMap = callback_->GetTemporaryShadowMap(shadowMapSize);
-        sceneLight->SetShadowMap(shadowMap);
+        if (shadowMapSize != IntVector2::ZERO)
+        {
+            const ShadowMap shadowMap = callback_->GetTemporaryShadowMap(shadowMapSize);
+            sceneLight->SetShadowMap(shadowMap);
+        }
+        sceneLight->FinalizeShaderParameters(camera_, 0.0f);
     }
 
     // Update batches for shadow casters

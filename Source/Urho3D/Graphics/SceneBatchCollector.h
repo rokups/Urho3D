@@ -119,7 +119,7 @@ public:
     /// Return main light index.
     unsigned GetMainLightIndex() const { return mainLightIndex_; }
     /// Return main light.
-    Light* GetMainLight() const { return mainLightIndex_ != M_MAX_UNSIGNED ? visibleLights_[mainLightIndex_]->GetLight() : nullptr; }
+    SceneLight* GetMainLight() const { return mainLightIndex_ != M_MAX_UNSIGNED ? visibleLights_[mainLightIndex_] : nullptr; }
     /// Return visible light by index.
     const SceneLight* GetVisibleLight(unsigned i) const { return visibleLights_[i]; }
     /// Return all visible lights.
@@ -136,7 +136,7 @@ public:
     /// Return vertex lights for drawable (as indices in the array of visible lights).
     VertexLightCollection GetVertexLightIndices(unsigned drawableIndex) const { return drawableLighting_[drawableIndex].GetVertexLights(); }
     /// Return vertex lights for drawable (as pointers).
-    ea::array<Light*, MaxVertexLights> GetVertexLights(unsigned drawableIndex) const;
+    ea::array<SceneLight*, MaxVertexLights> GetVertexLights(unsigned drawableIndex) const;
 
 private:
     /// Batch of drawable in scene.

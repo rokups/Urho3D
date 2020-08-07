@@ -37,14 +37,14 @@ namespace Urho3D
 {
 
 /// Scene light shadow parameters.
-struct SceneLightShadowParameters
+struct SceneLightShaderParameters
 {
     /// Light direction.
     Vector3 direction_;
     /// Light position.
     Vector3 position_;
     /// Inverse range.
-    float inverseRange_{};
+    float invRange_{};
 
     /// Shadow matrices for each split.
     Matrix4 shadowMatrices_[MAX_CASCADE_SPLITS];
@@ -71,8 +71,6 @@ struct SceneLightShadowParameters
     Vector2 shadowMapInvSize_;
     /// Shadow splits distances.
     Vector4 shadowSplits_;
-    /// VSM shadow parameters.
-    Vector2 vsmParams_;
     /// Normal offset and scale.
     Vector4 normalOffsetScale_;
 
@@ -121,7 +119,9 @@ struct SceneLightShadowSplit
     /// Quantize a directional light shadow camera view to eliminate swimming.
     void QuantizeDirLightShadowCamera(const FocusParameters& parameters, const BoundingBox& viewBox);
     /// Finalize shadow camera view after shadow casters and the shadow map are known.
-    void FinalizeShadowCamera();
+    void FinalizeShadowCamera(Light* light);
+    /// Calculate shadow matrix.
+    Matrix4 CalculateShadowMatrix(float subPixelOffset) const;
 };
 
 /// Per-viewport light data.
@@ -139,15 +139,21 @@ public:
     void FinalizeShadowMap();
     /// Set shadow map and finalize shader parameters.
     void SetShadowMap(const ShadowMap& shadowMap);
+    /// Finalize light and shadow shader parameters.
+    void FinalizeShaderParameters(Camera* cullCamera, float subPixelOffset);
 
     /// Return light.
     Light* GetLight() const { return light_; }
     /// Return shadow map size.
     IntVector2 GetShadowMapSize() const { return hasShadow_ ? shadowMapSize_ : IntVector2::ZERO; }
+    /// Return shadow map.
+    ShadowMap GetShadowMap() const { return shadowMap_; }
     /// Return number of splits.
     unsigned GetNumSplits() const { return numSplits_; }
     /// Return shadow split.
     const SceneLightShadowSplit& GetSplit(unsigned splitIndex) const { return splits_[splitIndex]; }
+    /// Return shader parameters.
+    const SceneLightShaderParameters& GetShaderParams() const { return shaderParams_; }
 
     /// Return lit geometries.
     const ea::vector<Drawable*>& GetLitGeometries() const { return litGeometries_; }
@@ -157,8 +163,6 @@ public:
     ea::vector<BaseSceneBatch>& GetMutableShadowBatches(unsigned splitIndex) { return splits_[splitIndex].shadowCasterBatches_; }
     /// Return shadow batches for given split.
     const ea::vector<BaseSceneBatch>& GetShadowBatches(unsigned splitIndex) const { return splits_[splitIndex].shadowCasterBatches_; }
-
-    Camera* GetShadowCamera() const { return splits_[0].shadowCamera_; }
 
 private:
     /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
@@ -201,8 +205,10 @@ private:
     /// Shadow map split count.
     unsigned numSplits_{};
 
+    /// Shadow map allocated to this light.
+    ShadowMap shadowMap_;
     /// Shader parameters.
-    SceneLightShadowParameters shaderParams_;
+    SceneLightShaderParameters shaderParams_;
 };
 
 }

@@ -189,6 +189,16 @@ public:
     unsigned lightMask_{};
 };
 
+/// Return current light fade.
+float GetLightFade(Light* light)
+{
+    const float fadeStart = light->GetFadeDistance();
+    const float fadeEnd = light->GetDrawDistance();
+    if (light->GetLightType() != LIGHT_DIRECTIONAL && fadeEnd > 0.0f && fadeStart > 0.0f && fadeStart < fadeEnd)
+        return ea::min(1.0f - (light->GetDistance() - fadeStart) / (fadeEnd - fadeStart), 1.0f);
+    return 1.0f;
+}
+
 }
 
 void SceneLightShadowSplit::SetupDirLightShadowCamera(Light* light, Camera* cullCamera,
@@ -303,10 +313,107 @@ void SceneLightShadowSplit::QuantizeDirLightShadowCamera(const FocusParameters& 
     }
 }
 
+void SceneLightShadowSplit::FinalizeShadowCamera(Light* light)
+{
+    const FocusParameters& parameters = light->GetShadowFocus();
+    const auto shadowMapWidth = static_cast<float>(shadowMap_.region_.Width());
+    const LightType type = light->GetLightType();
+
+    if (type == LIGHT_DIRECTIONAL)
+    {
+        BoundingBox shadowBox;
+        shadowBox.max_.y_ = shadowCamera_->GetOrthoSize() * 0.5f;
+        shadowBox.max_.x_ = shadowCamera_->GetAspectRatio() * shadowBox.max_.y_;
+        shadowBox.min_.y_ = -shadowBox.max_.y_;
+        shadowBox.min_.x_ = -shadowBox.max_.x_;
+
+        // Requantize and snap to shadow map texels
+        QuantizeDirLightShadowCamera(parameters, shadowBox);
+    }
+
+    if (type == LIGHT_SPOT && parameters.focus_)
+    {
+        const float viewSizeX = Max(Abs(shadowCasterBox_.min_.x_), Abs(shadowCasterBox_.max_.x_));
+        const float viewSizeY = Max(Abs(shadowCasterBox_.min_.y_), Abs(shadowCasterBox_.max_.y_));
+        float viewSize = Max(viewSizeX, viewSizeY);
+        // Scale the quantization parameters, because view size is in projection space (-1.0 - 1.0)
+        const float invOrthoSize = 1.0f / shadowCamera_->GetOrthoSize();
+        const float quantize = parameters.quantize_ * invOrthoSize;
+        const float minView = parameters.minView_ * invOrthoSize;
+
+        viewSize = Max(ceilf(viewSize / quantize) * quantize, minView);
+        if (viewSize < 1.0f)
+            shadowCamera_->SetZoom(1.0f / viewSize);
+    }
+
+    // Perform a finalization step for all lights: ensure zoom out of 2 pixels to eliminate border filtering issues
+    // For point lights use 4 pixels, as they must not cross sides of the virtual cube map (maximum 3x3 PCF)
+    if (shadowCamera_->GetZoom() >= 1.0f)
+    {
+        if (light->GetLightType() != LIGHT_POINT)
+            shadowCamera_->SetZoom(shadowCamera_->GetZoom() * ((shadowMapWidth - 2.0f) / shadowMapWidth));
+        else
+        {
+#ifdef URHO3D_OPENGL
+            shadowCamera_->SetZoom(shadowCamera_->GetZoom() * ((shadowMapWidth - 3.0f) / shadowMapWidth));
+#else
+            shadowCamera_->SetZoom(shadowCamera_->GetZoom() * ((shadowMapWidth - 4.0f) / shadowMapWidth));
+#endif
+        }
+    }
+}
+
+Matrix4 SceneLightShadowSplit::CalculateShadowMatrix(float subPixelOffset) const
+{
+    if (!shadowMap_)
+        return Matrix4::IDENTITY;
+
+    const IntRect& viewport = shadowMap_.region_;
+    const Matrix3x4& shadowView = shadowCamera_->GetView();
+    const Matrix4 shadowProj = shadowCamera_->GetGPUProjection();
+    const IntVector2 textureSize = shadowMap_.texture_->GetSize();
+
+    Vector3 offset;
+    Vector3 scale;
+
+    // Apply viewport offset and scale
+    offset.x_ = static_cast<float>(viewport.left_) / textureSize.x_;
+    offset.y_ = static_cast<float>(viewport.top_) / textureSize.y_;
+    offset.z_ = 0.0f;
+    scale.x_ = 0.5f * static_cast<float>(viewport.Width()) / textureSize.x_;
+    scale.y_ = 0.5f * static_cast<float>(viewport.Height()) / textureSize.y_;
+    scale.z_ = 1.0f;
+
+    offset.x_ += scale.x_;
+    offset.y_ += scale.y_;
+
+    // Apply GAPI-specific transforms
+    assert(Graphics::GetPixelUVOffset() == Vector2::ZERO);
+#ifdef URHO3D_OPENGL
+    offset.z_ = 0.5f;
+    scale.z_ = 0.5f;
+    offset.y_ = 1.0f - offset.y_;
+#else
+    scale.y_ = -scale.y_;
+#endif
+
+    // Apply sub-pixel offset if necessary
+    offset.x_ -= subPixelOffset / textureSize.x_;
+    offset.y_ -= subPixelOffset / textureSize.y_;
+
+    // Make final matrix
+    Matrix4 texAdjust(Matrix4::IDENTITY);
+    texAdjust.SetTranslation(offset);
+    texAdjust.SetScale(scale);
+
+    return texAdjust * shadowProj * shadowView;
+}
+
 void SceneLight::BeginFrame(bool hasShadow)
 {
     litGeometries_.clear();
     tempShadowCasters_.clear();
+    shadowMap_ = {};
     hasShadow_ = hasShadow;
     MarkPipelineStateHashDirty();
 }
@@ -369,7 +476,7 @@ void SceneLight::FinalizeShadowMap()
 
     // Evaluate split shadow map size
     // TODO(renderer): Implement me
-    shadowMapSplitSize_ = 1024;
+    shadowMapSplitSize_ = 512;
     shadowMapSize_ = IntVector2{ shadowMapSplitSize_, shadowMapSplitSize_ } * GetSplitsGridSize();
 }
 
@@ -383,8 +490,181 @@ void SceneLight::SetShadowMap(const ShadowMap& shadowMap)
     }
 
     // Initialize shadow map for all splits
+    shadowMap_ = shadowMap;
     for (unsigned splitIndex = 0; splitIndex < numSplits_; ++splitIndex)
-        splits_[splitIndex].shadowMap_ = shadowMap.GetSplit(splitIndex, GetSplitsGridSize());
+    {
+        SceneLightShadowSplit& split = splits_[splitIndex];
+        split.shadowMap_ = shadowMap.GetSplit(splitIndex, GetSplitsGridSize());
+        split.FinalizeShadowCamera(light_);
+    }
+}
+
+void SceneLight::FinalizeShaderParameters(Camera* cullCamera, float subPixelOffset)
+{
+    Node* lightNode = light_->GetNode();
+    const LightType lightType = light_->GetLightType();
+
+    // Setup common shader parameters
+    shaderParams_.position_ = lightNode->GetWorldPosition();
+    shaderParams_.direction_ = lightNode->GetWorldRotation() * Vector3::BACK;
+    shaderParams_.invRange_ = lightType == LIGHT_DIRECTIONAL ? 0.0f : 1.0f / Max(light_->GetRange(), M_EPSILON);
+    shaderParams_.radius_ = light_->GetRadius();
+    shaderParams_.length_ = light_->GetLength();
+
+    // Negative lights will use subtract blending, so use absolute RGB values
+    const float fade = GetLightFade(light_);
+    shaderParams_.color_ = fade * light_->GetEffectiveColor().Abs().ToVector3();
+    shaderParams_.specularIntensity_ = fade * light_->GetEffectiveSpecularIntensity();
+
+    // Setup vertex light parameters
+    if (lightType == LIGHT_SPOT)
+    {
+        shaderParams_.cutoff_ = Cos(light_->GetFov() * 0.5f);
+        shaderParams_.invCutoff_ = 1.0f / (1.0f - shaderParams_.cutoff_);
+    }
+    else
+    {
+        shaderParams_.cutoff_ = -2.0f;
+        shaderParams_.invCutoff_ = 1.0f;
+    }
+
+    // Skip the rest if no shadow
+    if (!shadowMap_)
+        return;
+
+    switch (lightType)
+    {
+    case LIGHT_DIRECTIONAL:
+        for (unsigned splitIndex = 0; splitIndex < numSplits_; ++splitIndex)
+            shaderParams_.shadowMatrices_[splitIndex] = splits_[splitIndex].CalculateShadowMatrix(subPixelOffset);
+        break;
+
+    case LIGHT_SPOT:
+        // TODO(renderer): Implement me
+        assert(0);
+        /*CalculateSpotMatrix(shadowMatrices[0], light);
+        bool isShadowed = shadowMap && graphics->HasTextureUnit(TU_SHADOWMAP);
+        if (isShadowed)
+            CalculateShadowMatrix(shadowMatrices[1], lightQueue_, 0, renderer);*/
+        break;
+
+    case LIGHT_POINT:
+        // TODO(renderer): Implement me
+        assert(0);
+        /*Matrix4 lightVecRot(lightNode->GetWorldRotation().RotationMatrix());
+        // HLSL compiler will pack the parameters as if the matrix is only 3x4, so must be careful to not overwrite
+        // the next parameter
+#ifdef URHO3D_OPENGL
+        graphics->SetShaderParameter(VSP_LIGHTMATRICES, lightVecRot.Data(), 16);
+#else
+        graphics->SetShaderParameter(VSP_LIGHTMATRICES, lightVecRot.Data(), 12);
+#endif*/
+        break;
+
+    default:
+        break;
+    }
+
+    // TODO(renderer): Implement me
+    shaderParams_.shadowCubeAdjust_ = Vector4::ZERO;
+    /*// Calculate point light shadow sampling offsets (unrolled cube map)
+    auto faceWidth = (unsigned)(shadowMap->GetWidth() / 2);
+    auto faceHeight = (unsigned)(shadowMap->GetHeight() / 3);
+    auto width = (float)shadowMap->GetWidth();
+    auto height = (float)shadowMap->GetHeight();
+#ifdef URHO3D_OPENGL
+    float mulX = (float)(faceWidth - 3) / width;
+    float mulY = (float)(faceHeight - 3) / height;
+    float addX = 1.5f / width;
+    float addY = 1.5f / height;
+#else
+    float mulX = (float)(faceWidth - 4) / width;
+    float mulY = (float)(faceHeight - 4) / height;
+    float addX = 2.5f / width;
+    float addY = 2.5f / height;
+#endif
+    // If using 4 shadow samples, offset the position diagonally by half pixel
+    if (renderer->GetShadowQuality() == SHADOWQUALITY_PCF_16BIT || renderer->GetShadowQuality() == SHADOWQUALITY_PCF_24BIT)
+    {
+        addX -= 0.5f / width;
+        addY -= 0.5f / height;
+    }
+    graphics->SetShaderParameter(PSP_SHADOWCUBEADJUST, Vector4(mulX, mulY, addX, addY));*/
+
+    {
+        // Calculate shadow camera depth parameters for point light shadows and shadow fade parameters for
+        //  directional light shadows, stored in the same uniform
+        Camera* shadowCamera = splits_[0].shadowCamera_;
+        const float nearClip = shadowCamera->GetNearClip();
+        const float farClip = shadowCamera->GetFarClip();
+        const float q = farClip / (farClip - nearClip);
+        const float r = -q * nearClip;
+
+        const CascadeParameters& parameters = light_->GetShadowCascade();
+        const float viewFarClip = cullCamera->GetFarClip();
+        const float shadowRange = parameters.GetShadowRange();
+        const float fadeStart = parameters.fadeStart_ * shadowRange / viewFarClip;
+        const float fadeEnd = shadowRange / viewFarClip;
+        const float fadeRange = fadeEnd - fadeStart;
+
+        shaderParams_.shadowDepthFade_ = { q, r, fadeStart, 1.0f / fadeRange };
+    }
+
+    {
+        float intensity = light_->GetShadowIntensity();
+        const float fadeStart = light_->GetShadowFadeDistance();
+        const float fadeEnd = light_->GetShadowDistance();
+        if (fadeStart > 0.0f && fadeEnd > 0.0f && fadeEnd > fadeStart)
+            intensity =
+                Lerp(intensity, 1.0f, Clamp((light_->GetDistance() - fadeStart) / (fadeEnd - fadeStart), 0.0f, 1.0f));
+        const float pcfValues = (1.0f - intensity);
+        float samples = 1.0f;
+        // TODO(renderer): Support me
+        //if (renderer->GetShadowQuality() == SHADOWQUALITY_PCF_16BIT || renderer->GetShadowQuality() == SHADOWQUALITY_PCF_24BIT)
+        //    samples = 4.0f;
+        shaderParams_.shadowIntensity_ = { pcfValues / samples, intensity, 0.0f, 0.0f };
+    }
+
+    const float sizeX = 1.0f / static_cast<float>(shadowMap_.texture_->GetWidth());
+    const float sizeY = 1.0f / static_cast<float>(shadowMap_.texture_->GetHeight());
+    shaderParams_.shadowMapInvSize_ = { sizeX, sizeY };
+
+    shaderParams_.shadowSplits_ = { M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE };
+    if (numSplits_ > 1)
+        shaderParams_.shadowSplits_.x_ = splits_[0].zRange_.second / cullCamera->GetFarClip();
+    if (numSplits_ > 2)
+        shaderParams_.shadowSplits_.y_ = splits_[1].zRange_.second / cullCamera->GetFarClip();
+    if (numSplits_ > 3)
+        shaderParams_.shadowSplits_.z_ = splits_[2].zRange_.second / cullCamera->GetFarClip();
+
+    // TODO(renderer): Implement me
+    shaderParams_.normalOffsetScale_ = Vector4::ZERO;
+    /*if (light->GetShadowBias().normalOffset_ > 0.0f)
+    {
+        Vector4 normalOffsetScale(Vector4::ZERO);
+
+        // Scale normal offset strength with the width of the shadow camera view
+        if (light->GetLightType() != LIGHT_DIRECTIONAL)
+        {
+            Camera* shadowCamera = lightQueue_->shadowSplits_[0].shadowCamera_;
+            normalOffsetScale.x_ = 2.0f * tanf(shadowCamera->GetFov() * M_DEGTORAD * 0.5f) * shadowCamera->GetFarClip();
+        }
+        else
+        {
+            normalOffsetScale.x_ = lightQueue_->shadowSplits_[0].shadowCamera_->GetOrthoSize();
+            if (lightQueue_->shadowSplits_.size() > 1)
+                normalOffsetScale.y_ = lightQueue_->shadowSplits_[1].shadowCamera_->GetOrthoSize();
+            if (lightQueue_->shadowSplits_.size() > 2)
+                normalOffsetScale.z_ = lightQueue_->shadowSplits_[2].shadowCamera_->GetOrthoSize();
+            if (lightQueue_->shadowSplits_.size() > 3)
+                normalOffsetScale.w_ = lightQueue_->shadowSplits_[3].shadowCamera_->GetOrthoSize();
+        }
+
+        normalOffsetScale *= light->GetShadowBias().normalOffset_;
+#ifdef GL_ES_VERSION_2_0
+        normalOffsetScale *= renderer->GetMobileNormalOffsetMul();
+#endif
+    }*/
 }
 
 unsigned SceneLight::RecalculatePipelineStateHash() const
