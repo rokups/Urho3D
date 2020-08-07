@@ -191,6 +191,118 @@ public:
 
 }
 
+void SceneLightShadowSplit::SetupDirLightShadowCamera(Light* light, Camera* cullCamera,
+    const ea::vector<Drawable*>& litGeometries,
+    const DrawableZRange& sceneZRange, const ea::vector<DrawableZRange>& drawableZRanges)
+{
+    Node* shadowCameraNode = shadowCamera_->GetNode();
+    Node* lightNode = light->GetNode();
+    float extrusionDistance = Min(cullCamera->GetFarClip(), light->GetShadowMaxExtrusion());
+    const FocusParameters& parameters = light->GetShadowFocus();
+
+    // Calculate initial position & rotation
+    Vector3 pos = cullCamera->GetNode()->GetWorldPosition() - extrusionDistance * lightNode->GetWorldDirection();
+    shadowCameraNode->SetTransform(pos, lightNode->GetWorldRotation());
+
+    // Use the scene Z bounds to limit frustum size if applicable
+    const DrawableZRange splitZRange = parameters.focus_ ? sceneZRange & zRange_ : zRange_;
+
+    // Calculate main camera shadowed frustum in light's view space
+    Frustum splitFrustum = cullCamera->GetSplitFrustum(splitZRange.first, splitZRange.second);
+    Polyhedron frustumVolume;
+    frustumVolume.Define(splitFrustum);
+    // If focusing enabled, clip the frustum volume by the combined bounding box of the lit geometries within the frustum
+    if (parameters.focus_)
+    {
+        BoundingBox litGeometriesBox;
+        unsigned lightMask = light->GetLightMaskEffective();
+
+        for (Drawable* drawable : litGeometries)
+        {
+            const DrawableZRange& drawableZRange = drawableZRanges[drawable->GetDrawableIndex()];
+            if (drawableZRange.Interset(splitZRange))
+                litGeometriesBox.Merge(drawable->GetWorldBoundingBox());
+        }
+
+        if (litGeometriesBox.Defined())
+        {
+            frustumVolume.Clip(litGeometriesBox);
+            // If volume became empty, restore it to avoid zero size
+            if (frustumVolume.Empty())
+                frustumVolume.Define(splitFrustum);
+        }
+    }
+
+    // Transform frustum volume to light space
+    const Matrix3x4& lightView = shadowCamera_->GetView();
+    frustumVolume.Transform(lightView);
+
+    // Fit the frustum volume inside a bounding box. If uniform size, use a sphere instead
+    BoundingBox shadowBox;
+    if (!parameters.nonUniform_)
+        shadowBox.Define(Sphere(frustumVolume));
+    else
+        shadowBox.Define(frustumVolume);
+
+    shadowCamera_->SetOrthographic(true);
+    shadowCamera_->SetAspectRatio(1.0f);
+    shadowCamera_->SetNearClip(0.0f);
+    shadowCamera_->SetFarClip(shadowBox.max_.z_);
+
+    // Center shadow camera on the bounding box. Can not snap to texels yet as the shadow map viewport is unknown
+    shadowMap_.region_ = IntRect::ZERO;
+    QuantizeDirLightShadowCamera(parameters, shadowBox);
+}
+
+void SceneLightShadowSplit::QuantizeDirLightShadowCamera(const FocusParameters& parameters, const BoundingBox& viewBox)
+{
+    Node* shadowCameraNode = shadowCamera_->GetNode();
+    const auto shadowMapWidth = static_cast<float>(shadowMap_.region_.Width());
+
+    const float minX = viewBox.min_.x_;
+    const float minY = viewBox.min_.y_;
+    const float maxX = viewBox.max_.x_;
+    const float maxY = viewBox.max_.y_;
+
+    const Vector2 center((minX + maxX) * 0.5f, (minY + maxY) * 0.5f);
+    Vector2 viewSize(maxX - minX, maxY - minY);
+
+    // Quantize size to reduce swimming
+    // Note: if size is uniform and there is no focusing, quantization is unnecessary
+    if (parameters.nonUniform_)
+    {
+        viewSize.x_ = ceilf(sqrtf(viewSize.x_ / parameters.quantize_));
+        viewSize.y_ = ceilf(sqrtf(viewSize.y_ / parameters.quantize_));
+        viewSize.x_ = Max(viewSize.x_ * viewSize.x_ * parameters.quantize_, parameters.minView_);
+        viewSize.y_ = Max(viewSize.y_ * viewSize.y_ * parameters.quantize_, parameters.minView_);
+    }
+    else if (parameters.focus_)
+    {
+        viewSize.x_ = Max(viewSize.x_, viewSize.y_);
+        viewSize.x_ = ceilf(sqrtf(viewSize.x_ / parameters.quantize_));
+        viewSize.x_ = Max(viewSize.x_ * viewSize.x_ * parameters.quantize_, parameters.minView_);
+        viewSize.y_ = viewSize.x_;
+    }
+
+    shadowCamera_->SetOrthoSize(viewSize);
+
+    // Center shadow camera to the view space bounding box
+    const Quaternion rot(shadowCameraNode->GetWorldRotation());
+    const Vector3 adjust(center.x_, center.y_, 0.0f);
+    shadowCameraNode->Translate(rot * adjust, TS_WORLD);
+
+    // If the shadow map viewport is known, snap to whole texels
+    if (shadowMapWidth > 0.0f)
+    {
+        const Vector3 viewPos(rot.Inverse() * shadowCameraNode->GetWorldPosition());
+        // Take into account that shadow map border will not be used
+        const float invActualSize = 1.0f / (shadowMapWidth - 2.0f);
+        const Vector2 texelSize(viewSize.x_ * invActualSize, viewSize.y_ * invActualSize);
+        const Vector3 snap(-fmodf(viewPos.x_, texelSize.x_), -fmodf(viewPos.y_, texelSize.y_), 0.0f);
+        shadowCameraNode->Translate(rot * snap, TS_WORLD);
+    }
+}
+
 void SceneLight::BeginFrame(bool hasShadow)
 {
     litGeometries_.clear();
@@ -227,9 +339,7 @@ void SceneLight::UpdateLitGeometriesAndShadowCasters(SceneLightProcessContext& c
             // For directional light check that the split is inside the visible scene: if not, can skip the split
             if (lightType == LIGHT_DIRECTIONAL)
             {
-                if (ctx.sceneZRange_.first > splits_[i].zFar_)
-                    continue;
-                if (ctx.sceneZRange_.second < splits_[i].zNear_)
+                if (!ctx.sceneZRange_.Interset(splits_[i].zRange_))
                     continue;
 
                 // Reuse lit geometry query for all except directional lights
@@ -242,6 +352,39 @@ void SceneLight::UpdateLitGeometriesAndShadowCasters(SceneLightProcessContext& c
             ProcessShadowCasters(ctx, tempShadowCasters_, i);
         }
     }
+}
+
+void SceneLight::FinalizeShadowMap()
+{
+    // Skip if doesn't have shadow or shadow casters
+    if (!hasShadow_)
+        return;
+
+    const auto hasShadowCaster = [](const SceneLightShadowSplit& split) { return !split.shadowCasters_.empty(); };
+    if (!ea::any_of(ea::begin(splits_), ea::begin(splits_) + numSplits_, hasShadowCaster))
+    {
+        hasShadow_ = false;
+        return;
+    }
+
+    // Evaluate split shadow map size
+    // TODO(renderer): Implement me
+    shadowMapSplitSize_ = 1024;
+    shadowMapSize_ = IntVector2{ shadowMapSplitSize_, shadowMapSplitSize_ } * GetSplitsGridSize();
+}
+
+void SceneLight::SetShadowMap(const ShadowMap& shadowMap)
+{
+    // If failed to allocate, reset shadows
+    if (!shadowMap.texture_)
+    {
+        numSplits_ = 0;
+        return;
+    }
+
+    // Initialize shadow map for all splits
+    for (unsigned splitIndex = 0; splitIndex < numSplits_; ++splitIndex)
+        splits_[splitIndex].shadowMap_ = shadowMap.GetSplit(splitIndex, GetSplitsGridSize());
 }
 
 unsigned SceneLight::RecalculatePipelineStateHash() const
@@ -328,9 +471,9 @@ void SceneLight::SetupShadowCameras(SceneLightProcessContext& ctx)
 
             // Setup the shadow camera for the split
             Camera* shadowCamera = GetOrCreateShadowCamera(i);
-            splits_[i].zNear_ = nearSplit;
-            splits_[i].zFar_ = farSplit;
-            SetupDirLightShadowCamera(ctx, shadowCamera, nearSplit, farSplit);
+            splits_[i].zRange_ = { nearSplit, farSplit };
+            splits_[i].SetupDirLightShadowCamera(light_, ctx.frameInfo_.camera_, litGeometries_,
+                ctx.sceneZRange_, ctx.drawableData_->zRange_);
 
             nearSplit = farSplit;
             ++numSplits_;
@@ -381,124 +524,6 @@ void SceneLight::SetupShadowCameras(SceneLightProcessContext& ctx)
         numSplits_ = MAX_CUBEMAP_FACES;
         break;
     }
-    }
-}
-
-void SceneLight::SetupDirLightShadowCamera(SceneLightProcessContext& ctx,
-    Camera* shadowCamera, float nearSplit, float farSplit)
-{
-    Node* shadowCameraNode = shadowCamera->GetNode();
-    Camera* cullCamera = ctx.frameInfo_.camera_;
-    Node* lightNode = light_->GetNode();
-    float extrusionDistance = Min(cullCamera->GetFarClip(), light_->GetShadowMaxExtrusion());
-    const FocusParameters& parameters = light_->GetShadowFocus();
-
-    // Calculate initial position & rotation
-    Vector3 pos = cullCamera->GetNode()->GetWorldPosition() - extrusionDistance * lightNode->GetWorldDirection();
-    shadowCameraNode->SetTransform(pos, lightNode->GetWorldRotation());
-
-    // Calculate main camera shadowed frustum in light's view space
-    farSplit = Min(farSplit, cullCamera->GetFarClip());
-    // Use the scene Z bounds to limit frustum size if applicable
-    if (parameters.focus_)
-    {
-        nearSplit = Max(ctx.sceneZRange_.first, nearSplit);
-        farSplit = Min(ctx.sceneZRange_.second, farSplit);
-    }
-
-    Frustum splitFrustum = cullCamera->GetSplitFrustum(nearSplit, farSplit);
-    Polyhedron frustumVolume;
-    frustumVolume.Define(splitFrustum);
-    // If focusing enabled, clip the frustum volume by the combined bounding box of the lit geometries within the frustum
-    if (parameters.focus_)
-    {
-        BoundingBox litGeometriesBox;
-        unsigned lightMask = light_->GetLightMaskEffective();
-
-        for (Drawable* drawable : litGeometries_)
-        {
-            const DrawableZRange& drawableZRange = ctx.drawableData_->zRange_[drawable->GetDrawableIndex()];
-            if (drawableZRange.first <= farSplit && drawableZRange.second >= nearSplit)
-                litGeometriesBox.Merge(drawable->GetWorldBoundingBox());
-        }
-
-        if (litGeometriesBox.Defined())
-        {
-            frustumVolume.Clip(litGeometriesBox);
-            // If volume became empty, restore it to avoid zero size
-            if (frustumVolume.Empty())
-                frustumVolume.Define(splitFrustum);
-        }
-    }
-
-    // Transform frustum volume to light space
-    const Matrix3x4& lightView = shadowCamera->GetView();
-    frustumVolume.Transform(lightView);
-
-    // Fit the frustum volume inside a bounding box. If uniform size, use a sphere instead
-    BoundingBox shadowBox;
-    if (!parameters.nonUniform_)
-        shadowBox.Define(Sphere(frustumVolume));
-    else
-        shadowBox.Define(frustumVolume);
-
-    shadowCamera->SetOrthographic(true);
-    shadowCamera->SetAspectRatio(1.0f);
-    shadowCamera->SetNearClip(0.0f);
-    shadowCamera->SetFarClip(shadowBox.max_.z_);
-
-    // Center shadow camera on the bounding box. Can not snap to texels yet as the shadow map viewport is unknown
-    QuantizeDirLightShadowCamera(ctx, shadowCamera, IntRect(0, 0, 0, 0), shadowBox);
-}
-
-void SceneLight::QuantizeDirLightShadowCamera(SceneLightProcessContext& ctx,
-    Camera* shadowCamera, const IntRect& shadowViewport, const BoundingBox& viewBox)
-{
-    Node* shadowCameraNode = shadowCamera->GetNode();
-    const FocusParameters& parameters = light_->GetShadowFocus();
-    auto shadowMapWidth = (float)(shadowViewport.Width());
-
-    float minX = viewBox.min_.x_;
-    float minY = viewBox.min_.y_;
-    float maxX = viewBox.max_.x_;
-    float maxY = viewBox.max_.y_;
-
-    Vector2 center((minX + maxX) * 0.5f, (minY + maxY) * 0.5f);
-    Vector2 viewSize(maxX - minX, maxY - minY);
-
-    // Quantize size to reduce swimming
-    // Note: if size is uniform and there is no focusing, quantization is unnecessary
-    if (parameters.nonUniform_)
-    {
-        viewSize.x_ = ceilf(sqrtf(viewSize.x_ / parameters.quantize_));
-        viewSize.y_ = ceilf(sqrtf(viewSize.y_ / parameters.quantize_));
-        viewSize.x_ = Max(viewSize.x_ * viewSize.x_ * parameters.quantize_, parameters.minView_);
-        viewSize.y_ = Max(viewSize.y_ * viewSize.y_ * parameters.quantize_, parameters.minView_);
-    }
-    else if (parameters.focus_)
-    {
-        viewSize.x_ = Max(viewSize.x_, viewSize.y_);
-        viewSize.x_ = ceilf(sqrtf(viewSize.x_ / parameters.quantize_));
-        viewSize.x_ = Max(viewSize.x_ * viewSize.x_ * parameters.quantize_, parameters.minView_);
-        viewSize.y_ = viewSize.x_;
-    }
-
-    shadowCamera->SetOrthoSize(viewSize);
-
-    // Center shadow camera to the view space bounding box
-    Quaternion rot(shadowCameraNode->GetWorldRotation());
-    Vector3 adjust(center.x_, center.y_, 0.0f);
-    shadowCameraNode->Translate(rot * adjust, TS_WORLD);
-
-    // If the shadow map viewport is known, snap to whole texels
-    if (shadowMapWidth > 0.0f)
-    {
-        Vector3 viewPos(rot.Inverse() * shadowCameraNode->GetWorldPosition());
-        // Take into account that shadow map border will not be used
-        float invActualSize = 1.0f / (shadowMapWidth - 2.0f);
-        Vector2 texelSize(viewSize.x_ * invActualSize, viewSize.y_ * invActualSize);
-        Vector3 snap(-fmodf(viewPos.x_, texelSize.x_), -fmodf(viewPos.y_, texelSize.y_), 0.0f);
-        shadowCameraNode->Translate(rot * snap, TS_WORLD);
     }
 }
 
@@ -562,8 +587,10 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
     if (type != LIGHT_DIRECTIONAL)
         lightViewFrustum = cullCamera->GetSplitFrustum(ctx.sceneZRange_.first, ctx.sceneZRange_.second).Transformed(lightView);
     else
-        lightViewFrustum = cullCamera->GetSplitFrustum(Max(ctx.sceneZRange_.first, splits_[splitIndex].zNear_),
-            Min(ctx.sceneZRange_.second, splits_[splitIndex].zFar_)).Transformed(lightView);
+    {
+        const DrawableZRange splitZRange = ctx.sceneZRange_ & splits_[splitIndex].zRange_;
+        lightViewFrustum = cullCamera->GetSplitFrustum(splitZRange.first, splitZRange.second).Transformed(lightView);
+    }
 
     BoundingBox lightViewFrustumBox(lightViewFrustum);
 
@@ -611,6 +638,18 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
             splits_[splitIndex].shadowCasters_.push_back(drawable);
         }
     }
+}
+
+IntVector2 SceneLight::GetSplitsGridSize() const
+{
+    if (numSplits_ == 1)
+        return { 1, 1 };
+    else if (numSplits_ == 2)
+        return { 2, 1 };
+    else if (numSplits_ < 6)
+        return { 2, 2 };
+    else
+        return { 3, 2 };
 }
 
 }

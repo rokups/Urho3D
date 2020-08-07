@@ -42,6 +42,12 @@ struct NumericRange : ea::pair<T, T>
     /// Return whether the range is valid.
     bool IsValid() const { return this->first <= this->second; }
 
+    /// Return whether the range intersects another.
+    bool Interset(const NumericRange& rhs) const
+    {
+        return this->first <= rhs.second && rhs.first <= this->second;
+    }
+
     /// Accumulate range.
     NumericRange<T>& operator |= (const NumericRange& rhs)
     {
@@ -55,6 +61,22 @@ struct NumericRange : ea::pair<T, T>
     {
         auto lhs = *this;
         lhs |= rhs;
+        return lhs;
+    }
+
+    /// Trim range.
+    NumericRange<T>& operator &= (const NumericRange& rhs)
+    {
+        this->first = ea::max(this->first, rhs.first);
+        this->second = ea::min(this->second, rhs.second);
+        return *this;
+    }
+
+    /// Trim range.
+    NumericRange<T> operator & (const NumericRange& rhs) const
+    {
+        auto lhs = *this;
+        lhs &= rhs;
         return lhs;
     }
 };

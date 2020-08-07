@@ -32,6 +32,20 @@
 namespace Urho3D
 {
 
+ShadowMap ShadowMap::GetSplit(unsigned split, const IntVector2& numSplits) const
+{
+    const IntVector2 splitSize = region_.Size() / numSplits;
+    assert(region_.Size() == splitSize * numSplits);
+
+    const IntVector2 index{ static_cast<int>(split % numSplits.x_), static_cast<int>(split / numSplits.x_) };
+    const IntVector2 splitBegin = region_.Min() + splitSize * index;
+    const IntVector2 splitEnd = splitBegin + splitSize;
+
+    ShadowMap splitShadowMap = *this;
+    splitShadowMap.region_ = { splitBegin, splitEnd };
+    return splitShadowMap;
+}
+
 ShadowMapAllocator::ShadowMapAllocator(Context* context)
     : Object(context)
     , graphics_(context_->GetGraphics())

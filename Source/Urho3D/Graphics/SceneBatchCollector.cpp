@@ -528,9 +528,6 @@ void SceneBatchCollector::ProcessVisibleLights()
     for (SceneLight* sceneLight : visibleLights_)
         sceneLight->BeginFrame(callback_->HasShadow(sceneLight->GetLight()));
 
-    // Find main light
-    mainLightIndex_ = FindMainLight();
-
     // Update lit geometries and shadow casters
     SceneLightProcessContext sceneLightProcessContext;
     sceneLightProcessContext.frameInfo_ = frameInfo_;
@@ -548,6 +545,26 @@ void SceneBatchCollector::ProcessVisibleLights()
     workQueue_->Complete(M_MAX_UNSIGNED);
 
     // Finalize scene lights
+    for (SceneLight* sceneLight : visibleLights_)
+        sceneLight->FinalizeShadowMap();
+
+    // Sort lights by shadow map size
+    const auto isShadowMapBigger = [](const SceneLight* lhs, const SceneLight* rhs)
+    {
+        return lhs->GetShadowMapSize().Length() > rhs->GetShadowMapSize().Length();
+    };
+    ea::sort(visibleLights_.begin(), visibleLights_.end(), isShadowMapBigger);
+
+    // Assign shadow maps and finalize shadow parameters
+    for (SceneLight* sceneLight : visibleLights_)
+    {
+        const IntVector2 shadowMapSize = sceneLight->GetShadowMapSize();
+        if (shadowMapSize == IntVector2::ZERO)
+            continue;
+
+        const ShadowMap shadowMap = callback_->GetTemporaryShadowMap(shadowMapSize);
+        sceneLight->SetShadowMap(shadowMap);
+    }
 
     // Update batches for shadow casters
     ForEachParallel(workQueue_, 1u, shadowCastersToBeUpdated_,
@@ -604,6 +621,9 @@ void SceneBatchCollector::ProcessVisibleLights()
         }
     }
     workQueue_->Complete(M_MAX_UNSIGNED);
+
+    // Find main light
+    mainLightIndex_ = FindMainLight();
 
     // Accumulate lighting
     for (unsigned i = 0; i < visibleLights_.size(); ++i)

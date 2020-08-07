@@ -44,8 +44,11 @@ struct ShadowMap
     SharedPtr<Texture2D> texture_;
     /// Region in texture.
     IntRect region_;
+
     /// Return whether the shadow map is valid.
     operator bool() const { return !!texture_; }
+    /// Return shadow map split.
+    ShadowMap GetSplit(unsigned split, const IntVector2& numSplits) const;
 };
 
 /// Shadow map type.

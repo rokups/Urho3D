@@ -26,6 +26,7 @@
 #include "../Graphics/Light.h"
 #include "../Graphics/SceneBatch.h"
 #include "../Graphics/SceneDrawableData.h"
+#include "../Graphics/ShadowMapAllocator.h"
 #include "../Graphics/PipelineStateTracker.h"
 #include "../Graphics/Camera.h"
 #include "../Scene/Node.h"
@@ -34,6 +35,52 @@
 
 namespace Urho3D
 {
+
+/// Scene light shadow parameters.
+struct SceneLightShadowParameters
+{
+    /// Light direction.
+    Vector3 direction_;
+    /// Light position.
+    Vector3 position_;
+    /// Inverse range.
+    float inverseRange_{};
+
+    /// Shadow matrices for each split.
+    Matrix4 shadowMatrices_[MAX_CASCADE_SPLITS];
+    /// Spot/point light matrix for cookie.
+    Matrix4 spotMatrix_;
+
+    /// Light color (faded).
+    Vector3 color_;
+    /// Specular intensity (faded).
+    float specularIntensity_{};
+
+    /// Light radius for volumetric lights.
+    float radius_{};
+    /// Light length for volumetric lights.
+    float length_{};
+
+    /// Shadow cube adjustment.
+    Vector4 shadowCubeAdjust_;
+    /// Shadow depth fade parameters.
+    Vector4 shadowDepthFade_;
+    /// Shadow intensity parameters.
+    Vector4 shadowIntensity_;
+    /// Inverse size of shadowmap.
+    Vector2 shadowMapInvSize_;
+    /// Shadow splits distances.
+    Vector4 shadowSplits_;
+    /// VSM shadow parameters.
+    Vector2 vsmParams_;
+    /// Normal offset and scale.
+    Vector4 normalOffsetScale_;
+
+    /// Cutoff for vertex lighting.
+    float cutoff_{};
+    /// Inverse cutoff for vertex lighting.
+    float invCutoff_{};
+};
 
 /// Scene light processing context.
 struct SceneLightProcessContext
@@ -63,10 +110,18 @@ struct SceneLightShadowSplit
     ea::vector<BaseSceneBatch> shadowCasterBatches_;
     /// Combined bounding box of shadow casters in light projection space. Only used for focused spot lights.
     BoundingBox shadowCasterBox_{};
-    /// Shadow camera near split (directional lights only).
-    float zNear_{};
-    /// Shadow camera far split (directional lights only).
-    float zFar_{};
+    /// Shadow camera Z range (directional lights only).
+    DrawableZRange zRange_{};
+    /// Shadow map for split.
+    ShadowMap shadowMap_;
+
+    /// Setup shadow camera for directional light split.
+    void SetupDirLightShadowCamera(Light* light, Camera* cullCamera, const ea::vector<Drawable*>& litGeometries,
+        const DrawableZRange& sceneZRange, const ea::vector<DrawableZRange>& drawableZRanges);
+    /// Quantize a directional light shadow camera view to eliminate swimming.
+    void QuantizeDirLightShadowCamera(const FocusParameters& parameters, const BoundingBox& viewBox);
+    /// Finalize shadow camera view after shadow casters and the shadow map are known.
+    void FinalizeShadowCamera();
 };
 
 /// Per-viewport light data.
@@ -78,15 +133,24 @@ public:
 
     /// Clear in the beginning of the frame.
     void BeginFrame(bool hasShadow);
-
     /// Update lit geometries and shadow casters. May be called from worker thread.
     void UpdateLitGeometriesAndShadowCasters(SceneLightProcessContext& ctx);
-    /// Return lit geometries.
-    const ea::vector<Drawable*>& GetLitGeometries() const { return litGeometries_; }
+    /// Finalize shadow basing on shadow caster information.
+    void FinalizeShadowMap();
+    /// Set shadow map and finalize shader parameters.
+    void SetShadowMap(const ShadowMap& shadowMap);
+
+    /// Return light.
+    Light* GetLight() const { return light_; }
+    /// Return shadow map size.
+    IntVector2 GetShadowMapSize() const { return hasShadow_ ? shadowMapSize_ : IntVector2::ZERO; }
     /// Return number of splits.
     unsigned GetNumSplits() const { return numSplits_; }
     /// Return shadow split.
     const SceneLightShadowSplit& GetSplit(unsigned splitIndex) const { return splits_[splitIndex]; }
+
+    /// Return lit geometries.
+    const ea::vector<Drawable*>& GetLitGeometries() const { return litGeometries_; }
     /// Return shadow casters for given split.
     const ea::vector<Drawable*>& GetShadowCasters(unsigned splitIndex) const { return splits_[splitIndex].shadowCasters_; }
     /// Return mutable shadow batches for given split.
@@ -94,10 +158,7 @@ public:
     /// Return shadow batches for given split.
     const ea::vector<BaseSceneBatch>& GetShadowBatches(unsigned splitIndex) const { return splits_[splitIndex].shadowCasterBatches_; }
 
-    /// Return light.
-    Light* GetLight() const { return light_; }
     Camera* GetShadowCamera() const { return splits_[0].shadowCamera_; }
-    //const ea::vector<BaseSceneBatch>& GetShadowCasters() const { return shadowCasters_; }
 
 private:
     /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
@@ -108,12 +169,6 @@ private:
     Camera* GetOrCreateShadowCamera(unsigned split);
     /// Setup shadow cameras.
     void SetupShadowCameras(SceneLightProcessContext& ctx);
-    /// Setup shadow camera for directional light split.
-    void SetupDirLightShadowCamera(SceneLightProcessContext& ctx,
-        Camera* shadowCamera, float nearSplit, float farSplit);
-    /// Quantize a directional light shadow camera view to eliminate swimming.
-    void QuantizeDirLightShadowCamera(SceneLightProcessContext& ctx,
-        Camera* shadowCamera, const IntRect& shadowViewport, const BoundingBox& viewBox);
     /// Check visibility of one shadow caster.
     bool IsShadowCasterVisible(SceneLightProcessContext& ctx,
         Drawable* drawable, BoundingBox lightViewBox, Camera* shadowCamera, const Matrix3x4& lightView,
@@ -121,11 +176,17 @@ private:
     /// Process shadow casters' visibilities and build their combined view- or projection-space bounding box.
     void ProcessShadowCasters(SceneLightProcessContext& ctx,
         const ea::vector<Drawable*>& drawables, unsigned splitIndex);
+    /// Return dimensions of splits grid in shadow map.
+    IntVector2 GetSplitsGridSize() const;
 
     /// Light.
     Light* light_{};
     /// Whether the light has shadow.
     bool hasShadow_{};
+    /// Shadow map split size.
+    int shadowMapSplitSize_{};
+    /// Shadow map size.
+    IntVector2 shadowMapSize_{};
 
     /// Lit geometries.
     // TODO(renderer): Skip unlit geometries?
@@ -139,6 +200,9 @@ private:
     SceneLightShadowSplit splits_[MAX_LIGHT_SPLITS];
     /// Shadow map split count.
     unsigned numSplits_{};
+
+    /// Shader parameters.
+    SceneLightShadowParameters shaderParams_;
 };
 
 }

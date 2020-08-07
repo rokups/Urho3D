@@ -31,6 +31,7 @@
 #include "../Graphics/SceneBatch.h"
 #include "../Graphics/SceneDrawableData.h"
 #include "../Graphics/SceneLight.h"
+#include "../Graphics/ShadowMapAllocator.h"
 #include "../Math/NumericRange.h"
 #include "../Math/SphericalHarmonics.h"
 
@@ -79,6 +80,8 @@ public:
         Geometry* geometry, GeometryType geometryType, Material* material, Pass* pass, Light* light) = 0;
     /// Return whether the light has shadow.
     virtual bool HasShadow(Light* light) = 0;
+    /// Return temporary shadow map of given size.
+    virtual ShadowMap GetTemporaryShadowMap(const IntVector2& size) = 0;
 };
 
 /// Utility class to collect batches from the scene for given frame.

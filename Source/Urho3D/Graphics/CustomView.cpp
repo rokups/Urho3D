@@ -63,10 +63,11 @@ class TestFactory : public SceneBatchCollectorCallback, public Object
     URHO3D_OBJECT(TestFactory, Object);
 
 public:
-    explicit TestFactory(Context* context)
+    explicit TestFactory(Context* context, ShadowMapAllocator* shadowMapAllocator)
         : Object(context)
         , graphics_(context->GetGraphics())
         , renderer_(context->GetRenderer())
+        , shadowMapAllocator_(shadowMapAllocator)
     {}
 
     PipelineState* CreatePipelineState(Camera* camera, Drawable* drawable,
@@ -145,6 +146,11 @@ public:
         return true;
     }
 
+    ShadowMap GetTemporaryShadowMap(const IntVector2& size) override
+    {
+        return shadowMapAllocator_->AllocateShadowMap(size);
+    }
+
 private:
     static CullMode GetEffectiveCullMode(CullMode mode, const Camera* camera)
     {
@@ -162,6 +168,7 @@ private:
 
     Graphics* graphics_{};
     Renderer* renderer_{};
+    ShadowMapAllocator* shadowMapAllocator_{};
 };
 
 Vector4 GetCameraDepthModeParameter(const Camera* camera)
@@ -366,7 +373,7 @@ void CustomView::Render()
     CollectDrawables(drawablesInMainCamera, camera_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT);
 
     // Process batches
-    static TestFactory scenePipelineStateFactory(context_);
+    static TestFactory scenePipelineStateFactory(context_, shadowMapAllocator);
     static SceneBatchCollector sceneBatchCollector(context_);
     static ScenePassDescription passes[] = {
         { ScenePassType::ForwardLitBase,   "base",  "litbase",  "light" },
