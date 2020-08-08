@@ -31,6 +31,7 @@
 #include "../Graphics/SceneBatch.h"
 #include "../Graphics/SceneDrawableData.h"
 #include "../Graphics/SceneLight.h"
+#include "../Graphics/ScenePipelineStateCache.h"
 #include "../Graphics/ShadowMapAllocator.h"
 #include "../Math/NumericRange.h"
 #include "../Math/SphericalHarmonics.h"
@@ -72,12 +73,9 @@ struct ScenePassDescription
 };
 
 /// Callback interface for SceneBatchCollector.
-class SceneBatchCollectorCallback
+class SceneBatchCollectorCallback : public ScenePipelineStateCacheCallback
 {
 public:
-    /// Create pipeline state. Only fields that constribute to pipeline state hashes are safe to use.
-    virtual PipelineState* CreatePipelineState(Camera* camera, Drawable* drawable,
-        Geometry* geometry, GeometryType geometryType, Material* material, Pass* pass, Light* light) = 0;
     /// Return whether the light has shadow.
     virtual bool HasShadow(Light* light) = 0;
     /// Return temporary shadow map of given size.
@@ -141,14 +139,6 @@ public:
 private:
     /// Batch of drawable in scene.
     struct IntermediateSceneBatch;
-    /// Sub-pass pipeline state cache context.
-    struct SubPassPipelineStateContext;
-    /// Sub-pass pipeline state cache key.
-    struct SubPassPipelineStateKey;
-    /// Sub-pass pipeline state cache entry.
-    struct SubPassPipelineStateEntry;
-    /// Sub-pass pipeline state cache.
-    struct SubPassPipelineStateCache;
     /// Internal pass data.
     struct PassData;
     /// Helper class to evaluate min and max Z of the drawable.
@@ -168,10 +158,10 @@ private:
     void AccumulateForwardLighting(unsigned lightIndex);
 
     /// Convert scene batches from intermediate batches to unlit base batches.
-    void CollectSceneUnlitBaseBatches(SubPassPipelineStateCache& subPassCache,
+    void CollectSceneUnlitBaseBatches(ScenePipelineStateCache& subPassCache,
         const ThreadedVector<IntermediateSceneBatch>& intermediateBatches, ea::vector<BaseSceneBatch>& sceneBatches);
     /// Convert scene batches from intermediate batches to lit base batches and light batches.
-    void CollectSceneLitBaseBatches(SubPassPipelineStateCache& baseSubPassCache, SubPassPipelineStateCache& lightSubPassCache,
+    void CollectSceneLitBaseBatches(ScenePipelineStateCache& baseSubPassCache, ScenePipelineStateCache& lightSubPassCache,
         const ThreadedVector<IntermediateSceneBatch>& intermediateBatches, ea::vector<BaseSceneBatch>& baseSceneBatches,
         ThreadedVector<LightSceneBatch>& lightSceneBatches);
 
@@ -205,6 +195,8 @@ private:
     /// Number of drawables.
     unsigned numDrawables_{};
 
+    /// Shadow pass pipeline state cache.
+    ScenePipelineStateCache shadowPipelineStateCache_;
     /// Passes.
     ea::vector<PassData> passes_;
     /// Base batches lookup table.
@@ -238,6 +230,8 @@ private:
     ThreadedVector<BaseSceneBatch*> baseSceneBatchesWithoutPipelineStates_;
     /// Temporary collection for pipeline state cache misses (light batches).
     ThreadedVector<unsigned> lightSceneBatchesWithoutPipelineStates_;
+    /// Temporary collection for pipeline state cache misses (shadow batches).
+    ThreadedVector<ea::pair<SceneLightShadowSplit*, unsigned>> shadowBatchesWithoutPipelineStates_;
 };
 
 template <class T>

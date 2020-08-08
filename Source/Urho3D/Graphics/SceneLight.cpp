@@ -409,6 +409,13 @@ Matrix4 SceneLightShadowSplit::CalculateShadowMatrix(float subPixelOffset) const
     return texAdjust * shadowProj * shadowView;
 }
 
+SceneLight::SceneLight(Light* light)
+    : light_(light)
+{
+    for (SceneLightShadowSplit& split : splits_)
+        split.sceneLight_ = this;
+}
+
 void SceneLight::BeginFrame(bool hasShadow)
 {
     litGeometries_.clear();
@@ -669,13 +676,17 @@ void SceneLight::FinalizeShaderParameters(Camera* cullCamera, float subPixelOffs
 
 unsigned SceneLight::RecalculatePipelineStateHash() const
 {
+    const BiasParameters& biasParameters = light_->GetShadowBias();
+
     // TODO(renderer): Extract into pipeline state factory
     unsigned hash = 0;
     hash |= light_->GetLightType() & 0x3;
     hash |= static_cast<unsigned>(hasShadow_) << 2;
     hash |= static_cast<unsigned>(!!light_->GetShapeTexture()) << 3;
     hash |= static_cast<unsigned>(light_->GetSpecularIntensity() > 0.0f) << 4;
-    hash |= static_cast<unsigned>(light_->GetShadowBias().normalOffset_ > 0.0f) << 5;
+    hash |= static_cast<unsigned>(biasParameters.normalOffset_ > 0.0f) << 5;
+    CombineHash(hash, biasParameters.constantBias_);
+    CombineHash(hash, biasParameters.slopeScaledBias_);
     return hash;
 }
 

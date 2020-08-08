@@ -36,6 +36,8 @@
 namespace Urho3D
 {
 
+class SceneLight;
+
 /// Scene light shadow parameters.
 struct SceneLightShaderParameters
 {
@@ -98,6 +100,8 @@ struct SceneLightProcessContext
 /// Scene light shadow split.
 struct SceneLightShadowSplit
 {
+    /// Owner light.
+    SceneLight* sceneLight_{};
     /// Shadow camera node.
     SharedPtr<Node> shadowCameraNode_;
     /// Shadow camera.
@@ -129,7 +133,7 @@ class SceneLight : public PipelineStateTracker
 {
 public:
     /// Construct.
-    explicit SceneLight(Light* light) : light_(light) {}
+    explicit SceneLight(Light* light);
 
     /// Clear in the beginning of the frame.
     void BeginFrame(bool hasShadow);
@@ -144,6 +148,8 @@ public:
 
     /// Return light.
     Light* GetLight() const { return light_; }
+    /// Return whether has shadow.
+    bool HasShadow() const { return hasShadow_; }
     /// Return shadow map size.
     IntVector2 GetShadowMapSize() const { return hasShadow_ ? shadowMapSize_ : IntVector2::ZERO; }
     /// Return shadow map.
@@ -152,6 +158,8 @@ public:
     unsigned GetNumSplits() const { return numSplits_; }
     /// Return shadow split.
     const SceneLightShadowSplit& GetSplit(unsigned splitIndex) const { return splits_[splitIndex]; }
+    /// Return mutable shadow split.
+    SceneLightShadowSplit& GetMutableSplit(unsigned splitIndex) { return splits_[splitIndex]; }
     /// Return shader parameters.
     const SceneLightShaderParameters& GetShaderParams() const { return shaderParams_; }
 

@@ -597,7 +597,7 @@ void Renderer::ApplyShadowMapFilter(View* view, Texture2D* shadowMap, float blur
         (shadowMapFilterInstance_->*shadowMapFilter_)(view, shadowMap, blurScale);
 }
 
-PipelineState* Renderer::GetOrCreatePipelineState(const PipelineStateDesc& desc)
+SharedPtr<PipelineState> Renderer::GetOrCreatePipelineState(const PipelineStateDesc& desc)
 {
     return pipelineStateCache_.GetPipelineState(desc);
 }

@@ -71,9 +71,14 @@ public:
         , shadowMapAllocator_(shadowMapAllocator)
     {}
 
-    PipelineState* CreatePipelineState(Camera* camera, Drawable* drawable,
-        Geometry* geometry, GeometryType geometryType, Material* material, Pass* pass, Light* light) override
+    SharedPtr<PipelineState> CreatePipelineState(
+        const ScenePipelineStateKey& key, const ScenePipelineStateContext& ctx) override
     {
+        Geometry* geometry = key.geometry_;
+        Material* material = key.material_;
+        Pass* pass = key.pass_;
+        Light* light = ctx.light_ ? ctx.light_->GetLight() : nullptr;
+
         PipelineStateDesc desc;
 
         for (VertexBuffer* vertexBuffer : geometry->GetVertexBuffers())
@@ -120,7 +125,7 @@ public:
         desc.alphaToCoverage_ = pass->GetAlphaToCoverage();
 
         desc.fillMode_ = FILL_SOLID;
-        desc.cullMode_ = GetEffectiveCullMode(material->GetCullMode(), camera);
+        desc.cullMode_ = GetEffectiveCullMode(material->GetCullMode(), ctx.camera_);
 
         return renderer_->GetOrCreatePipelineState(desc);
     }
@@ -413,8 +418,6 @@ void CustomView::Render()
             {
                 auto geometry = batch.geometry_;
                 const SourceBatch& sourceBatch = batch.drawable_->GetBatches()[batch.sourceBatchIndex_];
-                batch.pipelineState_ = scenePipelineStateFactory.CreatePipelineState(
-                    split.shadowCamera_, batch.drawable_, batch.geometry_, batch.geometryType_, batch.material_, batch.pass_, nullptr);
                 drawQueue.SetPipelineState(batch.pipelineState_);
                 FillGlobalSharedParameters(drawQueue, frameInfo_, split.shadowCamera_, zone, scene_);
                 SphericalHarmonicsDot9 sh;
