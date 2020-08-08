@@ -34,6 +34,7 @@
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Viewport.h"
 #include "../Graphics/SceneBatchCollector.h"
+#include "../Graphics/SceneViewport.h"
 #include "../Graphics/ShadowMapAllocator.h"
 #include "../Scene/Scene.h"
 
@@ -343,6 +344,9 @@ void CustomView::CollectDrawables(ea::vector<Drawable*>& drawables, Camera* came
 
 void CustomView::Render()
 {
+    static auto sceneViewport = MakeShared<SceneViewport>(context_);
+    sceneViewport->BeginFrame(renderTarget_, viewport_);
+
     static auto shadowMapAllocator = MakeShared<ShadowMapAllocator>(context_);
     shadowMapAllocator->Reset();
 
@@ -351,17 +355,7 @@ void CustomView::Render()
     //graphics_->SetViewport(viewport_->GetRect() == IntRect::ZERO ? graphics_->GetViewport() : viewport_->GetRect());
     graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_DEPTH, Color::RED * 0.5f);*/
 
-    script_->Render(this);
-
-    if (renderTarget_)
-    {
-        // On OpenGL, flip the projection if rendering to a texture so that the texture can be addressed in the same way
-        // as a render texture produced on Direct3D9
-#ifdef URHO3D_OPENGL
-        if (camera_)
-            camera_->SetFlipVertical(true);
-#endif
-    }
+    //script_->Render(this);
 
     // Set automatic aspect ratio if required
     if (camera_ && camera_->GetAutoAspectRatio())
@@ -455,11 +449,7 @@ void CustomView::Render()
         }
     }
 
-    graphics_->SetRenderTarget(0, renderTarget_);
-    graphics_->SetDepthStencil((RenderSurface*)nullptr);
-    const IntVector2 rtSizeNow = graphics_->GetRenderTargetDimensions();
-    const IntRect viewport = viewport_->GetRect() != IntRect::ZERO ? viewport_->GetRect() : IntRect(0, 0, rtSizeNow.x_, rtSizeNow.y_);
-    graphics_->SetViewport(viewport);
+    sceneViewport->SetOutputRenderTarget();
     graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, Color::RED * 0.5f);
 
     drawQueue.Reset(graphics_);
@@ -655,15 +645,7 @@ void CustomView::Render()
 
     drawQueue.Execute(graphics_);
 
-    if (renderTarget_)
-    {
-        // On OpenGL, flip the projection if rendering to a texture so that the texture can be addressed in the same way
-        // as a render texture produced on Direct3D9
-#ifdef URHO3D_OPENGL
-        if (camera_)
-            camera_->SetFlipVertical(false);
-#endif
-    }
+    sceneViewport->EndFrame();
 }
 
 }
