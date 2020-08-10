@@ -114,6 +114,8 @@ public:
     /// Collect scene batches.
     void CollectSceneBatches();
 
+    /// Return frame info.
+    const FrameInfo& GetFrameInfo() const { return frameInfo_; }
     /// Return main light index.
     unsigned GetMainLightIndex() const { return mainLightIndex_; }
     /// Return main light.

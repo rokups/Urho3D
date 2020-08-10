@@ -30,6 +30,7 @@ namespace Urho3D
 {
 
 /// Base or lit base scene batch for specific sub-pass.
+// TODO(renderer): Sort by vertex lights
 struct BaseSceneBatch
 {
     /// Drawable index.

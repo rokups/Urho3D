@@ -20,6 +20,8 @@
 // THE SOFTWARE.
 //
 
+#pragma once
+
 #include "../Graphics/ConstantBuffer.h"
 #include "../Graphics/ConstantBufferLayout.h"
 #include "../Graphics/Geometry.h"

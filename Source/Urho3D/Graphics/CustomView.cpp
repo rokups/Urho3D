@@ -34,6 +34,7 @@
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Viewport.h"
 #include "../Graphics/SceneBatchCollector.h"
+#include "../Graphics/SceneBatchRenderer.h"
 #include "../Graphics/SceneViewport.h"
 #include "../Graphics/ShadowMapAllocator.h"
 #include "../Scene/Scene.h"
@@ -462,7 +463,10 @@ void CustomView::Render()
 
     SceneLight* mainLight = sceneBatchCollector.GetMainLight();
     const SceneLightShaderParameters& mainLightParams = mainLight->GetShaderParams();
-    for (const BaseSceneBatchSortedByState& sortedBatch : baseBatches)
+
+    static auto sceneBatchRenderer = MakeShared<SceneBatchRenderer>(context_);
+    sceneBatchRenderer->RenderLitBaseBatches(drawQueue, sceneBatchCollector, camera_, zone, baseBatches);
+    /*for (const BaseSceneBatchSortedByState& sortedBatch : baseBatches)
     {
         auto shadowMap = mainLight->GetShadowMap().texture_;
 
@@ -555,7 +559,7 @@ void CustomView::Render()
         drawQueue.SetBuffers(sourceBatch.geometry_->GetVertexBuffers(), sourceBatch.geometry_->GetIndexBuffer());
 
         drawQueue.DrawIndexed(sourceBatch.geometry_->GetIndexStart(), sourceBatch.geometry_->GetIndexCount());
-    }
+    }*/
 
     for (const LightBatchSortedByState& sortedBatch : lightBatches)
     {

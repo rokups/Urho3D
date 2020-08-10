@@ -22,7 +22,6 @@
 
 #pragma once
 
-#include "../Core/Context.h"
 #include "../Core/Object.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/GraphicsDefs.h"
