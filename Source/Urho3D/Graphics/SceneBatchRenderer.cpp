@@ -41,19 +41,6 @@ namespace Urho3D
 namespace
 {
 
-/// Return shader parameters of scene light.
-const SceneLightShaderParameters& GetSceneLightShaderParameters(const SceneLight* sceneLight)
-{
-    static const SceneLightShaderParameters empty;
-    return sceneLight ? sceneLight->GetShaderParams() : empty;
-}
-
-/// Return shadow map texture of scene light.
-Texture2D* GetSceneLightShadowMap(const SceneLight* sceneLight)
-{
-    return sceneLight ? sceneLight->GetShadowMap().texture_ : nullptr;
-}
-
 /// Return shader parameter for camera depth mode.
 Vector4 GetCameraDepthModeParameter(const Camera* camera)
 {
@@ -175,23 +162,47 @@ SceneBatchRenderer::SceneBatchRenderer(Context* context)
 void SceneBatchRenderer::RenderLitBaseBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
     Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedByState> batches)
 {
+    SceneLight* mainLight = sceneBatchCollector.GetMainLight();
+    const auto getBatchLight = [&](const BaseSceneBatchSortedByState& batch)
+    {
+        return mainLight;
+    };
+    RenderBatches(drawQueue, sceneBatchCollector, camera, zone, batches, getBatchLight);
+}
+
+void SceneBatchRenderer::RenderLightBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
+    Camera* camera, Zone* zone, ea::span<const LightBatchSortedByState> batches)
+{
+    const ea::vector<SceneLight*>& visibleLights = sceneBatchCollector.GetVisibleLights();
+    const auto getBatchLight = [&](const LightBatchSortedByState& batch)
+    {
+        return visibleLights[batch.lightIndex_];
+    };
+    RenderBatches(drawQueue, sceneBatchCollector, camera, zone, batches, getBatchLight);
+}
+
+template <class BatchType, class GetBatchLightCallback>
+void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
+    Camera* camera, Zone* zone, ea::span<const BatchType> batches,
+    const GetBatchLightCallback& getBatchLight)
+{
     const FrameInfo& frameInfo = sceneBatchCollector.GetFrameInfo();
     const Scene* scene = frameInfo.octree_->GetScene();
-
-    SceneLight* mainLight = sceneBatchCollector.GetMainLight();
-    const SceneLightShaderParameters& mainLightParams = GetSceneLightShaderParameters(mainLight);
     const ea::vector<SceneLight*>& visibleLights = sceneBatchCollector.GetVisibleLights();
-    Texture2D* mainLightShadowMap = GetSceneLightShadowMap(mainLight);
+
+    static const SceneLightShaderParameters defaultLightParams;
+    const SceneLightShaderParameters* currentLightParams = &defaultLightParams;
+    Texture2D* currentShadowMap = nullptr;
 
     bool frameDirty = true;
     bool cameraDirty = true;
     bool zoneDirty = true;
     float previousConstantDepthBias = 0.0f;
-    SceneLight* previousLight = nullptr;
+    const SceneLight* previousLight = nullptr;
     SceneBatchCollector::VertexLightCollection previousVertexLights;
     Material* previousMaterial = nullptr;
 
-    for (const BaseSceneBatchSortedByState& sortedBatch : batches)
+    for (const auto& sortedBatch : batches)
     {
         const BaseSceneBatch& batch = *sortedBatch.sceneBatch_;
         const SourceBatch& sourceBatch = batch.GetSourceBatch();
@@ -200,6 +211,16 @@ void SceneBatchRenderer::RenderLitBaseBatches(DrawCommandQueue& drawQueue, const
         {
             URHO3D_LOGERROR("Cannot render scene batch witout pipeline state");
             continue;
+        }
+
+        // Get used light
+        const SceneLight* light = getBatchLight(sortedBatch);
+        const bool lightDirty = light != previousLight;
+        if (light != previousLight)
+        {
+            previousLight = light;
+            currentLightParams = light ? &light->GetShaderParams() : &defaultLightParams;
+            currentShadowMap = light ? light->GetShadowMap().texture_ : nullptr;
         }
 
         // Always set pipeline state first
@@ -237,19 +258,19 @@ void SceneBatchRenderer::RenderLitBaseBatches(DrawCommandQueue& drawQueue, const
         // Add light parameters
         auto vertexLights = sceneBatchCollector.GetVertexLightIndices(batch.drawableIndex_);
         ea::sort(vertexLights.begin(), vertexLights.end());
-        const bool lightDirty = !previousLight || previousVertexLights != vertexLights;
-        if (drawQueue.BeginShaderParameterGroup(SP_LIGHT, true))
+        const bool vertexLightsDirty = previousVertexLights != vertexLights;
+        if (drawQueue.BeginShaderParameterGroup(SP_LIGHT, lightDirty || vertexLightsDirty))
         {
             previousVertexLights = vertexLights;
 
-            drawQueue.AddShaderParameter(VSP_LIGHTDIR, mainLightParams.direction_);
-            drawQueue.AddShaderParameter(VSP_LIGHTPOS, Vector4{ mainLightParams.position_, mainLightParams.invRange_ });
-            drawQueue.AddShaderParameter(PSP_LIGHTCOLOR, Vector4{ mainLightParams.color_, mainLightParams.specularIntensity_ });
+            drawQueue.AddShaderParameter(VSP_LIGHTDIR, currentLightParams->direction_);
+            drawQueue.AddShaderParameter(VSP_LIGHTPOS, Vector4{ currentLightParams->position_, currentLightParams->invRange_ });
+            drawQueue.AddShaderParameter(PSP_LIGHTCOLOR, Vector4{ currentLightParams->color_, currentLightParams->specularIntensity_ });
 
-            drawQueue.AddShaderParameter(PSP_LIGHTDIR, mainLightParams.direction_);
-            drawQueue.AddShaderParameter(PSP_LIGHTPOS, Vector4{ mainLightParams.position_, mainLightParams.invRange_ });
-            drawQueue.AddShaderParameter(PSP_LIGHTRAD, mainLightParams.radius_);
-            drawQueue.AddShaderParameter(PSP_LIGHTLENGTH, mainLightParams.length_);
+            drawQueue.AddShaderParameter(PSP_LIGHTDIR, currentLightParams->direction_);
+            drawQueue.AddShaderParameter(PSP_LIGHTPOS, Vector4{ currentLightParams->position_, currentLightParams->invRange_ });
+            drawQueue.AddShaderParameter(PSP_LIGHTRAD, currentLightParams->radius_);
+            drawQueue.AddShaderParameter(PSP_LIGHTLENGTH, currentLightParams->length_);
 
             Vector4 vertexLightsData[MAX_VERTEX_LIGHTS * 3]{};
             for (unsigned i = 0; i < vertexLights.size(); ++i)
@@ -257,49 +278,51 @@ void SceneBatchRenderer::RenderLitBaseBatches(DrawCommandQueue& drawQueue, const
                 if (vertexLights[i] == M_MAX_UNSIGNED)
                     continue;
 
-                const SceneLightShaderParameters& vertexLightParams = GetSceneLightShaderParameters(visibleLights[vertexLights[i]]);
+                const SceneLightShaderParameters& vertexLightParams = visibleLights[vertexLights[i]]->GetShaderParams();
                 vertexLightsData[i * 3] = { vertexLightParams.color_, vertexLightParams.invRange_ };
                 vertexLightsData[i * 3 + 1] = { vertexLightParams.direction_, vertexLightParams.cutoff_ };
                 vertexLightsData[i * 3 + 2] = { vertexLightParams.position_, vertexLightParams.invCutoff_ };
             }
             drawQueue.AddShaderParameter(VSP_VERTEXLIGHTS, ea::span<const Vector4>{ vertexLightsData });
 
-            if (mainLightShadowMap)
+            if (currentShadowMap)
             {
-                ea::span<const Matrix4> shadowMatricesSpan = mainLightParams.shadowMatrices_;
+                ea::span<const Matrix4> shadowMatricesSpan = currentLightParams->shadowMatrices_;
                 drawQueue.AddShaderParameter(VSP_LIGHTMATRICES, shadowMatricesSpan);
                 drawQueue.AddShaderParameter(PSP_LIGHTMATRICES, shadowMatricesSpan);
-                drawQueue.AddShaderParameter(PSP_SHADOWDEPTHFADE, mainLightParams.shadowDepthFade_);
-                drawQueue.AddShaderParameter(PSP_SHADOWINTENSITY, mainLightParams.shadowIntensity_);
-                drawQueue.AddShaderParameter(PSP_SHADOWMAPINVSIZE, mainLightParams.shadowMapInvSize_);
-                drawQueue.AddShaderParameter(PSP_SHADOWSPLITS, mainLightParams.shadowSplits_);
-                drawQueue.AddShaderParameter(PSP_SHADOWCUBEADJUST, mainLightParams.shadowCubeAdjust_);
-                drawQueue.AddShaderParameter(VSP_NORMALOFFSETSCALE, mainLightParams.normalOffsetScale_);
-                drawQueue.AddShaderParameter(PSP_NORMALOFFSETSCALE, mainLightParams.normalOffsetScale_);
+                drawQueue.AddShaderParameter(PSP_SHADOWDEPTHFADE, currentLightParams->shadowDepthFade_);
+                drawQueue.AddShaderParameter(PSP_SHADOWINTENSITY, currentLightParams->shadowIntensity_);
+                drawQueue.AddShaderParameter(PSP_SHADOWMAPINVSIZE, currentLightParams->shadowMapInvSize_);
+                drawQueue.AddShaderParameter(PSP_SHADOWSPLITS, currentLightParams->shadowSplits_);
+                drawQueue.AddShaderParameter(PSP_SHADOWCUBEADJUST, currentLightParams->shadowCubeAdjust_);
+                drawQueue.AddShaderParameter(VSP_NORMALOFFSETSCALE, currentLightParams->normalOffsetScale_);
+                drawQueue.AddShaderParameter(PSP_NORMALOFFSETSCALE, currentLightParams->normalOffsetScale_);
                 drawQueue.AddShaderParameter(PSP_VSMSHADOWPARAMS, renderer_->GetVSMShadowParameters());
             }
 
             drawQueue.CommitShaderParameterGroup(SP_LIGHT);
         }
 
-        // Add material parameters and resources
-        if (previousMaterial != batch.material_)
+        // Add material parameters
+        const bool materialDirty = previousMaterial != batch.material_;
+        if (drawQueue.BeginShaderParameterGroup(SP_MATERIAL, materialDirty))
         {
-            if (drawQueue.BeginShaderParameterGroup(SP_MATERIAL, true))
-            {
-                const auto& materialParameters = batch.material_->GetShaderParameters();
-                for (const auto& parameter : materialParameters)
-                    drawQueue.AddShaderParameter(parameter.first, parameter.second.value_);
-                drawQueue.CommitShaderParameterGroup(SP_MATERIAL);
-            }
+            const auto& materialParameters = batch.material_->GetShaderParameters();
+            for (const auto& parameter : materialParameters)
+                drawQueue.AddShaderParameter(parameter.first, parameter.second.value_);
+            drawQueue.CommitShaderParameterGroup(SP_MATERIAL);
+        }
 
+        // Add resources
+        if (materialDirty || lightDirty)
+        {
             const auto& materialTextures = batch.material_->GetTextures();
             for (const auto& texture : materialTextures)
                 drawQueue.AddShaderResource(texture.first, texture.second);
 
             drawQueue.AddShaderResource(TU_LIGHTRAMP, renderer_->GetDefaultLightRamp());
-            if (mainLightShadowMap)
-                drawQueue.AddShaderResource(TU_SHADOWMAP, mainLightShadowMap);
+            if (currentShadowMap)
+                drawQueue.AddShaderResource(TU_SHADOWMAP, currentShadowMap);
             drawQueue.CommitShaderResources();
 
             previousMaterial = batch.material_;

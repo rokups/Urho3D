@@ -45,8 +45,17 @@ public:
     /// Render lit base batches. Safe to call from worker thread.
     void RenderLitBaseBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
         Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedByState> batches);
+    /// Render light batches. Safe to call from worker thread.
+    void RenderLightBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
+        Camera* camera, Zone* zone, ea::span<const LightBatchSortedByState> batches);
 
 private:
+    /// Render generic batches.
+    template <class BatchType, class GetBatchLightCallback>
+    void RenderBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
+        Camera* camera, Zone* zone, ea::span<const BatchType> batches,
+        const GetBatchLightCallback& getBatchLight);
+
     /// Graphics subsystem.
     Graphics* graphics_{};
     /// Renderer subsystem.

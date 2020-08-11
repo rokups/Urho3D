@@ -426,7 +426,8 @@ void Octant::GetDrawablesOnlyInternal(RayOctreeQuery& query, ea::vector<Drawable
 Octree::Octree(Context* context) :
     Component(context),
     rootOctant_(BoundingBox(-DEFAULT_OCTREE_SIZE, DEFAULT_OCTREE_SIZE), 0, nullptr, this),
-    numLevels_(DEFAULT_OCTREE_LEVELS)
+    numLevels_(DEFAULT_OCTREE_LEVELS),
+    worldBoundingBox_(rootOctant_.GetWorldBoundingBox())
 {
     // If the engine is running headless, subscribe to RenderUpdate events for manually updating the octree
     // to allow raycasts and animation update

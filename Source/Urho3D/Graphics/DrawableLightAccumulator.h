@@ -27,7 +27,7 @@
 
 #include <EASTL/fixed_vector.h>
 #include <EASTL/sort.h>
-#include <EASTL/vector_map.h>
+#include <EASTL/vector_multimap.h>
 
 namespace Urho3D
 {
@@ -54,7 +54,7 @@ struct DrawableLightAccumulator
     /// Max number of lights that don't require allocations.
     static const unsigned NumElements = ea::max(MaxPixelLights + 1, 4u) + MaxVertexLights;
     /// Container for lights.
-    using Container = ea::vector_map<float, unsigned, ea::less<float>, ea::allocator,
+    using Container = ea::vector_multimap<float, unsigned, ea::less<float>, ea::allocator,
         ea::fixed_vector<ea::pair<float, unsigned>, NumElements>>;
     /// Container for vertex lights.
     using VertexLightContainer = ea::array<unsigned, MaxVertexLights>;
@@ -104,7 +104,7 @@ struct DrawableLightAccumulator
     /// Return per-pixel lights.
     ea::span<const ea::pair<float, unsigned>> GetPixelLights() const
     {
-        return { lights_.data(), ea::min(lights_.size(), firstVertexLight_) };
+        return { lights_.data(), ea::min(static_cast<unsigned>(lights_.size()), firstVertexLight_) };
     }
 
     /// Container of per-pixel and per-pixel lights.

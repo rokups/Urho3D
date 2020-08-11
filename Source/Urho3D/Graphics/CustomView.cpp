@@ -89,7 +89,7 @@ public:
         if (light)
         {
             commonDefines += "PERPIXEL ";
-            if (light->GetCastShadows())
+            if (ctx.light_->HasShadow())
             {
                 commonDefines += "SHADOW SIMPLE_SHADOW ";
             }
@@ -382,7 +382,7 @@ void CustomView::Render()
         { ScenePassType::Unlit, "refract" },
         { ScenePassType::Unlit, "postalpha" },
     };
-    sceneBatchCollector.SetMaxPixelLights(2);
+    sceneBatchCollector.SetMaxPixelLights(4);
     sceneBatchCollector.BeginFrame(frameInfo_, scenePipelineStateFactory, passes);
     sceneBatchCollector.ProcessVisibleDrawables(drawablesInMainCamera);
     sceneBatchCollector.ProcessVisibleLights();
@@ -466,6 +466,7 @@ void CustomView::Render()
 
     static auto sceneBatchRenderer = MakeShared<SceneBatchRenderer>(context_);
     sceneBatchRenderer->RenderLitBaseBatches(drawQueue, sceneBatchCollector, camera_, zone, baseBatches);
+    sceneBatchRenderer->RenderLightBatches(drawQueue, sceneBatchCollector, camera_, zone, lightBatches);
     /*for (const BaseSceneBatchSortedByState& sortedBatch : baseBatches)
     {
         auto shadowMap = mainLight->GetShadowMap().texture_;
@@ -561,6 +562,7 @@ void CustomView::Render()
         drawQueue.DrawIndexed(sourceBatch.geometry_->GetIndexStart(), sourceBatch.geometry_->GetIndexCount());
     }*/
 
+#if 0
     for (const LightBatchSortedByState& sortedBatch : lightBatches)
     {
         //auto shadowMap = shadowMaps[sortedBatch.lightIndex_];
@@ -649,6 +651,7 @@ void CustomView::Render()
 
         drawQueue.DrawIndexed(sourceBatch.geometry_->GetIndexStart(), sourceBatch.geometry_->GetIndexCount());
     }
+    #endif
 
     drawQueue.Execute(graphics_);
 
