@@ -132,6 +132,8 @@ public:
     const ThreadedVector<LightSceneBatch>& GetLightBatches(const ea::string& pass) const;
     /// Return sorted light batches for given pass.
     template <class T> void GetSortedLightBatches(const ea::string& pass, ea::vector<T>& sortedBatches) const;
+    /// Return sorted shadow batches.
+    template <class T> void GetSortedShadowBatches(const ea::vector<BaseSceneBatch>& batches, ea::vector<T>& sortedBatches) const;
 
     /// Return vertex lights for drawable (as indices in the array of visible lights).
     VertexLightCollection GetVertexLightIndices(unsigned drawableIndex) const { return drawableLighting_[drawableIndex].GetVertexLights(); }
@@ -257,6 +259,16 @@ void SceneBatchCollector::GetSortedLightBatches(const ea::string& pass, ea::vect
     {
         sortedBatches[elementIndex] = T{ &lightBatch };
     });
+    ea::sort(sortedBatches.begin(), sortedBatches.end());
+}
+
+template <class T>
+void SceneBatchCollector::GetSortedShadowBatches(const ea::vector<BaseSceneBatch>& batches, ea::vector<T>& sortedBatches) const
+{
+    const unsigned numBatches = batches.size();
+    sortedBatches.resize(numBatches);
+    for (unsigned i = 0; i < numBatches; ++i)
+        sortedBatches[i] = T{ &batches[i] };
     ea::sort(sortedBatches.begin(), sortedBatches.end());
 }
 
