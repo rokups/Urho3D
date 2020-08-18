@@ -38,18 +38,6 @@
 namespace Urho3D
 {
 
-struct SceneBatchCollector::IntermediateSceneBatch
-{
-    /// Geometry.
-    Drawable* geometry_{};
-    /// Index of source batch within geometry.
-    unsigned sourceBatchIndex_{};
-    /// Base material pass.
-    Pass* basePass_{};
-    /// Additional material pass for forward rendering.
-    Pass* additionalPass_{};
-};
-
 struct SceneBatchCollector::PassData
 {
     /// Pass description.
@@ -229,6 +217,22 @@ Technique* SceneBatchCollector::FindTechnique(Drawable* drawable, Material* mate
     return techniques.size() ? techniques.back().technique_ : nullptr;
 }
 
+void SceneBatchCollector::ResetPasses()
+{
+    passes2_.clear();
+}
+
+void SceneBatchCollector::AddScenePass(const SharedPtr<ScenePass>& pass)
+{
+    if (!pass->IsValid())
+    {
+        // TODO(renderer): Log error
+        assert(0);
+        return;
+    }
+    passes2_.push_back(pass);
+}
+
 void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchCollectorCallback& callback,
     ea::span<const ScenePassDescription> passes)
 {
@@ -256,6 +260,9 @@ void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchColle
     drawableLighting_.resize(numDrawables_);
 
     // Initialize passes
+    for (ScenePass* pass : passes2_)
+        pass->BeginFrame();
+
     const unsigned numPasses = passes.size();
     passes_.resize(numPasses);
     for (unsigned i = 0; i < numPasses; ++i)
@@ -360,7 +367,14 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
                 if (!technique)
                     continue;
 
-                // Fill passes
+                // Update scene passes
+                for (ScenePass* pass : passes2_)
+                {
+                    const bool isLit = pass->AddSourceBatch(drawable, i, technique);
+                    if (isLit)
+                        transient_.traits_[drawableIndex] |= SceneDrawableData::ForwardLit;
+                }
+
                 for (PassData& pass : passes_)
                 {
                     Pass* unlitBasePass = technique->GetPass(pass.unlitBasePassIndex_);
@@ -578,6 +592,12 @@ void SceneBatchCollector::AccumulateForwardLighting(unsigned lightIndex)
 
 void SceneBatchCollector::CollectSceneBatches()
 {
+    for (ScenePass* pass : passes2_)
+    {
+        pass->CollectSceneBatches(mainLightIndex_, visibleLights_, drawableLighting_, camera_, *callback_);
+        pass->SortSceneBatches();
+    }
+
     for (PassData& passData : passes_)
     {
         CollectSceneUnlitBaseBatches(passData.unlitPipelineStateCache_,

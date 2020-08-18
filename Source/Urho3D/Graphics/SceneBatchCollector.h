@@ -31,6 +31,7 @@
 #include "../Graphics/SceneBatch.h"
 #include "../Graphics/SceneDrawableData.h"
 #include "../Graphics/SceneLight.h"
+#include "../Graphics/ScenePass.h"
 #include "../Graphics/ScenePipelineStateCache.h"
 #include "../Graphics/ShadowMapAllocator.h"
 #include "../Math/NumericRange.h"
@@ -103,6 +104,10 @@ public:
 
     /// Set max number of pixel lights per drawable. Important lights may override this limit.
     void SetMaxPixelLights(unsigned count) { maxPixelLights_ = count; }
+    /// Reset scene passes.
+    void ResetPasses();
+    /// Add scene pass.
+    void AddScenePass(const SharedPtr<ScenePass>& pass);
 
     /// Begin frame processing.
     void BeginFrame(const FrameInfo& frameInfo, SceneBatchCollectorCallback& callback,
@@ -141,8 +146,6 @@ public:
     ea::array<SceneLight*, MaxVertexLights> GetVertexLights(unsigned drawableIndex) const;
 
 private:
-    /// Batch of drawable in scene.
-    struct IntermediateSceneBatch;
     /// Internal pass data.
     struct PassData;
     /// Helper class to evaluate min and max Z of the drawable.
@@ -203,6 +206,7 @@ private:
     ScenePipelineStateCache shadowPipelineStateCache_;
     /// Passes.
     ea::vector<PassData> passes_;
+    ea::vector<SharedPtr<ScenePass>> passes2_;
     /// Base batches lookup table.
     ea::unordered_map<unsigned, ea::vector<BaseSceneBatch>*> baseBatchesLookup_;
     /// Light batches lookup table.

@@ -267,6 +267,11 @@ void CustomView::Render()
         { ScenePassType::Unlit, "postalpha" },
     };
     sceneBatchCollector.SetMaxPixelLights(4);
+
+    static auto basePass = MakeShared<OpaqueForwardLightingScenePass>(context_, "base", "litbase", "light");
+    sceneBatchCollector.ResetPasses();
+    sceneBatchCollector.AddScenePass(basePass);
+
     sceneBatchCollector.BeginFrame(frameInfo_, scenePipelineStateFactory, passes);
     sceneBatchCollector.ProcessVisibleDrawables(drawablesInMainCamera);
     sceneBatchCollector.ProcessVisibleLights();
@@ -306,8 +311,8 @@ void CustomView::Render()
 
     drawQueue.Reset(graphics_);
 
-    sceneBatchRenderer->RenderLitBaseBatches(drawQueue, sceneBatchCollector, camera_, zone, baseBatches);
-    sceneBatchRenderer->RenderLightBatches(drawQueue, sceneBatchCollector, camera_, zone, lightBatches);
+    sceneBatchRenderer->RenderLitBaseBatches(drawQueue, sceneBatchCollector, camera_, zone, basePass->GetSortedLitBaseBatches());
+    sceneBatchRenderer->RenderLightBatches(drawQueue, sceneBatchCollector, camera_, zone, basePass->GetSortedLightBatches());
 
     drawQueue.Execute(graphics_);
 

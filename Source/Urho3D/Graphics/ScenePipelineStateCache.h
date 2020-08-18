@@ -108,7 +108,7 @@ struct ScenePipelineStateContext
     /// Cull camera.
     Camera* camera_{};
     /// Scene light.
-    SceneLight* light_{};
+    const SceneLight* light_{};
     /// Drawable.
     Drawable* drawable_{};
 };

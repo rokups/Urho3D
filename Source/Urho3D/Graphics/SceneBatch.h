@@ -29,10 +29,25 @@
 namespace Urho3D
 {
 
+/// Intermediate batch that may map onto one or many actual batches.
+struct IntermediateSceneBatch
+{
+    /// Geometry.
+    Drawable* geometry_{};
+    /// Index of source batch within geometry.
+    unsigned sourceBatchIndex_{};
+    /// Base material pass.
+    Pass* basePass_{};
+    /// Additional material pass for forward rendering.
+    Pass* additionalPass_{};
+};
+
 /// Base or lit base scene batch for specific sub-pass.
 // TODO(renderer): Sort by vertex lights
 struct BaseSceneBatch
 {
+    /// Light index (if applicable).
+    unsigned lightIndex_{ M_MAX_UNSIGNED };
     /// Drawable index.
     unsigned drawableIndex_{};
     /// Source batch index.
@@ -50,6 +65,21 @@ struct BaseSceneBatch
     /// Pipeline state.
     PipelineState* pipelineState_{};
 
+    /// Construct default.
+    BaseSceneBatch() = default;
+    /// Construct from intermediate batch.
+    BaseSceneBatch(unsigned lightIndex, const IntermediateSceneBatch& intermediateBatch, Material* defaultMaterial)
+        : lightIndex_(lightIndex)
+        , drawableIndex_(intermediateBatch.geometry_->GetDrawableIndex())
+        , sourceBatchIndex_(intermediateBatch.sourceBatchIndex_)
+        , drawable_(intermediateBatch.geometry_)
+        , pass_(intermediateBatch.basePass_)
+    {
+        const SourceBatch& sourceBatch = GetSourceBatch();
+        geometryType_ = sourceBatch.geometryType_;
+        geometry_ = sourceBatch.geometry_;
+        material_ = sourceBatch.material_ ? sourceBatch.material_ : defaultMaterial;
+    }
     /// Return source batch.
     const SourceBatch& GetSourceBatch() const { return drawable_->GetBatches()[sourceBatchIndex_]; }
 };
@@ -58,7 +88,7 @@ struct BaseSceneBatch
 struct LightSceneBatch : public BaseSceneBatch
 {
     /// Index of light in the array of visible lights.
-    unsigned lightIndex_{ M_MAX_UNSIGNED };
+    //unsigned lightIndex_{ M_MAX_UNSIGNED };
 };
 
 /// Scene batch sorted by pipeline state, material and geometry. Also sorted front to back.
@@ -153,7 +183,7 @@ struct LightBatchSortedByState : public BaseSceneBatchSortedByState
     LightBatchSortedByState() = default;
 
     /// Construct from batch.
-    explicit LightBatchSortedByState(const LightSceneBatch* lightBatch)
+    explicit LightBatchSortedByState(const BaseSceneBatch* lightBatch)
         : BaseSceneBatchSortedByState(lightBatch)
         , lightIndex_(lightBatch->lightIndex_)
     {
