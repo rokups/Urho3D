@@ -84,13 +84,6 @@ struct BaseSceneBatch
     const SourceBatch& GetSourceBatch() const { return drawable_->GetBatches()[sourceBatchIndex_]; }
 };
 
-/// Additional light scene batch for specific sub-pass.
-struct LightSceneBatch : public BaseSceneBatch
-{
-    /// Index of light in the array of visible lights.
-    //unsigned lightIndex_{ M_MAX_UNSIGNED };
-};
-
 /// Scene batch sorted by pipeline state, material and geometry. Also sorted front to back.
 struct BaseSceneBatchSortedByState
 {

@@ -44,35 +44,6 @@
 namespace Urho3D
 {
 
-/// Type of scene pass.
-enum class ScenePassType
-{
-    /// No forward lighting. Custom lighting is used instead (e.g. deferred lighting).
-    /// Object is rendered once in base pass.
-    Unlit,
-    /// Forward lighting pass.
-    /// Object with lighting from the first light rendered once in base pass.
-    /// Lighting from other lights is applied in additional passes.
-    ForwardLitBase,
-    /// Forward lighting pass.
-    /// Object is rendered once in base pass without lighting.
-    /// Lighting from all lights is applied in additional passes.
-    ForwardUnlitBase
-};
-
-/// Description of scene pass.
-struct ScenePassDescription
-{
-    /// Pass type.
-    ScenePassType type_{};
-    /// Material pass used to render materials that don't receive light.
-    ea::string unlitBasePassName_;
-    /// Material pass used for first light during forward rendering.
-    ea::string litBasePassName_;
-    /// Material pass used for the rest of lights during forward rendering.
-    ea::string additionalLightPassName_;
-};
-
 /// Callback interface for SceneBatchCollector.
 class SceneBatchCollectorCallback : public ScenePipelineStateCacheCallback
 {
@@ -110,8 +81,7 @@ public:
     void AddScenePass(const SharedPtr<ScenePass>& pass);
 
     /// Begin frame processing.
-    void BeginFrame(const FrameInfo& frameInfo, SceneBatchCollectorCallback& callback,
-        ea::span<const ScenePassDescription> passes);
+    void BeginFrame(const FrameInfo& frameInfo, SceneBatchCollectorCallback& callback);
     /// Process visible drawables.
     void ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables);
     /// Process visible lights.
@@ -129,14 +99,6 @@ public:
     const SceneLight* GetVisibleLight(unsigned i) const { return visibleLights_[i]; }
     /// Return all visible lights.
     const ea::vector<SceneLight*>& GetVisibleLights() const { return visibleLights_; }
-    /// Return base batches for given pass.
-    const ea::vector<BaseSceneBatch>& GetBaseBatches(const ea::string& pass) const;
-    /// Return sorted base batches for given pass.
-    template <class T> void GetSortedBaseBatches(const ea::string& pass, ea::vector<T>& sortedBatches) const;
-    /// Return light batches for given pass.
-    const ThreadedVector<LightSceneBatch>& GetLightBatches(const ea::string& pass) const;
-    /// Return sorted light batches for given pass.
-    template <class T> void GetSortedLightBatches(const ea::string& pass, ea::vector<T>& sortedBatches) const;
     /// Return sorted shadow batches.
     template <class T> void GetSortedShadowBatches(const ea::vector<BaseSceneBatch>& batches, ea::vector<T>& sortedBatches) const;
 
@@ -146,16 +108,9 @@ public:
     ea::array<SceneLight*, MaxVertexLights> GetVertexLights(unsigned drawableIndex) const;
 
 private:
-    /// Internal pass data.
-    struct PassData;
-    /// Helper class to evaluate min and max Z of the drawable.
-    struct DrawableZRangeEvaluator;
-
     /// Return technique for given material and drawable.
     Technique* FindTechnique(Drawable* drawable, Material* material) const;
 
-    /// Update source batches and collect pass batches.
-    void UpdateAndCollectSourceBatches(const ea::vector<Drawable*>& drawables);
     /// Update source batches and collect pass batches for single thread.
     void ProcessVisibleDrawablesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables);
 
@@ -163,14 +118,6 @@ private:
     unsigned FindMainLight() const;
     /// Accumulate forward lighting for given light.
     void AccumulateForwardLighting(unsigned lightIndex);
-
-    /// Convert scene batches from intermediate batches to unlit base batches.
-    void CollectSceneUnlitBaseBatches(ScenePipelineStateCache& subPassCache,
-        const ThreadedVector<IntermediateSceneBatch>& intermediateBatches, ea::vector<BaseSceneBatch>& sceneBatches);
-    /// Convert scene batches from intermediate batches to lit base batches and light batches.
-    void CollectSceneLitBaseBatches(ScenePipelineStateCache& baseSubPassCache, ScenePipelineStateCache& lightSubPassCache,
-        const ThreadedVector<IntermediateSceneBatch>& intermediateBatches, ea::vector<BaseSceneBatch>& baseSceneBatches,
-        ThreadedVector<LightSceneBatch>& lightSceneBatches);
 
     /// Max number of pixel lights per drawable. Important lights may override this limit.
     unsigned maxPixelLights_{ 1 };
@@ -205,12 +152,7 @@ private:
     /// Shadow pass pipeline state cache.
     ScenePipelineStateCache shadowPipelineStateCache_;
     /// Passes.
-    ea::vector<PassData> passes_;
     ea::vector<SharedPtr<ScenePass>> passes2_;
-    /// Base batches lookup table.
-    ea::unordered_map<unsigned, ea::vector<BaseSceneBatch>*> baseBatchesLookup_;
-    /// Light batches lookup table.
-    ea::unordered_map<unsigned, ThreadedVector<LightSceneBatch>*> lightBatchesLookup_;
 
     /// Visible geometries.
     ThreadedVector<Drawable*> visibleGeometries_;
@@ -231,40 +173,12 @@ private:
     /// Drawable lighting data index.
     ea::vector<DrawableLightAccumulator<MaxPixelLights, MaxVertexLights>> drawableLighting_;
 
-    /// Per-light caches.
+    /// Cached lights data.
     ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<SceneLight>> cachedSceneLights_;
 
-    /// Temporary collection for pipeline state cache misses (base batches).
-    ThreadedVector<BaseSceneBatch*> baseSceneBatchesWithoutPipelineStates_;
-    /// Temporary collection for pipeline state cache misses (light batches).
-    ThreadedVector<unsigned> lightSceneBatchesWithoutPipelineStates_;
     /// Temporary collection for pipeline state cache misses (shadow batches).
     ThreadedVector<ea::pair<SceneLightShadowSplit*, unsigned>> shadowBatchesWithoutPipelineStates_;
 };
-
-template <class T>
-void SceneBatchCollector::GetSortedBaseBatches(const ea::string& pass, ea::vector<T>& sortedBatches) const
-{
-    const ea::vector<BaseSceneBatch>& baseBatches = GetBaseBatches(pass);
-    const unsigned numBatches = baseBatches.size();
-    sortedBatches.resize(numBatches);
-    for (unsigned i = 0; i < numBatches; ++i)
-        sortedBatches[i] = T{ &baseBatches[i] };
-    ea::sort(sortedBatches.begin(), sortedBatches.end());
-}
-
-template <class T>
-void SceneBatchCollector::GetSortedLightBatches(const ea::string& pass, ea::vector<T>& sortedBatches) const
-{
-    const ThreadedVector<LightSceneBatch>& lightBatches = GetLightBatches(pass);
-    const unsigned numBatches = lightBatches.Size();
-    sortedBatches.resize(numBatches);
-    lightBatches.ForEach([&](unsigned, unsigned elementIndex, const LightSceneBatch& lightBatch)
-    {
-        sortedBatches[elementIndex] = T{ &lightBatch };
-    });
-    ea::sort(sortedBatches.begin(), sortedBatches.end());
-}
 
 template <class T>
 void SceneBatchCollector::GetSortedShadowBatches(const ea::vector<BaseSceneBatch>& batches, ea::vector<T>& sortedBatches) const

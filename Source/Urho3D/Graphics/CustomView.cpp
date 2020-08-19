@@ -259,29 +259,23 @@ void CustomView::Render()
     static TestFactory scenePipelineStateFactory(context_, shadowMapAllocator);
     static SceneBatchCollector sceneBatchCollector(context_);
     static auto sceneBatchRenderer = MakeShared<SceneBatchRenderer>(context_);
-    static ScenePassDescription passes[] = {
+    /*static ScenePassDescription passes[] = {
         { ScenePassType::ForwardLitBase,   "base",  "litbase",  "light" },
         { ScenePassType::ForwardUnlitBase, "alpha", "",         "litalpha" },
         { ScenePassType::Unlit, "postopaque" },
         { ScenePassType::Unlit, "refract" },
         { ScenePassType::Unlit, "postalpha" },
-    };
+    };*/
     sceneBatchCollector.SetMaxPixelLights(4);
 
     static auto basePass = MakeShared<OpaqueForwardLightingScenePass>(context_, "base", "litbase", "light");
     sceneBatchCollector.ResetPasses();
     sceneBatchCollector.AddScenePass(basePass);
 
-    sceneBatchCollector.BeginFrame(frameInfo_, scenePipelineStateFactory, passes);
+    sceneBatchCollector.BeginFrame(frameInfo_, scenePipelineStateFactory);
     sceneBatchCollector.ProcessVisibleDrawables(drawablesInMainCamera);
     sceneBatchCollector.ProcessVisibleLights();
     sceneBatchCollector.CollectSceneBatches();
-
-    static ea::vector<BaseSceneBatchSortedByState> baseBatches;
-    sceneBatchCollector.GetSortedBaseBatches("litbase", baseBatches);
-
-    static ea::vector<LightBatchSortedByState> lightBatches;
-    sceneBatchCollector.GetSortedLightBatches("light", lightBatches);
 
     static ea::vector<BaseSceneBatchSortedByState> shadowBatches;
 
