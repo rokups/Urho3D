@@ -77,6 +77,8 @@ public:
     void SetMaxPixelLights(unsigned count) { maxPixelLights_ = count; }
     /// Reset scene passes.
     void ResetPasses();
+    /// Set shadow pass.
+    void SetShadowPass(const SharedPtr<ShadowScenePass>& shadowPass);
     /// Add scene pass.
     void AddScenePass(const SharedPtr<ScenePass>& pass);
 
@@ -99,8 +101,6 @@ public:
     const SceneLight* GetVisibleLight(unsigned i) const { return visibleLights_[i]; }
     /// Return all visible lights.
     const ea::vector<SceneLight*>& GetVisibleLights() const { return visibleLights_; }
-    /// Return sorted shadow batches.
-    template <class T> void GetSortedShadowBatches(const ea::vector<BaseSceneBatch>& batches, ea::vector<T>& sortedBatches) const;
 
     /// Return vertex lights for drawable (as indices in the array of visible lights).
     VertexLightCollection GetVertexLightIndices(unsigned drawableIndex) const { return drawableLighting_[drawableIndex].GetVertexLights(); }
@@ -108,9 +108,6 @@ public:
     ea::array<SceneLight*, MaxVertexLights> GetVertexLights(unsigned drawableIndex) const;
 
 private:
-    /// Return technique for given material and drawable.
-    Technique* FindTechnique(Drawable* drawable, Material* material) const;
-
     /// Update source batches and collect pass batches for single thread.
     void ProcessVisibleDrawablesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables);
 
@@ -149,9 +146,9 @@ private:
     /// Number of drawables.
     unsigned numDrawables_{};
 
-    /// Shadow pass pipeline state cache.
-    ScenePipelineStateCache shadowPipelineStateCache_;
-    /// Passes.
+    /// Shadow pass.
+    SharedPtr<ShadowScenePass> shadowPass_;
+    /// Scene passes.
     ea::vector<SharedPtr<ScenePass>> passes2_;
 
     /// Visible geometries.
@@ -175,19 +172,6 @@ private:
 
     /// Cached lights data.
     ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<SceneLight>> cachedSceneLights_;
-
-    /// Temporary collection for pipeline state cache misses (shadow batches).
-    ThreadedVector<ea::pair<SceneLightShadowSplit*, unsigned>> shadowBatchesWithoutPipelineStates_;
 };
-
-template <class T>
-void SceneBatchCollector::GetSortedShadowBatches(const ea::vector<BaseSceneBatch>& batches, ea::vector<T>& sortedBatches) const
-{
-    const unsigned numBatches = batches.size();
-    sortedBatches.resize(numBatches);
-    for (unsigned i = 0; i < numBatches; ++i)
-        sortedBatches[i] = T{ &batches[i] };
-    ea::sort(sortedBatches.begin(), sortedBatches.end());
-}
 
 }

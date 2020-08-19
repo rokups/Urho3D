@@ -63,8 +63,6 @@ public:
     /// Construct.
     ScenePass(Context* context, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
-    /// Return whether the pass is valid.
-    virtual bool IsValid() const = 0;
     /// Clear in the beginning of the frame.
     virtual void BeginFrame();
     /// Add source batch. Try to keep it non-virtual to optimize processing. Return whether it was lit.
@@ -156,7 +154,7 @@ class ForwardLightingScenePass : public ScenePass
 public:
     /// Construct.
     ForwardLightingScenePass(Context* context,
-        const ea::string& unlitBasePassIndex, const ea::string& litBasePassIndex, const ea::string& lightPassIndex);
+        const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass);
 
 private:
 };
@@ -170,8 +168,6 @@ public:
     /// Construct.
     using ForwardLightingScenePass::ForwardLightingScenePass;
 
-    /// Return whether the pass is valid.
-    bool IsValid() const override;
     /// Sort scene batches.
     virtual void SortSceneBatches() override;
 
@@ -189,6 +185,53 @@ protected:
     ea::vector<BaseSceneBatchSortedByState> sortedLitBaseBatches_;
     /// Sorted light batches.
     ea::vector<LightBatchSortedByState> sortedLightBatches_;
+};
+
+/// Scene pass for shadow rendering.
+class ShadowScenePass : public Object
+{
+    URHO3D_OBJECT(ShadowScenePass, Object);
+
+public:
+    /// Construct.
+    ShadowScenePass(Context* context, const ea::string& shadowPass);
+
+    /// Clear in the beginning of the frame.
+    virtual void BeginFrame();
+    /// Collect shadow batches for given light. Shall be safe to call from worker thread.
+    virtual void CollectShadowBatches(MaterialQuality materialQuality, SceneLight* sceneLight, unsigned splitIndex);
+    /// Finalize shadow batches. Called from main thread.
+    virtual void FinalizeShadowBatches(Camera* camera, ScenePipelineStateCacheCallback& callback);
+    /// Sort and return shadow batches. Safe to call from worker thread.
+    ea::span<const BaseSceneBatchSortedByState> GetSortedShadowBatches(const SceneLightShadowSplit& split) const;
+
+protected:
+    /// Sort batches (from vector).
+    template <class T>
+    static void SortBatches(const ea::vector<BaseSceneBatch>& sceneBatches, ea::vector<T>& sortedBatches)
+    {
+        const unsigned numBatches = sceneBatches.size();
+        sortedBatches.resize(numBatches);
+        for (unsigned i = 0; i < numBatches; ++i)
+            sortedBatches[i] = T{ &sceneBatches[i] };
+        ea::sort(sortedBatches.begin(), sortedBatches.end());
+    }
+
+    /// Work queue.
+    WorkQueue* const workQueue_{};
+    /// Renderer.
+    Renderer* const renderer_{};
+    /// Number of worker threads.
+    unsigned numThreads_{};
+
+    /// Shadow pass index.
+    const unsigned shadowPassIndex_{};
+
+    /// Temporary vector to store batches without pipeline states.
+    ThreadedVector<ea::pair<SceneLightShadowSplit*, unsigned>> batchesDirty_;
+
+    /// Pipeline state cache.
+    ScenePipelineStateCache pipelineStateCache_;
 };
 
 }

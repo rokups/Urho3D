@@ -95,44 +95,18 @@ ea::array<SceneLight*, SceneBatchCollector::MaxVertexLights> SceneBatchCollector
     return lights;
 }
 
-Technique* SceneBatchCollector::FindTechnique(Drawable* drawable, Material* material) const
-{
-    const ea::vector<TechniqueEntry>& techniques = material->GetTechniques();
-
-    // If only one technique, no choice
-    if (techniques.size() == 1)
-        return techniques[0].technique_;
-
-    // TODO(renderer): Consider optimizing this loop
-    const float lodDistance = drawable->GetLodDistance();
-    for (unsigned i = 0; i < techniques.size(); ++i)
-    {
-        const TechniqueEntry& entry = techniques[i];
-        Technique* tech = entry.technique_;
-
-        if (!tech || (!tech->IsSupported()) || materialQuality_ < entry.qualityLevel_)
-            continue;
-        if (lodDistance >= entry.lodDistance_)
-            return tech;
-    }
-
-    // If no suitable technique found, fallback to the last
-    return techniques.size() ? techniques.back().technique_ : nullptr;
-}
-
 void SceneBatchCollector::ResetPasses()
 {
     passes2_.clear();
 }
 
+void SceneBatchCollector::SetShadowPass(const SharedPtr<ShadowScenePass>& shadowPass)
+{
+    shadowPass_ = shadowPass;
+}
+
 void SceneBatchCollector::AddScenePass(const SharedPtr<ScenePass>& pass)
 {
-    if (!pass->IsValid())
-    {
-        // TODO(renderer): Log error
-        assert(0);
-        return;
-    }
     passes2_.push_back(pass);
 }
 
@@ -156,12 +130,13 @@ void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchColle
     visibleLightsTemp_.Clear(numThreads_);
     sceneZRange_.Clear(numThreads_);
     shadowCastersToBeUpdated_.Clear(numThreads_);
-    shadowBatchesWithoutPipelineStates_.Clear(numThreads_);
 
     transient_.Reset(numDrawables_);
     drawableLighting_.resize(numDrawables_);
 
     // Initialize passes
+    if (shadowPass_)
+        shadowPass_->BeginFrame();
     for (ScenePass* pass : passes2_)
         pass->BeginFrame();
 }
@@ -231,7 +206,7 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
 
                 // Find current technique
                 Material* material = sourceBatch.material_ ? sourceBatch.material_ : defaultMaterial;
-                Technique* technique = FindTechnique(drawable, material);
+                Technique* technique = material->FindTechnique(drawable, materialQuality_);
                 if (!technique)
                     continue;
 
@@ -264,7 +239,7 @@ void SceneBatchCollector::ProcessVisibleLights()
 {
     // Process lights in main thread
     for (SceneLight* sceneLight : visibleLights_)
-        sceneLight->BeginFrame(callback_->HasShadow(sceneLight->GetLight()));
+        sceneLight->BeginFrame(shadowPass_ && callback_->HasShadow(sceneLight->GetLight()));
 
     // Update lit geometries and shadow casters
     SceneLightProcessContext sceneLightProcessContext;
@@ -321,69 +296,15 @@ void SceneBatchCollector::ProcessVisibleLights()
         {
             workQueue_->AddWorkItem([=](unsigned threadIndex)
             {
-                Material* defaultMaterial = renderer_->GetDefaultMaterial();
-                const auto& shadowCasters = sceneLight->GetShadowCasters(splitIndex);
-                auto& shadowBatches = sceneLight->GetMutableShadowBatches(splitIndex);
-                for (Drawable* drawable : shadowCasters)
-                {
-                    // Check shadow distance
-                    float maxShadowDistance = drawable->GetShadowDistance();
-                    const float drawDistance = drawable->GetDrawDistance();
-                    if (drawDistance > 0.0f && (maxShadowDistance <= 0.0f || drawDistance < maxShadowDistance))
-                        maxShadowDistance = drawDistance;
-                    if (maxShadowDistance > 0.0f && drawable->GetDistance() > maxShadowDistance)
-                        continue;
-
-                    // Add batches
-                    const auto& sourceBatches = drawable->GetBatches();
-                    for (unsigned j = 0; j < sourceBatches.size(); ++j)
-                    {
-                        const SourceBatch& sourceBatch = sourceBatches[j];
-                        Material* material = sourceBatch.material_ ? sourceBatch.material_ : defaultMaterial;
-                        Technique* tech = FindTechnique(drawable, material);
-                        Pass* pass = tech->GetSupportedPass(Technique::shadowPassIndex);
-                        if (!pass)
-                            continue;
-
-                        BaseSceneBatch batch;
-                        batch.drawableIndex_ = drawable->GetDrawableIndex();
-                        batch.sourceBatchIndex_ = j;
-                        batch.geometryType_ = sourceBatch.geometryType_;
-                        batch.drawable_ = drawable;
-                        batch.geometry_ = sourceBatch.geometry_;
-                        batch.material_ = sourceBatch.material_;
-                        batch.pass_ = pass;
-
-                        const ScenePipelineStateKey key{ batch, sceneLight->GetPipelineStateHash() };
-                        batch.pipelineState_ = shadowPipelineStateCache_.GetPipelineState(key);
-                        if (!batch.pipelineState_)
-                        {
-                            SceneLightShadowSplit& split = sceneLight->GetMutableSplit(splitIndex);
-                            shadowBatchesWithoutPipelineStates_.Insert(threadIndex, { &split, shadowBatches.size() });
-                        }
-
-                        shadowBatches.push_back(batch);
-                    }
-                }
+                shadowPass_->CollectShadowBatches(materialQuality_, sceneLight, splitIndex);
             }, M_MAX_UNSIGNED);
         }
     }
     workQueue_->Complete(M_MAX_UNSIGNED);
 
-    // Fill missing pipeline states
-    ScenePipelineStateContext subPassContext;
-    subPassContext.camera_ = camera_;
-
-    shadowBatchesWithoutPipelineStates_.ForEach([&](unsigned, unsigned, const ea::pair<SceneLightShadowSplit*, unsigned>& splitAndBatch)
-    {
-        SceneLightShadowSplit& split = *splitAndBatch.first;
-        BaseSceneBatch& shadowBatch = split.shadowCasterBatches_[splitAndBatch.second];
-        subPassContext.drawable_ = shadowBatch.drawable_;
-        subPassContext.light_ = split.sceneLight_;
-        const ScenePipelineStateKey baseKey{ shadowBatch, split.sceneLight_->GetPipelineStateHash() };
-        shadowBatch.pipelineState_ = shadowPipelineStateCache_.GetOrCreatePipelineState(
-            baseKey, subPassContext, *callback_);
-    });
+    // Finalize shadow batches
+    if (shadowPass_)
+        shadowPass_->FinalizeShadowBatches(camera_, *callback_);
 
     // Find main light
     mainLightIndex_ = FindMainLight();

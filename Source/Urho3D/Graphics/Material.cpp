@@ -1160,6 +1160,31 @@ Technique* Material::GetTechnique(unsigned index) const
     return index < techniques_.size() ? techniques_[index].technique_ : nullptr;
 }
 
+Technique* Material::FindTechnique(Drawable* drawable, MaterialQuality materialQuality) const
+{
+    const ea::vector<TechniqueEntry>& techniques = GetTechniques();
+
+    // If only one technique, no choice
+    if (techniques.size() == 1)
+        return techniques[0].technique_;
+
+    // TODO(renderer): Consider optimizing this loop
+    const float lodDistance = drawable->GetLodDistance();
+    for (unsigned i = 0; i < techniques.size(); ++i)
+    {
+        const TechniqueEntry& entry = techniques[i];
+        Technique* tech = entry.technique_;
+
+        if (!tech || (!tech->IsSupported()) || materialQuality < entry.qualityLevel_)
+            continue;
+        if (lodDistance >= entry.lodDistance_)
+            return tech;
+    }
+
+    // If no suitable technique found, fallback to the last
+    return techniques.size() ? techniques.back().technique_ : nullptr;
+}
+
 Pass* Material::GetPass(unsigned index, const ea::string& passName) const
 {
     Technique* tech = index < techniques_.size() ? techniques_[index].technique_ : nullptr;

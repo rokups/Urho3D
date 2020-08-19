@@ -269,7 +269,9 @@ void CustomView::Render()
     sceneBatchCollector.SetMaxPixelLights(4);
 
     static auto basePass = MakeShared<OpaqueForwardLightingScenePass>(context_, "base", "litbase", "light");
+    static auto shadowPass = MakeShared<ShadowScenePass>(context_, "shadow");
     sceneBatchCollector.ResetPasses();
+    sceneBatchCollector.SetShadowPass(shadowPass);
     sceneBatchCollector.AddScenePass(basePass);
 
     sceneBatchCollector.BeginFrame(frameInfo_, scenePipelineStateFactory);
@@ -291,7 +293,7 @@ void CustomView::Render()
         for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
         {
             const SceneLightShadowSplit& split = sceneLight->GetSplit(splitIndex);
-            sceneBatchCollector.GetSortedShadowBatches(sceneLight->GetShadowBatches(splitIndex), shadowBatches);
+            const auto& shadowBatches = shadowPass->GetSortedShadowBatches(split);
 
             drawQueue.Reset(graphics_);
             sceneBatchRenderer->RenderShadowBatches(drawQueue, sceneBatchCollector, split.shadowCamera_, zone, shadowBatches);

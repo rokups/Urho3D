@@ -263,6 +263,8 @@ public:
     /// Return technique by index.
     /// @property{get_techniques}
     Technique* GetTechnique(unsigned index) const;
+    /// Find best technique for given drawable and quality settings.
+    Technique* FindTechnique(Drawable* drawable, MaterialQuality materialQuality) const;
     /// Return pass by technique index and pass name.
     Pass* GetPass(unsigned index, const ea::string& passName) const;
     /// Return texture by unit.
