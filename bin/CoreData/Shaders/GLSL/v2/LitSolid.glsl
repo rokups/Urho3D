@@ -1,12 +1,9 @@
-#include "Uniforms.glsl"
+#include "_Uniforms.glsl"
 #include "Samplers.glsl"
 #include "Transform.glsl"
 #include "ScreenPos.glsl"
 #include "Lighting.glsl"
 #include "Fog.glsl"
-
-#define PASS_LITBASE
-
 
 #ifdef NORMALMAP
     varying vec4 vTexCoord;
@@ -69,7 +66,7 @@ void VS()
         vTangent = vec4(tangent.xyz, bitangent.z);
     #endif
 
-    #ifdef PASS_LITBASE
+    #ifdef PASS_BASE_LITBASE
         vVertexLight = GetAmbientLight(vec4(vNormal, 1));
 
         #ifdef NUMVERTEXLIGHTS
@@ -126,7 +123,7 @@ void PS()
         float fogFactor = GetFogFactor(vWorldPos.w);
     #endif
 
-    #ifdef PASS_LITBASE
+    #ifdef PASS_BASE
         // Per-pixel forward lighting
         vec3 lightColor;
         vec3 lightDir;

@@ -1,19 +1,11 @@
-#if !defined(GL3) || !defined(USE_CBUFFERS)
-    #define CBUFFER_BEGIN(name)
-    #define CBUFFER_UNIFORM(decl) uniform decl;
-    #define CBUFFER_END()
-#else
-    #define CBUFFER_BEGIN(name) uniform name {
-    #define CBUFFER_UNIFORM(decl) decl;
-    #define CBUFFER_END() };
-#endif
+#ifndef _UNIFORMS_GLSL_
+#define _UNIFORMS_GLSL_
+
+#include "_Config.glsl"
 
 CBUFFER_BEGIN(Frame)
     CBUFFER_UNIFORM(float cDeltaTime)
     CBUFFER_UNIFORM(float cElapsedTime)
-
-    CBUFFER_UNIFORM(float cDeltaTimePS)
-    CBUFFER_UNIFORM(float cElapsedTimePS)
 CBUFFER_END()
 
 CBUFFER_BEGIN(Camera)
@@ -27,24 +19,14 @@ CBUFFER_BEGIN(Camera)
     CBUFFER_UNIFORM(mat4 cViewInv)
     CBUFFER_UNIFORM(mat4 cViewProj)
     CBUFFER_UNIFORM(vec4 cClipPlane)
-
-    CBUFFER_UNIFORM(vec3 cCameraPosPS)
     CBUFFER_UNIFORM(vec4 cDepthReconstruct)
     CBUFFER_UNIFORM(vec2 cGBufferInvSize)
-    CBUFFER_UNIFORM(float cNearClipPS)
-    CBUFFER_UNIFORM(float cFarClipPS)
 CBUFFER_END()
 
 CBUFFER_BEGIN(Zone)
-    CBUFFER_UNIFORM(vec3 cAmbientStartColor)
-    CBUFFER_UNIFORM(vec3 cAmbientEndColor)
-    CBUFFER_UNIFORM(mat4 cZone)
-
     CBUFFER_UNIFORM(vec4 cAmbientColor)
     CBUFFER_UNIFORM(vec4 cFogParams)
     CBUFFER_UNIFORM(vec3 cFogColor)
-    CBUFFER_UNIFORM(vec3 cZoneMin)
-    CBUFFER_UNIFORM(vec3 cZoneMax)
 CBUFFER_END()
 
 CBUFFER_BEGIN(Light)
@@ -57,15 +39,11 @@ CBUFFER_BEGIN(Light)
     CBUFFER_UNIFORM(mat4 cLightMatrices[4])
 
     CBUFFER_UNIFORM(vec4 cLightColor)
-    CBUFFER_UNIFORM(vec4 cLightPosPS)
-    CBUFFER_UNIFORM(vec3 cLightDirPS)
-    CBUFFER_UNIFORM(vec4 cNormalOffsetScalePS)
     CBUFFER_UNIFORM(vec4 cShadowCubeAdjust)
     CBUFFER_UNIFORM(vec4 cShadowDepthFade)
     CBUFFER_UNIFORM(vec2 cShadowIntensity)
     CBUFFER_UNIFORM(vec2 cShadowMapInvSize)
     CBUFFER_UNIFORM(vec4 cShadowSplits)
-    CBUFFER_UNIFORM(mat4 cLightMatricesPS[4])
 #ifdef VSM_SHADOW
     CBUFFER_UNIFORM(vec2 cVSMShadowParams)
 #endif
@@ -113,4 +91,6 @@ CBUFFER_BEGIN(Object)
     CBUFFER_UNIFORM(vec4 cSkinMatrices[MAXBONES*3])
 #endif
 CBUFFER_END()
+#endif
+
 #endif

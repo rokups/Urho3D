@@ -69,12 +69,12 @@ void PS()
     // Position acquired via near/far ray is relative to camera. Bring position to world space
     vec3 eyeVec = -worldPos;
     worldPos += cCameraPosPS;
-    
+
     vec3 normal = normalize(normalInput.rgb * 2.0 - 1.0);
     vec4 projWorldPos = vec4(worldPos, 1.0);
     vec3 lightColor;
     vec3 lightDir;
-    
+
     float diff = GetDiffuse(normal, worldPos, lightDir);
 
     #ifdef SHADOW
@@ -82,10 +82,10 @@ void PS()
     #endif
 
     #if defined(SPOTLIGHT)
-        vec4 spotPos = projWorldPos * cLightMatricesPS[0];
+        vec4 spotPos = projWorldPos * cLightMatrices[0];
         lightColor = spotPos.w > 0.0 ? texture2DProj(sLightSpotMap, spotPos).rgb * cLightColor.rgb : vec3(0.0);
     #elif defined(CUBEMASK)
-        mat3 lightVecRot = mat3(cLightMatricesPS[0][0].xyz, cLightMatricesPS[0][1].xyz, cLightMatricesPS[0][2].xyz);
+        mat3 lightVecRot = mat3(cLightMatrices[0][0].xyz, cLightMatrices[0][1].xyz, cLightMatrices[0][2].xyz);
         lightColor = textureCube(sLightCubeMap, (worldPos - cLightPosPS.xyz) * lightVecRot).rgb * cLightColor.rgb;
     #else
         lightColor = cLightColor.rgb;

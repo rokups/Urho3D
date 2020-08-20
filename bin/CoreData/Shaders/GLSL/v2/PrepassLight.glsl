@@ -78,12 +78,12 @@ void PS()
     #ifdef SHADOW
         diff *= GetShadowDeferred(projWorldPos, normal, depth);
     #endif
-    
+
     #if defined(SPOTLIGHT)
-        vec4 spotPos = projWorldPos * cLightMatricesPS[0];
+        vec4 spotPos = projWorldPos * cLightMatrices[0];
         lightColor = spotPos.w > 0.0 ? texture2DProj(sLightSpotMap, spotPos).rgb * cLightColor.rgb : vec3(0.0);
     #elif defined(CUBEMASK)
-        mat3 lightVecRot = mat3(cLightMatricesPS[0][0].xyz, cLightMatricesPS[0][1].xyz, cLightMatricesPS[0][2].xyz);
+        mat3 lightVecRot = mat3(cLightMatrices[0][0].xyz, cLightMatrices[0][1].xyz, cLightMatrices[0][2].xyz);
         lightColor = textureCube(sLightCubeMap, (worldPos - cLightPosPS.xyz) * lightVecRot).rgb * cLightColor.rgb;
     #else
         lightColor = cLightColor.rgb;

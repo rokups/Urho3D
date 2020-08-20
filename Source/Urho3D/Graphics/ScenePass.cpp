@@ -240,9 +240,9 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
 ForwardLightingScenePass::ForwardLightingScenePass(Context* context, const ea::string& tag,
     const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass)
     : ScenePass(context,
-        Format(tag, "UNLIT"),
-        Format(tag, "LITBASE"),
-        Format(tag, "LIGHT"),
+        Format("{0} {0}_UNLIT", tag),
+        Format("{0} {0}_LITBASE", tag),
+        Format("{0} {0}_LIGHT", tag),
         Technique::GetPassIndex(unlitBasePass),
         Technique::GetPassIndex(litBasePass),
         Technique::GetPassIndex(lightPass))

@@ -110,7 +110,7 @@ public:
             }
         }
         if (graphics_->GetConstantBuffersEnabled())
-            commonDefines += "USE_CBUFFERS ";
+            commonDefines += "URHO3D_USE_CBUFFERS ";
         desc.vertexShader_ = graphics_->GetShader(
             VS, "v2/" + pass->GetVertexShader(), commonDefines + pass->GetEffectiveVertexShaderDefines());
         desc.pixelShader_ = graphics_->GetShader(
@@ -271,7 +271,7 @@ void CustomView::Render()
     };*/
     sceneBatchCollector.SetMaxPixelLights(4);
 
-    static auto basePass = MakeShared<OpaqueForwardLightingScenePass>(context_, "PASS_BASE_{}", "base", "litbase", "light");
+    static auto basePass = MakeShared<OpaqueForwardLightingScenePass>(context_, "PASS_BASE", "base", "litbase", "light");
     static auto shadowPass = MakeShared<ShadowScenePass>(context_, "PASS_SHADOW", "shadow");
     sceneBatchCollector.ResetPasses();
     sceneBatchCollector.SetShadowPass(shadowPass);

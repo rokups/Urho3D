@@ -1,4 +1,4 @@
-#include "Uniforms.glsl"
+#include "_Uniforms.glsl"
 #include "Samplers.glsl"
 #include "Transform.glsl"
 
