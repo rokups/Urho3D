@@ -81,11 +81,14 @@ public:
         Light* light = ctx.light_ ? ctx.light_->GetLight() : nullptr;
 
         PipelineStateDesc desc;
+        if (ctx.shadowPass_)
+            shadowMapAllocator_->ExportPipelineState(desc, light->GetShadowBias());
 
         for (VertexBuffer* vertexBuffer : geometry->GetVertexBuffers())
             desc.vertexElements_.append(vertexBuffer->GetElements());
 
         ea::string commonDefines;
+        commonDefines += ctx.shaderDefines_;
         if (light)
         {
             commonDefines += "PERPIXEL ";
@@ -127,7 +130,7 @@ public:
 
         desc.fillMode_ = FILL_SOLID;
         const CullMode passCullMode = pass->GetCullMode();
-        const CullMode materialCullMode = material->GetCullMode();
+        const CullMode materialCullMode = ctx.shadowPass_ ? material->GetShadowCullMode() : material->GetCullMode();
         desc.cullMode_ = GetEffectiveCullMode(passCullMode != MAX_CULLMODES ? passCullMode : materialCullMode, ctx.camera_);
 
         return renderer_->GetOrCreatePipelineState(desc);
@@ -268,8 +271,8 @@ void CustomView::Render()
     };*/
     sceneBatchCollector.SetMaxPixelLights(4);
 
-    static auto basePass = MakeShared<OpaqueForwardLightingScenePass>(context_, "base", "litbase", "light");
-    static auto shadowPass = MakeShared<ShadowScenePass>(context_, "shadow");
+    static auto basePass = MakeShared<OpaqueForwardLightingScenePass>(context_, "PASS_BASE_{}", "base", "litbase", "light");
+    static auto shadowPass = MakeShared<ShadowScenePass>(context_, "PASS_SHADOW", "shadow");
     sceneBatchCollector.ResetPasses();
     sceneBatchCollector.SetShadowPass(shadowPass);
     sceneBatchCollector.AddScenePass(basePass);

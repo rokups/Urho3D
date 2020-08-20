@@ -23,26 +23,32 @@
 #include "../Precompiled.h"
 
 #include "../Core/Context.h"
+#include "../Core/StringUtils.h"
 #include "../Core/WorkQueue.h"
-/*
-#include "../Core/IteratorRange.h"
-#include "../Core/WorkQueue.h"
-#include "../Math/Polyhedron.h"
-#include "../Graphics/Camera.h"*/
 #include "../Graphics/Renderer.h"
 #include "../Graphics/ScenePass.h"
 #include "../Graphics/Technique.h"
-/*#include "../Graphics/Octree.h"
-#include "../Graphics/OctreeQuery.h"
-#include "../Graphics/Renderer.h"
-#include "../Scene/Node.h"*/
 
 #include "../DebugNew.h"
 
 namespace Urho3D
 {
 
+namespace
+{
+
+ea::string NormalizeShaderDefine(ea::string_view define)
+{
+    if (define.back() != ' ')
+        return ea::string(define) + " ";
+    else
+        return ea::string(define);
+}
+
+}
+
 ScenePass::ScenePass(Context* context,
+    const ea::string& unlitBaseTag, const ea::string& litBaseTag, const ea::string& lightTag,
     unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
     : Object(context)
     , workQueue_(context_->GetWorkQueue())
@@ -50,6 +56,9 @@ ScenePass::ScenePass(Context* context,
     , unlitBasePassIndex_(unlitBasePassIndex)
     , litBasePassIndex_(litBasePassIndex)
     , lightPassIndex_(lightPassIndex)
+    , unlitBaseTag_(NormalizeShaderDefine(unlitBaseTag))
+    , litBaseTag_(NormalizeShaderDefine(litBaseTag))
+    , lightTag_(NormalizeShaderDefine(lightTag))
 {
 }
 
@@ -133,6 +142,7 @@ void ScenePass::CollectUnlitBatches(Camera* camera, ScenePipelineStateCacheCallb
     });
 
     ScenePipelineStateContext subPassContext;
+    subPassContext.shaderDefines_ = unlitBaseTag_;
     subPassContext.camera_ = camera;
     subPassContext.light_ = nullptr;
 
@@ -193,6 +203,7 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
     // Resolve base pipeline states
     {
         ScenePipelineStateContext baseSubPassContext;
+        baseSubPassContext.shaderDefines_ = litBaseTag_;
         baseSubPassContext.camera_ = camera;
         baseSubPassContext.light_ = mainLightIndex != M_MAX_UNSIGNED ? sceneLights[mainLightIndex] : nullptr;
         const unsigned baseLightHash = mainLightIndex != M_MAX_UNSIGNED ? mainLightHash : 0;
@@ -209,6 +220,7 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
     // Resolve light pipeline states
     {
         ScenePipelineStateContext lightSubPassContext;
+        lightSubPassContext.shaderDefines_ = lightTag_;
         lightSubPassContext.camera_ = camera;
 
         lightBatchesDirty_.ForEach([&](unsigned threadIndex, unsigned, unsigned batchIndex)
@@ -225,9 +237,12 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
     }
 }
 
-ForwardLightingScenePass::ForwardLightingScenePass(Context* context,
+ForwardLightingScenePass::ForwardLightingScenePass(Context* context, const ea::string& tag,
     const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass)
     : ScenePass(context,
+        Format(tag, "UNLIT"),
+        Format(tag, "LITBASE"),
+        Format(tag, "LIGHT"),
         Technique::GetPassIndex(unlitBasePass),
         Technique::GetPassIndex(litBasePass),
         Technique::GetPassIndex(lightPass))
@@ -244,11 +259,12 @@ void OpaqueForwardLightingScenePass::SortSceneBatches()
     SortBatches(lightBatches_, sortedLightBatches_);
 }
 
-ShadowScenePass::ShadowScenePass(Context* context, const ea::string& shadowPass)
+ShadowScenePass::ShadowScenePass(Context* context, const ea::string& tag, const ea::string& shadowPass)
     : Object(context)
     , workQueue_(context_->GetWorkQueue())
     , renderer_(context_->GetRenderer())
     , shadowPassIndex_(Technique::GetPassIndex(shadowPass))
+    , tag_(NormalizeShaderDefine(tag))
 {
 }
 
@@ -310,6 +326,8 @@ void ShadowScenePass::CollectShadowBatches(MaterialQuality materialQuality, Scen
 void ShadowScenePass::FinalizeShadowBatches(Camera* camera, ScenePipelineStateCacheCallback& callback)
 {
     ScenePipelineStateContext subPassContext;
+    subPassContext.shaderDefines_ = tag_;
+    subPassContext.shadowPass_ = true;
     subPassContext.camera_ = camera;
 
     batchesDirty_.ForEach([&](unsigned, unsigned, const ea::pair<SceneLightShadowSplit*, unsigned>& splitAndBatch)

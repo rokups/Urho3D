@@ -105,6 +105,10 @@ struct ScenePipelineStateEntry
 /// External context that is not present in the key but is necessary to create new pipeline state.
 struct ScenePipelineStateContext
 {
+    /// Pass shader defines.
+    ea::string shaderDefines_;
+    /// Whether it is shadow pass.
+    bool shadowPass_{};
     /// Cull camera.
     Camera* camera_{};
     /// Scene light.

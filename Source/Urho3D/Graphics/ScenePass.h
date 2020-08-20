@@ -61,7 +61,9 @@ public:
     using DrawableLightingData = ea::vector<DrawableLightAccumulator<MaxPixelLights, MaxVertexLights>>;
 
     /// Construct.
-    ScenePass(Context* context, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
+    ScenePass(Context* context,
+        const ea::string& unlitBaseTag, const ea::string& litBaseTag, const ea::string& lightTag,
+        unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
     /// Clear in the beginning of the frame.
     virtual void BeginFrame();
@@ -117,6 +119,12 @@ protected:
     const unsigned litBasePassIndex_{};
     /// Additional light pass index.
     const unsigned lightPassIndex_{};
+    /// Shader define for unlit base pass.
+    const ea::string unlitBaseTag_;
+    /// Shader define for lit base pass.
+    const ea::string litBaseTag_;
+    /// Shader define for light pass.
+    const ea::string lightTag_;
 
     /// Unlit base scene batches.
     ea::vector<BaseSceneBatch> unlitBaseBatches_;
@@ -153,7 +161,7 @@ class ForwardLightingScenePass : public ScenePass
 
 public:
     /// Construct.
-    ForwardLightingScenePass(Context* context,
+    ForwardLightingScenePass(Context* context, const ea::string& tag,
         const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass);
 
 private:
@@ -194,7 +202,7 @@ class ShadowScenePass : public Object
 
 public:
     /// Construct.
-    ShadowScenePass(Context* context, const ea::string& shadowPass);
+    ShadowScenePass(Context* context, const ea::string& tag, const ea::string& shadowPass);
 
     /// Clear in the beginning of the frame.
     virtual void BeginFrame();
@@ -224,6 +232,8 @@ protected:
     /// Number of worker threads.
     unsigned numThreads_{};
 
+    /// Shader define tag.
+    ea::string tag_;
     /// Shadow pass index.
     const unsigned shadowPassIndex_{};
 
