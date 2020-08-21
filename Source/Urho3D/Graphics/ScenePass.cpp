@@ -255,6 +255,26 @@ void OpaqueForwardLightingScenePass::SortSceneBatches()
     SortBatches(lightBatches_, sortedLightBatches_);
 }
 
+void AlphaForwardLightingScenePass::SortSceneBatches()
+{
+    const unsigned numUnlitBaseBatches = unlitBaseBatches_.size();
+    const unsigned numLitBaseBatches = litBaseBatches_.size();
+    const unsigned numLightBatches = lightBatches_.Size();
+
+    sortedBatches_.resize(numUnlitBaseBatches + numLitBaseBatches + numLightBatches);
+    unsigned destIndex = 0;
+    for (unsigned i = 0; i < numUnlitBaseBatches; ++i)
+        sortedBatches_[destIndex++] = BaseSceneBatchSortedBackToFront{ &unlitBaseBatches_[i] };
+    for (unsigned i = 0; i < numLitBaseBatches; ++i)
+        sortedBatches_[destIndex++] = BaseSceneBatchSortedBackToFront{ &litBaseBatches_[i] };
+    lightBatches_.ForEach([&](unsigned, unsigned, const BaseSceneBatch& batch)
+    {
+        sortedBatches_[destIndex++] = BaseSceneBatchSortedBackToFront{ &batch };
+    });
+
+    ea::sort(sortedBatches_.begin(), sortedBatches_.end());
+}
+
 ShadowScenePass::ShadowScenePass(Context* context, const ea::string& tag, const ea::string& shadowPass)
     : Object(context)
     , workQueue_(context_->GetWorkQueue())

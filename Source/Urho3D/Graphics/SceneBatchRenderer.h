@@ -51,6 +51,9 @@ public:
     /// Render light batches. Safe to call from worker thread.
     void RenderLightBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
         Camera* camera, Zone* zone, ea::span<const LightBatchSortedByState> batches);
+    /// Render unlit and lit alpha batches. Safe to call from worker thread.
+    void RenderAlphaBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
+        Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedBackToFront> batches);
     /// Render shadow batches. Safe to call from worker thread.
     void RenderShadowBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
         Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedByState> batches);

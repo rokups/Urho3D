@@ -162,7 +162,7 @@ struct BaseSceneBatchSortedBackToFront
     {
         if (renderOrder_ != rhs.renderOrder_)
             return renderOrder_ < rhs.renderOrder_;
-        return distance_ < rhs.distance_;
+        return distance_ > rhs.distance_;
     }
 };
 

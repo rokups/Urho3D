@@ -66,7 +66,7 @@ void VS()
         vTangent = vec4(tangent.xyz, bitangent.z);
     #endif
 
-    #ifdef PASS_BASE_LITBASE
+    #if defined(PASS_BASE_LITBASE) || defined(PASS_ALPHA_LITBASE)
         vVertexLight = GetAmbientLight(vec4(vNormal, 1));
 
         #ifdef NUMVERTEXLIGHTS
@@ -123,7 +123,7 @@ void PS()
         float fogFactor = GetFogFactor(vWorldPos.w);
     #endif
 
-    #ifdef PASS_BASE
+    #if defined(PASS_BASE) || defined(PASS_ALPHA)
         // Per-pixel forward lighting
         vec3 lightColor;
         vec3 lightDir;

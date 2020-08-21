@@ -188,6 +188,18 @@ void SceneBatchRenderer::RenderLightBatches(DrawCommandQueue& drawQueue, const S
     RenderBatches<true>(drawQueue, sceneBatchCollector, camera, zone, batches, getBatchLight);
 }
 
+void SceneBatchRenderer::RenderAlphaBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
+    Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedBackToFront> batches)
+{
+    const ea::vector<SceneLight*>& visibleLights = sceneBatchCollector.GetVisibleLights();
+    const auto getBatchLight = [&](const BaseSceneBatchSortedBackToFront& batch)
+    {
+        const unsigned lightIndex = batch.sceneBatch_->lightIndex_;
+        return lightIndex != M_MAX_UNSIGNED ? visibleLights[lightIndex] : nullptr;
+    };
+    RenderBatches<true>(drawQueue, sceneBatchCollector, camera, zone, batches, getBatchLight);
+}
+
 void SceneBatchRenderer::RenderShadowBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
     Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedByState> batches)
 {

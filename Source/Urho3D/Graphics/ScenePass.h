@@ -195,6 +195,26 @@ protected:
     ea::vector<LightBatchSortedByState> sortedLightBatches_;
 };
 
+/// Scene pass for forward lighting (translucent objects).
+class AlphaForwardLightingScenePass : public ForwardLightingScenePass
+{
+    URHO3D_OBJECT(AlphaForwardLightingScenePass, ForwardLightingScenePass);
+
+public:
+    /// Construct.
+    using ForwardLightingScenePass::ForwardLightingScenePass;
+
+    /// Sort scene batches.
+    virtual void SortSceneBatches() override;
+
+    /// Return sorted unlit base batches.
+    ea::span<const BaseSceneBatchSortedBackToFront> GetSortedBatches() const { return sortedBatches_; }
+
+protected:
+    /// Sorted batches.
+    ea::vector<BaseSceneBatchSortedBackToFront> sortedBatches_;
+};
+
 /// Scene pass for shadow rendering.
 class ShadowScenePass : public Object
 {
