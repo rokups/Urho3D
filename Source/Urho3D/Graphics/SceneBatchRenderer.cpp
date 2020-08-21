@@ -159,6 +159,13 @@ SceneBatchRenderer::SceneBatchRenderer(Context* context)
     , renderer_(context_->GetRenderer())
 {}
 
+void SceneBatchRenderer::RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
+    Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedByState> batches)
+{
+    const auto getBatchLight = [&](const BaseSceneBatchSortedByState& batch) { return nullptr; };
+    RenderBatches<false>(drawQueue, sceneBatchCollector, camera, zone, batches, getBatchLight);
+}
+
 void SceneBatchRenderer::RenderLitBaseBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
     Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedByState> batches)
 {
@@ -196,6 +203,7 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
     const FrameInfo& frameInfo = sceneBatchCollector.GetFrameInfo();
     const Scene* scene = frameInfo.octree_->GetScene();
     const ea::vector<SceneLight*>& visibleLights = sceneBatchCollector.GetVisibleLights();
+    Node* cameraNode = camera->GetNode();
 
     static const SceneLightShaderParameters defaultLightParams;
     const SceneLightShaderParameters* currentLightParams = &defaultLightParams;
@@ -352,7 +360,27 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
             drawQueue.AddShaderParameter(VSP_SHBG, sh.Bg_);
             drawQueue.AddShaderParameter(VSP_SHBB, sh.Bb_);
             drawQueue.AddShaderParameter(VSP_SHC, sh.C_);
-            drawQueue.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
+            switch (batch.geometryType_)
+            {
+            case GEOM_INSTANCED:
+                // TODO(renderer): Implement instancing
+                assert(0);
+                break;
+            case GEOM_SKINNED:
+                drawQueue.AddShaderParameter(VSP_SKINMATRICES,
+                    ea::span<const Matrix3x4>(sourceBatch.worldTransform_, sourceBatch.numWorldTransforms_));
+                break;
+            case GEOM_BILLBOARD:
+                drawQueue.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
+                if (sourceBatch.numWorldTransforms_ > 1)
+                    drawQueue.AddShaderParameter(VSP_BILLBOARDROT, sourceBatch.worldTransform_[1].RotationMatrix());
+                else
+                    drawQueue.AddShaderParameter(VSP_BILLBOARDROT, cameraNode->GetWorldRotation().RotationMatrix());
+                break;
+            default:
+                drawQueue.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
+                break;
+            }
             drawQueue.CommitShaderParameterGroup(SP_OBJECT);
         }
 

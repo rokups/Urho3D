@@ -42,6 +42,9 @@ public:
     /// Construct.
     explicit SceneBatchRenderer(Context* context);
 
+    /// Render unlit base batches. Safe to call from worker thread.
+    void RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
+        Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedByState> batches);
     /// Render lit base batches. Safe to call from worker thread.
     void RenderLitBaseBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
         Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedByState> batches);

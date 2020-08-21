@@ -130,6 +130,8 @@ void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchColle
     visibleLightsTemp_.Clear(numThreads_);
     sceneZRange_.Clear(numThreads_);
     shadowCastersToBeUpdated_.Clear(numThreads_);
+    threadedGeometryUpdates_.Clear(numThreads_);
+    nonThreadedGeometryUpdates_.Clear(numThreads_);
 
     transient_.Reset(numDrawables_);
     drawableLighting_.resize(numDrawables_);
@@ -171,6 +173,7 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
         const unsigned drawableIndex = drawable->GetDrawableIndex();
 
         drawable->UpdateBatches(frameInfo_);
+        drawable->MarkInView(frameInfo_);
         transient_.isUpdated_[drawableIndex].test_and_set(std::memory_order_relaxed);
 
         // Skip if too far
@@ -197,6 +200,13 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
 
             visibleGeometries_.Insert(threadIndex, drawable);
             transient_.traits_[drawableIndex] |= SceneDrawableData::DrawableVisibleGeometry;
+
+            // Queue geometry update
+            const UpdateGeometryType updateGeometryType = drawable->GetUpdateGeometryType();
+            if (updateGeometryType == UPDATE_MAIN_THREAD)
+                nonThreadedGeometryUpdates_.Insert(threadIndex, drawable);
+            else
+                threadedGeometryUpdates_.Insert(threadIndex, drawable);
 
             // Collect batches
             const auto& sourceBatches = drawable->GetBatches();
@@ -282,10 +292,20 @@ void SceneBatchCollector::ProcessVisibleLights()
 
     // Update batches for shadow casters
     ForEachParallel(workQueue_, 1u, shadowCastersToBeUpdated_,
-        [&](unsigned /*threadIndex*/, unsigned /*offset*/, ea::span<Drawable* const> geometries)
+        [&](unsigned threadIndex, unsigned /*offset*/, ea::span<Drawable* const> geometries)
     {
         for (Drawable* drawable : geometries)
+        {
             drawable->UpdateBatches(frameInfo_);
+            drawable->MarkInView(frameInfo_);
+
+            // Queue geometry update
+            const UpdateGeometryType updateGeometryType = drawable->GetUpdateGeometryType();
+            if (updateGeometryType == UPDATE_MAIN_THREAD)
+                nonThreadedGeometryUpdates_.Insert(threadIndex, drawable);
+            else
+                threadedGeometryUpdates_.Insert(threadIndex, drawable);
+        }
     });
 
     // Collect shadow caster batches
@@ -368,6 +388,19 @@ void SceneBatchCollector::CollectSceneBatches()
         pass->CollectSceneBatches(mainLightIndex_, visibleLights_, drawableLighting_, camera_, *callback_);
         pass->SortSceneBatches();
     }
+}
+
+void SceneBatchCollector::UpdateGeometries()
+{
+    // TODO(renderer): Add multithreading
+    threadedGeometryUpdates_.ForEach([&](unsigned, unsigned, Drawable* drawable)
+    {
+        drawable->UpdateGeometry(frameInfo_);
+    });
+    nonThreadedGeometryUpdates_.ForEach([&](unsigned, unsigned, Drawable* drawable)
+    {
+        drawable->UpdateGeometry(frameInfo_);
+    });
 }
 
 }

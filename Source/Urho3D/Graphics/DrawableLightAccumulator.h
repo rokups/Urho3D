@@ -64,23 +64,41 @@ struct DrawableLightAccumulator
     {
         lights_.clear();
         numImportantLights_ = 0;
+        numAutoLights_ = 0;
     }
 
     /// Accumulate light.
     void AccumulateLight(const DrawableLightDataAccumulationContext& ctx, float penalty)
     {
-        // Count important lights
-        if (ctx.lightImportance_ == LI_IMPORTANT)
+        switch (ctx.lightImportance_)
         {
+        case LI_IMPORTANT:
+            // Important lights are never optimized out
             penalty = -1.0f;
             ++numImportantLights_;
+            break;
+        case LI_AUTO:
+            // Penalty for automatic lights is mapped to [0, 2]
+            if (penalty > 1.0f)
+                penalty = 2.0f - 1.0f / penalty;
+            ++numAutoLights_;
+            break;
+        case LI_NOT_IMPORTANT:
+            // Penalty for not important lights is mapped to [3, 5]
+            if (penalty <= 1.0f)
+                penalty = 3.0f + penalty;
+            else
+                penalty = 5.0f - 1.0f / penalty;
+            break;
         }
 
         // Add new light
         lights_.emplace(penalty, ctx.lightIndex_);
 
+        // First N important and automatic lights are per-pixel
+        firstVertexLight_ = ea::max(numImportantLights_, ea::min(numImportantLights_ + numAutoLights_, ctx.maxPixelLights_));
+
         // If too many lights, drop the least important one
-        firstVertexLight_ = ea::max(ctx.maxPixelLights_, numImportantLights_);
         const unsigned maxLights = MaxVertexLights + firstVertexLight_;
         if (lights_.size() > maxLights)
         {
@@ -113,6 +131,8 @@ struct DrawableLightAccumulator
     SphericalHarmonicsDot9 sh_;
     /// Number of important lights.
     unsigned numImportantLights_{};
+    /// Number of automatic lights.
+    unsigned numAutoLights_{};
     /// First vertex light.
     unsigned firstVertexLight_{};
 };

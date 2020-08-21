@@ -90,6 +90,8 @@ public:
     void ProcessVisibleLights();
     /// Collect scene batches.
     void CollectSceneBatches();
+    /// Update geometries.
+    void UpdateGeometries();
 
     /// Return frame info.
     const FrameInfo& GetFrameInfo() const { return frameInfo_; }
@@ -162,8 +164,12 @@ private:
     /// Scene Z range.
     SceneZRange sceneZRange_;
 
-    /// Shadow caster geometries to be updated.
+    /// Shadow caster drawables to be updated.
     ThreadedVector<Drawable*> shadowCastersToBeUpdated_;
+    /// Geometries to be updated from worker threads.
+    ThreadedVector<Drawable*> threadedGeometryUpdates_;
+    /// Geometries to be updated from main thread.
+    ThreadedVector<Drawable*> nonThreadedGeometryUpdates_;
 
     /// Common drawable data index.
     SceneDrawableData transient_;

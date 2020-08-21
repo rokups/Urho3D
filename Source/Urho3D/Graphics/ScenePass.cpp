@@ -101,17 +101,13 @@ bool ScenePass::AddSourceBatch(Drawable* drawable, unsigned sourceBatchIndex, Te
             litBatches_.Insert(workerThreadIndex, { drawable, sourceBatchIndex, nullptr, lightPass });
             return true;
         }
-        else
-        {
-            assert(0);
-            return false;
-        }
     }
-    else
+    else if (unlitBasePass)
     {
         unlitBatches_.Insert(workerThreadIndex, { drawable, sourceBatchIndex, unlitBasePass, nullptr });
         return false;
     }
+    return false;
 }
 
 void ScenePass::CollectSceneBatches(unsigned mainLightIndex, ea::span<SceneLight*> sceneLights,
@@ -307,7 +303,7 @@ void ShadowScenePass::CollectShadowBatches(MaterialQuality materialQuality, Scen
             batch.geometryType_ = sourceBatch.geometryType_;
             batch.drawable_ = drawable;
             batch.geometry_ = sourceBatch.geometry_;
-            batch.material_ = sourceBatch.material_;
+            batch.material_ = material;
             batch.pass_ = pass;
 
             const ScenePipelineStateKey key{ batch, sceneLight->GetPipelineStateHash() };
