@@ -34,7 +34,7 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
 }
 
 #ifdef SPHERICALHARMONICS
-    #ifdef INSTANCED
+    #ifdef GEOM_INSTANCED
         #define iSHAr iTexCoord7
         #define iSHAg iTexCoord8
         #define iSHAb iTexCoord9
@@ -54,7 +54,7 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
 
     #define GetAmbientLight(normal) LinearToGammaSpace(EvaluateSH01(normal, iSHAr, iSHAg, iSHAb) + EvaluateSH2(normal, iSHBr, iSHBg, iSHBb, iSHC))
 #else
-    #ifdef INSTANCED
+    #ifdef GEOM_INSTANCED
         #define iAmbient iTexCoord7
     #else
         #define iAmbient cAmbient

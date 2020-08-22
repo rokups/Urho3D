@@ -97,22 +97,22 @@ public:
             commonDefines += "GEOM_STATIC ";
             break;
         case GEOM_INSTANCED:
-            commonDefines += "GEOM_INSTANCED INSTANCED ";
+            commonDefines += "GEOM_INSTANCED ";
             break;
         case GEOM_SKINNED:
-            commonDefines += "GEOM_SKINNED SKINNED ";
+            commonDefines += "GEOM_SKINNED ";
             break;
         case GEOM_BILLBOARD:
-            commonDefines += "GEOM_BILLBOARD BILLBOARD ";
+            commonDefines += "GEOM_BILLBOARD ";
             break;
         case GEOM_DIRBILLBOARD:
-            commonDefines += "GEOM_DIRBILLBOARD DIRBILLBOARD ";
+            commonDefines += "GEOM_DIRBILLBOARD ";
             break;
         case GEOM_TRAIL_FACE_CAMERA:
-            commonDefines += "GEOM_TRAIL_FACE_CAMERA TRAILFACECAM ";
+            commonDefines += "GEOM_TRAIL_FACE_CAMERA ";
             break;
         case GEOM_TRAIL_BONE:
-            commonDefines += "GEOM_TRAIL_BONE TRAILBONE ";
+            commonDefines += "GEOM_TRAIL_BONE ";
             break;
         default:
             break;

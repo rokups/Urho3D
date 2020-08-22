@@ -16,7 +16,7 @@ attribute vec4 iBlendWeights;
 attribute vec4 iBlendIndices;
 attribute vec3 iCubeTexCoord;
 attribute vec4 iCubeTexCoord1;
-#ifdef INSTANCED
+#ifdef GEOM_INSTANCED
     attribute vec4 iTexCoord4;
     attribute vec4 iTexCoord5;
     attribute vec4 iTexCoord6;
@@ -34,7 +34,7 @@ attribute vec4 iCubeTexCoord1;
 #endif
 attribute float iObjectIndex;
 
-#ifdef SKINNED
+#ifdef GEOM_SKINNED
 mat4 GetSkinMatrix(vec4 blendWeights, vec4 blendIndices)
 {
     ivec4 idx = ivec4(blendIndices) * 3;
@@ -46,7 +46,7 @@ mat4 GetSkinMatrix(vec4 blendWeights, vec4 blendIndices)
 }
 #endif
 
-#ifdef INSTANCED
+#ifdef GEOM_INSTANCED
 mat4 GetInstanceMatrix()
 {
     const vec4 lastColumn = vec4(0.0, 0.0, 0.0, 1.0);
@@ -88,7 +88,7 @@ float GetDepth(vec4 clipPos)
     return dot(clipPos.zw, cDepthMode.zw);
 }
 
-#ifdef BILLBOARD
+#ifdef GEOM_BILLBOARD
 vec3 GetBillboardPos(vec4 iPos, vec2 iSize, mat4 modelMatrix)
 {
     return (iPos * modelMatrix).xyz + vec3(iSize.x, iSize.y, 0.0) * cBillboardRot;
@@ -100,7 +100,7 @@ vec3 GetBillboardNormal()
 }
 #endif
 
-#ifdef DIRBILLBOARD
+#ifdef GEOM_DIRBILLBOARD
 mat3 GetFaceCameraRotation(vec3 position, vec3 direction)
 {
     vec3 cameraDir = normalize(position - cCameraPos);
@@ -128,7 +128,7 @@ vec3 GetBillboardNormal(vec4 iPos, vec3 iDirection, mat4 modelMatrix)
 }
 #endif
 
-#ifdef TRAILFACECAM
+#ifdef GEOM_TRAIL_FACE_CAMERA
 vec3 GetTrailPos(vec4 iPos, vec3 iFront, float iScale, mat4 modelMatrix)
 {
     vec3 up = normalize(cCameraPos - iPos.xyz);
@@ -142,7 +142,7 @@ vec3 GetTrailNormal(vec4 iPos)
 }
 #endif
 
-#ifdef TRAILBONE
+#ifdef GEOM_TRAIL_BONE
 vec3 GetTrailPos(vec4 iPos, vec3 iParentPos, float iScale, mat4 modelMatrix)
 {
     vec3 right = iParentPos - iPos.xyz;
@@ -157,9 +157,9 @@ vec3 GetTrailNormal(vec4 iPos, vec3 iParentPos, vec3 iForward)
 }
 #endif
 
-#if defined(SKINNED)
+#if defined(GEOM_SKINNED)
     #define iModelMatrix GetSkinMatrix(iBlendWeights, iBlendIndices)
-#elif defined(INSTANCED)
+#elif defined(GEOM_INSTANCED)
     #define iModelMatrix GetInstanceMatrix()
 #else
     #define iModelMatrix cModel
@@ -167,13 +167,13 @@ vec3 GetTrailNormal(vec4 iPos, vec3 iParentPos, vec3 iForward)
 
 vec3 GetWorldPos(mat4 modelMatrix)
 {
-    #if defined(BILLBOARD)
+    #if defined(GEOM_BILLBOARD)
         return GetBillboardPos(iPos, iTexCoord1, modelMatrix);
-    #elif defined(DIRBILLBOARD)
+    #elif defined(GEOM_DIRBILLBOARD)
         return GetBillboardPos(iPos, iNormal, modelMatrix);
-    #elif defined(TRAILFACECAM)
+    #elif defined(GEOM_TRAIL_FACE_CAMERA)
         return GetTrailPos(iPos, iTangent.xyz, iTangent.w, modelMatrix);
-    #elif defined(TRAILBONE)
+    #elif defined(GEOM_TRAIL_BONE)
         return GetTrailPos(iPos, iTangent.xyz, iTangent.w, modelMatrix);
     #else
         return (iPos * modelMatrix).xyz;
@@ -182,13 +182,13 @@ vec3 GetWorldPos(mat4 modelMatrix)
 
 vec3 GetWorldNormal(mat4 modelMatrix)
 {
-    #if defined(BILLBOARD)
+    #if defined(GEOM_BILLBOARD)
         return GetBillboardNormal();
-    #elif defined(DIRBILLBOARD)
+    #elif defined(GEOM_DIRBILLBOARD)
         return GetBillboardNormal(iPos, iNormal, modelMatrix);
-    #elif defined(TRAILFACECAM)
+    #elif defined(GEOM_TRAIL_FACE_CAMERA)
         return GetTrailNormal(iPos);
-    #elif defined(TRAILBONE)
+    #elif defined(GEOM_TRAIL_BONE)
         return GetTrailNormal(iPos, iTangent.xyz, iNormal);
     #else
         return normalize(iNormal * GetNormalMatrix(modelMatrix));
@@ -197,9 +197,9 @@ vec3 GetWorldNormal(mat4 modelMatrix)
 
 vec4 GetWorldTangent(mat4 modelMatrix)
 {
-    #if defined(BILLBOARD)
+    #if defined(GEOM_BILLBOARD)
         return vec4(normalize(vec3(1.0, 0.0, 0.0) * cBillboardRot), 1.0);
-    #elif defined(DIRBILLBOARD)
+    #elif defined(GEOM_DIRBILLBOARD)
         return vec4(normalize(vec3(1.0, 0.0, 0.0) * GetNormalMatrix(modelMatrix)), 1.0);
     #else
         return vec4(normalize(iTangent.xyz * GetNormalMatrix(modelMatrix)), iTangent.w);

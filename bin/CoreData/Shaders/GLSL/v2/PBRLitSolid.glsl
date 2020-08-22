@@ -63,7 +63,7 @@ void VS()
         vTexCoord.xy = GetTexCoord(iTexCoord);
     #endif
 
-    #if defined(NORMALMAP) || defined(DIRBILLBOARD)
+    #if defined(NORMALMAP) || defined(GEOM_DIRBILLBOARD)
         vec4 tangent = GetWorldTangent(modelMatrix);
         vec3 bitangent = cross(tangent.xyz, vNormal) * tangent.w;
         vTexCoord.zw = bitangent.xy;
@@ -149,7 +149,7 @@ void PS()
     diffColor.rgb = diffColor.rgb - diffColor.rgb * metalness;
 
     // Get normal
-    #if defined(NORMALMAP) || defined(DIRBILLBOARD)
+    #if defined(NORMALMAP) || defined(GEOM_DIRBILLBOARD)
         vec3 tangent = vTangent.xyz;
         vec3 bitangent = vec3(vTexCoord.zw, vTangent.w);
         mat3 tbn = mat3(tangent, bitangent, vNormal);

@@ -84,10 +84,10 @@ CBUFFER_BEGIN(Object)
 #else
     CBUFFER_UNIFORM(vec4 cAmbient)
 #endif
-#ifdef BILLBOARD
+#ifdef GEOM_BILLBOARD
     CBUFFER_UNIFORM(mat3 cBillboardRot)
 #endif
-#ifdef SKINNED
+#ifdef GEOM_SKINNED
     CBUFFER_UNIFORM(vec4 cSkinMatrices[MAXBONES*3])
 #endif
 CBUFFER_END()
