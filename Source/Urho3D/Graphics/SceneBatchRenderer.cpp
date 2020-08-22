@@ -236,7 +236,9 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
         PipelineState* pipelineState = batch.pipelineState_;
         if (!pipelineState)
         {
-            URHO3D_LOGERROR("Cannot render scene batch witout pipeline state");
+            static std::atomic_flag errorReported;
+            if (!errorReported.test_and_set())
+                URHO3D_LOGERROR("Cannot render scene batch witout pipeline state");
             continue;
         }
 

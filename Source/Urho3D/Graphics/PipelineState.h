@@ -173,7 +173,7 @@ struct PipelineStateDesc
     }
 };
 
-/// Pipeline state container.
+/// Pipeline state.
 class PipelineState : public Object
 {
     URHO3D_OBJECT(PipelineState, Object);
@@ -181,10 +181,10 @@ class PipelineState : public Object
 public:
     /// Construct.
     explicit PipelineState(Context* context);
-    /// Create cached state.
-    void Create(const PipelineStateDesc& desc);
+    /// Create pipeline state.
+    bool Create(const PipelineStateDesc& desc);
 
-    /// Apply cached state.
+    /// Apply pipeline state.
     void Apply();
 
     /// Return description.
@@ -222,15 +222,17 @@ public:
     /// Create new or return existing pipeline state.
     SharedPtr<PipelineState> GetPipelineState(const PipelineStateDesc& desc)
     {
-        SharedPtr<PipelineState>& state = states_[desc];
-        if (!state)
+        auto iterNew = states_.emplace(desc, nullptr);
+        if (iterNew.second)
         {
-            if (!desc.IsValid())
-                return nullptr;
-            state = MakeShared<PipelineState>(context_);
-            state->Create(desc);
+            if (desc.IsValid())
+            {
+                auto newState = MakeShared<PipelineState>(context_);
+                if (newState->Create(desc))
+                    iterNew.first->second = newState;
+            }
         }
-        return state;
+        return iterNew.first->second;
     }
 
 private:

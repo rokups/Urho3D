@@ -35,16 +35,23 @@ PipelineState::PipelineState(Context* context)
 {
 }
 
-void PipelineState::Create(const PipelineStateDesc& desc)
+bool PipelineState::Create(const PipelineStateDesc& desc)
 {
     if (!desc.IsValid())
     {
         URHO3D_LOGERROR("Pipeline state is missing one or more shaders");
-        return;
+        return false;
     }
 
     desc_ = desc;
     constantBufferLayout_ = graphics_->GetConstantBufferLayout(desc_.vertexShader_, desc_.pixelShader_);
+    if (!constantBufferLayout_)
+    {
+        URHO3D_LOGERROR("Constant buffer layout of pipeline state is invalid");
+        return false;
+    }
+
+    return true;
 }
 
 void PipelineState::Apply()

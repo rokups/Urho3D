@@ -103,6 +103,9 @@ struct BaseSceneBatchSortedByState
     explicit BaseSceneBatchSortedByState(const BaseSceneBatch* batch)
         : sceneBatch_(batch)
     {
+        if (!batch->pipelineState_)
+            return;
+
         const SourceBatch& sourceBatch = batch->GetSourceBatch();
 
         // 8: render order

@@ -63,6 +63,8 @@ void CommentOutFunction(ea::string& code, const ea::string& signature)
     }
 }
 
+ea::unordered_map<ea::string, unsigned> Shader::fileToIndexMapping;
+
 Shader::Shader(Context* context) :
     Resource(context),
     timeStamp_(0),
@@ -175,6 +177,11 @@ bool Shader::ProcessSource(ea::string& code, Deserializer& source)
 {
     auto* cache = GetSubsystem<ResourceCache>();
 
+    // Add file to index
+    unsigned& fileIndex = fileToIndexMapping[source.GetName()];
+    if (!fileIndex)
+        fileIndex = fileToIndexMapping.size();
+
     // If the source if a non-packaged file, store the timestamp
     auto* file = dynamic_cast<File*>(&source);
     if (file && !file->IsPackaged())
@@ -190,6 +197,8 @@ bool Shader::ProcessSource(ea::string& code, Deserializer& source)
     if (source.GetName() != GetName())
         cache->StoreResourceDependency(this, source.GetName());
 
+    unsigned currentLine = 1;
+    code += Format("#line {} {}\n", currentLine, fileIndex);
     while (!source.IsEof())
     {
         ea::string line = source.ReadLine();
@@ -205,12 +214,15 @@ bool Shader::ProcessSource(ea::string& code, Deserializer& source)
             // Add the include file into the current code recursively
             if (!ProcessSource(code, *includeFile))
                 return false;
+
+            code += Format("#line {} {}\n", currentLine, fileIndex);
         }
         else
         {
             code += line;
             code += "\n";
         }
+        ++currentLine;
     }
 
     // Finally insert an empty line to mark the space between files
@@ -230,6 +242,23 @@ void Shader::RefreshMemoryUse()
 {
     SetMemoryUse(
         (unsigned)(sizeof(Shader) + vsSourceCode_.length() + psSourceCode_.length() + numVariations_ * sizeof(ShaderVariation)));
+}
+
+ea::string Shader::GetShaderFileList()
+{
+    ea::vector<ea::pair<ea::string, unsigned>> fileList(fileToIndexMapping.begin(), fileToIndexMapping.end());
+    ea::sort(fileList.begin(), fileList.end(),
+        [](const ea::pair<ea::string, unsigned>& lhs, const ea::pair<ea::string, unsigned>& rhs)
+    {
+        return lhs.second < rhs.second;
+    });
+
+    ea::string result;
+    result += "Shader Files:\n";
+    for (const auto& item : fileList)
+        result += Format("{}: {}\n", item.second, item.first);
+    result += "\n";
+    return result;
 }
 
 }
