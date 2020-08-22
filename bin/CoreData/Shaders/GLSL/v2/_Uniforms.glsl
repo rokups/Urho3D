@@ -1,8 +1,6 @@
 #ifndef _UNIFORMS_GLSL_
 #define _UNIFORMS_GLSL_
 
-#include "_Config.glsl"
-
 CBUFFER_BEGIN(Frame)
     CBUFFER_UNIFORM(float cDeltaTime)
     CBUFFER_UNIFORM(float cElapsedTime)

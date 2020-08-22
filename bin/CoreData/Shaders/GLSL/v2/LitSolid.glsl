@@ -1,6 +1,9 @@
+#include "_Config.glsl"
 #include "_Uniforms.glsl"
+#include "_VertexLayout.glsl"
+#include "_VertexTransform.glsl"
+#include "_PixelOutput.glsl"
 #include "Samplers.glsl"
-#include "Transform.glsl"
 #include "ScreenPos.glsl"
 #include "Lighting.glsl"
 #include "Fog.glsl"
@@ -67,7 +70,7 @@ void VS()
     #endif
 
     #if defined(PASS_BASE_LITBASE) || defined(PASS_ALPHA_LITBASE)
-        vVertexLight = GetAmbientLight(vec4(vNormal, 1));
+        vVertexLight = GetAmbientLight(vec4(vNormal, 1)) + cAmbientColor.rgb;
 
         #ifdef NUMVERTEXLIGHTS
             for (int i = 0; i < NUMVERTEXLIGHTS; ++i)

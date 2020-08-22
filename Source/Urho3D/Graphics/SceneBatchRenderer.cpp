@@ -143,10 +143,7 @@ void AddCameraShaderParameters(DrawCommandQueue& drawQueue, const Camera* camera
 /// Add zone-specific shader parameters.
 void AddZoneShaderParameters(DrawCommandQueue& drawQueue, const Camera* camera, const Zone* zone)
 {
-    drawQueue.AddShaderParameter(VSP_AMBIENTSTARTCOLOR, Color::WHITE);
-    drawQueue.AddShaderParameter(VSP_AMBIENTENDCOLOR, Vector4::ZERO);
-    drawQueue.AddShaderParameter(VSP_ZONE, Matrix3x4::IDENTITY);
-    drawQueue.AddShaderParameter(PSP_AMBIENTCOLOR, Color::WHITE);
+    drawQueue.AddShaderParameter(PSP_AMBIENTCOLOR, zone->GetAmbientColor());
     drawQueue.AddShaderParameter(PSP_FOGCOLOR, zone->GetFogColor());
     drawQueue.AddShaderParameter(PSP_FOGPARAMS, GetZoneFogParameter(zone, camera));
 }

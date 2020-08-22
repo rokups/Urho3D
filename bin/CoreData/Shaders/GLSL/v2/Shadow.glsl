@@ -1,6 +1,9 @@
+#include "_Config.glsl"
 #include "_Uniforms.glsl"
+#include "_VertexLayout.glsl"
+#include "_VertexTransform.glsl"
+#include "_PixelOutput.glsl"
 #include "Samplers.glsl"
-#include "Transform.glsl"
 
 #ifdef VSM_SHADOW
     varying vec4 vTexCoord;

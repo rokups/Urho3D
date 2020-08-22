@@ -84,11 +84,40 @@ public:
         if (ctx.shadowPass_)
             shadowMapAllocator_->ExportPipelineState(desc, light->GetShadowBias());
 
+        bool hasPosition = false;
+        bool hasNormal = false;
+        bool hasTangent = false;
+        bool hasTexCoord = false;
         for (VertexBuffer* vertexBuffer : geometry->GetVertexBuffers())
-            desc.vertexElements_.append(vertexBuffer->GetElements());
+        {
+            const auto& elements = vertexBuffer->GetElements();
+            desc.vertexElements_.append(elements);
+            for (const VertexElement& element : elements)
+            {
+                if (element.index_ != 0)
+                    continue;
+                if (element.semantic_ == SEM_POSITION)
+                    hasPosition = true;
+                if (element.semantic_ == SEM_NORMAL)
+                    hasNormal = true;
+                if (element.semantic_ == SEM_TANGENT)
+                    hasTangent = true;
+                if (element.semantic_ == SEM_TEXCOORD)
+                    hasTexCoord = true;
+            }
+        }
 
         ea::string commonDefines;
         commonDefines += ctx.shaderDefines_;
+
+        if (hasPosition)
+            commonDefines += "LAYOUT_HAS_POSITION ";
+        if (hasNormal)
+            commonDefines += "LAYOUT_HAS_NORMAL ";
+        if (hasTangent)
+            commonDefines += "LAYOUT_HAS_TANGENT ";
+        if (hasTexCoord)
+            commonDefines += "LAYOUT_HAS_UV ";
 
         switch (key.geometryType_)
         {
