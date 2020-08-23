@@ -48,10 +48,11 @@ struct SceneLightShaderParameters
     /// Inverse range.
     float invRange_{};
 
-    /// Shadow matrices for each split.
-    Matrix4 shadowMatrices_[MAX_CASCADE_SPLITS];
-    /// Spot/point light matrix for cookie.
-    Matrix4 spotMatrix_;
+    /// Number of light matrices.
+    unsigned numLightMatrices_{};
+    /// Shadow matrices for each split (for directional light).
+    /// Light matrix and shadow matrix (for spot and point lights).
+    Matrix4 lightMatrices_[MAX_CASCADE_SPLITS];
 
     /// Light color (faded).
     Vector3 color_;

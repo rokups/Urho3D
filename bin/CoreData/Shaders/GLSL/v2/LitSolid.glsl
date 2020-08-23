@@ -84,6 +84,14 @@ void VS()
         for (int i = 0; i < NUMCASCADES; i++)
             vShadowPos[i] = GetShadowPos(i, vNormal, projWorldPos);
     #endif
+
+    #ifdef SPOTLIGHT
+        vSpotPos = projWorldPos * cLightMatrices[0];
+    #endif
+
+    #ifdef POINTLIGHT
+        vCubeMaskVec = (worldPos - cLightPos.xyz) * mat3(cLightMatrices[0][0].xyz, cLightMatrices[0][1].xyz, cLightMatrices[0][2].xyz);
+    #endif
 }
 
 void PS()

@@ -272,11 +272,15 @@ void SceneBatchCollector::ProcessVisibleLights()
         sceneLight->FinalizeShadowMap();
 
     // Sort lights by shadow map size
-    const auto isShadowMapBigger = [](const SceneLight* lhs, const SceneLight* rhs)
+    const auto compareShadowMapSize = [](const SceneLight* lhs, const SceneLight* rhs)
     {
-        return lhs->GetShadowMapSize().Length() > rhs->GetShadowMapSize().Length();
+        const IntVector2 lhsSize = lhs->GetShadowMapSize();
+        const IntVector2 rhsSize = rhs->GetShadowMapSize();
+        if (lhsSize != rhsSize)
+            return lhsSize.Length() > rhsSize.Length();
+        return lhs->GetLight()->GetID() > rhs->GetLight()->GetID();
     };
-    ea::sort(visibleLights_.begin(), visibleLights_.end(), isShadowMapBigger);
+    ea::sort(visibleLights_.begin(), visibleLights_.end(), compareShadowMapSize);
 
     // Assign shadow maps and finalize shadow parameters
     for (SceneLight* sceneLight : visibleLights_)

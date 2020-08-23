@@ -297,9 +297,6 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
                 drawQueue.AddShaderParameter(PSP_LIGHTCOLOR,
                     Vector4{ currentLightParams->color_, currentLightParams->specularIntensity_ });
 
-                drawQueue.AddShaderParameter(PSP_LIGHTDIR, currentLightParams->direction_);
-                drawQueue.AddShaderParameter(PSP_LIGHTPOS,
-                    Vector4{ currentLightParams->position_, currentLightParams->invRange_ });
                 drawQueue.AddShaderParameter(PSP_LIGHTRAD, currentLightParams->radius_);
                 drawQueue.AddShaderParameter(PSP_LIGHTLENGTH, currentLightParams->length_);
 
@@ -316,18 +313,19 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
                 }
                 drawQueue.AddShaderParameter(VSP_VERTEXLIGHTS, ea::span<const Vector4>{ vertexLightsData });
 
+                if (currentLightParams->numLightMatrices_ > 0)
+                {
+                    ea::span<const Matrix4> shadowMatricesSpan{ currentLightParams->lightMatrices_, currentLightParams->numLightMatrices_ };
+                    drawQueue.AddShaderParameter(VSP_LIGHTMATRICES, shadowMatricesSpan);
+                }
                 if (currentShadowMap)
                 {
-                    ea::span<const Matrix4> shadowMatricesSpan = currentLightParams->shadowMatrices_;
-                    drawQueue.AddShaderParameter(VSP_LIGHTMATRICES, shadowMatricesSpan);
-                    drawQueue.AddShaderParameter(PSP_LIGHTMATRICES, shadowMatricesSpan);
                     drawQueue.AddShaderParameter(PSP_SHADOWDEPTHFADE, currentLightParams->shadowDepthFade_);
                     drawQueue.AddShaderParameter(PSP_SHADOWINTENSITY, currentLightParams->shadowIntensity_);
                     drawQueue.AddShaderParameter(PSP_SHADOWMAPINVSIZE, currentLightParams->shadowMapInvSize_);
                     drawQueue.AddShaderParameter(PSP_SHADOWSPLITS, currentLightParams->shadowSplits_);
                     drawQueue.AddShaderParameter(PSP_SHADOWCUBEADJUST, currentLightParams->shadowCubeAdjust_);
                     drawQueue.AddShaderParameter(VSP_NORMALOFFSETSCALE, currentLightParams->normalOffsetScale_);
-                    drawQueue.AddShaderParameter(PSP_NORMALOFFSETSCALE, currentLightParams->normalOffsetScale_);
                     drawQueue.AddShaderParameter(PSP_VSMSHADOWPARAMS, renderer_->GetVSMShadowParameters());
                 }
 
@@ -353,6 +351,7 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
                 drawQueue.AddShaderResource(texture.first, texture.second);
 
             drawQueue.AddShaderResource(TU_LIGHTRAMP, renderer_->GetDefaultLightRamp());
+            drawQueue.AddShaderResource(TU_LIGHTSHAPE, renderer_->GetDefaultLightSpot());
             if (currentShadowMap)
                 drawQueue.AddShaderResource(TU_SHADOWMAP, currentShadowMap);
             drawQueue.CommitShaderResources();

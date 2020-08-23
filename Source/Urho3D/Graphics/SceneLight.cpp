@@ -199,6 +199,33 @@ float GetLightFade(Light* light)
     return 1.0f;
 }
 
+/// Return spot light matrix.
+Matrix4 CalculateSpotMatrix(Light* light)
+{
+    Node* lightNode = light->GetNode();
+    const Matrix3x4 spotView = Matrix3x4(lightNode->GetWorldPosition(), lightNode->GetWorldRotation(), 1.0f).Inverse();
+
+    // Make the projected light slightly smaller than the shadow map to prevent light spill
+    Matrix4 spotProj = Matrix4::ZERO;
+    const float h = 1.005f / tanf(light->GetFov() * M_DEGTORAD * 0.5f);
+    const float w = h / light->GetAspectRatio();
+    spotProj.m00_ = w;
+    spotProj.m11_ = h;
+    spotProj.m22_ = 1.0f / Max(light->GetRange(), M_EPSILON);
+    spotProj.m32_ = 1.0f;
+
+    Matrix4 texAdjust;
+#ifdef URHO3D_OPENGL
+    texAdjust.SetTranslation(Vector3(0.5f, 0.5f, 0.5f));
+    texAdjust.SetScale(Vector3(0.5f, -0.5f, 0.5f));
+#else
+    texAdjust.SetTranslation(Vector3(0.5f, 0.5f, 0.0f));
+    texAdjust.SetScale(Vector3(0.5f, -0.5f, 1.0f));
+#endif
+
+    return texAdjust * spotProj * spotView;
+}
+
 }
 
 void SceneLightShadowSplit::SetupDirLightShadowCamera(Light* light, Camera* cullCamera,
@@ -331,7 +358,8 @@ void SceneLightShadowSplit::FinalizeShadowCamera(Light* light)
         QuantizeDirLightShadowCamera(parameters, shadowBox);
     }
 
-    if (type == LIGHT_SPOT && parameters.focus_)
+    // TODO(renderer): This code is to be removed. Clean up dependencies.
+    /*if (type == LIGHT_SPOT && parameters.focus_)
     {
         const float viewSizeX = Max(Abs(shadowCasterBox_.min_.x_), Abs(shadowCasterBox_.max_.x_));
         const float viewSizeY = Max(Abs(shadowCasterBox_.min_.y_), Abs(shadowCasterBox_.max_.y_));
@@ -344,7 +372,7 @@ void SceneLightShadowSplit::FinalizeShadowCamera(Light* light)
         viewSize = Max(ceilf(viewSize / quantize) * quantize, minView);
         if (viewSize < 1.0f)
             shadowCamera_->SetZoom(1.0f / viewSize);
-    }
+    }*/
 
     // Perform a finalization step for all lights: ensure zoom out of 2 pixels to eliminate border filtering issues
     // For point lights use 4 pixels, as they must not cross sides of the virtual cube map (maximum 3x3 PCF)
@@ -483,7 +511,7 @@ void SceneLight::FinalizeShadowMap()
 
     // Evaluate split shadow map size
     // TODO(renderer): Implement me
-    shadowMapSplitSize_ = 512;
+    shadowMapSplitSize_ = light_->GetLightType() != LIGHT_POINT ? 512 : 256;
     shadowMapSize_ = IntVector2{ shadowMapSplitSize_, shadowMapSplitSize_ } * GetSplitsGridSize();
 }
 
@@ -535,6 +563,24 @@ void SceneLight::FinalizeShaderParameters(Camera* cullCamera, float subPixelOffs
         shaderParams_.invCutoff_ = 1.0f;
     }
 
+    // TODO(renderer): Skip this step if there's no cookies
+    switch (lightType)
+    {
+    case LIGHT_DIRECTIONAL:
+        shaderParams_.numLightMatrices_ = 0;
+        break;
+    case LIGHT_SPOT:
+        shaderParams_.lightMatrices_[0] = CalculateSpotMatrix(light_);
+        shaderParams_.numLightMatrices_ = 1;
+        break;
+    case LIGHT_POINT:
+        shaderParams_.lightMatrices_[0] = lightNode->GetWorldRotation().RotationMatrix();
+        shaderParams_.numLightMatrices_ = 1;
+        break;
+    default:
+        break;
+    }
+
     // Skip the rest if no shadow
     if (!shadowMap_)
         return;
@@ -542,17 +588,14 @@ void SceneLight::FinalizeShaderParameters(Camera* cullCamera, float subPixelOffs
     switch (lightType)
     {
     case LIGHT_DIRECTIONAL:
+        shaderParams_.numLightMatrices_ = MAX_CASCADE_SPLITS;
         for (unsigned splitIndex = 0; splitIndex < numSplits_; ++splitIndex)
-            shaderParams_.shadowMatrices_[splitIndex] = splits_[splitIndex].CalculateShadowMatrix(subPixelOffset);
+            shaderParams_.lightMatrices_[splitIndex] = splits_[splitIndex].CalculateShadowMatrix(subPixelOffset);
         break;
 
     case LIGHT_SPOT:
-        // TODO(renderer): Implement me
-        assert(0);
-        /*CalculateSpotMatrix(shadowMatrices[0], light);
-        bool isShadowed = shadowMap && graphics->HasTextureUnit(TU_SHADOWMAP);
-        if (isShadowed)
-            CalculateShadowMatrix(shadowMatrices[1], lightQueue_, 0, renderer);*/
+        shaderParams_.numLightMatrices_ = 2;
+        shaderParams_.lightMatrices_[1] = splits_[0].CalculateShadowMatrix(subPixelOffset);
         break;
 
     case LIGHT_POINT:
@@ -724,15 +767,16 @@ void SceneLight::CollectLitGeometriesAndMaybeShadowCasters(SceneLightProcessCont
 
 Camera* SceneLight::GetOrCreateShadowCamera(unsigned split)
 {
-    if (!splits_[split].shadowCamera_)
+    SharedPtr<Camera>& camera = splits_[split].shadowCamera_;
+    if (!camera)
     {
         auto node = MakeShared<Node>(light_->GetContext());
-        auto camera = node->CreateComponent<Camera>();
-        camera->SetOrthographic(false);
-        camera->SetZoom(1.0f);
+        camera = node->CreateComponent<Camera>();
         splits_[split].shadowCameraNode_ = node;
         splits_[split].shadowCamera_ = camera;
     }
+    camera->SetOrthographic(false);
+    camera->SetZoom(1.0f);
     return splits_[split].shadowCamera_;
 }
 
