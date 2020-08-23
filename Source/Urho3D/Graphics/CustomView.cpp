@@ -189,7 +189,8 @@ public:
         desc.fillMode_ = FILL_SOLID;
         const CullMode passCullMode = pass->GetCullMode();
         const CullMode materialCullMode = ctx.shadowPass_ ? material->GetShadowCullMode() : material->GetCullMode();
-        desc.cullMode_ = GetEffectiveCullMode(passCullMode != MAX_CULLMODES ? passCullMode : materialCullMode, ctx.camera_);
+        const CullMode cullMode = passCullMode != MAX_CULLMODES ? passCullMode : materialCullMode;
+        desc.cullMode_ = ctx.shadowPass_ ? cullMode : GetEffectiveCullMode(cullMode, ctx.camera_);
 
         return renderer_->GetOrCreatePipelineState(desc);
     }
