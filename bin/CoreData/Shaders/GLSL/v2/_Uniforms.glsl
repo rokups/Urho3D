@@ -38,6 +38,7 @@ CBUFFER_BEGIN(Light)
 
     CBUFFER_UNIFORM(vec4 cLightColor)
     CBUFFER_UNIFORM(vec4 cShadowCubeAdjust)
+    CBUFFER_UNIFORM(vec2 cShadowCubeUVBias)
     CBUFFER_UNIFORM(vec4 cShadowDepthFade)
     CBUFFER_UNIFORM(vec2 cShadowIntensity)
     CBUFFER_UNIFORM(vec2 cShadowMapInvSize)

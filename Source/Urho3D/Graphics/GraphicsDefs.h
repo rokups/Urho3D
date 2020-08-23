@@ -453,6 +453,7 @@ extern URHO3D_API const StringHash PSP_MATSPECCOLOR;
 extern URHO3D_API const StringHash PSP_NEARCLIP;
 extern URHO3D_API const StringHash PSP_FARCLIP;
 extern URHO3D_API const StringHash PSP_SHADOWCUBEADJUST;
+extern URHO3D_API const StringHash PSP_SHADOWCUBEUVBIAS;
 extern URHO3D_API const StringHash PSP_SHADOWDEPTHFADE;
 extern URHO3D_API const StringHash PSP_SHADOWINTENSITY;
 extern URHO3D_API const StringHash PSP_SHADOWMAPINVSIZE;

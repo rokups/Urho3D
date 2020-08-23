@@ -324,6 +324,7 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
                     drawQueue.AddShaderParameter(PSP_SHADOWINTENSITY, currentLightParams->shadowIntensity_);
                     drawQueue.AddShaderParameter(PSP_SHADOWMAPINVSIZE, currentLightParams->shadowMapInvSize_);
                     drawQueue.AddShaderParameter(PSP_SHADOWSPLITS, currentLightParams->shadowSplits_);
+                    drawQueue.AddShaderParameter(PSP_SHADOWCUBEUVBIAS, currentLightParams->shadowCubeUVBias_);
                     drawQueue.AddShaderParameter(PSP_SHADOWCUBEADJUST, currentLightParams->shadowCubeAdjust_);
                     drawQueue.AddShaderParameter(VSP_NORMALOFFSETSCALE, currentLightParams->normalOffsetScale_);
                     drawQueue.AddShaderParameter(PSP_VSMSHADOWPARAMS, renderer_->GetVSMShadowParameters());

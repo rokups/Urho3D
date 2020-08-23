@@ -41,6 +41,9 @@ namespace Urho3D
 namespace
 {
 
+/// Cube shadow map padding, in pixels.
+const float cubeShadowMapPadding = 2.0f;
+
 /// Frustum Query for point light.
 struct PointLightLitGeometriesQuery : public SphereOctreeQuery
 {
@@ -382,11 +385,8 @@ void SceneLightShadowSplit::FinalizeShadowCamera(Light* light)
             shadowCamera_->SetZoom(shadowCamera_->GetZoom() * ((shadowMapWidth - 2.0f) / shadowMapWidth));
         else
         {
-#ifdef URHO3D_OPENGL
-            shadowCamera_->SetZoom(shadowCamera_->GetZoom() * ((shadowMapWidth - 3.0f) / shadowMapWidth));
-#else
-            shadowCamera_->SetZoom(shadowCamera_->GetZoom() * ((shadowMapWidth - 4.0f) / shadowMapWidth));
-#endif
+            const float scale = (shadowMapWidth - 2.0f * cubeShadowMapPadding) / shadowMapWidth;
+            shadowCamera_->SetZoom(shadowCamera_->GetZoom() * scale);
         }
     }
 }
@@ -585,6 +585,13 @@ void SceneLight::FinalizeShaderParameters(Camera* cullCamera, float subPixelOffs
     if (!shadowMap_)
         return;
 
+    // Initialize size of shadow map
+    const float textureSizeX = static_cast<float>(shadowMap_.texture_->GetWidth());
+    const float textureSizeY = static_cast<float>(shadowMap_.texture_->GetHeight());
+    shaderParams_.shadowMapInvSize_ = { 1.0f / textureSizeX, 1.0f / textureSizeY };
+
+    shaderParams_.shadowCubeUVBias_ = Vector2::ZERO;
+    shaderParams_.shadowCubeAdjust_ = Vector4::ZERO;
     switch (lightType)
     {
     case LIGHT_DIRECTIONAL:
@@ -599,47 +606,29 @@ void SceneLight::FinalizeShaderParameters(Camera* cullCamera, float subPixelOffs
         break;
 
     case LIGHT_POINT:
-        // TODO(renderer): Implement me
-        assert(0);
-        /*Matrix4 lightVecRot(lightNode->GetWorldRotation().RotationMatrix());
-        // HLSL compiler will pack the parameters as if the matrix is only 3x4, so must be careful to not overwrite
-        // the next parameter
+    {
+        const auto& splitViewport = splits_[0].shadowMap_.region_;
+        const float viewportSizeX = static_cast<float>(splitViewport.Width());
+        const float viewportSizeY = static_cast<float>(splitViewport.Height());
+        const float viewportOffsetX = static_cast<float>(splitViewport.Left());
+        const float viewportOffsetY = static_cast<float>(splitViewport.Top());
+        const Vector2 relativeViewportSize{ viewportSizeX / textureSizeX, viewportSizeY / textureSizeY };
+        const Vector2 relativeViewportOffset{ viewportOffsetX / textureSizeX, viewportOffsetY / textureSizeY };
+        shaderParams_.shadowCubeUVBias_ =
+            Vector2::ONE - 2.0f * cubeShadowMapPadding * shaderParams_.shadowMapInvSize_ / relativeViewportSize;
 #ifdef URHO3D_OPENGL
-        graphics->SetShaderParameter(VSP_LIGHTMATRICES, lightVecRot.Data(), 16);
+        const Vector2 scale = relativeViewportSize * Vector2(1, -1);
+        const Vector2 offset = Vector2(0, 1) + relativeViewportOffset * Vector2(1, -1);
 #else
-        graphics->SetShaderParameter(VSP_LIGHTMATRICES, lightVecRot.Data(), 12);
-#endif*/
+        const Vector2 scale = relativeViewportSize;
+        const Vector2 offset = relativeViewportOffset;
+#endif
+        shaderParams_.shadowCubeAdjust_ = { scale, offset };
         break;
-
+    }
     default:
         break;
     }
-
-    // TODO(renderer): Implement me
-    shaderParams_.shadowCubeAdjust_ = Vector4::ZERO;
-    /*// Calculate point light shadow sampling offsets (unrolled cube map)
-    auto faceWidth = (unsigned)(shadowMap->GetWidth() / 2);
-    auto faceHeight = (unsigned)(shadowMap->GetHeight() / 3);
-    auto width = (float)shadowMap->GetWidth();
-    auto height = (float)shadowMap->GetHeight();
-#ifdef URHO3D_OPENGL
-    float mulX = (float)(faceWidth - 3) / width;
-    float mulY = (float)(faceHeight - 3) / height;
-    float addX = 1.5f / width;
-    float addY = 1.5f / height;
-#else
-    float mulX = (float)(faceWidth - 4) / width;
-    float mulY = (float)(faceHeight - 4) / height;
-    float addX = 2.5f / width;
-    float addY = 2.5f / height;
-#endif
-    // If using 4 shadow samples, offset the position diagonally by half pixel
-    if (renderer->GetShadowQuality() == SHADOWQUALITY_PCF_16BIT || renderer->GetShadowQuality() == SHADOWQUALITY_PCF_24BIT)
-    {
-        addX -= 0.5f / width;
-        addY -= 0.5f / height;
-    }
-    graphics->SetShaderParameter(PSP_SHADOWCUBEADJUST, Vector4(mulX, mulY, addX, addY));*/
 
     {
         // Calculate shadow camera depth parameters for point light shadows and shadow fade parameters for
@@ -674,10 +663,6 @@ void SceneLight::FinalizeShaderParameters(Camera* cullCamera, float subPixelOffs
         //    samples = 4.0f;
         shaderParams_.shadowIntensity_ = { pcfValues / samples, intensity, 0.0f, 0.0f };
     }
-
-    const float sizeX = 1.0f / static_cast<float>(shadowMap_.texture_->GetWidth());
-    const float sizeY = 1.0f / static_cast<float>(shadowMap_.texture_->GetHeight());
-    shaderParams_.shadowMapInvSize_ = { sizeX, sizeY };
 
     shaderParams_.shadowSplits_ = { M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE };
     if (numSplits_ > 1)

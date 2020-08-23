@@ -72,6 +72,8 @@ struct SceneLightShaderParameters
     Vector4 shadowIntensity_;
     /// Inverse size of shadowmap.
     Vector2 shadowMapInvSize_;
+    /// Bias multiplier applied to UV to avoid seams.
+    Vector2 shadowCubeUVBias_;
     /// Shadow splits distances.
     Vector4 shadowSplits_;
     /// Normal offset and scale.

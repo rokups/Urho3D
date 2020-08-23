@@ -325,24 +325,40 @@ float GetShadow(highp vec4 shadowPos)
 #endif
 
 #ifdef POINTLIGHT
+vec3 GetPointShadowTexCoord(vec3 vec)
+{
+    vec3 vecAbs = abs(vec);
+    float invDominantAxis;
+    vec2 uv;
+    vec2 faceOffset;
+    if(vecAbs.z >= vecAbs.x && vecAbs.z >= vecAbs.y)
+    {
+        faceOffset = vec.z < 0.0 ? vec2(2.0, 1.0) : vec2(1.0, 1.0);
+        invDominantAxis = 1.0 / vecAbs.z;
+        uv = vec2(vec.z < 0.0 ? -vec.x : vec.x, -vec.y);
+    }
+    else if(vecAbs.y >= vecAbs.x)
+    {
+        faceOffset = vec.y < 0.0 ? vec2(0.0, 1.0) : vec2(2.0, 0.0);
+        invDominantAxis = 1.0 / vecAbs.y;
+        uv = vec2(vec.x, vec.y < 0.0 ? -vec.z : vec.z);
+    }
+    else
+    {
+        faceOffset = vec.x < 0.0 ? vec2(1.0, 0.0) : vec2(0.0, 0.0);
+        invDominantAxis = 1.0 / vecAbs.x;
+        uv = vec2(vec.x < 0.0 ? vec.z : -vec.z, -vec.y);
+    }
+    uv *= cShadowCubeUVBias.xy;
+    return vec3(uv * 0.5 * invDominantAxis + vec2(0.5, 0.5) + faceOffset, invDominantAxis);
+}
+
 float GetPointShadow(vec3 lightVec)
 {
-    vec3 axis = textureCube(sFaceSelectCubeMap, lightVec).rgb;
-    float depth = abs(dot(lightVec, axis));
-
-    // Expand the maximum component of the light vector to get full 0.0 - 1.0 UV range from the cube map,
-    // and to avoid sampling across faces. Some GPU's filter across faces, while others do not, and in this
-    // case filtering across faces is wrong
-    const vec3 factor = vec3(1.0 / 256.0);
-    lightVec += factor * axis * lightVec;
-
-    // Read the 2D UV coordinates, adjust according to shadow map size and add face offset
-    vec4 indirectPos = textureCube(sIndirectionCubeMap, lightVec);
-    indirectPos.xy *= cShadowCubeAdjust.xy;
-    indirectPos.xy += vec2(cShadowCubeAdjust.z + indirectPos.z * 0.5, cShadowCubeAdjust.w + indirectPos.w);
-
-    vec4 shadowPos = vec4(indirectPos.xy, cShadowDepthFade.x + cShadowDepthFade.y / depth, 1.0);
-    return GetShadow(shadowPos);
+    vec3 uvDepth = GetPointShadowTexCoord(lightVec);
+    uvDepth.xy = uvDepth.xy * cShadowCubeAdjust.xy + cShadowCubeAdjust.zw;
+    uvDepth.z = cShadowDepthFade.x + cShadowDepthFade.y * uvDepth.z;
+    return GetShadow(vec4(uvDepth, 1.0));
 }
 #endif
 
