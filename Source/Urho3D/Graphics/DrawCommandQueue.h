@@ -170,10 +170,10 @@ public:
                 }
 
                 if (!ConstantBufferCollection::StoreParameter(constantBuffers_.currentData_ + paramInfo.offset_,
-                    paramInfo.stride_, paramInfo.count_, value))
+                    paramInfo.size_, value))
                 {
-                    URHO3D_LOGERROR("Shader parameter #{} '{}' is expected to be {}-element array with {} byte elements",
-                        name.Value(), name.Reverse(), paramInfo.count_, paramInfo.stride_);
+                    URHO3D_LOGERROR("Shader parameter #{} '{}' has unexpected type, {} bytes expected",
+                        name.Value(), name.Reverse(), paramInfo.size_);
                 }
             }
         }

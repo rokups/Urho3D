@@ -89,40 +89,40 @@ public:
     const void* GetBufferData(unsigned index) const { return buffers_[index].first.data(); }
 
     /// Copy variant parameter into storage.
-    static bool StoreParameter(unsigned char* dest, unsigned stride, unsigned count, const Variant& value)
+    static bool StoreParameter(unsigned char* dest, unsigned size, const Variant& value)
     {
         switch (value.GetType())
         {
         case VAR_BOOL:
-            return StoreParameter(dest, stride, count, value.GetBool() ? 1 : 0);
+            return StoreParameter(dest, size, value.GetBool() ? 1 : 0);
 
         case VAR_INT:
-            return StoreParameter(dest, stride, count, value.GetInt());
+            return StoreParameter(dest, size, value.GetInt());
 
         case VAR_FLOAT:
         case VAR_DOUBLE:
-            return StoreParameter(dest, stride, count, value.GetFloat());
+            return StoreParameter(dest, size, value.GetFloat());
 
         case VAR_VECTOR2:
-            return StoreParameter(dest, stride, count, value.GetVector2());
+            return StoreParameter(dest, size, value.GetVector2());
 
         case VAR_VECTOR3:
-            return StoreParameter(dest, stride, count, value.GetVector3());
+            return StoreParameter(dest, size, value.GetVector3());
 
         case VAR_VECTOR4:
-            return StoreParameter(dest, stride, count, value.GetVector4());
+            return StoreParameter(dest, size, value.GetVector4());
 
         case VAR_COLOR:
-            return StoreParameter(dest, stride, count, value.GetColor());
+            return StoreParameter(dest, size, value.GetColor());
 
         case VAR_MATRIX3:
-            return StoreParameter(dest, stride, count, value.GetMatrix3());
+            return StoreParameter(dest, size, value.GetMatrix3());
 
         case VAR_MATRIX3X4:
-            return StoreParameter(dest, stride, count, value.GetMatrix3x4());
+            return StoreParameter(dest, size, value.GetMatrix3x4());
 
         case VAR_MATRIX4:
-            return StoreParameter(dest, stride, count, value.GetMatrix4());
+            return StoreParameter(dest, size, value.GetMatrix4());
 
         default:
             // Unsupported parameter type, do nothing
@@ -132,18 +132,18 @@ public:
 
     /// Copy new simple parameter into storage. Trim if too much data provided.
     template <class T>
-    static bool StoreParameter(unsigned char* dest, unsigned stride, unsigned count, const T& value)
+    static bool StoreParameter(unsigned char* dest, unsigned size, const T& value)
     {
-        if (stride > sizeof(T))
+        if (size > sizeof(T))
             return false;
-        memcpy(dest, &value, stride);
+        memcpy(dest, &value, size);
         return true;
     }
 
     /// Copy new Matrix3 parameter into storage.
-    static bool StoreParameter(unsigned char* dest, unsigned stride, unsigned count, const Matrix3& value)
+    static bool StoreParameter(unsigned char* dest, unsigned size, const Matrix3& value)
     {
-        if (stride != 12 * sizeof(float))
+        if (size != 12 * sizeof(float))
             return false;
 
         const Matrix3x4 data{ value };
@@ -152,9 +152,9 @@ public:
     }
 
     /// Add new Vector4 array parameter.
-    static bool StoreParameter(unsigned char* dest, unsigned stride, unsigned count, ea::span<const Vector4> values)
+    static bool StoreParameter(unsigned char* dest, unsigned size, ea::span<const Vector4> values)
     {
-        if (stride != 4 * sizeof(float) || count < values.size())
+        if (size < 4 * sizeof(float) * values.size())
             return false;
 
         memcpy(dest, values.data(), sizeof(Vector4) * values.size());
@@ -162,9 +162,9 @@ public:
     }
 
     /// Add new Matrix3x4 array parameter.
-    static bool StoreParameter(unsigned char* dest, unsigned stride, unsigned count, ea::span<const Matrix3x4> values)
+    static bool StoreParameter(unsigned char* dest, unsigned size, ea::span<const Matrix3x4> values)
     {
-        if (stride != 12 * sizeof(float) || count < values.size())
+        if (size < 12 * sizeof(float) * values.size())
             return false;
 
         memcpy(dest, values.data(), sizeof(Matrix3x4) * values.size());
@@ -172,9 +172,9 @@ public:
     }
 
     /// Add new Matrix4 array parameter.
-    static bool StoreParameter(unsigned char* dest, unsigned stride, unsigned count, ea::span<const Matrix4> values)
+    static bool StoreParameter(unsigned char* dest, unsigned size, ea::span<const Matrix4> values)
     {
-        if (stride != 16 * sizeof(float) || count < values.size())
+        if (size < 16 * sizeof(float) * values.size())
             return false;
 
         memcpy(dest, values.data(), sizeof(Matrix4) * values.size());

@@ -55,7 +55,7 @@ static unsigned NumberPostfix(const ea::string& str)
     return M_MAX_UNSIGNED;
 }
 
-static unsigned GetUniformStride(int glType)
+static unsigned GetUniformElementSize(int glType)
 {
     switch (glType)
     {
@@ -77,6 +77,13 @@ static unsigned GetUniformStride(int glType)
     default:
         return 0;
     }
+}
+
+static unsigned GetUniformSize(int glType, int arraySize)
+{
+    const unsigned size = GetUniformElementSize(glType);
+    const unsigned minStride = 4 * sizeof(float);
+    return size < minStride && arraySize > 1 ? M_MAX_UNSIGNED : size * arraySize;
 }
 
 unsigned ShaderProgram::globalFrameNumber = 0;
@@ -304,9 +311,15 @@ bool ShaderProgram::Link()
                 {
                     // Register in layout
                     const unsigned parameterGroup = blockToBinding[blockIndex] % MAX_SHADER_PARAMETER_GROUPS;
+                    const unsigned size = GetUniformSize(type, elementCount);
+                    if (size == M_MAX_UNSIGNED)
+                    {
+                        URHO3D_LOGERROR("Invalid shader parameter '{}': "
+                            "only vec4, mat3x4 and mat4 arrays are supported", paramName);
+                        continue;
+                    }
                     AddConstantBufferParameter(paramName,
-                        static_cast<ShaderParameterGroup>(parameterGroup), blockOffset,
-                        GetUniformStride(type), static_cast<unsigned>(elementCount));
+                        static_cast<ShaderParameterGroup>(parameterGroup), blockOffset, size);
                 }
             }
 #endif

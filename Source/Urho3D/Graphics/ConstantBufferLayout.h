@@ -37,10 +37,8 @@ struct ConstantBufferElement
     ShaderParameterGroup group_{};
     /// Offset of the element within buffer.
     unsigned offset_{};
-    /// Size of element after alignment.
-    unsigned stride_{};
-    /// Size of array (if applicable) or 1 (if not an array).
-    unsigned count_{};
+    /// Size of element in the buffer.
+    unsigned size_{};
 };
 
 /// Description of constant buffer layout of shader program.
@@ -56,7 +54,7 @@ public:
     /// Return parameter info by hash.
     const ConstantBufferElement& GetConstantBufferParameter(StringHash name) const
     {
-        static const ConstantBufferElement empty{ MAX_SHADER_PARAMETER_GROUPS, M_MAX_UNSIGNED, 0, 0 };
+        static const ConstantBufferElement empty{ MAX_SHADER_PARAMETER_GROUPS, M_MAX_UNSIGNED, 0 };
         const auto iter = constantBufferParameters_.find(name);
         if (iter == constantBufferParameters_.end())
             return empty;
@@ -71,10 +69,9 @@ protected:
     }
 
     /// Add parameter inside constant buffer.
-    void AddConstantBufferParameter(StringHash name, ShaderParameterGroup group,
-        unsigned offset, unsigned stride, unsigned count)
+    void AddConstantBufferParameter(StringHash name, ShaderParameterGroup group, unsigned offset, unsigned size)
     {
-        constantBufferParameters_.emplace(name, ConstantBufferElement{ group, offset, stride, count });
+        constantBufferParameters_.emplace(name, ConstantBufferElement{ group, offset, size });
     }
 
     /// Recalculate layout hash.
@@ -92,8 +89,7 @@ protected:
             const ConstantBufferElement& element = item.second;
             CombineHash(constantBufferHashes_[element.group_], paramName.Value());
             CombineHash(constantBufferHashes_[element.group_], element.offset_);
-            CombineHash(constantBufferHashes_[element.group_], element.stride_);
-            CombineHash(constantBufferHashes_[element.group_], element.count_);
+            CombineHash(constantBufferHashes_[element.group_], element.size_);
 
             if (constantBufferHashes_[element.group_] == 0)
                 constantBufferHashes_[element.group_] = 1;
