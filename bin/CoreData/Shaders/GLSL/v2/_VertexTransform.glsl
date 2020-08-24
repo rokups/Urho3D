@@ -4,7 +4,7 @@
 #ifdef STAGE_VERTEX_SHADER
 
 /// Return normal matrix from model matrix.
-mat3 GetNormalMatrix(mat4 modelMatrix)
+mat3 GetNormalMatrix(mat3x4 modelMatrix)
 {
     return mat3(modelMatrix[0].xyz, modelMatrix[1].xyz, modelMatrix[2].xyz);
 }
@@ -45,18 +45,16 @@ float GetDepth(vec4 clipPos)
 
 /// Return model matrix.
 #if defined(GEOM_SKINNED)
-    mat4 GetSkinMatrix(vec4 blendWeights, vec4 blendIndices)
+    mat3x4 GetSkinMatrix(vec4 blendWeights, vec4 blendIndices)
     {
-        ivec4 idx = ivec4(blendIndices) * 3;
-        const vec4 lastColumn = vec4(0.0, 0.0, 0.0, 1.0);
-        return mat4(cSkinMatrices[idx.x], cSkinMatrices[idx.x + 1], cSkinMatrices[idx.x + 2], lastColumn) * blendWeights.x +
-            mat4(cSkinMatrices[idx.y], cSkinMatrices[idx.y + 1], cSkinMatrices[idx.y + 2], lastColumn) * blendWeights.y +
-            mat4(cSkinMatrices[idx.z], cSkinMatrices[idx.z + 1], cSkinMatrices[idx.z + 2], lastColumn) * blendWeights.z +
-            mat4(cSkinMatrices[idx.w], cSkinMatrices[idx.w + 1], cSkinMatrices[idx.w + 2], lastColumn) * blendWeights.w;
+        return cSkinMatrices[int(blendIndices.x)] * blendWeights.x +
+            cSkinMatrices[int(blendIndices.y)] * blendWeights.y +
+            cSkinMatrices[int(blendIndices.z)] * blendWeights.z +
+            cSkinMatrices[int(blendIndices.w)] * blendWeights.w;
     }
     #define GetModelMatrix() GetSkinMatrix(iBlendWeights, iBlendIndices)
 #elif defined(GEOM_INSTANCED)
-    #define GetModelMatrix() mat4(iTexCoord4, iTexCoord5, iTexCoord6, vec4(0.0, 0.0, 0.0, 1.0))
+    #define GetModelMatrix() mat3x4(iTexCoord4, iTexCoord5, iTexCoord6)
 #else
     #define GetModelMatrix() cModel
 #endif
@@ -65,19 +63,19 @@ float GetDepth(vec4 clipPos)
 #define iModelMatrix GetModelMatrix()
 
 /// Return world position for simple geometry.
-vec3 GetGeometryPos(mat4 modelMatrix)
+vec3 GetGeometryPos(mat3x4 modelMatrix)
 {
     return (iPos * modelMatrix).xyz;
 }
 
 /// Return world normal for simple geometry.
-vec3 GetGeometryNormal(mat4 modelMatrix)
+vec3 GetGeometryNormal(mat3x4 modelMatrix)
 {
     return normalize(iNormal * GetNormalMatrix(modelMatrix));
 }
 
 /// Return world tangent for simple geometry.
-vec4 GetGeometryTangent(mat4 modelMatrix)
+vec4 GetGeometryTangent(mat3x4 modelMatrix)
 {
     return vec4(normalize(iTangent.xyz * GetNormalMatrix(modelMatrix)), iTangent.w);
 }
@@ -88,7 +86,7 @@ vec4 GetGeometryTangent(mat4 modelMatrix)
     #define GetWorldNormal(modelMatrix) GetGeometryNormal(modelMatrix)
     #define GetWorldTangent(modelMatrix) GetGeometryTangent(modelMatrix)
 #elif defined(GEOM_BILLBOARD)
-    vec3 GetBillboardPos(vec4 position, vec2 size, mat4 modelMatrix)
+    vec3 GetBillboardPos(vec4 position, vec2 size, mat3x4 modelMatrix)
     {
         return (position * modelMatrix).xyz + vec3(size.x, size.y, 0.0) * cBillboardRot;
     }
@@ -117,17 +115,17 @@ vec4 GetGeometryTangent(mat4 modelMatrix)
             right.z, up.z, front.z
         );
     }
-    vec3 GetBillboardPos(vec4 iPos, vec3 iDirection, mat4 modelMatrix)
+    vec3 GetBillboardPos(vec4 iPos, vec3 iDirection, mat3x4 modelMatrix)
     {
         vec3 worldPos = (iPos * modelMatrix).xyz;
         return worldPos + vec3(iTexCoord1.x, 0.0, iTexCoord1.y) * GetFaceCameraRotation(worldPos, iDirection);
     }
-    vec3 GetBillboardNormal(vec4 iPos, vec3 iDirection, mat4 modelMatrix)
+    vec3 GetBillboardNormal(vec4 iPos, vec3 iDirection, mat3x4 modelMatrix)
     {
         vec3 worldPos = (iPos * modelMatrix).xyz;
         return vec3(0.0, 1.0, 0.0) * GetFaceCameraRotation(worldPos, iDirection);
     }
-    vec4 GetBilboardTangent(mat4 modelMatrix)
+    vec4 GetBilboardTangent(mat3x4 modelMatrix)
     {
         return vec4(normalize(vec3(1.0, 0.0, 0.0) * GetNormalMatrix(modelMatrix)), 1.0);
     }
@@ -135,7 +133,7 @@ vec4 GetGeometryTangent(mat4 modelMatrix)
     #define GetWorldNormal(modelMatrix) GetBillboardNormal(iPos, iNormal, modelMatrix)
     #define GetWorldTangent(modelMatrix) GetBilboardTangent(modelMatrix)
 #elif defined(GEOM_TRAIL_FACE_CAMERA)
-    vec3 GetTrailPos(vec4 iPos, vec3 iFront, float iScale, mat4 modelMatrix)
+    vec3 GetTrailPos(vec4 iPos, vec3 iFront, float iScale, mat3x4 modelMatrix)
     {
         vec3 up = normalize(cCameraPos - iPos.xyz);
         vec3 right = normalize(cross(iFront, up));
@@ -149,7 +147,7 @@ vec4 GetGeometryTangent(mat4 modelMatrix)
     #define GetWorldNormal(modelMatrix) GetTrailNormal(iPos)
     #define GetWorldTangent(modelMatrix) GetGeometryTangent(modelMatrix)
 #elif defined(GEOM_TRAIL_BONE)
-    vec3 GetTrailPos(vec4 iPos, vec3 iParentPos, float iScale, mat4 modelMatrix)
+    vec3 GetTrailPos(vec4 iPos, vec3 iParentPos, float iScale, mat3x4 modelMatrix)
     {
         vec3 right = iParentPos - iPos.xyz;
         return (vec4((iPos.xyz + right * iScale), 1.0) * modelMatrix).xyz;

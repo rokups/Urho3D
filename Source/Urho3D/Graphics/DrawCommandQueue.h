@@ -29,6 +29,7 @@
 #include "../Graphics/PipelineState.h"
 #include "../Graphics/ShaderParameterCollection.h"
 #include "../Graphics/ConstantBufferCollection.h"
+#include "../IO/Log.h"
 
 namespace Urho3D
 {
@@ -137,6 +138,7 @@ public:
                 currentDrawCommand_.constantBuffers_[group] = refAndData.first;
                 constantBuffers_.currentData_ = refAndData.second;
                 constantBuffers_.currentHashes_[group] = groupLayoutHash;
+                constantBuffers_.currentGroup_ = group;
                 return true;
             }
             return false;
@@ -157,8 +159,23 @@ public:
         if (useConstantBuffers_)
         {
             const auto paramInfo = constantBuffers_.currentLayout_->GetConstantBufferParameter(name);
-            if (paramInfo.second != M_MAX_UNSIGNED)
-                ConstantBufferCollection::StoreParameter(constantBuffers_.currentData_ + paramInfo.second, value);
+            if (paramInfo.offset_ != M_MAX_UNSIGNED)
+            {
+                // TODO(renderer): Profile performance impact
+                if (constantBuffers_.currentGroup_ != paramInfo.group_)
+                {
+                    URHO3D_LOGERROR("Shader parameter #{} '{}' shall be stored in group {} instead of group {}",
+                        name.Value(), name.Reverse(), constantBuffers_.currentGroup_, paramInfo.group_);
+                    return;
+                }
+
+                if (!ConstantBufferCollection::StoreParameter(constantBuffers_.currentData_ + paramInfo.offset_,
+                    paramInfo.stride_, paramInfo.count_, value))
+                {
+                    URHO3D_LOGERROR("Shader parameter #{} '{}' is expected to be {}-element array with {} byte elements",
+                        name.Value(), name.Reverse(), paramInfo.count_, paramInfo.stride_);
+                }
+            }
         }
         else
         {
@@ -173,6 +190,7 @@ public:
         if (useConstantBuffers_)
         {
             // All data is already stored, nothing to do
+            constantBuffers_.currentGroup_ = MAX_SHADER_PARAMETER_GROUPS;
         }
         else
         {
@@ -296,6 +314,8 @@ private:
         /// Constant buffers.
         ConstantBufferCollection collection_;
 
+        /// Current constant buffer group.
+        ShaderParameterGroup currentGroup_{ MAX_SHADER_PARAMETER_GROUPS };
         /// Current constant buffer layout.
         ConstantBufferLayout* currentLayout_{};
         /// Current pointer to constant buffer data.

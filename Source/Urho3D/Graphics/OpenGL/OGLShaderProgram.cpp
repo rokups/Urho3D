@@ -55,6 +55,30 @@ static unsigned NumberPostfix(const ea::string& str)
     return M_MAX_UNSIGNED;
 }
 
+static unsigned GetUniformStride(int glType)
+{
+    switch (glType)
+    {
+    case GL_BOOL:
+    case GL_INT:
+    case GL_FLOAT:
+        return sizeof(float);
+    case GL_FLOAT_VEC2:
+        return 2 * sizeof(float);
+    case GL_FLOAT_VEC3:
+        return 3 * sizeof(float);
+    case GL_FLOAT_VEC4:
+        return 4 * sizeof(float);
+    case GL_FLOAT_MAT3:
+    case GL_FLOAT_MAT3x4:
+        return 12 * sizeof(float);
+    case GL_FLOAT_MAT4:
+        return 16 * sizeof(float);
+    default:
+        return 0;
+    }
+}
+
 unsigned ShaderProgram::globalFrameNumber = 0;
 
 ShaderProgram::ShaderProgram(Graphics* graphics, ShaderVariation* vertexShader, ShaderVariation* pixelShader) :
@@ -281,7 +305,8 @@ bool ShaderProgram::Link()
                     // Register in layout
                     const unsigned parameterGroup = blockToBinding[blockIndex] % MAX_SHADER_PARAMETER_GROUPS;
                     AddConstantBufferParameter(paramName,
-                        static_cast<ShaderParameterGroup>(parameterGroup), blockOffset);
+                        static_cast<ShaderParameterGroup>(parameterGroup), blockOffset,
+                        GetUniformStride(type), static_cast<unsigned>(elementCount));
                 }
             }
 #endif

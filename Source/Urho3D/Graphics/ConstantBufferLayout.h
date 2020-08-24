@@ -30,6 +30,19 @@
 namespace Urho3D
 {
 
+/// Element of constant buffer.
+struct ConstantBufferElement
+{
+    /// Shader parameter group aka constant buffer index.
+    ShaderParameterGroup group_{};
+    /// Offset of the element within buffer.
+    unsigned offset_{};
+    /// Size of element after alignment.
+    unsigned stride_{};
+    /// Size of array (if applicable) or 1 (if not an array).
+    unsigned count_{};
+};
+
 /// Description of constant buffer layout of shader program.
 class URHO3D_API ConstantBufferLayout : public RefCounted
 {
@@ -41,12 +54,12 @@ public:
     unsigned GetConstantBufferHash(ShaderParameterGroup group) const { return constantBufferHashes_[group]; }
 
     /// Return parameter info by hash.
-    ea::pair<ShaderParameterGroup, unsigned> GetConstantBufferParameter(StringHash name) const
+    const ConstantBufferElement& GetConstantBufferParameter(StringHash name) const
     {
+        static const ConstantBufferElement empty{ MAX_SHADER_PARAMETER_GROUPS, M_MAX_UNSIGNED, 0, 0 };
         const auto iter = constantBufferParameters_.find(name);
         if (iter == constantBufferParameters_.end())
-            return { MAX_SHADER_PARAMETER_GROUPS, M_MAX_UNSIGNED };
-
+            return empty;
         return iter->second;
     }
 
@@ -58,9 +71,10 @@ protected:
     }
 
     /// Add parameter inside constant buffer.
-    void AddConstantBufferParameter(StringHash name, ShaderParameterGroup group, unsigned offset)
+    void AddConstantBufferParameter(StringHash name, ShaderParameterGroup group,
+        unsigned offset, unsigned stride, unsigned count)
     {
-        constantBufferParameters_.emplace(name, ea::make_pair(group, offset));
+        constantBufferParameters_.emplace(name, ConstantBufferElement{ group, offset, stride, count });
     }
 
     /// Recalculate layout hash.
@@ -75,13 +89,14 @@ protected:
         for (const auto& item : constantBufferParameters_)
         {
             const StringHash paramName = item.first;
-            const ShaderParameterGroup group = item.second.first;
-            const unsigned offset = item.second.second;
-            CombineHash(constantBufferHashes_[group], paramName.Value());
-            CombineHash(constantBufferHashes_[group], offset);
+            const ConstantBufferElement& element = item.second;
+            CombineHash(constantBufferHashes_[element.group_], paramName.Value());
+            CombineHash(constantBufferHashes_[element.group_], element.offset_);
+            CombineHash(constantBufferHashes_[element.group_], element.stride_);
+            CombineHash(constantBufferHashes_[element.group_], element.count_);
 
-            if (constantBufferHashes_[group] == 0)
-                constantBufferHashes_[group] = 1;
+            if (constantBufferHashes_[element.group_] == 0)
+                constantBufferHashes_[element.group_] = 1;
         }
     }
 
@@ -91,7 +106,7 @@ private:
     /// Constant buffer hashes.
     unsigned constantBufferHashes_[MAX_SHADER_PARAMETER_GROUPS]{};
     /// Mapping from parameter name to (buffer, offset) pair.
-    ea::unordered_map<StringHash, ea::pair<ShaderParameterGroup, unsigned>> constantBufferParameters_;
+    ea::unordered_map<StringHash, ConstantBufferElement> constantBufferParameters_;
 };
 
 }

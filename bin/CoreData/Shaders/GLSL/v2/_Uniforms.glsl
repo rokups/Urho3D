@@ -13,8 +13,8 @@ CBUFFER_BEGIN(Camera)
     CBUFFER_UNIFORM(vec4 cDepthMode)
     CBUFFER_UNIFORM(vec3 cFrustumSize)
     CBUFFER_UNIFORM(vec4 cGBufferOffsets)
-    CBUFFER_UNIFORM(mat4 cView)
-    CBUFFER_UNIFORM(mat4 cViewInv)
+    CBUFFER_UNIFORM(mat3x4 cView)
+    CBUFFER_UNIFORM(mat3x4 cViewInv)
     CBUFFER_UNIFORM(mat4 cViewProj)
     CBUFFER_UNIFORM(vec4 cClipPlane)
     CBUFFER_UNIFORM(vec4 cDepthReconstruct)
@@ -71,7 +71,7 @@ CBUFFER_END()
 
 #ifdef COMPILEVS
 CBUFFER_BEGIN(Object)
-    CBUFFER_UNIFORM(mat4 cModel)
+    CBUFFER_UNIFORM(mat3x4 cModel)
 #ifdef SPHERICALHARMONICS
     CBUFFER_UNIFORM(vec4 cSHAr)
     CBUFFER_UNIFORM(vec4 cSHAg)
@@ -87,7 +87,7 @@ CBUFFER_BEGIN(Object)
     CBUFFER_UNIFORM(mat3 cBillboardRot)
 #endif
 #ifdef GEOM_SKINNED
-    CBUFFER_UNIFORM(vec4 cSkinMatrices[MAXBONES*3])
+    CBUFFER_UNIFORM(mat3x4 cSkinMatrices[MAXBONES])
 #endif
 CBUFFER_END()
 #endif

@@ -1227,6 +1227,10 @@ void Graphics::SetShaderParameter(StringHash param, const float data[], unsigned
                 glUniformMatrix3fv(info->location_, count / 9, GL_FALSE, data);
                 break;
 
+            case GL_FLOAT_MAT3x4:
+                glUniformMatrix3x4fv(info->location_, count / 12, GL_FALSE, data);
+                break;
+
             case GL_FLOAT_MAT4:
                 glUniformMatrix4fv(info->location_, count / 16, GL_FALSE, data);
                 break;
@@ -1310,7 +1314,20 @@ void Graphics::SetShaderParameter(StringHash param, const Matrix3& matrix)
         const ShaderParameter* info = impl_->shaderProgram_->GetParameter(param);
         if (info)
         {
-            glUniformMatrix3fv(info->location_, 1, GL_FALSE, matrix.Data());
+            switch (info->glType_)
+            {
+            case GL_FLOAT_MAT3:
+                glUniformMatrix3fv(info->location_, 1, GL_FALSE, matrix.Data());
+                break;
+
+            case GL_FLOAT_MAT3x4:
+                glUniformMatrix3x4fv(info->location_, 1, GL_FALSE, Matrix3x4(matrix).Data());
+                break;
+
+            case GL_FLOAT_MAT4:
+                glUniformMatrix4fv(info->location_, 1, GL_FALSE, Matrix4(matrix).Data());
+                break;
+            }
         }
     }
 }
@@ -1350,7 +1367,20 @@ void Graphics::SetShaderParameter(StringHash param, const Matrix4& matrix)
         const ShaderParameter* info = impl_->shaderProgram_->GetParameter(param);
         if (info)
         {
-            glUniformMatrix4fv(info->location_, 1, GL_FALSE, matrix.Data());
+            switch (info->glType_)
+            {
+            case GL_FLOAT_MAT3:
+                glUniformMatrix3fv(info->location_, 1, GL_FALSE, matrix.ToMatrix3().Data());
+                break;
+
+            case GL_FLOAT_MAT3x4:
+                glUniformMatrix3x4fv(info->location_, 1, GL_FALSE, Matrix3x4(matrix).Data());
+                break;
+
+            case GL_FLOAT_MAT4:
+                glUniformMatrix4fv(info->location_, 1, GL_FALSE, matrix.Data());
+                break;
+            }
         }
     }
 }
@@ -1394,22 +1424,20 @@ void Graphics::SetShaderParameter(StringHash param, const Matrix3x4& matrix)
         const ShaderParameter* info = impl_->shaderProgram_->GetParameter(param);
         if (info)
         {
-            // Expand to a full Matrix4
-            static Matrix4 fullMatrix;
-            fullMatrix.m00_ = matrix.m00_;
-            fullMatrix.m01_ = matrix.m01_;
-            fullMatrix.m02_ = matrix.m02_;
-            fullMatrix.m03_ = matrix.m03_;
-            fullMatrix.m10_ = matrix.m10_;
-            fullMatrix.m11_ = matrix.m11_;
-            fullMatrix.m12_ = matrix.m12_;
-            fullMatrix.m13_ = matrix.m13_;
-            fullMatrix.m20_ = matrix.m20_;
-            fullMatrix.m21_ = matrix.m21_;
-            fullMatrix.m22_ = matrix.m22_;
-            fullMatrix.m23_ = matrix.m23_;
+            switch (info->glType_)
+            {
+            case GL_FLOAT_MAT3:
+                glUniformMatrix3fv(info->location_, 1, GL_FALSE, matrix.ToMatrix3().Data());
+                break;
 
-            glUniformMatrix4fv(info->location_, 1, GL_FALSE, fullMatrix.Data());
+            case GL_FLOAT_MAT3x4:
+                glUniformMatrix3x4fv(info->location_, 1, GL_FALSE, matrix.Data());
+                break;
+
+            case GL_FLOAT_MAT4:
+                glUniformMatrix4fv(info->location_, 1, GL_FALSE, matrix.ToMatrix4().Data());
+                break;
+            };
         }
     }
 }

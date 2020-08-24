@@ -20,8 +20,6 @@ uniform samplerCube sLightCubeMap;
     #else
         uniform sampler2DShadow sShadowMap;
     #endif
-    uniform samplerCube sFaceSelectCubeMap;
-    uniform samplerCube sIndirectionCubeMap;
     uniform samplerCube sZoneCubeMap;
     uniform sampler3D sZoneVolumeMap;
 #else
