@@ -25,6 +25,7 @@
 #include <EASTL/unordered_map.h>
 
 #include "../../Graphics/ConstantBuffer.h"
+#include "../../Graphics/ConstantBufferLayout.h"
 #include "../../Graphics/Graphics.h"
 #include "../../Graphics/ShaderVariation.h"
 
@@ -32,7 +33,7 @@ namespace Urho3D
 {
 
 /// Combined information for specific vertex and pixel shaders.
-class URHO3D_API ShaderProgram : public RefCounted
+class URHO3D_API ShaderProgram : public ConstantBufferLayout
 {
 public:
     /// Construct.
@@ -43,47 +44,40 @@ public:
         for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
         {
             if (vsBufferSizes[i])
-                vsConstantBuffers_[i] = graphics->GetOrCreateConstantBuffer(VS, i, vsBufferSizes[i]);
+                AddConstantBuffer(static_cast<ShaderParameterGroup>(i), vsBufferSizes[i]);
         }
 
         const unsigned* psBufferSizes = pixelShader->GetConstantBufferSizes();
         for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
         {
             if (psBufferSizes[i])
-                psConstantBuffers_[i] = graphics->GetOrCreateConstantBuffer(PS, i, psBufferSizes[i]);
+                AddConstantBuffer(static_cast<ShaderParameterGroup>(i), psBufferSizes[i]);
         }
 
         // Copy parameters, add direct links to constant buffers
         const ea::unordered_map<StringHash, ShaderParameter>& vsParams = vertexShader->GetParameters();
         for (auto i = vsParams.begin(); i != vsParams.end(); ++i)
         {
-            parameters_[i->first] = i->second;
-            parameters_[i->first].bufferPtr_ = vsConstantBuffers_[i->second.buffer_].Get();
+            const ShaderParameter& param = i->second;
+            AddConstantBufferParameter(param.name_, static_cast<ShaderParameterGroup>(param.buffer_),
+                param.offset_, param.size_);
         }
 
         const ea::unordered_map<StringHash, ShaderParameter>& psParams = pixelShader->GetParameters();
         for (auto i = psParams.begin(); i != psParams.end(); ++i)
         {
-            parameters_[i->first] = i->second;
-            parameters_[i->first].bufferPtr_ = psConstantBuffers_[i->second.buffer_].Get();
+            const ShaderParameter& param = i->second;
+            AddConstantBufferParameter(param.name_, static_cast<ShaderParameterGroup>(param.buffer_),
+                param.offset_, param.size_);
         }
 
-        // Optimize shader parameter lookup by rehashing to next power of two
-        parameters_.rehash(Max(2u, NextPowerOfTwo(parameters_.size())));
-
+        RecalculateLayoutHash();
     }
 
     /// Destruct.
     virtual ~ShaderProgram() override
     {
     }
-
-    /// Combined parameters from the vertex and pixel shader.
-    ea::unordered_map<StringHash, ShaderParameter> parameters_;
-    /// Vertex shader constant buffers.
-    SharedPtr<ConstantBuffer> vsConstantBuffers_[MAX_SHADER_PARAMETER_GROUPS];
-    /// Pixel shader constant buffers.
-    SharedPtr<ConstantBuffer> psConstantBuffers_[MAX_SHADER_PARAMETER_GROUPS];
 };
 
 }

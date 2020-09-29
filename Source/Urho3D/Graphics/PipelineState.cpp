@@ -44,12 +44,14 @@ bool PipelineState::Create(const PipelineStateDesc& desc)
     }
 
     desc_ = desc;
+#ifndef URHO3D_D3D9
     constantBufferLayout_ = graphics_->GetConstantBufferLayout(desc_.vertexShader_, desc_.pixelShader_);
     if (!constantBufferLayout_)
     {
         URHO3D_LOGERROR("Constant buffer layout of pipeline state is invalid");
         return false;
     }
+#endif
 
     return true;
 }

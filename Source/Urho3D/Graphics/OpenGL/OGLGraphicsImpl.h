@@ -132,7 +132,7 @@ private:
     /// Vertex attribute instancing bitmask for keeping track of divisors.
     unsigned instancingVertexAttributes_{};
     /// Current mapping of vertex attribute locations by semantic. The map is owned by the shader program, so care must be taken to switch a null shader program when it's destroyed.
-    const ea::unordered_map<ea::pair<unsigned char, unsigned char>, unsigned>* vertexAttributes_{};
+    const ea::unordered_map<ea::pair<unsigned char, unsigned char>, ea::pair<unsigned, bool>>* vertexAttributes_{};
     /// Currently bound frame buffer object.
     unsigned boundFBO_{};
     /// Currently bound vertex buffer object.

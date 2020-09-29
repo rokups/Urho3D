@@ -20,33 +20,25 @@
 // THE SOFTWARE.
 //
 
-#include "../../Precompiled.h"
+#pragma once
 
-#include "../../Graphics/Graphics.h"
-#include "../../Graphics/ConstantBuffer.h"
-#include "../../IO/Log.h"
+#include "../Core/Context.h"
+#include "../Core/Object.h"
+#include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/ShaderDefineArray.h"
 
-#include "../../DebugNew.h"
+#ifdef URHO3D_SPIRV
+
+#include <EASTL/vector.h>
+#include <EASTL/utility.h>
 
 namespace Urho3D
 {
 
-void ConstantBuffer::OnDeviceReset()
-{
-}
-
-void ConstantBuffer::Release()
-{
-}
-
-bool ConstantBuffer::SetSize(unsigned size)
-{
-    URHO3D_LOGERROR("Constant buffers are not supported on Direct3D9");
-    return false;
-}
-
-void ConstantBuffer::Update(const void* data)
-{
-}
+/// Convert GLSL shader to HLSL5.
+bool ConvertShaderToHLSL5(ShaderType shaderType, const ea::string& sourceCode, const ShaderDefineArray& shaderDefines,
+    ea::string& outputShaderCode, ea::string& errorMessage);
 
 }
+
+#endif

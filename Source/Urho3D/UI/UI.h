@@ -25,6 +25,7 @@
 #pragma once
 
 #include "../Core/Object.h"
+#include "../Graphics/DrawCommandQueue.h"
 #include "../Graphics/VertexBuffer.h"
 #include "../UI/Cursor.h"
 #include "../UI/UIBatch.h"
@@ -382,8 +383,51 @@ private:
     /// Return true when subsystem should not process any mouse/keyboard input.
     bool IsHandlingInput() const;
 
+    /// UIBatch shader type.
+    enum class UIBatchShaderType
+    {
+        NoTexture,
+        DiffTexture,
+        DiffMaskTexture,
+        AlphaTexture,
+    };
+    /// Key of UIBatch pipeline state cache.
+    struct UIBatchPipelineStateKey
+    {
+        /// Type of shader used. Custom material may override actual shader.
+        UIBatchShaderType shaderType_{};
+        /// Blend mode.
+        BlendMode blendMode_{};
+        /// Custom material.
+        Material* customMaterial_{};
+
+        /// Compare.
+        bool operator ==(const UIBatchPipelineStateKey& rhs) const
+        {
+            return shaderType_ == rhs.shaderType_
+                && blendMode_ == rhs.blendMode_
+                && customMaterial_ == rhs.customMaterial_;
+        }
+
+        /// Return hash.
+        unsigned ToHash() const
+        {
+            unsigned hash = 0;
+            CombineHash(hash, MakeHash(shaderType_));
+            CombineHash(hash, MakeHash(blendMode_));
+            CombineHash(hash, MakeHash(customMaterial_));
+            return hash;
+        }
+    };
+    /// Return UIBatch shader type.
+    UIBatchShaderType GetShaderType(const UIBatch& batch) const;
+    /// Return pipeline state for given batch.
+    PipelineState* GetPipelineState(const UIBatch& batch, bool renderToTexture);
+
     /// Graphics subsystem.
     WeakPtr<Graphics> graphics_;
+    /// Renderer subsystem.
+    WeakPtr<Renderer> renderer_;
     /// UI root element.
     SharedPtr<UIElement> rootElement_;
     /// UI root modal element.
@@ -392,6 +436,10 @@ private:
     SharedPtr<Cursor> cursor_;
     /// Currently focused element.
     WeakPtr<UIElement> focusElement_;
+    /// Draw queue used for rendering.
+    DrawCommandQueue drawQueue_;
+    /// Cached pipeline states.
+    ea::unordered_map<UIBatchPipelineStateKey, SharedPtr<PipelineState>> pipelineStateCache_;
     /// UI rendering batches.
     ea::vector<UIBatch> batches_;
     /// UI rendering vertex data.

@@ -1,6 +1,8 @@
 #ifndef _CONFIG_GLSL_
 #define _CONFIG_GLSL_
 
+#extension GL_ARB_shading_language_420pack: enable
+
 // Vertex shader defines
 #ifdef COMPILEVS
     #define STAGE_VERTEX_SHADER
@@ -27,13 +29,22 @@
 
 // Helpers to declare shader constants
 #ifdef URHO3D_USE_CBUFFERS
-    #define CBUFFER_BEGIN(name) uniform name {
-    #define CBUFFER_UNIFORM(decl) decl;
-    #define CBUFFER_END() };
+    #ifdef GL_ARB_shading_language_420pack
+        #define CBUFFER_BEGIN(index, name) layout(binding=index) uniform name {
+        #define CBUFFER_UNIFORM(decl) decl;
+        #define CBUFFER_END() };
+        #define UNIFORM_SAMPLER(index, decl) layout(binding=index) uniform decl;
+    #else
+        #define CBUFFER_BEGIN(index, name) uniform name {
+        #define CBUFFER_UNIFORM(decl) decl;
+        #define CBUFFER_END() };
+        #define UNIFORM_SAMPLER(index, decl) uniform decl;
+    #endif
 #else
-    #define CBUFFER_BEGIN(name)
+    #define CBUFFER_BEGIN(index, name)
     #define CBUFFER_UNIFORM(decl) uniform decl;
     #define CBUFFER_END()
+    #define UNIFORM_SAMPLER(index, decl) uniform decl;
 #endif
 
 #endif

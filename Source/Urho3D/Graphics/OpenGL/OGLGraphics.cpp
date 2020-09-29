@@ -1050,7 +1050,7 @@ ConstantBufferLayout* Graphics::GetConstantBufferLayout(ShaderVariation* vs, Sha
     if (iter != impl_->shaderPrograms_.end())
         return iter->second;
 
-    // TODO: Some overhead due to redundant setting of shader program
+    // TODO(renderer): Some overhead due to redundant setting of shader program
     ShaderVariation* prevVertexShader = vertexShader_;
     ShaderVariation* prevPixelShader = pixelShader_;
     SetShaders(vs, ps);
@@ -3115,7 +3115,8 @@ void Graphics::PrepareDraw()
 
                 if (k != impl_->vertexAttributes_->end())
                 {
-                    unsigned location = k->second;
+                    const unsigned location = k->second.first;
+                    const bool isInteger = k->second.second;
                     unsigned locationMask = 1u << location;
                     if (assignedLocations & locationMask)
                         continue; // Already assigned by higher index vertex buffer
@@ -3149,9 +3150,17 @@ void Graphics::PrepareDraw()
                     }
 
                     SetVBO(buffer->GetGPUObjectName());
-                    glVertexAttribPointer(location, glElementComponents[element.type_], glElementTypes[element.type_],
-                        element.type_ == TYPE_UBYTE4_NORM ? GL_TRUE : GL_FALSE, (unsigned)buffer->GetVertexSize(),
-                        (const void *)(size_t)dataStart);
+                    if (isInteger)
+                    {
+                        glVertexAttribIPointer(location, glElementComponents[element.type_], glElementTypes[element.type_],
+                            (unsigned)buffer->GetVertexSize(), (const void *)(size_t)dataStart);
+                    }
+                    else
+                    {
+                        glVertexAttribPointer(location, glElementComponents[element.type_], glElementTypes[element.type_],
+                            element.type_ == TYPE_UBYTE4_NORM ? GL_TRUE : GL_FALSE, (unsigned)buffer->GetVertexSize(),
+                            (const void *)(size_t)dataStart);
+                    }
                 }
             }
         }
@@ -3262,10 +3271,6 @@ void Graphics::ResetCachedState()
         SetDepthTest(CMP_LESSEQUAL);
         SetDepthWrite(true);
     }
-
-    /*for (auto& constantBuffer : impl_->constantBuffers_)
-        constantBuffer = nullptr;
-    impl_->dirtyConstantBuffers_.clear();*/
 }
 
 void Graphics::SetTextureUnitMappings()

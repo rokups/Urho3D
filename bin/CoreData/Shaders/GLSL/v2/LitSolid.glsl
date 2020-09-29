@@ -9,44 +9,45 @@
 #include "Fog.glsl"
 
 #ifdef NORMALMAP
-    varying vec4 vTexCoord;
-    varying vec4 vTangent;
+    VERTEX_SHADER_OUT(vec4 vTexCoord)
+    VERTEX_SHADER_OUT(vec4 vTangent)
 #else
-    varying vec2 vTexCoord;
+    VERTEX_SHADER_OUT(vec2 vTexCoord)
 #endif
-varying vec3 vNormal;
-varying vec4 vWorldPos;
+VERTEX_SHADER_OUT(vec3 vNormal)
+VERTEX_SHADER_OUT(vec4 vWorldPos)
 #ifdef VERTEXCOLOR
-    varying vec4 vColor;
+    VERTEX_SHADER_OUT(vec4 vColor)
 #endif
 #if defined(LIGHTMAP) || defined(AO)
-    varying vec2 vTexCoord2;
+    VERTEX_SHADER_OUT(vec2 vTexCoord2)
 #endif
-varying vec3 vVertexLight;
+VERTEX_SHADER_OUT(vec3 vVertexLight)
 #ifdef PERPIXEL
     #ifdef SHADOW
         #ifndef GL_ES
-            varying vec4 vShadowPos[NUMCASCADES];
+            VERTEX_SHADER_OUT(vec4 vShadowPos[NUMCASCADES])
         #else
-            varying highp vec4 vShadowPos[NUMCASCADES];
+            VERTEX_SHADER_OUT(highp vec4 vShadowPos[NUMCASCADES])
         #endif
     #endif
     #ifdef SPOTLIGHT
-        varying vec4 vSpotPos;
+        VERTEX_SHADER_OUT(vec4 vSpotPos)
     #endif
     #ifdef POINTLIGHT
-        varying vec3 vCubeMaskVec;
+        VERTEX_SHADER_OUT(vec3 vCubeMaskVec)
     #endif
 #else
-    varying vec4 vScreenPos;
+    VERTEX_SHADER_OUT(vec4 vScreenPos)
     #ifdef ENVCUBEMAP
-        varying vec3 vReflectionVec;
+        VERTEX_SHADER_OUT(vec3 vReflectionVec)
     #endif
 #endif
 
-void VS()
+#ifdef STAGE_VERTEX_SHADER
+void main()
 {
-    mat3x4 modelMatrix = iModelMatrix;
+    mat4 modelMatrix = iModelMatrix;
     vec3 worldPos = GetWorldPos(modelMatrix);
     gl_Position = GetClipPos(worldPos);
     vNormal = GetWorldNormal(modelMatrix);
@@ -93,8 +94,10 @@ void VS()
         vCubeMaskVec = (worldPos - cLightPos.xyz) * mat3(cLightMatrices[0][0].xyz, cLightMatrices[0][1].xyz, cLightMatrices[0][2].xyz);
     #endif
 }
+#endif
 
-void PS()
+#ifdef STAGE_PIXEL_SHADER
+void main()
 {
     // Get material diffuse albedo
     #ifdef DIFFMAP
@@ -178,3 +181,4 @@ void PS()
         gl_FragColor = vec4(GetFog(finalColor, fogFactor), diffColor.a);
     #endif
 }
+#endif

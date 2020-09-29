@@ -1056,6 +1056,12 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
     }
 }
 
+ConstantBufferLayout* Graphics::GetConstantBufferLayout(ShaderVariation* vs, ShaderVariation* ps)
+{
+    URHO3D_LOGERROR("Graphics::GetConstantBufferLayout is not supported for D3D9 graphics");
+    return nullptr;
+}
+
 void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 {
     if (vs == vertexShader_ && ps == pixelShader_)
@@ -1143,6 +1149,11 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
     // Store shader combination if shader dumping in progress
     if (shaderPrecache_)
         shaderPrecache_->StoreShaders(vertexShader_, pixelShader_);
+}
+
+void Graphics::SetShaderConstantBuffers(ea::span<const ConstantBufferRange, MAX_SHADER_PARAMETER_GROUPS> constantBuffers)
+{
+    URHO3D_LOGERROR("Graphics::SetShaderConstantBuffers is not supported for D3D9 graphics");
 }
 
 void Graphics::SetShaderParameter(StringHash param, const float data[], unsigned count)

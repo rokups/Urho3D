@@ -64,6 +64,8 @@ struct DrawCommandDescription
     /// Shader resources bound to the command.
     ShaderResourceRange shaderResources_;
 
+    /// Index of scissor rectangle. 0 if disabled.
+    unsigned scissorRect_{};
     /// Start vertex/index.
     unsigned indexStart_{};
     /// Number of vertices/indices.
@@ -81,46 +83,25 @@ class DrawCommandQueue
 {
 public:
     /// Reset queue.
-    void Reset(Graphics* graphics)
-    {
-        useConstantBuffers_ = graphics->GetConstantBuffersEnabled();
-
-        // Reset state accumulators
-        currentDrawCommand_ = {};
-        currentShaderResourceGroup_ = {};
-
-        // Clear shadep parameters
-        if (useConstantBuffers_)
-        {
-            constantBuffers_.collection_.ClearAndInitialize(graphics->GetConstantBuffersOffsetAlignment());
-            constantBuffers_.currentLayout_ = nullptr;
-            constantBuffers_.currentData_ = nullptr;
-            constantBuffers_.currentHashes_.fill(0);
-
-            currentDrawCommand_.constantBuffers_.fill({});
-        }
-        else
-        {
-            shaderParameters_.collection_.Clear();
-            shaderParameters_.currentGroupRange_ = {};
-
-            currentDrawCommand_.shaderParameters_.fill({});
-        }
-
-        // Clear arrays and draw commands
-        shaderResources_.clear();
-        drawCommands_.clear();
-    }
+    void Reset(Graphics* graphics, bool preferConstantBuffers = true);
 
     /// Set pipeline state. Must be called first.
     void SetPipelineState(PipelineState* pipelineState)
     {
+        assert(pipelineState);
         currentDrawCommand_.pipelineState_ = pipelineState;
 
         if (useConstantBuffers_)
         {
             constantBuffers_.currentLayout_ = pipelineState->GetConstantBufferLayout();
         }
+    }
+
+    /// Set scissor rect.
+    void SetScissorRect(const IntRect& scissorRect)
+    {
+        currentDrawCommand_.scissorRect_ = scissorRects_.size();
+        scissorRects_.push_back(scissorRect);
     }
 
     /// Begin shader parameter group. All parameters shall be set for each draw command.
@@ -214,6 +195,13 @@ public:
         currentDrawCommand_.shaderResources_ = currentShaderResourceGroup_;
         currentShaderResourceGroup_.first = shaderResources_.size();
         currentShaderResourceGroup_.second = currentShaderResourceGroup_.first;
+    }
+
+    /// Set vertex and index buffers.
+    void SetBuffers(VertexBuffer* vertexBuffer, IndexBuffer* indexBuffer)
+    {
+        currentDrawCommand_.vertexBuffers_[0] = vertexBuffer;
+        currentDrawCommand_.indexBuffer_ = indexBuffer;
     }
 
     /// Set vertex and index buffers.
@@ -326,6 +314,8 @@ private:
 
     /// Shader resources.
     ShaderResourceCollection shaderResources_;
+    /// Scissor rects.
+    ea::vector<IntRect> scissorRects_;
     /// Draw operations.
     ea::vector<DrawCommandDescription> drawCommands_;
 

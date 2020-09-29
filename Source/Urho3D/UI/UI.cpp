@@ -34,6 +34,7 @@
 #include "../Graphics/Octree.h"
 #include "../Graphics/Viewport.h"
 #include "../Graphics/Camera.h"
+#include "../Graphics/Renderer.h"
 #include "../Graphics/Technique.h"
 #include "../Scene/Scene.h"
 #include "../Input/Input.h"
@@ -847,6 +848,7 @@ void UI::Initialize()
     URHO3D_PROFILE("InitUI");
 
     graphics_ = graphics;
+    renderer_ = GetSubsystem<Renderer>();
     UIBatch::posAdjust = Vector3(Graphics::GetPixelUVOffset(), 0.0f);
 
     // Set initial root element size
@@ -891,6 +893,96 @@ void UI::SetVertexData(VertexBuffer* dest, const ea::vector<float>& vertexData)
     dest->SetData(&vertexData[0]);
 }
 
+UI::UIBatchShaderType UI::GetShaderType(const UIBatch& batch) const
+{
+    if (batch.customMaterial_)
+        return UIBatchShaderType::DiffTexture;
+
+    if (!batch.texture_)
+        return UIBatchShaderType::NoTexture;
+    else
+    {
+        // If texture contains only an alpha channel, use alpha shader (for fonts)
+        if (batch.texture_->GetFormat() == Graphics::GetAlphaFormat())
+            return UIBatchShaderType::AlphaTexture;
+        else if (batch.blendMode_ != BLEND_ALPHA && batch.blendMode_ != BLEND_ADDALPHA && batch.blendMode_ != BLEND_PREMULALPHA)
+            return UIBatchShaderType::DiffMaskTexture;
+        else
+            return UIBatchShaderType::DiffTexture;
+    }
+}
+
+PipelineState* UI::GetPipelineState(const UIBatch& batch, bool renderToTexture)
+{
+    const UIBatchPipelineStateKey key{ GetShaderType(batch), batch.blendMode_, batch.customMaterial_ };
+    SharedPtr<PipelineState>& pipelineState = pipelineStateCache_[key];
+    if (!pipelineState)
+    {
+        PipelineStateDesc desc;
+        desc.primitiveType_ = TRIANGLE_LIST;
+        desc.colorWrite_ = true;
+        desc.cullMode_ = CULL_CCW;
+#ifdef URHO3D_OPENGL
+        // Reverse winding if rendering to texture on OpenGL
+        if (renderToTexture)
+            desc.cullMode_ = CULL_CW;
+#endif
+        desc.depthMode_ = CMP_ALWAYS;
+        desc.depthWrite_ = false;
+        desc.fillMode_ = FILL_SOLID;
+        desc.stencilEnabled_ = false;
+        desc.blendMode_ = batch.blendMode_;
+        desc.vertexElements_ = vertexBuffer_->GetElements();
+
+        // Set vertex shader
+        if (key.shaderType_ == UIBatchShaderType::NoTexture)
+            desc.vertexShader_ = graphics_->GetShader(VS, "UIBasic", "VERTEXCOLOR");
+        else
+            desc.vertexShader_ = graphics_->GetShader(VS, "UIBasic", "DIFFMAP VERTEXCOLOR");
+
+        // Set pixel shader
+        switch (key.shaderType_)
+        {
+        case UIBatchShaderType::NoTexture:
+            desc.pixelShader_ = graphics_->GetShader(PS, "UIBasic", "VERTEXCOLOR");
+            break;
+
+        case UIBatchShaderType::AlphaTexture:
+            desc.pixelShader_ = graphics_->GetShader(PS, "UIBasic", "ALPHAMAP VERTEXCOLOR");
+            break;
+
+        case UIBatchShaderType::DiffMaskTexture:
+            desc.pixelShader_ = graphics_->GetShader(PS, "UIBasic", "DIFFMAP ALPHAMASK VERTEXCOLOR");
+            break;
+
+        case UIBatchShaderType::DiffTexture:
+            desc.pixelShader_ = graphics_->GetShader(PS, "UIBasic", "DIFFMAP VERTEXCOLOR");
+            break;
+
+        default:
+            break;
+        }
+
+        // Override pixel and vertex shaders by custom material
+        if (key.customMaterial_)
+        {
+            if (Technique* technique = key.customMaterial_->GetTechnique(0))
+            {
+                for (Pass* pass : technique->GetPasses())
+                {
+                    desc.vertexShader_ = graphics_->GetShader(VS, pass->GetVertexShader(), batch.customMaterial_->GetVertexShaderDefines());
+                    desc.pixelShader_ = graphics_->GetShader(PS, pass->GetPixelShader(), batch.customMaterial_->GetPixelShaderDefines());
+                    break;
+                }
+            }
+        }
+
+        pipelineState = renderer_->GetOrCreatePipelineState(desc);
+    }
+
+    return pipelineState;
+}
+
 void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsigned batchStart, unsigned batchEnd)
 {
     // Engine does not render when window is closed or device is lost
@@ -925,89 +1017,53 @@ void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsign
     projection.m23_ = 0.0f;
     projection.m33_ = 1.0f;
 
-    graphics_->ClearParameterSources();
-    graphics_->SetColorWrite(true);
-#ifdef URHO3D_OPENGL
-    // Reverse winding if rendering to texture on OpenGL
-    if (surface)
-        graphics_->SetCullMode(CULL_CW);
-    else
-#endif
-        graphics_->SetCullMode(CULL_CCW);
-    graphics_->SetDepthTest(CMP_ALWAYS);
-    graphics_->SetDepthWrite(false);
-    graphics_->SetFillMode(FILL_SOLID);
-    graphics_->SetStencilTest(false);
-    graphics_->SetVertexBuffer(buffer);
+    drawQueue_.Reset(graphics_, false /* prefer uniforms for compatibility with old shaders */);
 
-    ShaderVariation* noTextureVS = graphics_->GetShader(VS, "Basic", "VERTEXCOLOR");
-    ShaderVariation* diffTextureVS = graphics_->GetShader(VS, "Basic", "DIFFMAP VERTEXCOLOR");
-    ShaderVariation* noTexturePS = graphics_->GetShader(PS, "Basic", "VERTEXCOLOR");
-    ShaderVariation* diffTexturePS = graphics_->GetShader(PS, "Basic", "DIFFMAP VERTEXCOLOR");
-    ShaderVariation* diffMaskTexturePS = graphics_->GetShader(PS, "Basic", "DIFFMAP ALPHAMASK VERTEXCOLOR");
-    ShaderVariation* alphaTexturePS = graphics_->GetShader(PS, "Basic", "ALPHAMAP VERTEXCOLOR");
-
-
+    const float elapsedTime = GetSubsystem<Time>()->GetElapsedTime();
     for (unsigned i = batchStart; i < batchEnd; ++i)
     {
         const UIBatch& batch = batches[i];
         if (batch.vertexStart_ == batch.vertexEnd_)
             continue;
 
-        ShaderVariation* ps;
-        ShaderVariation* vs;
+        PipelineState* pipelineState = GetPipelineState(batch, !!surface);
+        if (!pipelineState)
+            continue;
 
-        if (!batch.customMaterial_)
+        drawQueue_.SetPipelineState(pipelineState);
+
+        if (drawQueue_.BeginShaderParameterGroup(SP_FRAME))
         {
-            if (!batch.texture_)
-            {
-                ps = noTexturePS;
-                vs = noTextureVS;
-            } else
-            {
-                // If texture contains only an alpha channel, use alpha shader (for fonts)
-                vs = diffTextureVS;
-
-                if (batch.texture_->GetFormat() == alphaFormat)
-                    ps = alphaTexturePS;
-                else if (batch.blendMode_ != BLEND_ALPHA && batch.blendMode_ != BLEND_ADDALPHA && batch.blendMode_ != BLEND_PREMULALPHA)
-                    ps = diffMaskTexturePS;
-                else
-                    ps = diffTexturePS;
-            }
-        } else
-        {
-            vs = diffTextureVS;
-            ps = diffTexturePS;
-
-            Technique* technique = batch.customMaterial_->GetTechnique(0);
-            if (technique)
-            {
-                Pass* pass = nullptr;
-                for (int i = 0; i < technique->GetNumPasses(); ++i)
-                {
-                    pass = technique->GetPass(i);
-                    if (pass)
-                    {
-                        vs = graphics_->GetShader(VS, pass->GetVertexShader(), batch.customMaterial_->GetVertexShaderDefines());
-                        ps = graphics_->GetShader(PS, pass->GetPixelShader(), batch.customMaterial_->GetPixelShaderDefines());
-                        break;
-                    }
-                }
-            }
+            drawQueue_.AddShaderParameter(VSP_ELAPSEDTIME, elapsedTime);
+            drawQueue_.AddShaderParameter(PSP_ELAPSEDTIME, elapsedTime);
+            drawQueue_.CommitShaderParameterGroup(SP_FRAME);
         }
 
-        graphics_->SetShaders(vs, ps);
-        if (graphics_->NeedParameterUpdate(SP_OBJECT, this))
-            graphics_->SetShaderParameter(VSP_MODEL, Matrix3x4::IDENTITY);
-        if (graphics_->NeedParameterUpdate(SP_CAMERA, this))
-            graphics_->SetShaderParameter(VSP_VIEWPROJ, projection);
-        if (graphics_->NeedParameterUpdate(SP_MATERIAL, this))
-            graphics_->SetShaderParameter(PSP_MATDIFFCOLOR, Color(1.0f, 1.0f, 1.0f, 1.0f));
+        if (drawQueue_.BeginShaderParameterGroup(SP_OBJECT))
+        {
+            drawQueue_.AddShaderParameter(VSP_MODEL, Matrix3x4::IDENTITY);
+            drawQueue_.CommitShaderParameterGroup(SP_OBJECT);
+        }
 
-        float elapsedTime = GetSubsystem<Time>()->GetElapsedTime();
-        graphics_->SetShaderParameter(VSP_ELAPSEDTIME, elapsedTime);
-        graphics_->SetShaderParameter(PSP_ELAPSEDTIME, elapsedTime);
+        if (drawQueue_.BeginShaderParameterGroup(SP_CAMERA))
+        {
+            drawQueue_.AddShaderParameter(VSP_VIEWPROJ, projection);
+            drawQueue_.CommitShaderParameterGroup(SP_CAMERA);
+        }
+
+        if (drawQueue_.BeginShaderParameterGroup(SP_MATERIAL))
+        {
+            if (!batch.customMaterial_)
+                drawQueue_.AddShaderParameter(PSP_MATDIFFCOLOR, Color(1.0f, 1.0f, 1.0f, 1.0f));
+            else
+            {
+                for (const auto& param : batch.customMaterial_->GetShaderParameters())
+                    drawQueue_.AddShaderParameter(param.first, param.second.value_);
+            }
+            drawQueue_.CommitShaderParameterGroup(SP_MATERIAL);
+        }
+
+        drawQueue_.SetBuffers(vertexBuffer_, nullptr);
 
         IntRect scissor = batch.scissor_;
         scissor.left_ = (int)(scissor.left_ * uiScale_);
@@ -1025,44 +1081,21 @@ void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsign
             scissor.bottom_ = viewSize.y_ - top;
         }
 #endif
+        drawQueue_.SetScissorRect(scissor);
 
-        graphics_->SetBlendMode(batch.blendMode_);
-        graphics_->SetScissorTest(true, scissor);
         if (!batch.customMaterial_)
+            drawQueue_.AddShaderResource(TU_DIFFUSE, batch.texture_);
+        else
         {
-            graphics_->SetTexture(0, batch.texture_);
-        } else
-        {
-            // Update custom shader parameters if needed
-            if (graphics_->NeedParameterUpdate(SP_MATERIAL, reinterpret_cast<const void*>(batch.customMaterial_->GetShaderParameterHash())))
-            {
-                auto shader_parameters = batch.customMaterial_->GetShaderParameters();
-                for (auto it = shader_parameters.begin(); it != shader_parameters.end(); ++it)
-                {
-                    graphics_->SetShaderParameter(it->second.name_, it->second.value_);
-                }
-            }
-            // Apply custom shader textures
-            auto textures = batch.customMaterial_->GetTextures();
-            for (auto it = textures.begin(); it != textures.end(); ++it)
-            {
-                graphics_->SetTexture(it->first, it->second);
-            }
+            for (const auto& texture : batch.customMaterial_->GetTextures())
+                drawQueue_.AddShaderResource(texture.first, texture.second);
         }
+        drawQueue_.CommitShaderResources();
 
-        graphics_->Draw(TRIANGLE_LIST, batch.vertexStart_ / UI_VERTEX_SIZE,
-            (batch.vertexEnd_ - batch.vertexStart_) / UI_VERTEX_SIZE);
-
-        if (batch.customMaterial_)
-        {
-            // Reset textures used by the batch custom material
-            auto textures = batch.customMaterial_->GetTextures();
-            for (auto it = textures.begin(); it != textures.end(); ++it)
-            {
-                graphics_->SetTexture(it->first, 0);
-            }
-        }
+        drawQueue_.Draw(batch.vertexStart_ / UI_VERTEX_SIZE, (batch.vertexEnd_ - batch.vertexStart_) / UI_VERTEX_SIZE);
     }
+
+    drawQueue_.Execute(graphics_);
 }
 
 void UI::GetBatches(ea::vector<UIBatch>& batches, ea::vector<float>& vertexData, UIElement* element, IntRect currentScissor)

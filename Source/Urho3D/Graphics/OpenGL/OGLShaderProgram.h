@@ -70,7 +70,7 @@ public:
     const ea::string& GetLinkerOutput() const { return linkerOutput_; }
 
     /// Return semantic to vertex attributes location mappings used by the shader.
-    const ea::unordered_map<ea::pair<unsigned char, unsigned char>, unsigned>& GetVertexAttributes() const { return vertexAttributes_; }
+    const ea::unordered_map<ea::pair<unsigned char, unsigned char>, ea::pair<unsigned, bool>>& GetVertexAttributes() const { return vertexAttributes_; }
 
     /// Return attribute location use bitmask.
     unsigned GetUsedVertexAttributes() const { return usedVertexAttributes_; }
@@ -95,7 +95,7 @@ private:
     /// Texture unit use.
     bool useTextureUnits_[MAX_TEXTURE_UNITS]{};
     /// Vertex attributes.
-    ea::unordered_map<ea::pair<unsigned char, unsigned char>, unsigned> vertexAttributes_;
+    ea::unordered_map<ea::pair<unsigned char, unsigned char>, ea::pair<unsigned, bool>> vertexAttributes_;
     /// Used vertex attribute location bitmask.
     unsigned usedVertexAttributes_{};
     /// Remembered shader parameter sources for individual uniform mode.

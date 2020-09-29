@@ -188,6 +188,12 @@ set (THIRD_PARTY_DEPENDENCIES
     xatlas
     embree
     RmlUi
+    glslang
+    SPIRV
+    spirv-cross-core
+    spirv-cross-glsl
+    spirv-cross-msl
+    spirv-cross-hlsl
 )
 
 if (URHO3D_MERGE_STATIC_LIBS)

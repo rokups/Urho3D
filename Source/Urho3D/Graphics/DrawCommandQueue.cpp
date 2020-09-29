@@ -30,6 +30,41 @@
 namespace Urho3D
 {
 
+void DrawCommandQueue::Reset(Graphics* graphics, bool preferConstantBuffers)
+{
+    useConstantBuffers_ = preferConstantBuffers
+        ? graphics->GetConstantBuffersEnabled()
+        : graphics->GetConstantBuffersRequired();
+
+    // Reset state accumulators
+    currentDrawCommand_ = {};
+    currentShaderResourceGroup_ = {};
+
+    // Clear shadep parameters
+    if (useConstantBuffers_)
+    {
+        constantBuffers_.collection_.ClearAndInitialize(graphics->GetConstantBuffersOffsetAlignment());
+        constantBuffers_.currentLayout_ = nullptr;
+        constantBuffers_.currentData_ = nullptr;
+        constantBuffers_.currentHashes_.fill(0);
+
+        currentDrawCommand_.constantBuffers_.fill({});
+    }
+    else
+    {
+        shaderParameters_.collection_.Clear();
+        shaderParameters_.currentGroupRange_ = {};
+
+        currentDrawCommand_.shaderParameters_.fill({});
+    }
+
+    // Clear arrays and draw commands
+    shaderResources_.clear();
+    drawCommands_.clear();
+    scissorRects_.clear();
+    scissorRects_.push_back(IntRect::ZERO);
+}
+
 void DrawCommandQueue::Execute(Graphics* graphics)
 {
     // Constant buffers to store all shader parameters for queue
@@ -60,6 +95,7 @@ void DrawCommandQueue::Execute(Graphics* graphics)
     ea::array<VertexBuffer*, MAX_VERTEX_STREAMS> currentVertexBuffers{};
     ShaderResourceRange currentShaderResources;
     PrimitiveType currentPrimitiveType{};
+    unsigned currentScissorRect = M_MAX_UNSIGNED;
 
     // Temporary collections
     ea::vector<VertexBuffer*> tempVertexBuffers;
@@ -67,6 +103,14 @@ void DrawCommandQueue::Execute(Graphics* graphics)
 
     for (const DrawCommandDescription& cmd : drawCommands_)
     {
+        // Set scissor
+        if (cmd.scissorRect_ != currentScissorRect)
+        {
+            const bool scissorEnabled = cmd.scissorRect_ != 0;
+            graphics->SetScissorTest(scissorEnabled, scissorRects_[cmd.scissorRect_]);
+            currentScissorRect = cmd.scissorRect_;
+        }
+
         // Set pipeline state
         if (cmd.pipelineState_ != currentPipelineState)
         {

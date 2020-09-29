@@ -25,6 +25,8 @@
 #include "../../Graphics/Graphics.h"
 #include "../../Graphics/GraphicsImpl.h"
 #include "../../Graphics/Shader.h"
+#include "../../Graphics/ShaderDefineArray.h"
+#include "../../Graphics/ShaderConverter.h"
 #include "../../Graphics/VertexBuffer.h"
 #include "../../IO/File.h"
 #include "../../IO/FileSystem.h"
@@ -234,59 +236,74 @@ bool ShaderVariation::LoadByteCode(const ea::string& binaryShaderName)
 
 bool ShaderVariation::Compile()
 {
-    const ea::string& sourceCode = owner_->GetSourceCode(type_);
-    ea::vector<ea::string> defines = defines_.split(' ');
-
-    // Set the entrypoint, profile and flags according to the shader being compiled
+    // Set the code, defines, entrypoint, profile and flags according to the shader being compiled
+    const ea::string* sourceCode = nullptr;
     const char* entryPoint = nullptr;
     const char* profile = nullptr;
     unsigned flags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
-
-    defines.emplace_back("D3D11");
+    ShaderDefineArray defines{ defines_ };
+    ea::vector<D3D_SHADER_MACRO> macros;
 
     if (type_ == VS)
     {
         entryPoint = "VS";
-        defines.emplace_back("COMPILEVS");
+        defines.Append("COMPILEVS");
         profile = "vs_4_0";
     }
     else
     {
         entryPoint = "PS";
-        defines.emplace_back("COMPILEPS");
+        defines.Append("COMPILEPS");
         profile = "ps_4_0";
         flags |= D3DCOMPILE_PREFER_FLOW_CONTROL;
     }
 
-    defines.emplace_back("MAXBONES=" + ea::to_string(Graphics::GetMaxBones()));
+    defines.Append("MAXBONES", ea::to_string(Graphics::GetMaxBones()));
 
-    // Collect defines into macros
-    ea::vector<ea::string> defineValues;
-    ea::vector<D3D_SHADER_MACRO> macros;
-
-    for (unsigned i = 0; i < defines.size(); ++i)
+    // Convert shader source code if GLSL
+    static thread_local ea::string convertedShaderSourceCode;
+    if (owner_->IsGLSL())
     {
-        unsigned equalsPos = defines[i].find('=');
-        if (equalsPos != ea::string::npos)
+        defines.Append("DESKTOP_GRAPHICS");
+        defines.Append("GL3");
+
+        const ea::string& universalSourceCode = owner_->GetSourceCode(type_);
+        ea::string errorMessage;
+        if (!ConvertShaderToHLSL5(type_, universalSourceCode, defines, convertedShaderSourceCode, errorMessage))
         {
-            defineValues.emplace_back(defines[i].substr(equalsPos + 1));
-            defines[i].resize(equalsPos);
+            URHO3D_LOGERROR("Failed to convert shader {} from GLSL:\n{}", GetFullName(), errorMessage);
+            return false;
         }
-        else
-            defineValues.emplace_back("1");
-    }
-    for (unsigned i = 0; i < defines.size(); ++i)
-    {
-        D3D_SHADER_MACRO macro;
-        macro.Name = defines[i].c_str();
-        macro.Definition = defineValues[i].c_str();
-        macros.emplace_back(macro);
 
         // In debug mode, check that all defines are referenced by the shader code
 #ifdef _DEBUG
-        if (sourceCode.find(defines[i]) == ea::string::npos)
-            URHO3D_LOGWARNING("Shader " + GetFullName() + " does not use the define " + defines[i]);
+        const auto& unusedDefines = defines.FindUnused(universalSourceCode);
+        if (!unusedDefines.empty())
+            URHO3D_LOGWARNING("Shader {} does not use the define(s): {}", GetFullName(), ea::string::joined(unusedDefines, ", "));
 #endif
+
+        sourceCode = &convertedShaderSourceCode;
+        entryPoint = "main";
+    }
+    else
+    {
+        defines.Append("D3D11");
+
+        const ea::string& nativeSourceCode = owner_->GetSourceCode(type_);
+        sourceCode = &nativeSourceCode;
+
+        macros.reserve(defines.Size());
+        for (const auto& define : defines)
+        {
+            macros.push_back({ define.first.c_str(), define.second.c_str() });
+
+            // In debug mode, check that all defines are referenced by the shader code
+#ifdef _DEBUG
+            const auto& unusedDefines = defines.FindUnused(nativeSourceCode);
+            if (!unusedDefines.empty())
+                URHO3D_LOGWARNING("Shader {} does not use the define(s): {}", GetFullName(), ea::string::joined(unusedDefines, ", "));
+#endif
+        }
     }
 
     D3D_SHADER_MACRO endMacro;
@@ -298,7 +315,7 @@ bool ShaderVariation::Compile()
     ID3DBlob* shaderCode = nullptr;
     ID3DBlob* errorMsgs = nullptr;
 
-    HRESULT hr = D3DCompile(sourceCode.c_str(), sourceCode.length(), owner_->GetName().c_str(), &macros.front(), nullptr,
+    HRESULT hr = D3DCompile(sourceCode->c_str(), sourceCode->length(), owner_->GetName().c_str(), &macros.front(), nullptr,
         entryPoint, profile, flags, 0, &shaderCode, &errorMsgs);
     if (FAILED(hr))
     {
@@ -392,9 +409,10 @@ void ShaderVariation::ParseParameters(unsigned char* bufData, unsigned bufSize)
             D3D11_SHADER_VARIABLE_DESC varDesc;
             var->GetDesc(&varDesc);
             ea::string varName(varDesc.Name);
-            if (varName[0] == 'c')
+            const auto nameStart = varName.find('c');
+            if (nameStart != ea::string::npos)
             {
-                varName = varName.substr(1); // Strip the c to follow Urho3D constant naming convention
+                varName = varName.substr(nameStart + 1); // Strip the c to follow Urho3D constant naming convention
                 parameters_[varName] = ShaderParameter{type_, varName, varDesc.StartOffset, varDesc.Size, cbRegister};
             }
         }

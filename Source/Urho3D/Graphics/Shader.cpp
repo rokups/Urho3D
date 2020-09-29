@@ -63,6 +63,14 @@ void CommentOutFunction(ea::string& code, const ea::string& signature)
     }
 }
 
+ea::string FormatLineDirective(bool isGLSL, const ea::string& fileName, unsigned fileIndex, unsigned line)
+{
+    if (isGLSL)
+        return Format("#line {} {}\n", line, fileIndex);
+    else
+        return Format("#line {} \"{}\"\n", line, fileName);
+}
+
 ea::unordered_map<ea::string, unsigned> Shader::fileToIndexMapping;
 
 Shader::Shader(Context* context) :
@@ -176,9 +184,11 @@ unsigned Shader::GetShaderDefinesHash(const char* defines) const
 bool Shader::ProcessSource(ea::string& code, Deserializer& source)
 {
     auto* cache = GetSubsystem<ResourceCache>();
+    const ea::string& fileName = source.GetName();
+    const bool isGLSL = IsGLSL();
 
     // Add file to index
-    unsigned& fileIndex = fileToIndexMapping[source.GetName()];
+    unsigned& fileIndex = fileToIndexMapping[fileName];
     if (!fileIndex)
         fileIndex = fileToIndexMapping.size();
 
@@ -198,7 +208,7 @@ bool Shader::ProcessSource(ea::string& code, Deserializer& source)
         cache->StoreResourceDependency(this, source.GetName());
 
     unsigned currentLine = 1;
-    code += Format("#line {} {}\n", currentLine, fileIndex);
+    code += FormatLineDirective(isGLSL, fileName, fileIndex, currentLine);
     while (!source.IsEof())
     {
         ea::string line = source.ReadLine();
@@ -215,7 +225,7 @@ bool Shader::ProcessSource(ea::string& code, Deserializer& source)
             if (!ProcessSource(code, *includeFile))
                 return false;
 
-            code += Format("#line {} {}\n", currentLine, fileIndex);
+            code += FormatLineDirective(isGLSL, fileName, fileIndex, currentLine);
         }
         else
         {

@@ -520,6 +520,9 @@ public:
     /// Return whether constant buffers are enabled.
     bool GetConstantBuffersEnabled() const { return constantBuffersEnabled_; }
 
+    /// Return whether constant buffers are required.
+    bool GetConstantBuffersRequired() const { return constantBuffersRequired_; }
+
     /// Return constant buffer offset alignment.
     unsigned GetConstantBuffersOffsetAlignment() const { return constantBufferOffsetAlignment_; }
 
@@ -875,6 +878,8 @@ private:
     bool constantBuffersSupport_{};
     /// Whether the constant buffers are enabled.
     bool constantBuffersEnabled_{};
+    /// Whether the constant buffers are required.
+    bool constantBuffersRequired_{};
     /// Constant buffer offset alignment.
     unsigned constantBufferOffsetAlignment_{};
     /// Number of primitives this frame.
@@ -969,6 +974,10 @@ private:
     const void* shaderParameterSources_[MAX_SHADER_PARAMETER_GROUPS]{};
     /// Base directory for shaders.
     ea::string shaderPath_;
+    /// Shader name prefix for universal shaders.
+    ea::string universalShaderNamePrefix_{ "v2/" };
+    /// Format string for universal shaders.
+    ea::string universalShaderPath_{ "Shaders/GLSL/{}.glsl" };
     /// Cache directory for Direct3D binary shaders.
     ea::string shaderCacheDir_;
     /// File extension for shaders.

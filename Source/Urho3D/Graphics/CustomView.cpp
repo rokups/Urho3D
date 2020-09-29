@@ -81,71 +81,91 @@ public:
         Light* light = ctx.light_ ? ctx.light_->GetLight() : nullptr;
 
         PipelineStateDesc desc;
-        if (ctx.shadowPass_)
-            shadowMapAllocator_->ExportPipelineState(desc, light->GetShadowBias());
+        ea::string commonDefines;
+        ea::string vertexShaderDefines;
+        ea::string pixelShaderDefines;
 
-        bool hasPosition = false;
-        bool hasNormal = false;
-        bool hasTangent = false;
-        bool hasTexCoord = false;
+        // Update vertex elements
         for (VertexBuffer* vertexBuffer : geometry->GetVertexBuffers())
         {
             const auto& elements = vertexBuffer->GetElements();
             desc.vertexElements_.append(elements);
-            for (const VertexElement& element : elements)
+        }
+        if (desc.vertexElements_.empty())
+            return nullptr;
+
+        // Update shadow parameters
+        if (ctx.shadowPass_)
+            shadowMapAllocator_->ExportPipelineState(desc, light->GetShadowBias());
+
+        // Add vertex input layout defines
+        for (const VertexElement& element : desc.vertexElements_)
+        {
+            if (element.index_ != 0)
             {
-                if (element.index_ != 0)
-                    continue;
-                if (element.semantic_ == SEM_POSITION)
-                    hasPosition = true;
-                if (element.semantic_ == SEM_NORMAL)
-                    hasNormal = true;
-                if (element.semantic_ == SEM_TANGENT)
-                    hasTangent = true;
-                if (element.semantic_ == SEM_TEXCOORD)
-                    hasTexCoord = true;
+                if (element.semantic_)
+                    vertexShaderDefines += "LAYOUT_HAS_TEXCOORD1 ";
+            }
+            else
+            {
+                switch (element.semantic_)
+                {
+                case SEM_POSITION:
+                    vertexShaderDefines += "LAYOUT_HAS_POSITION ";
+                    break;
+
+                case SEM_NORMAL:
+                    vertexShaderDefines += "LAYOUT_HAS_NORMAL ";
+                    break;
+
+                case SEM_COLOR:
+                    vertexShaderDefines += "LAYOUT_HAS_COLOR ";
+                    break;
+
+                case SEM_TEXCOORD:
+                    vertexShaderDefines += "LAYOUT_HAS_TEXCOORD0 ";
+                    break;
+
+                case SEM_TANGENT:
+                    vertexShaderDefines += "LAYOUT_HAS_TANGENT ";
+                    break;
+
+                default:
+                    break;
+                }
             }
         }
 
-        ea::string commonDefines;
-        commonDefines += ctx.shaderDefines_;
-
-        if (hasPosition)
-            commonDefines += "LAYOUT_HAS_POSITION ";
-        if (hasNormal)
-            commonDefines += "LAYOUT_HAS_NORMAL ";
-        if (hasTangent)
-            commonDefines += "LAYOUT_HAS_TANGENT ";
-        if (hasTexCoord)
-            commonDefines += "LAYOUT_HAS_UV ";
-
+        // Add geometry type defines
         switch (key.geometryType_)
         {
         case GEOM_STATIC:
         case GEOM_STATIC_NOINSTANCING:
-            commonDefines += "GEOM_STATIC ";
+            vertexShaderDefines += "GEOM_STATIC ";
             break;
         case GEOM_INSTANCED:
-            commonDefines += "GEOM_INSTANCED ";
+            vertexShaderDefines += "GEOM_INSTANCED ";
             break;
         case GEOM_SKINNED:
-            commonDefines += "GEOM_SKINNED ";
+            vertexShaderDefines += "GEOM_SKINNED ";
             break;
         case GEOM_BILLBOARD:
-            commonDefines += "GEOM_BILLBOARD ";
+            vertexShaderDefines += "GEOM_BILLBOARD ";
             break;
         case GEOM_DIRBILLBOARD:
-            commonDefines += "GEOM_DIRBILLBOARD ";
+            vertexShaderDefines += "GEOM_DIRBILLBOARD ";
             break;
         case GEOM_TRAIL_FACE_CAMERA:
-            commonDefines += "GEOM_TRAIL_FACE_CAMERA ";
+            vertexShaderDefines += "GEOM_TRAIL_FACE_CAMERA ";
             break;
         case GEOM_TRAIL_BONE:
-            commonDefines += "GEOM_TRAIL_BONE ";
+            vertexShaderDefines += "GEOM_TRAIL_BONE ";
             break;
         default:
             break;
         }
+
+        commonDefines += ctx.shaderDefines_;
 
         if (light)
         {
@@ -169,10 +189,13 @@ public:
         }
         if (graphics_->GetConstantBuffersEnabled())
             commonDefines += "URHO3D_USE_CBUFFERS ";
-        desc.vertexShader_ = graphics_->GetShader(
-            VS, "v2/" + pass->GetVertexShader(), commonDefines + pass->GetEffectiveVertexShaderDefines());
-        desc.pixelShader_ = graphics_->GetShader(
-            PS, "v2/" + pass->GetPixelShader(), commonDefines + pass->GetEffectivePixelShaderDefines());
+
+        vertexShaderDefines += commonDefines;
+        vertexShaderDefines += pass->GetEffectiveVertexShaderDefines();
+        pixelShaderDefines += commonDefines;
+        pixelShaderDefines += pass->GetEffectivePixelShaderDefines();
+        desc.vertexShader_ = graphics_->GetShader(VS, "v2/" + pass->GetVertexShader(), vertexShaderDefines);
+        desc.pixelShader_ = graphics_->GetShader(PS, "v2/" + pass->GetPixelShader(), pixelShaderDefines);
 
         desc.primitiveType_ = geometry->GetPrimitiveType();
         desc.indexType_ = IndexBuffer::GetIndexBufferType(geometry->GetIndexBuffer());
@@ -341,8 +364,8 @@ void CustomView::Render()
     sceneBatchCollector.BeginFrame(frameInfo_, scenePipelineStateFactory);
     sceneBatchCollector.ProcessVisibleDrawables(drawablesInMainCamera);
     sceneBatchCollector.ProcessVisibleLights();
-    sceneBatchCollector.CollectSceneBatches();
     sceneBatchCollector.UpdateGeometries();
+    sceneBatchCollector.CollectSceneBatches();
 
     // Collect batches
     static DrawCommandQueue drawQueue;
@@ -366,7 +389,11 @@ void CustomView::Render()
     }
 
     sceneViewport->SetOutputRenderTarget();
+#ifdef URHO3D_OPENGL
     graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, Color::RED * 0.5f);
+#else
+    graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, Color::GREEN * 0.5f);
+#endif
 
     drawQueue.Reset(graphics_);
 

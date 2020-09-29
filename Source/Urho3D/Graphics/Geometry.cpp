@@ -85,17 +85,20 @@ bool Geometry::SetVertexBuffer(unsigned index, VertexBuffer* buffer)
     }
 
     vertexBuffers_[index] = buffer;
+    RefreshSubscriptions();
     return true;
 }
 
 void Geometry::SetVertexBuffers(const ea::vector<SharedPtr<VertexBuffer>>& vertexBuffers)
 {
     vertexBuffers_ = vertexBuffers;
+    RefreshSubscriptions();
 }
 
 void Geometry::SetIndexBuffer(IndexBuffer* buffer)
 {
     indexBuffer_ = buffer;
+    RefreshSubscriptions();
     RecalculatePipelineStateHash();
 }
 

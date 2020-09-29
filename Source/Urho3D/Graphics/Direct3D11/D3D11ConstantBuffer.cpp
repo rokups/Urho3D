@@ -41,7 +41,6 @@ void ConstantBuffer::Release()
 {
     URHO3D_SAFE_RELEASE(object_.ptr_);
 
-    shadowData_.reset();
     size_ = 0;
 }
 
@@ -60,9 +59,6 @@ bool ConstantBuffer::SetSize(unsigned size)
     size &= 0xfffffff0;
 
     size_ = size;
-    dirty_ = false;
-    shadowData_ = ea::unique_ptr<unsigned char[]>(new unsigned char[size_]);
-    memset(shadowData_.get(), 0, size_);
 
     if (graphics_)
     {
@@ -86,12 +82,11 @@ bool ConstantBuffer::SetSize(unsigned size)
     return true;
 }
 
-void ConstantBuffer::Apply()
+void ConstantBuffer::Update(const void* data)
 {
-    if (dirty_ && object_.ptr_)
+    if (object_.ptr_)
     {
-        graphics_->GetImpl()->GetDeviceContext()->UpdateSubresource((ID3D11Buffer*)object_.ptr_, 0, 0, shadowData_.get(), 0, 0);
-        dirty_ = false;
+        graphics_->GetImpl()->GetDeviceContext()->UpdateSubresource((ID3D11Buffer*)object_.ptr_, 0, 0, data, 0, 0);
     }
 }
 

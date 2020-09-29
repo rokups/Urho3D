@@ -3,16 +3,28 @@
 
 #ifdef STAGE_VERTEX_SHADER
 
-VERTEX_SHADER_IN(vec4 iPos)
-VERTEX_SHADER_IN(vec3 iNormal)
-VERTEX_SHADER_IN(vec4 iColor)
-VERTEX_SHADER_IN(vec2 iTexCoord)
-VERTEX_SHADER_IN(vec2 iTexCoord1)
-VERTEX_SHADER_IN(vec4 iTangent)
-VERTEX_SHADER_IN(vec4 iBlendWeights)
-VERTEX_SHADER_IN(vec4 iBlendIndices)
-VERTEX_SHADER_IN(vec3 iCubeTexCoord)
-VERTEX_SHADER_IN(vec4 iCubeTexCoord1)
+#ifdef LAYOUT_HAS_POSITION
+    VERTEX_SHADER_IN(vec4 iPos)
+#endif
+#ifdef LAYOUT_HAS_NORMAL
+    VERTEX_SHADER_IN(vec3 iNormal)
+#endif
+#ifdef LAYOUT_HAS_COLOR
+    VERTEX_SHADER_IN(vec4 iColor)
+#endif
+#ifdef LAYOUT_HAS_TEXCOORD0
+    VERTEX_SHADER_IN(vec2 iTexCoord)
+#endif
+#ifdef LAYOUT_HAS_TEXCOORD1
+    VERTEX_SHADER_IN(vec2 iTexCoord1)
+#endif
+#ifdef LAYOUT_HAS_TANGENT
+    VERTEX_SHADER_IN(vec4 iTangent)
+#endif
+#ifdef GEOM_SKINNED
+    VERTEX_SHADER_IN(vec4 iBlendWeights)
+    VERTEX_SHADER_IN(ivec4 iBlendIndices)
+#endif
 #ifdef GEOM_INSTANCED
     VERTEX_SHADER_IN(vec4 iTexCoord4)
     VERTEX_SHADER_IN(vec4 iTexCoord5)
@@ -29,7 +41,6 @@ VERTEX_SHADER_IN(vec4 iCubeTexCoord1)
         VERTEX_SHADER_IN(vec4 iTexCoord7)
     #endif
 #endif
-VERTEX_SHADER_IN(float iObjectIndex)
 
 #endif
 

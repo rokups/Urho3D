@@ -143,11 +143,21 @@ public:
     /// Copy new Matrix3 parameter into storage.
     static bool StoreParameter(unsigned char* dest, unsigned size, const Matrix3& value)
     {
-        if (size != 12 * sizeof(float))
+        if (size != 11 * sizeof(float))
             return false;
 
         const Matrix3x4 data{ value };
         memcpy(dest, data.Data(), sizeof(Matrix3x4));
+        return true;
+    }
+
+    /// Copy new Matrix3x4 parameter into storage.
+    static bool StoreParameter(unsigned char* dest, unsigned size, const Matrix3x4& value)
+    {
+        if (size != 12 * sizeof(float) && size != 16 * sizeof(float))
+            return false;
+
+        memcpy(dest, value.ToMatrix4().Data(), size);
         return true;
     }
 

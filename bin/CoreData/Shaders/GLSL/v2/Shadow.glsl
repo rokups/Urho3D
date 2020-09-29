@@ -6,14 +6,15 @@
 #include "Samplers.glsl"
 
 #ifdef VSM_SHADOW
-    varying vec4 vTexCoord;
+    VERTEX_SHADER_OUT(vec4 vTexCoord)
 #else
-    varying vec2 vTexCoord;
+    VERTEX_SHADER_OUT(vec2 vTexCoord)
 #endif
 
-void VS()
+#ifdef STAGE_VERTEX_SHADER
+void main()
 {
-    mat3x4 modelMatrix = iModelMatrix;
+    mat4 modelMatrix = iModelMatrix;
     vec3 worldPos = GetWorldPos(modelMatrix);
     gl_Position = GetClipPos(worldPos);
 
@@ -27,8 +28,10 @@ void VS()
         vTexCoord.zw = gl_Position.zw;
     #endif
 }
+#endif
 
-void PS()
+#ifdef STAGE_PIXEL_SHADER
+void main()
 {
     #ifdef ALPHAMASK
         float alpha = texture2D(sDiffMap, vTexCoord.xy).a;
@@ -43,3 +46,4 @@ void PS()
         gl_FragColor = vec4(1.0);
     #endif
 }
+#endif

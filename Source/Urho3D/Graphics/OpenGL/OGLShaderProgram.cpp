@@ -79,11 +79,29 @@ static unsigned GetUniformElementSize(int glType)
     }
 }
 
+static bool IsIntegerType(int glType)
+{
+    switch (glType)
+    {
+    case GL_INT:
+    case GL_INT_VEC2:
+    case GL_INT_VEC3:
+    case GL_INT_VEC4:
+    case GL_UNSIGNED_INT:
+    case GL_UNSIGNED_INT_VEC2:
+    case GL_UNSIGNED_INT_VEC3:
+    case GL_UNSIGNED_INT_VEC4:
+        return true;
+    default:
+        return false;
+    };
+}
+
 static unsigned GetUniformSize(int glType, int arraySize)
 {
     const unsigned size = GetUniformElementSize(glType);
     const unsigned minStride = 4 * sizeof(float);
-    return size < minStride && arraySize > 1 ? M_MAX_UNSIGNED : size * arraySize;
+    return size < minStride && arraySize > 1 ? M_MAX_UNSIGNED : size * arraySize - (glType == GL_FLOAT_MAT3 ? sizeof(float) : 0);
 }
 
 unsigned ShaderProgram::globalFrameNumber = 0;
@@ -213,8 +231,9 @@ bool ShaderProgram::Link()
             continue;
         }
 
-        int location = glGetAttribLocation(object_.name_, name.c_str());
-        vertexAttributes_[ea::make_pair((unsigned char)semantic, semanticIndex)] = location;
+        const int location = glGetAttribLocation(object_.name_, name.c_str());
+        const bool isInteger = IsIntegerType(type);
+        vertexAttributes_[ea::make_pair((unsigned char)semantic, semanticIndex)] = { location, isInteger };
         usedVertexAttributes_ |= (1u << location);
     }
 

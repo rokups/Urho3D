@@ -28,7 +28,7 @@
 #include "../../Graphics/VertexDeclaration.h"
 #include "../../Math/Color.h"
 
-#include <d3d11.h>
+#include <d3d11_1.h>
 #include <dxgi1_2.h>
 
 namespace Urho3D
@@ -55,7 +55,7 @@ public:
     ID3D11Device* GetDevice() const { return device_; }
 
     /// Return Direct3D immediate device context.
-    ID3D11DeviceContext* GetDeviceContext() const { return deviceContext_; }
+    ID3D11DeviceContext1* GetDeviceContext() const { return deviceContext_; }
 
     /// Return swapchain.
     IDXGISwapChain* GetSwapChain() const { return swapChain_; }
@@ -76,7 +76,7 @@ private:
     /// Graphics device.
     ID3D11Device* device_;
     /// Immediate device context.
-    ID3D11DeviceContext* deviceContext_;
+    ID3D11DeviceContext1* deviceContext_;
     /// Swap chain.
     IDXGISwapChain1* swapChain_;
     /// Default (backbuffer) rendertarget view.
@@ -104,7 +104,11 @@ private:
     /// Bound vertex buffers.
     ID3D11Buffer* vertexBuffers_[MAX_VERTEX_STREAMS];
     /// Bound constant buffers.
-    ID3D11Buffer* constantBuffers_[2][MAX_SHADER_PARAMETER_GROUPS];
+    ID3D11Buffer* constantBuffers_[MAX_SHADER_PARAMETER_GROUPS]{};
+    /// Bound constant buffers start slots.
+    UINT constantBuffersStartSlots_[MAX_SHADER_PARAMETER_GROUPS]{};
+    /// Bound constant buffers start slots.
+    UINT constantBuffersNumSlots_[MAX_SHADER_PARAMETER_GROUPS]{};
     /// Vertex sizes per buffer.
     unsigned vertexSizes_[MAX_VERTEX_STREAMS];
     /// Vertex stream offsets per buffer.
@@ -143,8 +147,6 @@ private:
     VertexDeclarationMap vertexDeclarations_;
     /// Constant buffer search map.
     ConstantBufferMap allConstantBuffers_;
-    /// Currently dirty constant buffers.
-    ea::vector<ConstantBuffer*> dirtyConstantBuffers_;
     /// Shader programs.
     ShaderProgramMap shaderPrograms_;
     /// Shader program in use.

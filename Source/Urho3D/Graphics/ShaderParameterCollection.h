@@ -154,7 +154,7 @@ public:
     /// Add new Matrix3x4 array parameter.
     void AddParameter(StringHash name, ea::span<const Matrix3x4> values)
     {
-        AllocateParameter(name, VAR_MATRIX4, values.size(), values.data()->Data(), 12 * values.size());
+        AllocateParameter(name, VAR_MATRIX3X4, values.size(), values.data()->Data(), 12 * values.size());
     }
 
     /// Add new Matrix4 array parameter.
