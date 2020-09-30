@@ -23,7 +23,7 @@
 #endif
 #ifdef GEOM_SKINNED
     VERTEX_SHADER_IN(vec4 iBlendWeights)
-    VERTEX_SHADER_IN(ivec4 iBlendIndices)
+    VERTEX_SHADER_IN(ivec4_attrib iBlendIndices)
 #endif
 #ifdef GEOM_INSTANCED
     VERTEX_SHADER_IN(vec4 iTexCoord4)

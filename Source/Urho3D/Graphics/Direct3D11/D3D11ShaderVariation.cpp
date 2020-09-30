@@ -259,6 +259,7 @@ bool ShaderVariation::Compile()
     }
 
     defines.Append("MAXBONES", ea::to_string(Graphics::GetMaxBones()));
+    defines.Append("D3D11");
 
     // Convert shader source code if GLSL
     static thread_local ea::string convertedShaderSourceCode;
@@ -287,8 +288,6 @@ bool ShaderVariation::Compile()
     }
     else
     {
-        defines.Append("D3D11");
-
         const ea::string& nativeSourceCode = owner_->GetSourceCode(type_);
         sourceCode = &nativeSourceCode;
 

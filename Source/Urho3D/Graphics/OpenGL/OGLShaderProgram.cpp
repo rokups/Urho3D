@@ -70,7 +70,9 @@ static unsigned GetUniformElementSize(int glType)
     case GL_FLOAT_VEC4:
         return 4 * sizeof(float);
     case GL_FLOAT_MAT3:
+#ifndef GL_ES_VERSION_2_0
     case GL_FLOAT_MAT3x4:
+#endif
         return 12 * sizeof(float);
     case GL_FLOAT_MAT4:
         return 16 * sizeof(float);
@@ -88,9 +90,11 @@ static bool IsIntegerType(int glType)
     case GL_INT_VEC3:
     case GL_INT_VEC4:
     case GL_UNSIGNED_INT:
+#ifndef GL_ES_VERSION_2_0
     case GL_UNSIGNED_INT_VEC2:
     case GL_UNSIGNED_INT_VEC3:
     case GL_UNSIGNED_INT_VEC4:
+#endif
         return true;
     default:
         return false;

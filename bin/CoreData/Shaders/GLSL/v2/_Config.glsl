@@ -47,4 +47,11 @@
     #define UNIFORM_SAMPLER(index, decl) uniform decl;
 #endif
 
+// Compatible ivec4 vertex attribite
+#ifdef D3D11
+    #define ivec4_attrib ivec4
+#else
+    #define ivec4_attrib vec4
+#endif
+
 #endif

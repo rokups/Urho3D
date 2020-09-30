@@ -56,7 +56,7 @@ float GetDepth(vec4 clipPos)
         return mat4(col1, col2, col3, col4);
         #undef GetSkinMatrixColumn
     }
-    #define GetModelMatrix() GetSkinMatrix(iBlendWeights, iBlendIndices)
+    #define GetModelMatrix() GetSkinMatrix(iBlendWeights, ivec4(iBlendIndices))
 #elif defined(GEOM_INSTANCED)
     #define GetModelMatrix() mat4(iTexCoord4, iTexCoord5, iTexCoord6, vec4(0.0, 0.0, 0.0, 1.0))
 #else

@@ -1227,9 +1227,11 @@ void Graphics::SetShaderParameter(StringHash param, const float data[], unsigned
                 glUniformMatrix3fv(info->location_, count / 9, GL_FALSE, data);
                 break;
 
+#ifndef GL_ES_VERSION_2_0
             case GL_FLOAT_MAT3x4:
                 glUniformMatrix3x4fv(info->location_, count / 12, GL_FALSE, data);
                 break;
+#endif
 
             case GL_FLOAT_MAT4:
                 glUniformMatrix4fv(info->location_, count / 16, GL_FALSE, data);
@@ -1320,9 +1322,11 @@ void Graphics::SetShaderParameter(StringHash param, const Matrix3& matrix)
                 glUniformMatrix3fv(info->location_, 1, GL_FALSE, matrix.Data());
                 break;
 
+#ifndef GL_ES_VERSION_2_0
             case GL_FLOAT_MAT3x4:
                 glUniformMatrix3x4fv(info->location_, 1, GL_FALSE, Matrix3x4(matrix).Data());
                 break;
+#endif
 
             case GL_FLOAT_MAT4:
                 glUniformMatrix4fv(info->location_, 1, GL_FALSE, Matrix4(matrix).Data());
@@ -1373,9 +1377,11 @@ void Graphics::SetShaderParameter(StringHash param, const Matrix4& matrix)
                 glUniformMatrix3fv(info->location_, 1, GL_FALSE, matrix.ToMatrix3().Data());
                 break;
 
+#ifndef GL_ES_VERSION_2_0
             case GL_FLOAT_MAT3x4:
                 glUniformMatrix3x4fv(info->location_, 1, GL_FALSE, Matrix3x4(matrix).Data());
                 break;
+#endif
 
             case GL_FLOAT_MAT4:
                 glUniformMatrix4fv(info->location_, 1, GL_FALSE, matrix.Data());
@@ -1430,9 +1436,11 @@ void Graphics::SetShaderParameter(StringHash param, const Matrix3x4& matrix)
                 glUniformMatrix3fv(info->location_, 1, GL_FALSE, matrix.ToMatrix3().Data());
                 break;
 
+#ifndef GL_ES_VERSION_2_0
             case GL_FLOAT_MAT3x4:
                 glUniformMatrix3x4fv(info->location_, 1, GL_FALSE, matrix.Data());
                 break;
+#endif
 
             case GL_FLOAT_MAT4:
                 glUniformMatrix4fv(info->location_, 1, GL_FALSE, matrix.ToMatrix4().Data());
@@ -3116,7 +3124,6 @@ void Graphics::PrepareDraw()
                 if (k != impl_->vertexAttributes_->end())
                 {
                     const unsigned location = k->second.first;
-                    const bool isInteger = k->second.second;
                     unsigned locationMask = 1u << location;
                     if (assignedLocations & locationMask)
                         continue; // Already assigned by higher index vertex buffer
@@ -3150,12 +3157,15 @@ void Graphics::PrepareDraw()
                     }
 
                     SetVBO(buffer->GetGPUObjectName());
+#ifndef GL_ES_VERSION_2_0
+                    const bool isInteger = k->second.second;
                     if (isInteger)
                     {
                         glVertexAttribIPointer(location, glElementComponents[element.type_], glElementTypes[element.type_],
                             (unsigned)buffer->GetVertexSize(), (const void *)(size_t)dataStart);
                     }
                     else
+#endif
                     {
                         glVertexAttribPointer(location, glElementComponents[element.type_], glElementTypes[element.type_],
                             element.type_ == TYPE_UBYTE4_NORM ? GL_TRUE : GL_FALSE, (unsigned)buffer->GetVertexSize(),
