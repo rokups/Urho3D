@@ -182,6 +182,11 @@ bool Graphics::ToggleFullscreen()
     return SetScreenMode(primaryWindowMode_.width_, primaryWindowMode_.height_, primaryWindowMode_.screenParams_);
 }
 
+void Graphics::SetEnableConstantBuffers(bool enable)
+{
+    constantBuffersEnabled_ = enable && constantBuffersSupport_ || constantBuffersRequired_;
+}
+
 void Graphics::SetShaderParameter(StringHash param, const Variant& value)
 {
     switch (value.GetType())
