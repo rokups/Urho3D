@@ -29,6 +29,7 @@
 #include "../Graphics/Material.h"
 #include "../Graphics/Technique.h"
 #include "../Graphics/SceneBatch.h"
+#include "../Graphics/SceneBatchCollectorCallback.h"
 #include "../Graphics/SceneDrawableData.h"
 #include "../Graphics/SceneLight.h"
 #include "../Graphics/ScenePass.h"
@@ -43,16 +44,6 @@
 
 namespace Urho3D
 {
-
-/// Callback interface for SceneBatchCollector.
-class SceneBatchCollectorCallback : public ScenePipelineStateCacheCallback
-{
-public:
-    /// Return whether the light has shadow.
-    virtual bool HasShadow(Light* light) = 0;
-    /// Return temporary shadow map of given size.
-    virtual ShadowMap GetTemporaryShadowMap(const IntVector2& size) = 0;
-};
 
 /// Utility class to collect batches from the scene for given frame.
 class SceneBatchCollector : public Object

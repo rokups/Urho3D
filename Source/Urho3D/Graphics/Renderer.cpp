@@ -26,7 +26,6 @@
 #include "../Core/Context.h"
 #include "../Core/Profiler.h"
 #include "../Graphics/Camera.h"
-#include "../Graphics/CustomView.h"
 #include "../Graphics/DebugRenderer.h"
 #include "../Graphics/Geometry.h"
 #include "../Graphics/Graphics.h"
@@ -38,6 +37,7 @@
 #include "../Graphics/Octree.h"
 #include "../Graphics/Renderer.h"
 #include "../Graphics/RenderPath.h"
+#include "../Graphics/RenderPipeline.h"
 #include "../Graphics/ShaderVariation.h"
 #include "../Graphics/Technique.h"
 #include "../Graphics/Texture2D.h"
@@ -717,7 +717,7 @@ void Renderer::Update(float timeStep)
     URHO3D_PROFILE("UpdateViews");
 
     views_.clear();
-    customViews_.clear();
+    renderPipelineViews_.clear();
     preparedViews_.clear();
 
     // If device lost, do not perform update. This is because any dynamic vertex/index buffer updates happen already here,
@@ -808,9 +808,9 @@ void Renderer::Render()
     }
 
     // Render custom views.
-    for (CustomView* customView : customViews_)
+    for (RenderPipeline* renderPipelineView : renderPipelineViews_)
     {
-        customView->Render();
+        renderPipelineView->Render();
     }
 
     // Copy the number of batches & primitives from Graphics so that we can account for 3D geometry only
@@ -1563,16 +1563,16 @@ void Renderer::UpdateQueuedViewport(unsigned index)
     if (!viewport->GetView() || resetViews_)
         viewport->AllocateView();
 
-    CustomView* customView = viewport->GetCustomView();
+    RenderPipeline* renderPipeline = viewport->GetRenderPipeline();
     View* view = viewport->GetView();
-    assert(view || customView);
+    assert(view || renderPipeline);
 
-    if (customView)
+    if (renderPipeline)
     {
-        if (!customView->Define(renderTarget, viewport))
+        if (!renderPipeline->Define(renderTarget, viewport))
             return;
 
-        customViews_.push_back(WeakPtr<CustomView>(customView));
+        renderPipelineViews_.push_back(WeakPtr<RenderPipeline>(renderPipeline));
     }
     else
     {
@@ -1610,9 +1610,9 @@ void Renderer::UpdateQueuedViewport(unsigned index)
 
     // Update view. This may queue further views. View will send update begin/end events once its state is set
     ResetShadowMapAllocations(); // Each view can reuse the same shadow maps
-    if (customView)
+    if (renderPipeline)
     {
-        customView->Update(frame_);
+        renderPipeline->Update(frame_);
     }
     else
     {

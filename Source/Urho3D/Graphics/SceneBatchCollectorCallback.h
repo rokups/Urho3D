@@ -22,29 +22,20 @@
 
 #pragma once
 
-#include "../Core/Object.h"
-#include "../Graphics/CustomViewportDriver.h"
+#include "../Graphics/ScenePipelineStateCache.h"
+#include "../Graphics/ShadowMapAllocator.h"
 
 namespace Urho3D
 {
 
-class Camera;
-class RenderPath;
-class RenderSurface;
-class Scene;
-class XMLFile;
-class View;
-class Viewport;
-
-class CustomViewportScript : public Object
+/// Callback interface for SceneBatchCollector.
+class SceneBatchCollectorCallback : public ScenePipelineStateCacheCallback
 {
-    URHO3D_OBJECT(CustomViewportScript, Object);
-
 public:
-    CustomViewportScript(Context* context) : Object(context) {}
-    static void RegisterObject(Context* context);
-
-    void Render(CustomViewportDriver* driver);
+    /// Return whether the light has shadow.
+    virtual bool HasShadow(Light* light) = 0;
+    /// Return temporary shadow map of given size.
+    virtual ShadowMap GetTemporaryShadowMap(const IntVector2& size) = 0;
 };
 
 }

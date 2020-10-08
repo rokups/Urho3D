@@ -23,9 +23,8 @@
 #pragma once
 
 #include "../Core/Object.h"
-#include "../Graphics/CustomViewportDriver.h"
-#include "../Graphics/CustomViewportScript.h"
 #include "../Graphics/Drawable.h"
+#include "../Graphics/SceneBatchCollectorCallback.h"
 
 namespace Urho3D
 {
@@ -37,17 +36,19 @@ class Scene;
 class XMLFile;
 class View;
 class Viewport;
+class SceneViewport;
+class ShadowMapAllocator;
 
 ///
-class URHO3D_API CustomView : public Object, private CustomViewportDriver
+class URHO3D_API RenderPipeline : public Object, public SceneBatchCollectorCallback
 {
-    URHO3D_OBJECT(CustomView, Object);
+    URHO3D_OBJECT(RenderPipeline, Object);
 
 public:
     /// Construct with defaults.
-    CustomView(Context* context, CustomViewportScript* script);
+    RenderPipeline(Context* context);
     /// Destruct.
-    ~CustomView() override;
+    ~RenderPipeline() override;
 
     /// Register object with the engine.
     static void RegisterObject(Context* context);
@@ -62,17 +63,22 @@ public:
     void Render();
 
 protected:
-    unsigned GetNumThreads() const override { return numThreads_; }
-    void PostTask(std::function<void(unsigned)> task) override;
-    void CompleteTasks() override;
+    unsigned GetNumThreads() const { return numThreads_; }
+    void PostTask(std::function<void(unsigned)> task);
+    void CompleteTasks();
 
     //void ClearViewport(ClearTargetFlags flags, const Color& color, float depth, unsigned stencil) override;
-    void CollectDrawables(ea::vector<Drawable*>& drawables, Camera* camera, DrawableFlags flags) override;
+    void CollectDrawables(ea::vector<Drawable*>& drawables, Camera* camera, DrawableFlags flags);
+    bool HasShadow(Light* light);
+    ShadowMap GetTemporaryShadowMap(const IntVector2& size);
+
+    SharedPtr<PipelineState> CreatePipelineState(
+        const ScenePipelineStateKey& key, const ScenePipelineStateContext& ctx) override;
 
 private:
     Graphics* graphics_{};
+    Renderer* renderer_{};
     WorkQueue* workQueue_{};
-    WeakPtr<CustomViewportScript> script_;
 
     Scene* scene_{};
     Camera* camera_{};
@@ -84,6 +90,9 @@ private:
     unsigned numDrawables_{};
 
     FrameInfo frameInfo_{};
+
+    SharedPtr<SceneViewport> sceneViewport_;
+    SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
 };
 
 }

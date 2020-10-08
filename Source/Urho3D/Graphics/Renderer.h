@@ -37,7 +37,7 @@
 namespace Urho3D
 {
 
-class CustomView;
+class RenderPipeline;
 class Geometry;
 class Drawable;
 class Light;
@@ -623,8 +623,8 @@ private:
     ea::vector<ea::pair<WeakPtr<RenderSurface>, WeakPtr<Viewport> > > queuedViewports_;
     /// Views that have been processed this frame.
     ea::vector<WeakPtr<View> > views_;
-    /// Custom views that have been processed this frame.
-    ea::vector<WeakPtr<CustomView> > customViews_;
+    /// Render pipeline views that have been processed this frame.
+    ea::vector<WeakPtr<RenderPipeline> > renderPipelineViews_;
     /// Prepared views by culling camera.
     ea::unordered_map<Camera*, WeakPtr<View> > preparedViews_;
     /// Octrees that have been updated during the frame.
@@ -718,7 +718,7 @@ private:
     /// Number of bones used for software skinning.
     unsigned numSoftwareSkinningBones_{ 4 };
     /// Pipeline state cache.
-    PipelineStateCache pipelineStateCache_;	
+    PipelineStateCache pipelineStateCache_;
 };
 
 }

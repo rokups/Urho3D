@@ -24,12 +24,12 @@
 
 #include "../Core/Context.h"
 #include "../Graphics/Camera.h"
-#include "../Graphics/CustomView.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Renderer.h"
 #include "../Graphics/RenderPath.h"
 #include "../Graphics/View.h"
 #include "../Graphics/Viewport.h"
+#include "../Graphics/RenderPipeline.h"
 #include "../Resource/ResourceCache.h"
 #include "../Resource/XMLFile.h"
 #include "../Scene/Scene.h"
@@ -74,9 +74,9 @@ void Viewport::RegisterObject(Context* context)
     context->RegisterFactory<Viewport>();
 }
 
-void Viewport::SetCustomViewport(CustomViewportScript* script)
+void Viewport::SetRenderPipeline(RenderPipeline* pipeline)
 {
-    customViewportScript_ = script;
+    renderPipeline_ = pipeline;
 }
 
 void Viewport::SetScene(Scene* scene)
@@ -226,9 +226,8 @@ Vector3 Viewport::ScreenToWorldPoint(int x, int y, float depth) const
 
 void Viewport::AllocateView()
 {
+    // TODO(renderer): Don't create view if render pipeline is present
     view_ = MakeShared<View>(context_);
-    if (customViewportScript_)
-        customView_ = MakeShared<CustomView>(context_, customViewportScript_);
 }
 
 }
