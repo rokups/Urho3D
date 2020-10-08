@@ -78,9 +78,9 @@ static CullMode GetEffectiveCullMode(CullMode mode, const Camera* camera)
 
 RenderPipeline::RenderPipeline(Context* context)
     : Object(context)
-    , graphics_(context_->GetGraphics())
-    , renderer_(context_->GetRenderer())
-    , workQueue_(context_->GetWorkQueue())
+    , graphics_(context_->GetSubsystem<Graphics>())
+    , renderer_(context_->GetSubsystem<Renderer>())
+    , workQueue_(context_->GetSubsystem<WorkQueue>())
     , sceneViewport_(MakeShared<SceneViewport>(context_))
     , shadowMapAllocator_(MakeShared<ShadowMapAllocator>(context_))
 {}
@@ -351,7 +351,6 @@ void RenderPipeline::Render()
     static DrawCommandQueue drawQueue;
     const auto zone = octree_->GetZone();
 
-    auto renderer = context_->GetRenderer();
     const auto& visibleLights = sceneBatchCollector.GetVisibleLights();
     for (SceneLight* sceneLight : visibleLights)
     {

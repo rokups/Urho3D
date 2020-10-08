@@ -51,8 +51,8 @@ ScenePass::ScenePass(Context* context,
     const ea::string& unlitBaseTag, const ea::string& litBaseTag, const ea::string& lightTag,
     unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
     : Object(context)
-    , workQueue_(context_->GetWorkQueue())
-    , renderer_(context_->GetRenderer())
+    , workQueue_(context_->GetSubsystem<WorkQueue>())
+    , renderer_(context_->GetSubsystem<Renderer>())
     , unlitBasePassIndex_(unlitBasePassIndex)
     , litBasePassIndex_(litBasePassIndex)
     , lightPassIndex_(lightPassIndex)
@@ -277,8 +277,8 @@ void AlphaForwardLightingScenePass::SortSceneBatches()
 
 ShadowScenePass::ShadowScenePass(Context* context, const ea::string& tag, const ea::string& shadowPass)
     : Object(context)
-    , workQueue_(context_->GetWorkQueue())
-    , renderer_(context_->GetRenderer())
+    , workQueue_(context_->GetSubsystem<WorkQueue>())
+    , renderer_(context_->GetSubsystem<Renderer>())
     , shadowPassIndex_(Technique::GetPassIndex(shadowPass))
     , tag_(NormalizeShaderDefine(tag))
 {

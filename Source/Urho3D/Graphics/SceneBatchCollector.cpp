@@ -78,8 +78,8 @@ struct DrawableZRangeEvaluator
 
 SceneBatchCollector::SceneBatchCollector(Context* context)
     : Object(context)
-    , workQueue_(context->GetWorkQueue())
-    , renderer_(context->GetRenderer())
+    , workQueue_(context->GetSubsystem<WorkQueue>())
+    , renderer_(context->GetSubsystem<Renderer>())
 {}
 
 SceneBatchCollector::~SceneBatchCollector()

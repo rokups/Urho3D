@@ -152,8 +152,8 @@ void AddZoneShaderParameters(DrawCommandQueue& drawQueue, const Camera* camera, 
 
 SceneBatchRenderer::SceneBatchRenderer(Context* context)
     : Object(context)
-    , graphics_(context_->GetGraphics())
-    , renderer_(context_->GetRenderer())
+    , graphics_(context_->GetSubsystem<Graphics>())
+    , renderer_(context_->GetSubsystem<Renderer>())
 {}
 
 void SceneBatchRenderer::RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,

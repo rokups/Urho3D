@@ -31,7 +31,7 @@ namespace Urho3D
 
 PipelineState::PipelineState(Context* context)
     : Object(context)
-    , graphics_(context_->GetGraphics())
+    , graphics_(context_->GetSubsystem<Graphics>())
 {
 }
 

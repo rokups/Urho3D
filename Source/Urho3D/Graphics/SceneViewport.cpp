@@ -34,8 +34,8 @@ namespace Urho3D
 
 SceneViewport::SceneViewport(Context* context)
     : Object(context)
-    , graphics_(context_->GetGraphics())
-    , renderer_(context_->GetRenderer())
+    , graphics_(context_->GetSubsystem<Graphics>())
+    , renderer_(context_->GetSubsystem<Renderer>())
 {}
 
 void SceneViewport::BeginFrame(RenderSurface* renderTarget, Viewport* viewport)

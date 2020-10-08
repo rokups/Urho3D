@@ -48,8 +48,8 @@ ShadowMap ShadowMap::GetSplit(unsigned split, const IntVector2& numSplits) const
 
 ShadowMapAllocator::ShadowMapAllocator(Context* context)
     : Object(context)
-    , graphics_(context_->GetGraphics())
-    , renderer_(context_->GetRenderer())
+    , graphics_(context_->GetSubsystem<Graphics>())
+    , renderer_(context_->GetSubsystem<Renderer>())
 {}
 
 void ShadowMapAllocator::Reset()
@@ -217,8 +217,7 @@ ShadowMap ShadowMapAllocator::PoolElement::Allocate(const IntVector2& size)
 
 ShadowMapType ShadowMapAllocator::GetShadowMapType() const
 {
-    Renderer* renderer = context_->GetRenderer();
-    switch (renderer->GetShadowQuality())
+    switch (renderer_->GetShadowQuality())
     {
     case SHADOWQUALITY_SIMPLE_16BIT:
     case SHADOWQUALITY_PCF_16BIT:
