@@ -33,9 +33,9 @@
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Viewport.h"
+#include "../Graphics/RenderPipelineViewport.h"
 #include "../Graphics/SceneBatchCollector.h"
 #include "../Graphics/SceneBatchRenderer.h"
-#include "../Graphics/SceneViewport.h"
 #include "../Graphics/ShadowMapAllocator.h"
 #include "../Scene/Scene.h"
 
@@ -81,8 +81,6 @@ RenderPipeline::RenderPipeline(Context* context)
     , graphics_(context_->GetSubsystem<Graphics>())
     , renderer_(context_->GetSubsystem<Renderer>())
     , workQueue_(context_->GetSubsystem<WorkQueue>())
-    , sceneViewport_(MakeShared<SceneViewport>(context_))
-    , shadowMapAllocator_(MakeShared<ShadowMapAllocator>(context_))
 {}
 
 RenderPipeline::~RenderPipeline()
@@ -271,8 +269,11 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         return false;
 
     numDrawables_ = octree_->GetAllDrawables().size();
-    renderTarget_ = renderTarget;
-    viewport_ = viewport;
+
+    viewport_ = MakeShared<RenderPipelineViewport>(context_);
+    viewport_->Define(renderTarget, viewport);
+    shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
+
     return true;
 }
 
@@ -307,10 +308,8 @@ void RenderPipeline::CollectDrawables(ea::vector<Drawable*>& drawables, Camera* 
 
 void RenderPipeline::Render()
 {
-    sceneViewport_->BeginFrame(renderTarget_, viewport_);
+    viewport_->BeginFrame();
     shadowMapAllocator_->Reset();
-
-    //script_->Render(this);
 
     // Set automatic aspect ratio if required
     if (camera_ && camera_->GetAutoAspectRatio())
@@ -367,7 +366,7 @@ void RenderPipeline::Render()
         }
     }
 
-    sceneViewport_->SetOutputRenderTarget();
+    viewport_->SetOutputRenderTarget();
 #ifdef URHO3D_OPENGL
     graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, Color::RED * 0.5f);
 #else
@@ -383,7 +382,7 @@ void RenderPipeline::Render()
 
     drawQueue.Execute(graphics_);
 
-    sceneViewport_->EndFrame();
+    viewport_->EndFrame();
 }
 
 }

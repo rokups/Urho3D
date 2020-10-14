@@ -36,7 +36,7 @@ class Scene;
 class XMLFile;
 class View;
 class Viewport;
-class SceneViewport;
+class RenderPipelineViewport;
 class ShadowMapAllocator;
 
 ///
@@ -83,15 +83,13 @@ private:
     Scene* scene_{};
     Camera* camera_{};
     Octree* octree_{};
-    RenderSurface* renderTarget_{};
-    Viewport* viewport_{};
 
     unsigned numThreads_{};
     unsigned numDrawables_{};
 
     FrameInfo frameInfo_{};
 
-    SharedPtr<SceneViewport> sceneViewport_;
+    SharedPtr<RenderPipelineViewport> viewport_;
     SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
 };
 

@@ -26,23 +26,27 @@
 #include "../Graphics/Camera.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/PipelineStateTracker.h"
-#include "../Graphics/RenderSurface.h"
 #include "../Graphics/Viewport.h"
 
 namespace Urho3D
 {
 
-/// Global state of scene viewport.
-class SceneViewport : public Object, public PipelineStateTracker
+class RenderSurface;
+
+/// Viewport of render pipeline.
+class RenderPipelineViewport : public Object, public PipelineStateTracker
 {
-    URHO3D_OBJECT(SceneViewport, Object);
+    URHO3D_OBJECT(RenderPipelineViewport, Object);
 
 public:
     /// Construct.
-    explicit SceneViewport(Context* context);
+    explicit RenderPipelineViewport(Context* context);
+
+    /// Initialize render target and viewport.
+    void Define(RenderSurface* renderTarget, Viewport* viewport);
 
     /// Begin frame.
-    void BeginFrame(RenderSurface* renderTarget, Viewport* viewport);
+    void BeginFrame();
     /// Return whether the pipeline state caches shall be invalidated.
     bool ArePipelineStatesInvalidated() const { return GetPipelineStateHash() != cachedPipelineStateHash_; }
     /// Return output viewport rectange.

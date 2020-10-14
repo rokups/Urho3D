@@ -25,24 +25,28 @@
 #include "../Core/Context.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Renderer.h"
-#include "../Graphics/SceneViewport.h"
+#include "../Graphics/RenderSurface.h"
+#include "../Graphics/RenderPipelineViewport.h"
 
 #include "../DebugNew.h"
 
 namespace Urho3D
 {
 
-SceneViewport::SceneViewport(Context* context)
+RenderPipelineViewport::RenderPipelineViewport(Context* context)
     : Object(context)
     , graphics_(context_->GetSubsystem<Graphics>())
     , renderer_(context_->GetSubsystem<Renderer>())
 {}
 
-void SceneViewport::BeginFrame(RenderSurface* renderTarget, Viewport* viewport)
+void RenderPipelineViewport::Define(RenderSurface* renderTarget, Viewport* viewport)
 {
     viewport_ = viewport;
     renderTarget_ = renderTarget;
+}
 
+void RenderPipelineViewport::BeginFrame()
+{
     // Update viewport rect
     if (viewport_->GetRect() != IntRect::ZERO)
         viewportRect_ = viewport_->GetRect();
@@ -50,7 +54,7 @@ void SceneViewport::BeginFrame(RenderSurface* renderTarget, Viewport* viewport)
         viewportRect_ = { IntVector2::ZERO, graphics_->GetRenderTargetDimensions() };
 
     // Update pipeline state inputs
-    cullCamera_ = viewport->GetCamera();
+    cullCamera_ = viewport_->GetCamera();
     constantBuffersEnabled_ = graphics_->GetConstantBuffersEnabled();
     MarkPipelineStateHashDirty();
 
@@ -65,14 +69,14 @@ void SceneViewport::BeginFrame(RenderSurface* renderTarget, Viewport* viewport)
 #endif
 }
 
-void SceneViewport::SetOutputRenderTarget(RenderSurface* depthStencil)
+void RenderPipelineViewport::SetOutputRenderTarget(RenderSurface* depthStencil)
 {
     graphics_->SetRenderTarget(0, renderTarget_);
     graphics_->SetDepthStencil(depthStencil);
     graphics_->SetViewport(viewportRect_);
 }
 
-void SceneViewport::EndFrame()
+void RenderPipelineViewport::EndFrame()
 {
     cachedPipelineStateHash_ = GetPipelineStateHash();
 
@@ -86,7 +90,7 @@ void SceneViewport::EndFrame()
 #endif
 }
 
-unsigned SceneViewport::RecalculatePipelineStateHash() const
+unsigned RenderPipelineViewport::RecalculatePipelineStateHash() const
 {
     unsigned hash = 0;
     CombineHash(hash, cullCamera_->GetFlipVertical());
