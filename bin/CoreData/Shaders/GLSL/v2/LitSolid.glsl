@@ -179,6 +179,31 @@ void main()
         #endif
 
         gl_FragColor = vec4(GetFog(finalColor, fogFactor), diffColor.a);
+    #elif defined(PASS_DEFERRED)
+        // Fill deferred G-buffer
+        float specIntensity = specColor.g;
+        float specPower = cMatSpecColor.a / 255.0;
+
+        vec3 finalColor = vVertexLight * diffColor.rgb;
+        #ifdef AO
+            // If using AO, the vertex light ambient is black, calculate occluded ambient here
+            finalColor += texture2D(sEmissiveMap, vTexCoord2).rgb * cAmbientColor.rgb * diffColor.rgb;
+        #endif
+
+        #ifdef ENVCUBEMAP
+            finalColor += cMatEnvMapColor * textureCube(sEnvCubeMap, reflect(vReflectionVec, normal)).rgb;
+        #endif
+        #ifdef LIGHTMAP
+            finalColor += (texture2D(sEmissiveMap, vTexCoord2).rgb * 2.0 + cAmbientColor.rgb) * diffColor.rgb;
+        #elif defined(EMISSIVEMAP)
+            finalColor += cMatEmissiveColor * texture2D(sEmissiveMap, vTexCoord.xy).rgb;
+        #else
+            finalColor += cMatEmissiveColor;
+        #endif
+
+        gl_FragData[0] = vec4(GetFog(finalColor, fogFactor), 1.0);
+        gl_FragData[1] = fogFactor * vec4(diffColor.rgb, specIntensity);
+        gl_FragData[2] = vec4(normal * 0.5 + 0.5, specPower);
     #endif
 }
 #endif

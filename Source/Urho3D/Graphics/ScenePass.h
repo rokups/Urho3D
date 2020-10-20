@@ -215,6 +215,26 @@ protected:
     ea::vector<BaseSceneBatchSortedBackToFront> sortedBatches_;
 };
 
+/// Scene pass for unlit/deferred rendered objects.
+class UnlitScenePass : public ScenePass
+{
+    URHO3D_OBJECT(UnlitScenePass, ScenePass);
+
+public:
+    /// Construct.
+    UnlitScenePass(Context* context, const ea::string& tag, const ea::string& pass);
+
+    /// Sort scene batches.
+    virtual void SortSceneBatches() override;
+
+    /// Return sorted batches.
+    ea::span<const BaseSceneBatchSortedByState> GetBatches() const { return sortedBatches_; }
+
+private:
+    /// Sorted batches.
+    ea::vector<BaseSceneBatchSortedByState> sortedBatches_;
+};
+
 /// Scene pass for shadow rendering.
 class ShadowScenePass : public Object
 {

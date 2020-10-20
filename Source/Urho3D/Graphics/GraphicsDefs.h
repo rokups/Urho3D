@@ -480,6 +480,7 @@ enum MaterialQuality : unsigned
 
 enum ClearTarget : unsigned
 {
+    CLEAR_NONE = 0x0,
     CLEAR_COLOR = 0x1,
     CLEAR_DEPTH = 0x2,
     CLEAR_STENCIL = 0x4,

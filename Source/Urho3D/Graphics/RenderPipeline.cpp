@@ -60,7 +60,7 @@ namespace Urho3D
 namespace
 {
 
-static CullMode GetEffectiveCullMode(CullMode mode, const Camera* camera)
+CullMode GetEffectiveCullMode(CullMode mode, const Camera* camera)
 {
     // If a camera is specified, check whether it reverses culling due to vertical flipping or reflection
     if (camera && camera->GetReverseCulling())
@@ -72,6 +72,15 @@ static CullMode GetEffectiveCullMode(CullMode mode, const Camera* camera)
     }
 
     return mode;
+}
+
+Color GetDefaultFogColor(Graphics* graphics)
+{
+#ifdef URHO3D_OPENGL
+    return graphics->GetForceGL2() ? Color::RED * 0.5f : Color::BLUE * 0.5f;
+#else
+    return Color::GREEN * 0.5f;
+#endif
 }
 
 }
@@ -274,6 +283,11 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
     viewport_->Define(renderTarget, viewport);
     shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
 
+    viewport_->AddRenderTarget("viewport", "rgba");
+    viewport_->AddRenderTarget("albedo", "rgba");
+    viewport_->AddRenderTarget("normal", "rgba");
+    viewport_->AddRenderTarget("depth", "readabledepth");
+
     return true;
 }
 
@@ -334,11 +348,13 @@ void RenderPipeline::Render()
 
     static auto basePass = MakeShared<OpaqueForwardLightingScenePass>(context_, "PASS_BASE", "base", "litbase", "light");
     static auto alphaPass = MakeShared<AlphaForwardLightingScenePass>(context_, "PASS_ALPHA", "alpha", "alpha", "litalpha");
+    static auto deferredPass = MakeShared<UnlitScenePass>(context_, "PASS_DEFERRED", "deferred");
     static auto shadowPass = MakeShared<ShadowScenePass>(context_, "PASS_SHADOW", "shadow");
     sceneBatchCollector.ResetPasses();
     sceneBatchCollector.SetShadowPass(shadowPass);
     sceneBatchCollector.AddScenePass(basePass);
     sceneBatchCollector.AddScenePass(alphaPass);
+    sceneBatchCollector.AddScenePass(deferredPass);
 
     sceneBatchCollector.BeginFrame(frameInfo_, *this);
     sceneBatchCollector.ProcessVisibleDrawables(drawablesInMainCamera);
@@ -366,21 +382,30 @@ void RenderPipeline::Render()
         }
     }
 
-    viewport_->SetOutputRenderTarget();
-#ifdef URHO3D_OPENGL
-    graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, Color::RED * 0.5f);
-#else
-    graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, Color::GREEN * 0.5f);
-#endif
-
+    // Draw deferred
+    viewport_->ClearRenderTarget("viewport", GetDefaultFogColor(graphics_));
+    viewport_->ClearRenderTarget("albedo", Color::TRANSPARENT_BLACK);
+    viewport_->ClearDepthStencil("depth", 1.0f, 0);
+    const ea::string_view geometryBufferTargets[] = { "viewport", "albedo", "normal" };
+    viewport_->SetRenderTargets("depth", geometryBufferTargets);
     drawQueue.Reset(graphics_);
+    sceneBatchRenderer->RenderUnlitBaseBatches(drawQueue, sceneBatchCollector, camera_, zone, deferredPass->GetBatches());
+    drawQueue.Execute(graphics_);
 
+    // Draw forward
+    viewport_->SetViewportRenderTargets(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, GetDefaultFogColor(graphics_), 1.0f, 0);
+    drawQueue.Reset(graphics_);
     sceneBatchRenderer->RenderUnlitBaseBatches(drawQueue, sceneBatchCollector, camera_, zone, basePass->GetSortedUnlitBaseBatches());
     sceneBatchRenderer->RenderLitBaseBatches(drawQueue, sceneBatchCollector, camera_, zone, basePass->GetSortedLitBaseBatches());
     sceneBatchRenderer->RenderLightBatches(drawQueue, sceneBatchCollector, camera_, zone, basePass->GetSortedLightBatches());
     sceneBatchRenderer->RenderAlphaBatches(drawQueue, sceneBatchCollector, camera_, zone, alphaPass->GetSortedBatches());
-
     drawQueue.Execute(graphics_);
+
+    // Post-process
+    static unsigned frame = 0;
+    ++frame;
+    if (frame % 2 == 0)
+        viewport_->CopyToViewportRenderTarget("normal");
 
     viewport_->EndFrame();
 }

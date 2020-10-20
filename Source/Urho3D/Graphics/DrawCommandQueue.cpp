@@ -174,7 +174,7 @@ void DrawCommandQueue::Execute(Graphics* graphics)
                 const auto range = cmd.shaderParameters_[i];
 
                 // If needed range is already bound to active shader program, ignore
-                if (!graphics->NeedParameterUpdate(group, reinterpret_cast<void *>(range.first)))
+                if (!graphics->NeedParameterUpdate(group, reinterpret_cast<void *>(static_cast<uintptr_t>(range.first))))
                     continue;
 
                 shaderParameters_.collection_.ForEach(range.first, range.second, shaderParameterSetter);

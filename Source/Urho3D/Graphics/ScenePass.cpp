@@ -39,7 +39,7 @@ namespace
 
 ea::string NormalizeShaderDefine(ea::string_view define)
 {
-    if (define.back() != ' ')
+    if (!define.empty() && define.back() != ' ')
         return ea::string(define) + " ";
     else
         return ea::string(define);
@@ -273,6 +273,16 @@ void AlphaForwardLightingScenePass::SortSceneBatches()
     });
 
     ea::sort(sortedBatches_.begin(), sortedBatches_.end());
+}
+
+UnlitScenePass::UnlitScenePass(Context* context, const ea::string& tag, const ea::string& pass)
+    : ScenePass(context, tag, "", "", Technique::GetPassIndex(pass), M_MAX_UNSIGNED, M_MAX_UNSIGNED)
+{
+}
+
+void UnlitScenePass::SortSceneBatches()
+{
+    SortBatches(unlitBaseBatches_, sortedBatches_);
 }
 
 ShadowScenePass::ShadowScenePass(Context* context, const ea::string& tag, const ea::string& shadowPass)

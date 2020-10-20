@@ -73,19 +73,6 @@ Vector4 GetCameraDepthReconstructParameter(const Camera* camera)
     };
 }
 
-/// Return effective view-projection matrix.
-Matrix4 GetEffectiveCameraViewProj(const Camera* camera, float constantDepthBias)
-{
-    Matrix4 projection = camera->GetGPUProjection();
-    // glPolygonOffset is not supported in GL ES 2.0
-#ifdef URHO3D_OPENGL
-    const float constantBias = 2.0f * constantDepthBias;
-    projection.m22_ += projection.m32_ * constantBias;
-    projection.m23_ += projection.m33_ * constantBias;
-#endif
-    return projection * camera->GetView();
-}
-
 /// Return shader parameter for zone fog.
 Vector4 GetZoneFogParameter(const Zone* zone, const Camera* camera)
 {
@@ -137,7 +124,7 @@ void AddCameraShaderParameters(DrawCommandQueue& drawQueue, const Camera* camera
     camera->GetFrustumSize(nearVector, farVector);
     drawQueue.AddShaderParameter(VSP_FRUSTUMSIZE, farVector);
 
-    drawQueue.AddShaderParameter(VSP_VIEWPROJ, GetEffectiveCameraViewProj(camera, constantDepthBias));
+    drawQueue.AddShaderParameter(VSP_VIEWPROJ, camera->GetEffectiveGPUViewProjection(constantDepthBias));
 }
 
 /// Add zone-specific shader parameters.

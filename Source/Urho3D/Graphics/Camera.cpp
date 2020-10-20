@@ -477,6 +477,18 @@ Matrix4 Camera::GetGPUProjection() const
 #endif
 }
 
+Matrix4 Camera::GetEffectiveGPUViewProjection(float constantDepthBias) const
+{
+    Matrix4 projection = GetGPUProjection();
+    // glPolygonOffset is not supported in GL ES 2.0
+#ifdef URHO3D_OPENGL
+    const float constantBias = 2.0f * constantDepthBias;
+    projection.m22_ += projection.m32_ * constantBias;
+    projection.m23_ += projection.m33_ * constantBias;
+#endif
+    return projection * GetView();
+}
+
 void Camera::GetFrustumSize(Vector3& nearSize, Vector3& farSize) const
 {
     Frustum viewSpaceFrustum = GetViewSpaceFrustum();
