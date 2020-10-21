@@ -96,8 +96,10 @@ IntVector2 GetCommonSize(RenderSurface* depthStencilSurface, ea::span<RenderSurf
     return result;
 }
 
+}
+
 /// Return GBuffer offsets.
-Vector4 GetGBufferOffsets(const IntVector2& textureSize, const IntRect& viewportRect)
+Vector4 RenderPipelineViewport::GetGBufferOffsets(const IntVector2& textureSize, const IntRect& viewportRect)
 {
     const Vector2 halfViewportScale = 0.5f * static_cast<Vector2>(viewportRect.Size()) / static_cast<Vector2>(textureSize);
     const float xOffset = static_cast<float>(viewportRect.left_) / textureSize.x_ + halfViewportScale.x_;
@@ -110,11 +112,9 @@ Vector4 GetGBufferOffsets(const IntVector2& textureSize, const IntRect& viewport
 }
 
 /// Return GBuffer inverted size.
-Vector2 GetGBufferInvSize(const IntVector2& textureSize)
+Vector2 RenderPipelineViewport::GetGBufferInvSize(const IntVector2& textureSize)
 {
     return { 1.0f / textureSize.x_, 1.0f / textureSize.y_ };
-}
-
 }
 
 RenderPipelineViewport::RenderPipelineViewport(Context* context)

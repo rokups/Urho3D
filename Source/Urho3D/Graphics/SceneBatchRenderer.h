@@ -33,6 +33,15 @@ namespace Urho3D
 
 class SceneBatchCollector;
 
+/// Geometry buffer texture for deferred renderer.
+struct GeometryBufferResource
+{
+    /// Texture unit.
+    TextureUnit unit_{};
+    /// Texture resource.
+    Texture* texture_{};
+};
+
 /// Utility class to convert batches into sequence of draw operations.
 class SceneBatchRenderer : public Object
 {
@@ -57,6 +66,11 @@ public:
     /// Render shadow batches. Safe to call from worker thread.
     void RenderShadowBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
         Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedByState> batches);
+
+    /// Render light volume batches for deferred rendering.
+    void RenderLightVolumeBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
+        Camera* camera, Zone* zone, ea::span<const LightVolumeBatch> batches,
+        ea::span<const GeometryBufferResource> geometryBuffer, const Vector4& geometryBufferOffset, const Vector2& geometryBufferInvSize);
 
 private:
     /// Render generic batches.

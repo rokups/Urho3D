@@ -191,6 +191,151 @@ void SceneBatchRenderer::RenderShadowBatches(DrawCommandQueue& drawQueue, const 
     RenderBatches<false>(drawQueue, sceneBatchCollector, camera, zone, batches, getBatchLight);
 }
 
+void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
+    Camera* camera, Zone* zone, ea::span<const LightVolumeBatch> batches,
+    ea::span<const GeometryBufferResource> geometryBuffer, const Vector4& geometryBufferOffset, const Vector2& geometryBufferInvSize)
+{
+    // TODO(renderer): Remove copypaste
+    const FrameInfo& frameInfo = sceneBatchCollector.GetFrameInfo();
+    const Scene* scene = frameInfo.octree_->GetScene();
+    const ea::vector<SceneLight*>& visibleLights = sceneBatchCollector.GetVisibleLights();
+    Node* cameraNode = camera->GetNode();
+
+    static const SceneLightShaderParameters defaultLightParams;
+    const SceneLightShaderParameters* currentLightParams = &defaultLightParams;
+    Texture2D* currentShadowMap = nullptr;
+
+    bool frameDirty = true;
+    bool cameraDirty = true;
+    bool zoneDirty = true;
+    float previousConstantDepthBias = 0.0f;
+    const SceneLight* previousLight = nullptr;
+
+    for (const LightVolumeBatch& batch : batches)
+    {
+        PipelineState* pipelineState = batch.pipelineState_;
+        if (!pipelineState)
+        {
+            static std::atomic_flag errorReported;
+            if (!errorReported.test_and_set())
+                URHO3D_LOGERROR("Cannot render scene batch witout pipeline state");
+            continue;
+        }
+
+        // Get used light
+        const SceneLight* light = visibleLights[batch.lightIndex_];
+        const bool lightDirty = light != previousLight;
+        if (lightDirty)
+        {
+            previousLight = light;
+            currentLightParams = light ? &light->GetShaderParams() : &defaultLightParams;
+            currentShadowMap = light ? light->GetShadowMap().texture_ : nullptr;
+        }
+
+        // Always set pipeline state first
+        drawQueue.SetPipelineState(batch.pipelineState_);
+
+        // Reset camera parameters if depth bias changed
+        const float constantDepthBias = pipelineState->GetDesc().constantDepthBias_;
+
+        // Add frame parameters
+        if (drawQueue.BeginShaderParameterGroup(SP_FRAME, frameDirty))
+        {
+            AddFrameShaderParameters(drawQueue, frameInfo, scene);
+            drawQueue.CommitShaderParameterGroup(SP_FRAME);
+            frameDirty = false;
+        }
+
+        // Add camera parameters
+        if (drawQueue.BeginShaderParameterGroup(SP_CAMERA,
+            !cameraDirty || previousConstantDepthBias != constantDepthBias))
+        {
+            AddCameraShaderParameters(drawQueue, camera, constantDepthBias);
+            drawQueue.AddShaderParameter(VSP_GBUFFEROFFSETS, geometryBufferOffset);
+            drawQueue.AddShaderParameter(PSP_GBUFFERINVSIZE, geometryBufferInvSize);
+            drawQueue.CommitShaderParameterGroup(SP_CAMERA);
+            cameraDirty = false;
+            previousConstantDepthBias = constantDepthBias;
+        }
+
+        // Add zone parameters
+        if (drawQueue.BeginShaderParameterGroup(SP_ZONE, !zoneDirty))
+        {
+            AddZoneShaderParameters(drawQueue, camera, zone);
+            drawQueue.CommitShaderParameterGroup(SP_ZONE);
+            zoneDirty = false;
+        }
+
+        // Add light parameters
+        if constexpr (1)
+        {
+            if (drawQueue.BeginShaderParameterGroup(SP_LIGHT, lightDirty))
+            {
+                drawQueue.AddShaderParameter(VSP_LIGHTDIR, currentLightParams->direction_);
+                drawQueue.AddShaderParameter(VSP_LIGHTPOS,
+                    Vector4{ currentLightParams->position_, currentLightParams->invRange_ });
+                drawQueue.AddShaderParameter(PSP_LIGHTCOLOR,
+                    Vector4{ currentLightParams->color_, currentLightParams->specularIntensity_ });
+
+                // TODO(renderer): Remove them
+                drawQueue.AddShaderParameter(PSP_LIGHTDIR, currentLightParams->direction_);
+                drawQueue.AddShaderParameter(PSP_LIGHTPOS,
+                    Vector4{ currentLightParams->position_, currentLightParams->invRange_ });
+
+                drawQueue.AddShaderParameter(PSP_LIGHTRAD, currentLightParams->radius_);
+                drawQueue.AddShaderParameter(PSP_LIGHTLENGTH, currentLightParams->length_);
+
+                if (currentLightParams->numLightMatrices_ > 0)
+                {
+                    ea::span<const Matrix4> shadowMatricesSpan{ currentLightParams->lightMatrices_, currentLightParams->numLightMatrices_ };
+                    drawQueue.AddShaderParameter(VSP_LIGHTMATRICES, shadowMatricesSpan);
+                    // TODO(renderer): Remove them
+                    drawQueue.AddShaderParameter(PSP_LIGHTMATRICES, shadowMatricesSpan);
+                }
+                if (currentShadowMap)
+                {
+                    drawQueue.AddShaderParameter(PSP_SHADOWDEPTHFADE, currentLightParams->shadowDepthFade_);
+                    drawQueue.AddShaderParameter(PSP_SHADOWINTENSITY, currentLightParams->shadowIntensity_);
+                    drawQueue.AddShaderParameter(PSP_SHADOWMAPINVSIZE, currentLightParams->shadowMapInvSize_);
+                    drawQueue.AddShaderParameter(PSP_SHADOWSPLITS, currentLightParams->shadowSplits_);
+                    drawQueue.AddShaderParameter(PSP_SHADOWCUBEUVBIAS, currentLightParams->shadowCubeUVBias_);
+                    drawQueue.AddShaderParameter(PSP_SHADOWCUBEADJUST, currentLightParams->shadowCubeAdjust_);
+                    drawQueue.AddShaderParameter(VSP_NORMALOFFSETSCALE, currentLightParams->normalOffsetScale_);
+                    // TODO(renderer): Remove them
+                    drawQueue.AddShaderParameter(PSP_NORMALOFFSETSCALE, currentLightParams->normalOffsetScale_);
+                    drawQueue.AddShaderParameter(PSP_VSMSHADOWPARAMS, renderer_->GetVSMShadowParameters());
+                }
+
+                drawQueue.CommitShaderParameterGroup(SP_LIGHT);
+            }
+        }
+
+        // Add resources
+        if (lightDirty)
+        {
+            for (const auto& texture : geometryBuffer)
+                drawQueue.AddShaderResource(texture.unit_, texture.texture_);
+
+            drawQueue.AddShaderResource(TU_LIGHTRAMP, renderer_->GetDefaultLightRamp());
+            drawQueue.AddShaderResource(TU_LIGHTSHAPE, renderer_->GetDefaultLightSpot());
+            if (currentShadowMap)
+                drawQueue.AddShaderResource(TU_SHADOWMAP, currentShadowMap);
+            drawQueue.CommitShaderResources();
+        }
+
+        // Add object parameters
+        if (drawQueue.BeginShaderParameterGroup(SP_OBJECT, true))
+        {
+            drawQueue.AddShaderParameter(VSP_MODEL, light->GetLight()->GetVolumeTransform(camera));
+            drawQueue.CommitShaderParameterGroup(SP_OBJECT);
+        }
+
+        // Set buffers and draw
+        drawQueue.SetBuffers(batch.geometry_->GetVertexBuffers(), batch.geometry_->GetIndexBuffer());
+        drawQueue.DrawIndexed(batch.geometry_->GetIndexStart(), batch.geometry_->GetIndexCount());
+    }
+}
+
 template <bool HasLight, class BatchType, class GetBatchLightCallback>
 void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
     Camera* camera, Zone* zone, ea::span<const BatchType> batches,

@@ -74,6 +74,8 @@ protected:
 
     SharedPtr<PipelineState> CreatePipelineState(
         const ScenePipelineStateKey& key, const ScenePipelineStateContext& ctx) override;
+    /// Return new or existing pipeline state for deferred light volume.
+    SharedPtr<PipelineState> CreateLightVolumePipelineState(SceneLight* sceneLight, Geometry* lightGeometry) override;
 
 private:
     Graphics* graphics_{};

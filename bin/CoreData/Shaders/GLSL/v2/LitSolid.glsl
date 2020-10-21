@@ -77,6 +77,8 @@ void main()
             for (int i = 0; i < NUMVERTEXLIGHTS; ++i)
                 vVertexLight += GetVertexLight(i, worldPos, vNormal) * cVertexLights[i * 3].rgb;
         #endif
+    #elif defined(PASS_DEFERRED)
+        vVertexLight = GetAmbientLight(vec4(vNormal, 1)) + cAmbientColor.rgb;
     #endif
 
     vec4 projWorldPos = vec4(worldPos, 1.0);

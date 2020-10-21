@@ -242,6 +242,96 @@ SharedPtr<PipelineState> RenderPipeline::CreatePipelineState(
     return renderer_->GetOrCreatePipelineState(desc);
 }
 
+SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(SceneLight* sceneLight, Geometry* lightGeometry)
+{
+    ea::string vertexDefines;
+    ea::string pixelDefiles = "HWDEPTH ";
+
+    Light* light = sceneLight->GetLight();
+    LightType type = light->GetLightType();
+    switch (type)
+    {
+    case LIGHT_DIRECTIONAL:
+        vertexDefines += "DIRLIGHT ";
+        pixelDefiles += "DIRLIGHT ";
+        break;
+
+    case LIGHT_SPOT:
+        pixelDefiles += "SPOTLIGHT ";
+        break;
+
+    case LIGHT_POINT:
+        pixelDefiles += "POINTLIGHT ";
+        if (light->GetShapeTexture())
+            pixelDefiles += "CUBEMASK ";
+        break;
+    }
+
+    if (sceneLight->GetNumSplits() > 0)
+    {
+        pixelDefiles += "SHADOW SIMPLE_SHADOW ";
+        if (light->GetShadowBias().normalOffset_ > 0.0)
+            pixelDefiles += "NORMALOFFSET ";
+    }
+
+    if (light->GetSpecularIntensity() > 0.0f)
+        pixelDefiles += "SPECULAR ";
+
+    // TODO(renderer): Fix me
+    /*if (camera->IsOrthographic())
+    {
+        vertexDefines += DLVS_ORTHO;
+        pixelDefiles += DLPS_ORTHO;
+    }*/
+
+    PipelineStateDesc desc;
+    desc.vertexElements_ = lightGeometry->GetVertexBuffer(0)->GetElements();
+
+    desc.primitiveType_ = lightGeometry->GetPrimitiveType();
+    desc.indexType_ = IndexBuffer::GetIndexBufferType(lightGeometry->GetIndexBuffer());
+    desc.stencilEnabled_ = false;
+    desc.stencilMode_ = CMP_ALWAYS;
+
+    desc.colorWrite_ = true;
+    desc.blendMode_ = light->IsNegative() ? BLEND_SUBTRACT : BLEND_ADD;
+    desc.alphaToCoverage_ = false;
+
+    desc.fillMode_ = FILL_SOLID;
+
+    // TODO(renderer): Extract this code to collector
+    Vector3 cameraPos = camera_->GetNode()->GetWorldPosition();
+    if (type != LIGHT_DIRECTIONAL)
+    {
+        float lightDist{};
+        if (type == LIGHT_POINT)
+            lightDist = Sphere(light->GetNode()->GetWorldPosition(), light->GetRange() * 1.25f).Distance(cameraPos);
+        else
+            lightDist = light->GetFrustum().Distance(cameraPos);
+
+        // Draw front faces if not inside light volume
+        if (lightDist < camera_->GetNearClip() * 2.0f)
+        {
+            desc.cullMode_ = GetEffectiveCullMode(CULL_CW, camera_);
+            desc.depthMode_ = CMP_GREATER;
+        }
+        else
+        {
+            desc.cullMode_ = GetEffectiveCullMode(CULL_CCW, camera_);
+            desc.depthMode_ = CMP_LESSEQUAL;
+        }
+    }
+    else
+    {
+        desc.cullMode_ = CULL_NONE;
+        desc.depthMode_ = CMP_ALWAYS;
+    }
+
+    desc.vertexShader_ = graphics_->GetShader(VS, "DeferredLight", vertexDefines);
+    desc.pixelShader_ = graphics_->GetShader(PS, "DeferredLight", pixelDefiles);
+
+    return renderer_->GetOrCreatePipelineState(desc);
+}
+
 bool RenderPipeline::HasShadow(Light* light)
 {
     const bool shadowsEnabled = renderer_->GetDrawShadows()
@@ -309,11 +399,6 @@ void RenderPipeline::CompleteTasks()
     workQueue_->Complete(M_MAX_UNSIGNED);
 }
 
-/*void RenderPipeline::ClearViewport(ClearTargetFlags flags, const Color& color, float depth, unsigned stencil)
-{
-    graphics_->Clear(flags, color, depth, stencil);
-}*/
-
 void RenderPipeline::CollectDrawables(ea::vector<Drawable*>& drawables, Camera* camera, DrawableFlags flags)
 {
     FrustumOctreeQuery query(drawables, camera->GetFrustum(), flags, camera->GetViewMask());
@@ -361,6 +446,7 @@ void RenderPipeline::Render()
     sceneBatchCollector.ProcessVisibleLights();
     sceneBatchCollector.UpdateGeometries();
     sceneBatchCollector.CollectSceneBatches();
+    sceneBatchCollector.CollectLightVolumeBatches();
 
     // Collect batches
     static DrawCommandQueue drawQueue;
@@ -382,7 +468,7 @@ void RenderPipeline::Render()
         }
     }
 
-    // Draw deferred
+    // Draw deferred GBuffer
     viewport_->ClearRenderTarget("viewport", GetDefaultFogColor(graphics_));
     viewport_->ClearRenderTarget("albedo", Color::TRANSPARENT_BLACK);
     viewport_->ClearDepthStencil("depth", 1.0f, 0);
@@ -390,6 +476,25 @@ void RenderPipeline::Render()
     viewport_->SetRenderTargets("depth", geometryBufferTargets);
     drawQueue.Reset(graphics_);
     sceneBatchRenderer->RenderUnlitBaseBatches(drawQueue, sceneBatchCollector, camera_, zone, deferredPass->GetBatches());
+    drawQueue.Execute(graphics_);
+
+    // Draw deferred lights
+    GeometryBufferResource geometryBuffer[] = {
+        { TU_ALBEDOBUFFER, viewport_->GetRenderTarget("albedo") },
+        { TU_NORMALBUFFER, viewport_->GetRenderTarget("normal") },
+        { TU_DEPTHBUFFER, viewport_->GetRenderTarget("depth") }
+    };
+
+    const IntVector2 gbufferSize = geometryBuffer[0].texture_->GetSize();
+    const IntRect gbufferRect{ IntVector2::ZERO, gbufferSize };
+
+    drawQueue.Reset(graphics_, false);
+    sceneBatchRenderer->RenderLightVolumeBatches(drawQueue, sceneBatchCollector, camera_, zone,
+        sceneBatchCollector.GetLightVolumeBatches(), geometryBuffer,
+        viewport_->GetGBufferOffsets(gbufferSize, gbufferRect), viewport_->GetGBufferInvSize(gbufferSize));
+
+    const ea::string_view viewportTarget[] = { "viewport" };
+    viewport_->SetRenderTargets("depth", viewportTarget);
     drawQueue.Execute(graphics_);
 
     // Draw forward
@@ -404,8 +509,8 @@ void RenderPipeline::Render()
     // Post-process
     static unsigned frame = 0;
     ++frame;
-    if (frame % 2 == 0)
-        viewport_->CopyToViewportRenderTarget("normal");
+    if (frame % 100 < 50)
+        viewport_->CopyToViewportRenderTarget("viewport");
 
     viewport_->EndFrame();
 }

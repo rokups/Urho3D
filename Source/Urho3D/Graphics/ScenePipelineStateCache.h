@@ -123,6 +123,7 @@ class ScenePipelineStateCacheCallback
 public:
     /// Create pipeline state given context and key.
     /// Only attributes that constribute to pipeline state hashes are safe to use.
+    // TODO(renderer): Rename into something less generic
     virtual SharedPtr<PipelineState> CreatePipelineState(
         const ScenePipelineStateKey& key, const ScenePipelineStateContext& ctx) = 0;
 };

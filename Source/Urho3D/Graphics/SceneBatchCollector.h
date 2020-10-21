@@ -83,6 +83,8 @@ public:
     void CollectSceneBatches();
     /// Update geometries.
     void UpdateGeometries();
+    /// Collect light volume batches for deferred rendering.
+    void CollectLightVolumeBatches();
 
     /// Return frame info.
     const FrameInfo& GetFrameInfo() const { return frameInfo_; }
@@ -94,6 +96,8 @@ public:
     const SceneLight* GetVisibleLight(unsigned i) const { return visibleLights_[i]; }
     /// Return all visible lights.
     const ea::vector<SceneLight*>& GetVisibleLights() const { return visibleLights_; }
+    /// Return light volume batches.
+    ea::span<const LightVolumeBatch> GetLightVolumeBatches() const { return lightVolumeBatches_; }
 
     /// Return vertex lights for drawable (as indices in the array of visible lights).
     VertexLightCollection GetVertexLightIndices(unsigned drawableIndex) const { return drawableLighting_[drawableIndex].GetVertexLights(); }
@@ -142,6 +146,7 @@ private:
     /// Shadow pass.
     SharedPtr<ShadowScenePass> shadowPass_;
     /// Scene passes.
+    /// TODO(renderer): Rename
     ea::vector<SharedPtr<ScenePass>> passes2_;
 
     /// Visible geometries.
@@ -166,6 +171,8 @@ private:
     SceneDrawableData transient_;
     /// Drawable lighting data index.
     ea::vector<DrawableLightAccumulator<MaxPixelLights, MaxVertexLights>> drawableLighting_;
+    /// Light volume batches.
+    ea::vector<LightVolumeBatch> lightVolumeBatches_;
 
     /// Cached lights data.
     ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<SceneLight>> cachedSceneLights_;

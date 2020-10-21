@@ -196,4 +196,15 @@ struct LightBatchSortedByState : public BaseSceneBatchSortedByState
     }
 };
 
+/// Light volume batch.
+struct LightVolumeBatch
+{
+    /// Light index.
+    unsigned lightIndex_{ M_MAX_UNSIGNED };
+    /// Light geometry.
+    Geometry* geometry_{};
+    /// Pipeline state.
+    PipelineState* pipelineState_{};
+};
+
 }

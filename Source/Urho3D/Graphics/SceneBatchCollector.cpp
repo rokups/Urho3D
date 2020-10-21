@@ -407,4 +407,20 @@ void SceneBatchCollector::UpdateGeometries()
     });
 }
 
+void SceneBatchCollector::CollectLightVolumeBatches()
+{
+    lightVolumeBatches_.clear();
+    for (unsigned i = 0; i < visibleLights_.size(); ++i)
+    {
+        SceneLight* sceneLight = visibleLights_[i];
+        Light* light = sceneLight->GetLight();
+
+        LightVolumeBatch batch;
+        batch.lightIndex_ = i;
+        batch.geometry_ = renderer_->GetLightGeometry(light);
+        batch.pipelineState_ = callback_->CreateLightVolumePipelineState(sceneLight, batch.geometry_);
+        lightVolumeBatches_.push_back(batch);
+    }
+}
+
 }

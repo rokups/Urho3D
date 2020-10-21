@@ -116,6 +116,11 @@ public:
     /// End frame.
     void EndFrame();
 
+    /// Return GBuffer offsets.
+    static Vector4 GetGBufferOffsets(const IntVector2& textureSize, const IntRect& viewportRect);
+    /// Return GBuffer inverted size.
+    static Vector2 GetGBufferInvSize(const IntVector2& textureSize);
+
 protected:
     /// Mark pipeline state hash as dirty.
     unsigned RecalculatePipelineStateHash() const override;

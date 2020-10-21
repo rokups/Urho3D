@@ -220,8 +220,9 @@ public:
     /// Construct.
     explicit PipelineStateCache(Context* context) : Object(context) {}
     /// Create new or return existing pipeline state.
-    SharedPtr<PipelineState> GetPipelineState(const PipelineStateDesc& desc)
+    SharedPtr<PipelineState> GetPipelineState(PipelineStateDesc desc)
     {
+        desc.RecalculateHash();
         auto iterNew = states_.emplace(desc, nullptr);
         if (iterNew.second)
         {
