@@ -474,6 +474,8 @@ void RenderPipeline::Render()
         }
     }
 
+    // TODO(renderer): Remove this guard
+#ifdef DESKTOP_GRAPHICS
     // Draw deferred GBuffer
     viewport_->ClearRenderTarget("viewport", GetDefaultFogColor(graphics_));
     viewport_->ClearRenderTarget("albedo", Color::TRANSPARENT_BLACK);
@@ -517,6 +519,7 @@ void RenderPipeline::Render()
     ++frame;
     if (frame % 100 < 50)
         viewport_->CopyToViewportRenderTarget("viewport");
+#endif
 
     viewport_->EndFrame();
 }
