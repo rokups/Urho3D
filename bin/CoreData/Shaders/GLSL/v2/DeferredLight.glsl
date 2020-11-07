@@ -1,20 +1,27 @@
-#include "Uniforms.glsl"
+#define GEOM_STATIC
+#define LAYOUT_HAS_POSITION
+
+#include "_Config.glsl"
+#include "_Uniforms.glsl"
+#include "_VertexLayout.glsl"
+#include "_VertexTransform.glsl"
+#include "_VertexScreenPos.glsl"
+#include "_PixelOutput.glsl"
 #include "Samplers.glsl"
-#include "Transform.glsl"
-#include "ScreenPos.glsl"
 #include "Lighting.glsl"
 
 #ifdef DIRLIGHT
-    varying vec2 vScreenPos;
+    VERTEX_SHADER_OUT(vec2 vScreenPos)
 #else
-    varying vec4 vScreenPos;
+    VERTEX_SHADER_OUT(vec4 vScreenPos)
 #endif
-varying vec3 vFarRay;
+VERTEX_SHADER_OUT(vec3 vFarRay)
 #ifdef ORTHO
-    varying vec3 vNearRay;
+    VERTEX_SHADER_OUT(vec3 vNearRay)
 #endif
 
-void VS()
+#ifdef STAGE_VERTEX_SHADER
+void main()
 {
     mat4 modelMatrix = iModelMatrix;
     vec3 worldPos = GetWorldPos(modelMatrix);
@@ -33,9 +40,10 @@ void VS()
         #endif
     #endif
 }
+#endif
 
-
-void PS()
+#ifdef STAGE_PIXEL_SHADER
+void main()
 {
     // If rendering a directional light quad, optimize out the w divide
     #ifdef DIRLIGHT
@@ -68,7 +76,7 @@ void PS()
 
     // Position acquired via near/far ray is relative to camera. Bring position to world space
     vec3 eyeVec = -worldPos;
-    worldPos += cCameraPosPS;
+    worldPos += cCameraPos;
 
     vec3 normal = normalize(normalInput.rgb * 2.0 - 1.0);
     vec4 projWorldPos = vec4(worldPos, 1.0);
@@ -86,7 +94,7 @@ void PS()
         lightColor = spotPos.w > 0.0 ? texture2DProj(sLightSpotMap, spotPos).rgb * cLightColor.rgb : vec3(0.0);
     #elif defined(CUBEMASK)
         mat3 lightVecRot = mat3(cLightMatrices[0][0].xyz, cLightMatrices[0][1].xyz, cLightMatrices[0][2].xyz);
-        lightColor = textureCube(sLightCubeMap, (worldPos - cLightPosPS.xyz) * lightVecRot).rgb * cLightColor.rgb;
+        lightColor = textureCube(sLightCubeMap, (worldPos - cLightPos.xyz) * lightVecRot).rgb * cLightColor.rgb;
     #else
         lightColor = cLightColor.rgb;
     #endif
@@ -98,3 +106,4 @@ void PS()
         gl_FragColor = diff * vec4(lightColor * albedoInput.rgb, 0.0);
     #endif
 }
+#endif

@@ -28,15 +28,6 @@ uniform samplerCube sLightCubeMap;
     uniform highp sampler2D sShadowMap;
 #endif
 
-#ifdef GL3
-#define texture2D texture
-#define texture2DProj textureProj
-#define texture3D texture
-#define textureCube texture
-#define texture2DLod textureLod
-#define texture2DLodOffset textureLodOffset
-#endif
-
 vec3 DecodeNormal(vec4 normalInput)
 {
     #ifdef PACKEDNORMAL

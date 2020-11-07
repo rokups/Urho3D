@@ -131,9 +131,10 @@ RenderPipelineViewport::RenderPipelineViewport(Context* context)
         desc.primitiveType_ = TRIANGLE_LIST;
         desc.colorWrite_ = true;
 
-        static const char* shaderName = "CopyFramebuffer";
-        desc.vertexShader_ = graphics_->GetShader(VS, shaderName);
-        desc.pixelShader_ = graphics_->GetShader(PS, shaderName);
+        static const char* shaderName = "v2/CopyFramebuffer";
+        static const char* defines = graphics_->GetConstantBuffersEnabled() ? "URHO3D_USE_CBUFFERS " : "";
+        desc.vertexShader_ = graphics_->GetShader(VS, shaderName, defines);
+        desc.pixelShader_ = graphics_->GetShader(PS, shaderName, defines);
         copyRenderTargetPipelineState_ = renderer_->GetOrCreatePipelineState(desc);
     }
 }
@@ -318,7 +319,7 @@ void RenderPipelineViewport::CopyToRenderTarget(Texture* sourceTexture, RenderSu
     modelMatrix.m23_ = 0.5f;
 #endif
 
-    drawQueue_.Reset(graphics_, false);
+    drawQueue_.Reset(graphics_);
     drawQueue_.SetPipelineState(copyRenderTargetPipelineState_);
     if (drawQueue_.BeginShaderParameterGroup(SP_CAMERA))
     {

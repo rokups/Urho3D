@@ -276,12 +276,6 @@ void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, c
                     Vector4{ currentLightParams->position_, currentLightParams->invRange_ });
                 drawQueue.AddShaderParameter(PSP_LIGHTCOLOR,
                     Vector4{ currentLightParams->color_, currentLightParams->specularIntensity_ });
-
-                // TODO(renderer): Remove them
-                drawQueue.AddShaderParameter(PSP_LIGHTDIR, currentLightParams->direction_);
-                drawQueue.AddShaderParameter(PSP_LIGHTPOS,
-                    Vector4{ currentLightParams->position_, currentLightParams->invRange_ });
-
                 drawQueue.AddShaderParameter(PSP_LIGHTRAD, currentLightParams->radius_);
                 drawQueue.AddShaderParameter(PSP_LIGHTLENGTH, currentLightParams->length_);
 
@@ -289,8 +283,6 @@ void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, c
                 {
                     ea::span<const Matrix4> shadowMatricesSpan{ currentLightParams->lightMatrices_, currentLightParams->numLightMatrices_ };
                     drawQueue.AddShaderParameter(VSP_LIGHTMATRICES, shadowMatricesSpan);
-                    // TODO(renderer): Remove them
-                    drawQueue.AddShaderParameter(PSP_LIGHTMATRICES, shadowMatricesSpan);
                 }
                 if (currentShadowMap)
                 {
@@ -301,8 +293,6 @@ void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, c
                     drawQueue.AddShaderParameter(PSP_SHADOWCUBEUVBIAS, currentLightParams->shadowCubeUVBias_);
                     drawQueue.AddShaderParameter(PSP_SHADOWCUBEADJUST, currentLightParams->shadowCubeAdjust_);
                     drawQueue.AddShaderParameter(VSP_NORMALOFFSETSCALE, currentLightParams->normalOffsetScale_);
-                    // TODO(renderer): Remove them
-                    drawQueue.AddShaderParameter(PSP_NORMALOFFSETSCALE, currentLightParams->normalOffsetScale_);
                     drawQueue.AddShaderParameter(PSP_VSMSHADOWPARAMS, renderer_->GetVSMShadowParameters());
                 }
 

@@ -4,7 +4,6 @@
 #include "_VertexTransform.glsl"
 #include "_PixelOutput.glsl"
 #include "Samplers.glsl"
-#include "ScreenPos.glsl"
 #include "Lighting.glsl"
 #include "Fog.glsl"
 

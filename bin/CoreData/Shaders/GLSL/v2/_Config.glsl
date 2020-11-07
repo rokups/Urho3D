@@ -54,4 +54,19 @@
     #define ivec4_attrib vec4
 #endif
 
+// Compatible texture sampling
+#ifdef GL3
+    #define texture2D texture
+    #define texture2DProj textureProj
+    #define texture3D texture
+    #define textureCube texture
+    #define texture2DLod textureLod
+    #define texture2DLodOffset textureLodOffset
+#endif
+
+// Whether to flip framebuffer on rendering
+#ifdef D3D11
+    #define URHO3D_FLIP_FRAMEBUFFER
+#endif
+
 #endif

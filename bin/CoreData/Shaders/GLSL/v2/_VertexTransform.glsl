@@ -172,6 +172,8 @@ vec4 GetGeometryTangent(mat4 modelMatrix)
     #define GetWorldPos(modelMatrix) GetTrailPos(iPos, iTangent.xyz, iTangent.w, modelMatrix)
     #define GetWorldNormal(modelMatrix) GetTrailNormal(iPos, iTangent.xyz, iNormal)
     #define GetWorldTangent(modelMatrix) GetGeometryTangent(modelMatrix)
+#else
+    #error Exactly one geometry type define GEOM_* shall be defined!
 #endif
 
 #endif

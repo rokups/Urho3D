@@ -247,6 +247,12 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(SceneLig
     ea::string vertexDefines;
     ea::string pixelDefiles = "HWDEPTH ";
 
+    if (graphics_->GetConstantBuffersEnabled())
+    {
+        vertexDefines += "URHO3D_USE_CBUFFERS ";
+        pixelDefiles += "URHO3D_USE_CBUFFERS ";
+    }
+
     Light* light = sceneLight->GetLight();
     LightType type = light->GetLightType();
     switch (type)
@@ -326,8 +332,8 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(SceneLig
         desc.depthMode_ = CMP_ALWAYS;
     }
 
-    desc.vertexShader_ = graphics_->GetShader(VS, "DeferredLight", vertexDefines);
-    desc.pixelShader_ = graphics_->GetShader(PS, "DeferredLight", pixelDefiles);
+    desc.vertexShader_ = graphics_->GetShader(VS, "v2/DeferredLight", vertexDefines);
+    desc.pixelShader_ = graphics_->GetShader(PS, "v2/DeferredLight", pixelDefiles);
 
     return renderer_->GetOrCreatePipelineState(desc);
 }
@@ -488,7 +494,7 @@ void RenderPipeline::Render()
     const IntVector2 gbufferSize = geometryBuffer[0].texture_->GetSize();
     const IntRect gbufferRect{ IntVector2::ZERO, gbufferSize };
 
-    drawQueue.Reset(graphics_, false);
+    drawQueue.Reset(graphics_);
     sceneBatchRenderer->RenderLightVolumeBatches(drawQueue, sceneBatchCollector, camera_, zone,
         sceneBatchCollector.GetLightVolumeBatches(), geometryBuffer,
         viewport_->GetGBufferOffsets(gbufferSize, gbufferRect), viewport_->GetGBufferInvSize(gbufferSize));
