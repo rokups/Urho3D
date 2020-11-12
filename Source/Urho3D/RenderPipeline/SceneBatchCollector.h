@@ -23,20 +23,20 @@
 #pragma once
 
 #include "../Core/ThreadedVector.h"
-#include "../Graphics/DrawableLightAccumulator.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Light.h"
 #include "../Graphics/Material.h"
 #include "../Graphics/Technique.h"
-#include "../Graphics/SceneBatch.h"
-#include "../Graphics/SceneBatchCollectorCallback.h"
-#include "../Graphics/SceneDrawableData.h"
-#include "../Graphics/SceneLight.h"
-#include "../Graphics/ScenePass.h"
-#include "../Graphics/ScenePipelineStateCache.h"
-#include "../Graphics/ShadowMapAllocator.h"
 #include "../Math/NumericRange.h"
 #include "../Math/SphericalHarmonics.h"
+#include "../RenderPipeline/DrawableLightAccumulator.h"
+#include "../RenderPipeline/SceneBatch.h"
+#include "../RenderPipeline/SceneBatchCollectorCallback.h"
+#include "../RenderPipeline/SceneDrawableData.h"
+#include "../RenderPipeline/SceneLight.h"
+#include "../RenderPipeline/ScenePass.h"
+#include "../RenderPipeline/ScenePipelineStateCache.h"
+#include "../RenderPipeline/ShadowMapAllocator.h"
 
 #include <EASTL/fixed_vector.h>
 #include <EASTL/sort.h>

@@ -29,7 +29,7 @@
 #include "../Graphics/RenderPath.h"
 #include "../Graphics/View.h"
 #include "../Graphics/Viewport.h"
-#include "../Graphics/RenderPipeline.h"
+#include "../RenderPipeline/RenderPipeline.h"
 #include "../Resource/ResourceCache.h"
 #include "../Resource/XMLFile.h"
 #include "../Scene/Scene.h"

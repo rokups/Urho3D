@@ -26,8 +26,8 @@
 #include "../Core/StringUtils.h"
 #include "../Core/WorkQueue.h"
 #include "../Graphics/Renderer.h"
-#include "../Graphics/ScenePass.h"
 #include "../Graphics/Technique.h"
+#include "../RenderPipeline/ScenePass.h"
 
 #include "../DebugNew.h"
 

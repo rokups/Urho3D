@@ -28,9 +28,9 @@
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/Renderer.h"
-#include "../Graphics/SceneBatchCollector.h"
-#include "../Graphics/SceneBatchRenderer.h"
 #include "../Graphics/Zone.h"
+#include "../RenderPipeline/SceneBatchCollector.h"
+#include "../RenderPipeline/SceneBatchRenderer.h"
 #include "../Scene/Scene.h"
 
 #include "../DebugNew.h"

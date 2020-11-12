@@ -24,7 +24,7 @@
 
 #include "../Core/Object.h"
 #include "../Graphics/Drawable.h"
-#include "../Graphics/SceneBatchCollectorCallback.h"
+#include "../RenderPipeline/SceneBatchCollectorCallback.h"
 
 namespace Urho3D
 {

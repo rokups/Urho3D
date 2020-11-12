@@ -23,8 +23,8 @@
 #pragma once
 
 #include "../Core/Object.h"
-#include "../Graphics/SceneBatch.h"
 #include "../Graphics/DrawCommandQueue.h"
+#include "../RenderPipeline/SceneBatch.h"
 
 #include <EASTL/span.h>
 

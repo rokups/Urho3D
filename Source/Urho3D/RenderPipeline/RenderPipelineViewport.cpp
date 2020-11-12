@@ -26,9 +26,9 @@
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Renderer.h"
 #include "../Graphics/RenderSurface.h"
-#include "../Graphics/RenderPipelineViewport.h"
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/TextureCube.h"
+#include "../RenderPipeline/RenderPipelineViewport.h"
 #include "../IO/Log.h"
 
 #include "../DebugNew.h"

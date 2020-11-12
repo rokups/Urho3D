@@ -24,11 +24,11 @@
 
 #include "../Core/ThreadedVector.h"
 #include "../Graphics/Light.h"
-#include "../Graphics/SceneBatch.h"
-#include "../Graphics/SceneDrawableData.h"
-#include "../Graphics/ShadowMapAllocator.h"
-#include "../Graphics/PipelineStateTracker.h"
 #include "../Graphics/Camera.h"
+#include "../Graphics/PipelineStateTracker.h"
+#include "../RenderPipeline/SceneBatch.h"
+#include "../RenderPipeline/SceneDrawableData.h"
+#include "../RenderPipeline/ShadowMapAllocator.h"
 #include "../Scene/Node.h"
 
 #include <EASTL/vector.h>

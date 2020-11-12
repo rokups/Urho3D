@@ -25,7 +25,7 @@
 #include "../Core/Context.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Renderer.h"
-#include "../Graphics/ShadowMapAllocator.h"
+#include "../RenderPipeline/ShadowMapAllocator.h"
 
 #include "../DebugNew.h"
 

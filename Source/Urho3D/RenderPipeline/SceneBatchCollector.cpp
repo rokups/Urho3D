@@ -30,7 +30,7 @@
 #include "../Graphics/Octree.h"
 #include "../Graphics/OctreeQuery.h"
 #include "../Graphics/Renderer.h"
-#include "../Graphics/SceneBatchCollector.h"
+#include "../RenderPipeline/SceneBatchCollector.h"
 #include "../Scene/Scene.h"
 
 #include "../DebugNew.h"

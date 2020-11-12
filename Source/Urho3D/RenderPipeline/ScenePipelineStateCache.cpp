@@ -23,8 +23,8 @@
 #include "../Precompiled.h"
 
 #include "../Graphics/Geometry.h"
-#include "../Graphics/ScenePipelineStateCache.h"
 #include "../Graphics/Technique.h"
+#include "../RenderPipeline/ScenePipelineStateCache.h"
 
 #include "../DebugNew.h"
 

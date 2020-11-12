@@ -24,7 +24,7 @@
 
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/PipelineState.h"
-#include "../Graphics/SceneBatch.h"
+#include "../RenderPipeline/SceneBatch.h"
 
 namespace Urho3D
 {

@@ -24,10 +24,10 @@
 
 #include "../Core/Object.h"
 #include "../Core/ThreadedVector.h"
-#include "../Graphics/DrawableLightAccumulator.h"
-#include "../Graphics/SceneBatch.h"
-#include "../Graphics/SceneLight.h"
-#include "../Graphics/ScenePipelineStateCache.h"
+#include "../RenderPipeline/DrawableLightAccumulator.h"
+#include "../RenderPipeline/SceneBatch.h"
+#include "../RenderPipeline/SceneLight.h"
+#include "../RenderPipeline/ScenePipelineStateCache.h"
 /*
 #include "../Graphics/Light.h"
 #include "../Graphics/SceneDrawableData.h"

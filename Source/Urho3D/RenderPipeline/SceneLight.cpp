@@ -27,10 +27,10 @@
 #include "../Core/WorkQueue.h"
 #include "../Math/Polyhedron.h"
 #include "../Graphics/Camera.h"
-#include "../Graphics/SceneLight.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/OctreeQuery.h"
 #include "../Graphics/Renderer.h"
+#include "../RenderPipeline/SceneLight.h"
 #include "../Scene/Node.h"
 
 #include "../DebugNew.h"

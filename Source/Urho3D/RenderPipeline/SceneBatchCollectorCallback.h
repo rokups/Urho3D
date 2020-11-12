@@ -22,8 +22,8 @@
 
 #pragma once
 
-#include "../Graphics/ScenePipelineStateCache.h"
-#include "../Graphics/ShadowMapAllocator.h"
+#include "../RenderPipeline/ScenePipelineStateCache.h"
+#include "../RenderPipeline/ShadowMapAllocator.h"
 
 namespace Urho3D
 {
