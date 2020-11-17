@@ -60,6 +60,64 @@ namespace Urho3D
 namespace
 {
 
+enum class SampleConversionType
+{
+    GammaToLinear,
+    None,
+    LinearToGamma,
+    LinearToGammaSquare,
+};
+
+SampleConversionType GetSampleLinearConversion(bool linearInput, bool srgbTexture)
+{
+    static const SampleConversionType mapping[2][2] = {
+        // linearInput = false
+        {
+            // srgbTexture = false
+            SampleConversionType::GammaToLinear,
+            // srgbTexture = true
+            SampleConversionType::None
+        },
+        // linearInput = true
+        {
+            // srgbTexture = false
+            SampleConversionType::None,
+            // srgbTexture = true
+            SampleConversionType::LinearToGamma
+        },
+    };
+    return mapping[linearInput][srgbTexture];
+}
+
+SampleConversionType GetSampleGammaConversion(bool linearInput, bool srgbTexture)
+{
+    static const SampleConversionType mapping[3] = {
+        SampleConversionType::None,
+        SampleConversionType::LinearToGamma,
+        SampleConversionType::LinearToGammaSquare
+    };
+
+    const auto sampleLinear = GetSampleLinearConversion(linearInput, srgbTexture);
+    assert(sampleLinear != SampleConversionType::LinearToGammaSquare);
+    return mapping[static_cast<int>(sampleLinear)];
+}
+
+const char* GetSampleConversionFunction(SampleConversionType conversion)
+{
+    switch (conversion)
+    {
+    case SampleConversionType::GammaToLinear:
+        return "COLOR_GAMMATOLINEAR4 ";
+    case SampleConversionType::LinearToGamma:
+        return "COLOR_LINEARTOGAMMA4 ";
+    case SampleConversionType::LinearToGammaSquare:
+        return "COLOR_LINEARTOGAMMASQUARE4 ";
+    case SampleConversionType::None:
+    default:
+        return "COLOR_NOOP ";
+    }
+}
+
 CullMode GetEffectiveCullMode(CullMode mode, const Camera* camera)
 {
     // If a camera is specified, check whether it reverses culling due to vertical flipping or reflection
@@ -86,13 +144,25 @@ Color GetDefaultFogColor(Graphics* graphics)
 }
 
 RenderPipeline::RenderPipeline(Context* context)
-    : Object(context)
+    : Serializable(context)
     , graphics_(context_->GetSubsystem<Graphics>())
     , renderer_(context_->GetSubsystem<Renderer>())
     , workQueue_(context_->GetSubsystem<WorkQueue>())
 {}
 
 RenderPipeline::~RenderPipeline()
+{
+}
+
+void RenderPipeline::RegisterObject(Context* context)
+{
+    context->RegisterFactory<RenderPipeline>();
+
+    URHO3D_ATTRIBUTE("Deferred Rendering", bool, settings_.deferred_, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Gamma Correction", bool, settings_.gammaCorrection_, false, AM_DEFAULT);
+}
+
+void RenderPipeline::ApplyAttributes()
 {
 }
 
@@ -160,6 +230,24 @@ SharedPtr<PipelineState> RenderPipeline::CreatePipelineState(
         }
     }
 
+    // Add material defines
+    if (Texture* diffuseTexture = material->GetTexture(TU_DIFFUSE))
+    {
+        pixelShaderDefines += "MATERIAL_HAS_DIFFUSE_TEXTURE ";
+        const bool isLinear = diffuseTexture->GetLinear();
+        const bool sRGB = diffuseTexture->GetSRGB();
+        pixelShaderDefines += "MATERIAL_DIFFUSE_TEXTURE_LINEAR=";
+        pixelShaderDefines += GetSampleConversionFunction(GetSampleLinearConversion(isLinear, sRGB));
+        pixelShaderDefines += "MATERIAL_DIFFUSE_TEXTURE_GAMMA=";
+        pixelShaderDefines += GetSampleConversionFunction(GetSampleGammaConversion(isLinear, sRGB));
+    }
+    if (material->GetTexture(TU_NORMAL))
+        pixelShaderDefines += "MATERIAL_HAS_NORMAL_TEXTURE ";
+    if (material->GetTexture(TU_SPECULAR))
+        pixelShaderDefines += "MATERIAL_HAS_SPECULAR_TEXTURE ";
+    if (material->GetTexture(TU_EMISSIVE))
+        pixelShaderDefines += "MATERIAL_HAS_EMISSIVE_TEXTURE ";
+
     // Add geometry type defines
     switch (key.geometryType_)
     {
@@ -214,6 +302,9 @@ SharedPtr<PipelineState> RenderPipeline::CreatePipelineState(
     if (graphics_->GetConstantBuffersEnabled())
         commonDefines += "URHO3D_USE_CBUFFERS ";
 
+    if (settings_.gammaCorrection_)
+        commonDefines += "URHO3D_GAMMA_CORRECTION ";
+
     vertexShaderDefines += commonDefines;
     vertexShaderDefines += pass->GetEffectiveVertexShaderDefines();
     pixelShaderDefines += commonDefines;
@@ -251,6 +342,12 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(SceneLig
     {
         vertexDefines += "URHO3D_USE_CBUFFERS ";
         pixelDefiles += "URHO3D_USE_CBUFFERS ";
+    }
+
+    if (settings_.gammaCorrection_)
+    {
+        vertexDefines += "URHO3D_GAMMA_CORRECTION ";
+        pixelDefiles += "URHO3D_GAMMA_CORRECTION ";
     }
 
     Light* light = sceneLight->GetLight();
@@ -375,14 +472,17 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
     numDrawables_ = octree_->GetAllDrawables().size();
 
-    viewport_ = MakeShared<RenderPipelineViewport>(context_);
+    if (!viewport_)
+    {
+        viewport_ = MakeShared<RenderPipelineViewport>(context_);
+        viewport_->AddRenderTarget("viewport", "rgba");
+        viewport_->AddRenderTarget("albedo", "rgba");
+        viewport_->AddRenderTarget("normal", "rgba");
+        viewport_->AddRenderTarget("depth", "readabledepth");
+    }
     viewport_->Define(renderTarget, viewport);
-    shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
-
-    viewport_->AddRenderTarget("viewport", "rgba");
-    viewport_->AddRenderTarget("albedo", "rgba");
-    viewport_->AddRenderTarget("normal", "rgba");
-    viewport_->AddRenderTarget("depth", "readabledepth");
+    if (!shadowMapAllocator_)
+        shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
 
     return true;
 }
@@ -413,8 +513,20 @@ void RenderPipeline::CollectDrawables(ea::vector<Drawable*>& drawables, Camera* 
 
 void RenderPipeline::Render()
 {
+    static SceneBatchCollector sceneBatchCollector(context_);
+    static auto sceneBatchRenderer = MakeShared<SceneBatchRenderer>(context_);
+    static RenderPipelineSettings oldSettings;
+
     viewport_->BeginFrame();
     shadowMapAllocator_->Reset();
+
+    // Invalidate cached pipeline states
+    // TODO(renderer): Fix this trash
+    if (viewport_->ArePipelineStatesInvalidated() || memcmp(&oldSettings, &settings_, sizeof(RenderPipelineSettings)))
+    {
+        sceneBatchCollector.InvalidatePipelineStateCache();
+        oldSettings = settings_;
+    }
 
     // Set automatic aspect ratio if required
     if (camera_ && camera_->GetAutoAspectRatio())
@@ -426,8 +538,6 @@ void RenderPipeline::Render()
     CollectDrawables(drawablesInMainCamera, camera_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT);
 
     // Process batches
-    static SceneBatchCollector sceneBatchCollector(context_);
-    static auto sceneBatchRenderer = MakeShared<SceneBatchRenderer>(context_);
     /*static ScenePassDescription passes[] = {
         { ScenePassType::ForwardLitBase,   "base",  "litbase",  "light" },
         { ScenePassType::ForwardUnlitBase, "alpha", "",         "litalpha" },
@@ -515,9 +625,7 @@ void RenderPipeline::Render()
     drawQueue.Execute(graphics_);
 
     // Post-process
-    static unsigned frame = 0;
-    ++frame;
-    if (frame % 100 < 50)
+    if (settings_.deferred_)
         viewport_->CopyToViewportRenderTarget("viewport");
 #endif
 

@@ -133,19 +133,17 @@ public:
     bool IsEmpty() const { return indexCount_ == 0 && vertexCount_ == 0; }
 
 private:
-    /// Subscribe to buffer format changes.
-    void SubscribeToBufferFormatChange(Object* buffer);
-    /// Refresh subscriptions to buffer format changes.
-    void RefreshSubscriptions();
-    /// Called when vertex or index buffer format is changed.
-    void HandleBufferFormatChanged(StringHash eventType, VariantMap& eventData) { MarkPipelineStateHashDirty(); }
     /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
     unsigned RecalculatePipelineStateHash() const override;
 
     /// Vertex buffers.
     ea::vector<SharedPtr<VertexBuffer> > vertexBuffers_;
+    /// Vertex buffers dependencies.
+    ea::vector<PipelineStateDependency> vertexBuffersDependencies_;
     /// Index buffer.
     SharedPtr<IndexBuffer> indexBuffer_;
+    /// Index buffer dependency.
+    PipelineStateDependency indexBufferDependency_;
     /// Primitive type.
     PrimitiveType primitiveType_;
     /// Start index.

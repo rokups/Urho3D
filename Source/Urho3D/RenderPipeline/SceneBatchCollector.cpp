@@ -110,6 +110,14 @@ void SceneBatchCollector::AddScenePass(const SharedPtr<ScenePass>& pass)
     passes2_.push_back(pass);
 }
 
+void SceneBatchCollector::InvalidatePipelineStateCache()
+{
+    if (shadowPass_)
+        shadowPass_->InvalidatePipelineStateCache();
+    for (ScenePass* pass : passes2_)
+        pass->InvalidatePipelineStateCache();
+}
+
 void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchCollectorCallback& callback)
 {
     // Initialize context

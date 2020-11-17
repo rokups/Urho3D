@@ -157,6 +157,8 @@ public:
     void Close() override;
 
 protected:
+    /// Render tab context menu.
+    virtual void OnRenderContextMenu();
     /// Render scene hierarchy window starting from specified node.
     void RenderNodeTree(Node* node);
     /// Called when node selection changes.

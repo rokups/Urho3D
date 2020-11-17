@@ -27,6 +27,7 @@
 #include "../Core/Object.h"
 #include "../Graphics/GPUObject.h"
 #include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/PipelineStateTracker.h"
 
 namespace Urho3D
 {
@@ -40,7 +41,7 @@ enum IndexBufferType
 };
 
 /// Hardware index buffer.
-class URHO3D_API IndexBuffer : public Object, public GPUObject
+class URHO3D_API IndexBuffer : public Object, public GPUObject, public PipelineStateTracker
 {
     URHO3D_OBJECT(IndexBuffer, Object);
 
@@ -134,6 +135,9 @@ private:
     void* MapBuffer(unsigned start, unsigned count, bool discard);
     /// Unmap the GPU buffer. Not used on OpenGL.
     void UnmapBuffer();
+
+    /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
+    unsigned RecalculatePipelineStateHash() const override;
 
     /// Shadow data.
     ea::shared_array<unsigned char> shadowData_;

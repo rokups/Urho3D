@@ -132,6 +132,8 @@ public:
 class ScenePipelineStateCache
 {
 public:
+    /// Invalidate cache.
+    void Invalidate();
     /// Return existing pipeline state. Thread-safe.
     PipelineState* GetPipelineState(const ScenePipelineStateKey& key) const;
     /// Return existing or create new pipeline state. Not thread safe.

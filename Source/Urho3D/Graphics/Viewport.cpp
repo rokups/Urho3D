@@ -106,6 +106,10 @@ void Viewport::SetDrawDebug(bool enable)
 
 void Viewport::SetRenderPath(RenderPath* renderPath)
 {
+#ifndef URHO3D_D3D9
+    SetRenderPipeline(MakeShared<RenderPipeline>(context_));
+#endif
+
     if (renderPath)
         renderPath_ = renderPath;
     else

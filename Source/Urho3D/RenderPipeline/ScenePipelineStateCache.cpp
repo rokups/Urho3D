@@ -31,6 +31,11 @@
 namespace Urho3D
 {
 
+void ScenePipelineStateCache::Invalidate()
+{
+    cache_.clear();
+}
+
 PipelineState* ScenePipelineStateCache::GetPipelineState(const ScenePipelineStateKey& key) const
 {
     const auto iter = cache_.find(key);

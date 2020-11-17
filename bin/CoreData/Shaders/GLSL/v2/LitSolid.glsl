@@ -3,6 +3,7 @@
 #include "_VertexLayout.glsl"
 #include "_VertexTransform.glsl"
 #include "_PixelOutput.glsl"
+#include "_GammaCorrection.glsl"
 #include "Samplers.glsl"
 #include "Lighting.glsl"
 #include "Fog.glsl"
@@ -107,9 +108,9 @@ void main()
             if (diffInput.a < 0.5)
                 discard;
         #endif
-        vec4 diffColor = cMatDiffColor * diffInput;
+        vec4 diffColor = Color_DiffMapToLight(cMatDiffColor * diffInput);
     #else
-        vec4 diffColor = cMatDiffColor;
+        vec4 diffColor = Color_GammaToLight4(cMatDiffColor);
     #endif
 
     #ifdef VERTEXCOLOR
@@ -174,12 +175,12 @@ void main()
             #else
                 finalColor += cMatEmissiveColor;
             #endif
-            gl_FragColor = vec4(GetFog(finalColor, fogFactor), diffColor.a);
+            gl_FragColor = vec4(GetFog(Color_LightToGamma3(finalColor), fogFactor), diffColor.a);
         #else
-            gl_FragColor = vec4(GetLitFog(finalColor, fogFactor), diffColor.a);
+            gl_FragColor = vec4(GetLitFog(Color_LightToGamma3(finalColor), fogFactor), diffColor.a);
         #endif
 
-        gl_FragColor = vec4(GetFog(finalColor, fogFactor), diffColor.a);
+        gl_FragColor = vec4(GetFog(Color_LightToGamma3(finalColor), fogFactor), diffColor.a);
     #elif defined(PASS_DEFERRED)
         // Fill deferred G-buffer
         float specIntensity = specColor.g;
@@ -202,7 +203,7 @@ void main()
             finalColor += cMatEmissiveColor;
         #endif
 
-        gl_FragData[0] = vec4(GetFog(finalColor, fogFactor), 1.0);
+        gl_FragData[0] = vec4(GetFog(Color_LightToGamma3(finalColor), fogFactor), 1.0);
         gl_FragData[1] = fogFactor * vec4(diffColor.rgb, specIntensity);
         gl_FragData[2] = vec4(normal * 0.5 + 0.5, specPower);
     #endif

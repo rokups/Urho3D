@@ -60,6 +60,9 @@
 #endif
 #include "../Resource/ResourceCache.h"
 #include "../Resource/Localization.h"
+#ifndef URHO3D_D3D9
+#include "../RenderPipeline/RenderPipeline.h"
+#endif
 #include "../Scene/Scene.h"
 #include "../Scene/SceneEvents.h"
 #include "../UI/UI.h"
@@ -155,6 +158,12 @@ Engine::Engine(Context* context) :
     // Light baker needs only one class so far, so register it directly.
     // Extract this code into function if you are adding more.
     StaticModelForLightmap::RegisterObject(context_);
+#endif
+
+#ifndef URHO3D_D3D9
+    // Register render pipeline.
+    // Extract this code into function if you are adding more.
+    RenderPipeline::RegisterObject(context_);
 #endif
 
 #ifdef URHO3D_IK

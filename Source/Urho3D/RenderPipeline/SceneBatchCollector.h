@@ -73,6 +73,8 @@ public:
     /// Add scene pass.
     void AddScenePass(const SharedPtr<ScenePass>& pass);
 
+    /// Invalidate pipeline state caches.
+    void InvalidatePipelineStateCache();
     /// Begin frame processing.
     void BeginFrame(const FrameInfo& frameInfo, SceneBatchCollectorCallback& callback);
     /// Process visible drawables.

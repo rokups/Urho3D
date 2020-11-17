@@ -65,6 +65,8 @@ public:
         const ea::string& unlitBaseTag, const ea::string& litBaseTag, const ea::string& lightTag,
         unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
+    /// Invalidate pipeline state caches.
+    virtual void InvalidatePipelineStateCache();
     /// Clear in the beginning of the frame.
     virtual void BeginFrame();
     /// Add source batch. Try to keep it non-virtual to optimize processing. Return whether it was lit.
@@ -147,11 +149,11 @@ private:
     ThreadedVector<unsigned> lightBatchesDirty_;
 
     /// Pipeline state cache for unlit batches.
-    ScenePipelineStateCache unlitPipelineStateCache_;
+    ScenePipelineStateCache unlitBasePipelineStateCache_;
     /// Pipeline state cache for lit batches.
-    ScenePipelineStateCache litPipelineStateCache_;
+    ScenePipelineStateCache litBasePipelineStateCache_;
     /// Pipeline state cache for additional light batches.
-    ScenePipelineStateCache additionalLightPipelineStateCache_;
+    ScenePipelineStateCache lightPipelineStateCache_;
 };
 
 /// Scene pass for forward lighting.
@@ -244,6 +246,8 @@ public:
     /// Construct.
     ShadowScenePass(Context* context, const ea::string& tag, const ea::string& shadowPass);
 
+    /// Invalidate pipeline state caches.
+    virtual void InvalidatePipelineStateCache();
     /// Clear in the beginning of the frame.
     virtual void BeginFrame();
     /// Collect shadow batches for given light. Shall be safe to call from worker thread.

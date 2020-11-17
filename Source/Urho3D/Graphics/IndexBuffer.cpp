@@ -90,7 +90,7 @@ bool IndexBuffer::SetSize(unsigned indexCount, bool largeIndices, bool dynamic)
     indexSize_ = (unsigned)(largeIndices ? sizeof(unsigned) : sizeof(unsigned short));
     dynamic_ = dynamic;
 
-    SendEvent(E_BUFFERFORMATCHANGED);
+    MarkPipelineStateHashDirty();
 
     if (shadowed_ && indexCount_ && indexSize_)
         shadowData_ = new unsigned char[indexCount_ * indexSize_];
@@ -216,6 +216,13 @@ void IndexBuffer::PackIndexData(const unsigned source[], void* dest, bool largeI
             memcpy(&destBytes[i * stride], &index, sizeof(index));
         }
     }
+}
+
+unsigned IndexBuffer::RecalculatePipelineStateHash() const
+{
+    unsigned hash = 0;
+    CombineHash(hash, indexSize_);
+    return ea::max(1u, hash);
 }
 
 }

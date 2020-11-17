@@ -69,10 +69,9 @@ bool Geometry::SetNumVertexBuffers(unsigned num)
         return false;
     }
 
-    unsigned oldSize = vertexBuffers_.size();
+    vertexBuffersDependencies_.resize(num);
     vertexBuffers_.resize(num);
 
-    RefreshSubscriptions();
     return true;
 }
 
@@ -84,22 +83,23 @@ bool Geometry::SetVertexBuffer(unsigned index, VertexBuffer* buffer)
         return false;
     }
 
+    vertexBuffersDependencies_[index] = CreateDependency(buffer);
     vertexBuffers_[index] = buffer;
-    RefreshSubscriptions();
     return true;
 }
 
 void Geometry::SetVertexBuffers(const ea::vector<SharedPtr<VertexBuffer>>& vertexBuffers)
 {
+    vertexBuffersDependencies_.resize(vertexBuffers.size());
+    for (unsigned i = 0; i < vertexBuffers.size(); ++i)
+        vertexBuffersDependencies_[i] = CreateDependency(vertexBuffers[i]);
     vertexBuffers_ = vertexBuffers;
-    RefreshSubscriptions();
 }
 
 void Geometry::SetIndexBuffer(IndexBuffer* buffer)
 {
+    indexBufferDependency_ = CreateDependency(indexBuffer_);
     indexBuffer_ = buffer;
-    RefreshSubscriptions();
-    RecalculatePipelineStateHash();
 }
 
 bool Geometry::SetDrawRange(PrimitiveType type, unsigned indexStart, unsigned indexCount, bool getUsedVertexRange)
@@ -135,7 +135,7 @@ bool Geometry::SetDrawRange(PrimitiveType type, unsigned indexStart, unsigned in
         vertexCount_ = 0;
     }
 
-    RecalculatePipelineStateHash();
+    MarkPipelineStateHashDirty();
     return true;
 }
 
@@ -363,35 +363,15 @@ bool Geometry::IsInside(const Ray& ray) const
                          ray.InsideGeometry(vertexData, vertexSize, vertexStart_, vertexCount_)) : false;
 }
 
-void Geometry::SubscribeToBufferFormatChange(Object* buffer)
-{
-    if (buffer)
-        SubscribeToEvent(buffer, E_BUFFERFORMATCHANGED, URHO3D_HANDLER(Geometry, HandleBufferFormatChanged));
-}
-
-void Geometry::RefreshSubscriptions()
-{
-    UnsubscribeFromAllEvents();
-
-    for (VertexBuffer* vertexBuffer : vertexBuffers_)
-        SubscribeToBufferFormatChange(vertexBuffer);
-
-    SubscribeToBufferFormatChange(indexBuffer_);
-}
-
 unsigned Geometry::RecalculatePipelineStateHash() const
 {
     unsigned hash = 0;
     CombineHash(hash, vertexBuffers_.size());
     for (VertexBuffer* vertexBuffer : vertexBuffers_)
     {
-        if (vertexBuffer)
-        {
-            for (const VertexElement& element : vertexBuffer->GetElements())
-                CombineHash(hash, element.ToHash());
-        }
+        CombineHash(hash, vertexBuffer ? vertexBuffer->GetPipelineStateHash() : 0);
     }
-    CombineHash(hash, IndexBuffer::GetIndexBufferType(indexBuffer_));
+    CombineHash(hash, indexBuffer_ ? indexBuffer_->GetPipelineStateHash() : 0);
     CombineHash(hash, primitiveType_);
     return hash;
 }

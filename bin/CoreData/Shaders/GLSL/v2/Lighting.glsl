@@ -1,16 +1,4 @@
 #ifdef COMPILEVS
-vec3 GammaToLinearSpace(vec3 color)
-{
-    return color * (color * (color * 0.305306011 + 0.682171111) + 0.012522878);
-}
-
-vec3 LinearToGammaSpace(vec3 color)
-{
-    const float p = 0.416666667;
-    color = max(color, vec3(0.0, 0.0, 0.0));
-    return max(1.055 * pow(color, vec3(p, p, p)) - 0.055, 0.0);
-}
-
 vec3 EvaluateSH01(vec4 normal, vec4 SHAr, vec4 SHAg, vec4 SHAb)
 {
     vec3 value;

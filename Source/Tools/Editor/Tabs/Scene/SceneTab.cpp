@@ -36,6 +36,7 @@
 #include <Urho3D/IO/ArchiveSerialization.h>
 #include <Urho3D/IO/FileSystem.h>
 #include <Urho3D/IO/Log.h>
+#include <Urho3D/RenderPipeline/RenderPipeline.h>
 #include <Urho3D/Resource/ResourceCache.h>
 #include <Urho3D/Scene/SceneEvents.h>
 #include <Urho3D/Scene/SceneManager.h>
@@ -110,6 +111,20 @@ SceneTab::~SceneTab()
 {
     Close();
     context_->RegisterSubsystem(new UI(context_));
+}
+
+void SceneTab::OnRenderContextMenu()
+{
+    if (ui::MenuItem("Inspect Render Pipeline Settings"))
+    {
+        auto inspector = GetSubsystem<InspectorTab>();
+        inspector->Clear();
+        inspector->Inspect(viewport_->GetRenderPipeline());
+    }
+
+    ui::Separator();
+
+    BaseResourceTab::OnRenderContextMenu();
 }
 
 bool SceneTab::RenderWindowContent()

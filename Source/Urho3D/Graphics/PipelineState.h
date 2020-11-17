@@ -168,8 +168,7 @@ struct PipelineStateDesc
         CombineHash(hash, slopeScaledDepthBias_);
 
         // Consider 0-hash invalid
-        if (hash == 0)
-            hash = 1;
+        hash_ = ea::max(1u, hash);
     }
 };
 
@@ -219,6 +218,7 @@ class PipelineStateCache : public Object
 public:
     /// Construct.
     explicit PipelineStateCache(Context* context) : Object(context) {}
+
     /// Create new or return existing pipeline state.
     SharedPtr<PipelineState> GetPipelineState(PipelineStateDesc desc)
     {

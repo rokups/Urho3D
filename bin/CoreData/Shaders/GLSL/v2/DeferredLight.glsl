@@ -7,6 +7,7 @@
 #include "_VertexTransform.glsl"
 #include "_VertexScreenPos.glsl"
 #include "_PixelOutput.glsl"
+#include "_GammaCorrection.glsl"
 #include "Samplers.glsl"
 #include "Lighting.glsl"
 
@@ -101,9 +102,9 @@ void main()
 
     #ifdef SPECULAR
         float spec = GetSpecular(normal, eyeVec, lightDir, normalInput.a * 255.0);
-        gl_FragColor = diff * vec4(lightColor * (albedoInput.rgb + spec * cLightColor.a * albedoInput.aaa), 0.0);
+        gl_FragColor = Color_LightToGamma4(diff * vec4(lightColor * (albedoInput.rgb + spec * cLightColor.a * albedoInput.aaa), 0.0));
     #else
-        gl_FragColor = diff * vec4(lightColor * albedoInput.rgb, 0.0);
+        gl_FragColor = Color_LightToGamma4(diff * vec4(lightColor * albedoInput.rgb, 0.0));
     #endif
 }
 #endif

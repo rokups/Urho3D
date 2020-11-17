@@ -364,6 +364,10 @@ private:
     void UpdateEventSubscription();
     /// Update shader parameter animations.
     void HandleAttributeAnimationUpdate(StringHash eventType, VariantMap& eventData);
+    /// Refresh subscriptions to texture events.
+    void RefreshTextureEventSubscriptions();
+    /// Set texture without event resubscription.
+    void SetTextureInternal(TextureUnit unit, Texture* texture);
     /// Recalculate hash of pipeline state configuration.
     unsigned RecalculatePipelineStateHash() const override;
 

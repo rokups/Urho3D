@@ -25,6 +25,7 @@
 #include "../Core/Object.h"
 #include "../Graphics/Drawable.h"
 #include "../RenderPipeline/SceneBatchCollectorCallback.h"
+#include "../Scene/Serializable.h"
 
 namespace Urho3D
 {
@@ -39,10 +40,16 @@ class Viewport;
 class RenderPipelineViewport;
 class ShadowMapAllocator;
 
-///
-class URHO3D_API RenderPipeline : public Object, public SceneBatchCollectorCallback
+struct RenderPipelineSettings
 {
-    URHO3D_OBJECT(RenderPipeline, Object);
+    bool deferred_{};
+    bool gammaCorrection_{};
+};
+
+///
+class URHO3D_API RenderPipeline : public Serializable, public SceneBatchCollectorCallback
+{
+    URHO3D_OBJECT(RenderPipeline, Serializable);
 
 public:
     /// Construct with defaults.
@@ -52,6 +59,8 @@ public:
 
     /// Register object with the engine.
     static void RegisterObject(Context* context);
+    /// Apply attribute changes that can not be applied immediately. Called after scene load or a network update.
+    void ApplyAttributes() override;
 
     /// Define all dependencies.
     bool Define(RenderSurface* renderTarget, Viewport* viewport);
@@ -78,6 +87,8 @@ protected:
     SharedPtr<PipelineState> CreateLightVolumePipelineState(SceneLight* sceneLight, Geometry* lightGeometry) override;
 
 private:
+    RenderPipelineSettings settings_;
+
     Graphics* graphics_{};
     Renderer* renderer_{};
     WorkQueue* workQueue_{};

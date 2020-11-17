@@ -62,6 +62,13 @@ ScenePass::ScenePass(Context* context,
 {
 }
 
+void ScenePass::InvalidatePipelineStateCache()
+{
+    unlitBasePipelineStateCache_.Invalidate();
+    litBasePipelineStateCache_.Invalidate();
+    lightPipelineStateCache_.Invalidate();
+}
+
 void ScenePass::BeginFrame()
 {
     numThreads_ = workQueue_->GetNumThreads() + 1;
@@ -131,7 +138,7 @@ void ScenePass::CollectUnlitBatches(Camera* camera, ScenePipelineStateCacheCallb
 
             // Add base batch
             sceneBatch = BaseSceneBatch{ M_MAX_UNSIGNED, intermediateBatch, defaultMaterial };
-            sceneBatch.pipelineState_ = unlitPipelineStateCache_.GetPipelineState({ sceneBatch, 0 });
+            sceneBatch.pipelineState_ = unlitBasePipelineStateCache_.GetPipelineState({ sceneBatch, 0 });
             if (!sceneBatch.pipelineState_)
                 unlitBaseBatchesDirty_.Insert(threadIndex, &sceneBatch);
         }
@@ -146,7 +153,7 @@ void ScenePass::CollectUnlitBatches(Camera* camera, ScenePipelineStateCacheCallb
     {
         const ScenePipelineStateKey key{ *sceneBatch, 0 };
         subPassContext.drawable_ = sceneBatch->drawable_;
-        sceneBatch->pipelineState_ = unlitPipelineStateCache_.GetOrCreatePipelineState(key, subPassContext, callback);
+        sceneBatch->pipelineState_ = unlitBasePipelineStateCache_.GetOrCreatePipelineState(key, subPassContext, callback);
     });
 }
 
@@ -175,7 +182,7 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
 
             // Add base batch
             sceneBatch = BaseSceneBatch{ baseLightIndex, intermediateBatch, defaultMaterial };
-            sceneBatch.pipelineState_ = litPipelineStateCache_.GetPipelineState({ sceneBatch, baseLightHash });
+            sceneBatch.pipelineState_ = litBasePipelineStateCache_.GetPipelineState({ sceneBatch, baseLightHash });
             if (!sceneBatch.pipelineState_)
                 litBaseBatchesDirty_.Insert(threadIndex, &sceneBatch);
 
@@ -188,7 +195,7 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
                 lightBatch.lightIndex_ = lightIndex;
                 lightBatch.pass_ = intermediateBatch.additionalPass_;
 
-                lightBatch.pipelineState_ = additionalLightPipelineStateCache_.GetPipelineState({ lightBatch, lightHash });
+                lightBatch.pipelineState_ = lightPipelineStateCache_.GetPipelineState({ lightBatch, lightHash });
                 const unsigned batchIndex = lightBatches_.Insert(threadIndex, lightBatch);
                 if (!lightBatch.pipelineState_)
                     lightBatchesDirty_.Insert(threadIndex, batchIndex);
@@ -208,7 +215,7 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
         {
             baseSubPassContext.drawable_ = sceneBatch->drawable_;
             const ScenePipelineStateKey baseKey{ *sceneBatch, baseLightHash };
-            sceneBatch->pipelineState_ = litPipelineStateCache_.GetOrCreatePipelineState(
+            sceneBatch->pipelineState_ = litBasePipelineStateCache_.GetOrCreatePipelineState(
                 baseKey, baseSubPassContext, callback);
         });
     }
@@ -227,7 +234,7 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
             lightSubPassContext.drawable_ = lightBatch.drawable_;
 
             const ScenePipelineStateKey lightKey{ lightBatch, sceneLight->GetPipelineStateHash() };
-            lightBatch.pipelineState_ = additionalLightPipelineStateCache_.GetOrCreatePipelineState(
+            lightBatch.pipelineState_ = lightPipelineStateCache_.GetOrCreatePipelineState(
                 lightKey, lightSubPassContext, callback);
         });
     }
@@ -292,6 +299,11 @@ ShadowScenePass::ShadowScenePass(Context* context, const ea::string& tag, const 
     , shadowPassIndex_(Technique::GetPassIndex(shadowPass))
     , tag_(NormalizeShaderDefine(tag))
 {
+}
+
+void ShadowScenePass::InvalidatePipelineStateCache()
+{
+    pipelineStateCache_.Invalidate();
 }
 
 void ShadowScenePass::BeginFrame()

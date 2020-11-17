@@ -35,6 +35,16 @@ UNIFORM_SAMPLER(9, samplerCube sLightCubeMap)
 #define texture2DLodOffset textureLodOffset
 #endif
 
+#ifdef MATERIAL_HAS_DIFFUSE_TEXTURE
+    #define Color_DiffMapToLinear(color) MATERIAL_DIFFUSE_TEXTURE_LINEAR(color)
+    #define Color_DiffMapToGamma(color)  MATERIAL_DIFFUSE_TEXTURE_GAMMA(color)
+    #ifdef URHO3D_GAMMA_CORRECTION
+        #define Color_DiffMapToLight(color) Color_DiffMapToLinear(color)
+    #else
+        #define Color_DiffMapToLight(color) Color_DiffMapToGamma(color)
+    #endif
+#endif
+
 vec3 DecodeNormal(vec4 normalInput)
 {
     #ifdef PACKEDNORMAL

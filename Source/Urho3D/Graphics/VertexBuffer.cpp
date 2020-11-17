@@ -161,8 +161,7 @@ bool VertexBuffer::SetSize(unsigned vertexCount, const ea::vector<VertexElement>
     dynamic_ = dynamic;
 
     UpdateOffsets();
-
-    SendEvent(E_BUFFERFORMATCHANGED);
+    MarkPipelineStateHashDirty();
 
     if (shadowed_ && vertexCount_ && vertexSize_)
         shadowData_ = new unsigned char[vertexCount_ * vertexSize_];
@@ -426,6 +425,14 @@ void VertexBuffer::ShuffleUnpackedVertexData(unsigned vertexCount,
         for (unsigned i = 0; i < vertexCount; ++i)
             dest[i * numDestElements + destElementIndex] = source[i * numSourceElements + sourceElementIndex];
     }
+}
+
+unsigned VertexBuffer::RecalculatePipelineStateHash() const
+{
+    unsigned hash = 0;
+    for (const VertexElement& element : elements_)
+        CombineHash(hash, element.ToHash());
+    return ea::max(1u, hash);
 }
 
 }
