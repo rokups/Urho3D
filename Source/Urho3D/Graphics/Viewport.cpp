@@ -27,6 +27,7 @@
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Renderer.h"
 #include "../Graphics/RenderPath.h"
+#include "../Graphics/RenderSurface.h"
 #include "../Graphics/View.h"
 #include "../Graphics/Viewport.h"
 #include "../RenderPipeline/RenderPipeline.h"
@@ -141,6 +142,27 @@ Camera* Viewport::GetCamera() const
     return camera_;
 }
 
+IntRect Viewport::GetEffectiveRect(RenderSurface* renderTarget) const
+{
+    const IntVector2 renderTargetSize = RenderSurface::GetSize(GetSubsystem<Graphics>(), renderTarget);
+
+    if (rect_ == IntRect::ZERO)
+    {
+        // Return render target dimensions if viewport rectangle is not defined
+        return { IntVector2::ZERO, renderTargetSize };
+    }
+    else
+    {
+        // Validate and return viewport rectangle
+        IntRect rect;
+        rect.left_ = Clamp(rect_.left_, 0, renderTargetSize.x_ - 1);
+        rect.top_ = Clamp(rect_.top_, 0, renderTargetSize.y_ - 1);
+        rect.right_ = Clamp(rect_.right_, rect.left_ + 1, renderTargetSize.x_);
+        rect.bottom_ = Clamp(rect_.bottom_, rect.top_ + 1, renderTargetSize.y_);
+        return rect;
+    }
+}
+
 Camera* Viewport::GetCullCamera() const
 {
     return cullCamera_;
@@ -230,8 +252,8 @@ Vector3 Viewport::ScreenToWorldPoint(int x, int y, float depth) const
 
 void Viewport::AllocateView()
 {
-    // TODO(renderer): Don't create view if render pipeline is present
-    view_ = MakeShared<View>(context_);
+    if (!renderPipeline_)
+        view_ = MakeShared<View>(context_);
 }
 
 }

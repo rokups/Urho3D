@@ -437,7 +437,7 @@ private:
     /// Currently focused element.
     WeakPtr<UIElement> focusElement_;
     /// Draw queue used for rendering.
-    DrawCommandQueue drawQueue_;
+    SharedPtr<DrawCommandQueue> drawQueue_;
     /// Cached pipeline states.
     ea::unordered_map<UIBatchPipelineStateKey, SharedPtr<PipelineState>> pipelineStateCache_;
     /// UI rendering batches.

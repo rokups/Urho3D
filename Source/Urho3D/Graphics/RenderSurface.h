@@ -75,6 +75,9 @@ public:
     /// @property
     int GetHeight() const;
 
+    /// Return size.
+    IntVector2 GetSize() const;
+
     /// Return usage.
     /// @property
     TextureUsage GetUsage() const;
@@ -136,6 +139,12 @@ public:
 
     /// Set or clear the need resolve flag. Called internally by Graphics.
     void SetResolveDirty(bool enable) { resolveDirty_ = enable; }
+
+    /// Return size of render surface. Nullptr corresponds to default render surface.
+    static IntVector2 GetSize(Graphics* graphics, const RenderSurface* renderSurface);
+
+    /// Return multisampling of render surface. Nullptr corresponds to default render surface.
+    static int GetMultiSample(Graphics* graphics, const RenderSurface* renderSurface);
 
 private:
     /// Graphics subsystem.

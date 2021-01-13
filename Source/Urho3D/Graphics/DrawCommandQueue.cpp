@@ -30,11 +30,17 @@
 namespace Urho3D
 {
 
-void DrawCommandQueue::Reset(Graphics* graphics, bool preferConstantBuffers)
+DrawCommandQueue::DrawCommandQueue(Graphics* graphics)
+    : graphics_(graphics)
+{
+
+}
+
+void DrawCommandQueue::Reset(bool preferConstantBuffers)
 {
     useConstantBuffers_ = preferConstantBuffers
-        ? graphics->GetConstantBuffersEnabled()
-        : graphics->GetConstantBuffersRequired();
+        ? graphics_->GetConstantBuffersEnabled()
+        : graphics_->GetConstantBuffersRequired();
 
     // Reset state accumulators
     currentDrawCommand_ = {};
@@ -43,7 +49,7 @@ void DrawCommandQueue::Reset(Graphics* graphics, bool preferConstantBuffers)
     // Clear shadep parameters
     if (useConstantBuffers_)
     {
-        constantBuffers_.collection_.ClearAndInitialize(graphics->GetConstantBuffersOffsetAlignment());
+        constantBuffers_.collection_.ClearAndInitialize(graphics_->GetConstantBuffersOffsetAlignment());
         constantBuffers_.currentLayout_ = nullptr;
         constantBuffers_.currentData_ = nullptr;
         constantBuffers_.currentHashes_.fill(0);
@@ -65,13 +71,13 @@ void DrawCommandQueue::Reset(Graphics* graphics, bool preferConstantBuffers)
     scissorRects_.push_back(IntRect::ZERO);
 }
 
-void DrawCommandQueue::Execute(Graphics* graphics)
+void DrawCommandQueue::Execute()
 {
     // Constant buffers to store all shader parameters for queue
     ea::vector<SharedPtr<ConstantBuffer>> constantBuffers;
 
     // Utility to set shader parameters if constant buffers are not used
-    const SharedParameterSetter shaderParameterSetter{ graphics };
+    const SharedParameterSetter shaderParameterSetter{ graphics_ };
 
     // Prepare shader parameters
     if (useConstantBuffers_)
@@ -80,13 +86,13 @@ void DrawCommandQueue::Execute(Graphics* graphics)
         constantBuffers.resize(numConstantBuffers);
         for (unsigned i = 0; i < numConstantBuffers; ++i)
         {
-            constantBuffers[i] = graphics->GetOrCreateConstantBuffer(VS, i, constantBuffers_.collection_.GetBufferSize(i));
+            constantBuffers[i] = graphics_->GetOrCreateConstantBuffer(VS, i, constantBuffers_.collection_.GetBufferSize(i));
             constantBuffers[i]->Update(constantBuffers_.collection_.GetBufferData(i));
         }
     }
     else
     {
-        graphics->ClearParameterSources();
+        graphics_->ClearParameterSources();
     }
 
     // Cached current state
@@ -107,7 +113,7 @@ void DrawCommandQueue::Execute(Graphics* graphics)
         if (cmd.scissorRect_ != currentScissorRect)
         {
             const bool scissorEnabled = cmd.scissorRect_ != 0;
-            graphics->SetScissorTest(scissorEnabled, scissorRects_[cmd.scissorRect_]);
+            graphics_->SetScissorTest(scissorEnabled, scissorRects_[cmd.scissorRect_]);
             currentScissorRect = cmd.scissorRect_;
         }
 
@@ -122,7 +128,7 @@ void DrawCommandQueue::Execute(Graphics* graphics)
         // Set index buffer
         if (cmd.indexBuffer_ != currentIndexBuffer)
         {
-            graphics->SetIndexBuffer(cmd.indexBuffer_);
+            graphics_->SetIndexBuffer(cmd.indexBuffer_);
             currentIndexBuffer = cmd.indexBuffer_;
         }
 
@@ -131,7 +137,7 @@ void DrawCommandQueue::Execute(Graphics* graphics)
         {
             tempVertexBuffers.clear();
             tempVertexBuffers.assign(cmd.vertexBuffers_.begin(), cmd.vertexBuffers_.end());
-            graphics->SetVertexBuffers(tempVertexBuffers, cmd.instanceStart_);
+            graphics_->SetVertexBuffers(tempVertexBuffers, cmd.instanceStart_);
             currentVertexBuffers = cmd.vertexBuffers_;
         }
 
@@ -141,8 +147,8 @@ void DrawCommandQueue::Execute(Graphics* graphics)
             for (unsigned i = cmd.shaderResources_.first; i < cmd.shaderResources_.second; ++i)
             {
                 const auto& unitAndResource = shaderResources_[i];
-                if (graphics->HasTextureUnit(unitAndResource.first))
-                    graphics->SetTexture(unitAndResource.first, unitAndResource.second);
+                if (graphics_->HasTextureUnit(unitAndResource.first))
+                    graphics_->SetTexture(unitAndResource.first, unitAndResource.second);
             }
             currentShaderResources = cmd.shaderResources_;
         }
@@ -163,7 +169,7 @@ void DrawCommandQueue::Execute(Graphics* graphics)
             }
 
             // Set all constant buffers at once
-            graphics->SetShaderConstantBuffers(constantBufferRanges);
+            graphics_->SetShaderConstantBuffers(constantBufferRanges);
         }
         else
         {
@@ -174,7 +180,7 @@ void DrawCommandQueue::Execute(Graphics* graphics)
                 const auto range = cmd.shaderParameters_[i];
 
                 // If needed range is already bound to active shader program, ignore
-                if (!graphics->NeedParameterUpdate(group, reinterpret_cast<void *>(static_cast<uintptr_t>(range.first))))
+                if (!graphics_->NeedParameterUpdate(group, reinterpret_cast<void *>(static_cast<uintptr_t>(range.first))))
                     continue;
 
                 shaderParameters_.collection_.ForEach(range.first, range.second, shaderParameterSetter);
@@ -186,23 +192,23 @@ void DrawCommandQueue::Execute(Graphics* graphics)
         {
             if (cmd.baseVertexIndex_ == 0)
             {
-                graphics->DrawInstanced(currentPrimitiveType,
+                graphics_->DrawInstanced(currentPrimitiveType,
                     cmd.indexStart_, cmd.indexCount_, 0, 0, cmd.instanceCount_);
             }
             else
             {
-                graphics->DrawInstanced(currentPrimitiveType,
+                graphics_->DrawInstanced(currentPrimitiveType,
                     cmd.indexStart_, cmd.indexCount_, cmd.baseVertexIndex_, 0, 0, cmd.instanceCount_);
             }
         }
         else
         {
             if (!currentIndexBuffer)
-                graphics->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_);
+                graphics_->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_);
             else if (cmd.baseVertexIndex_ == 0)
-                graphics->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_, 0, 0);
+                graphics_->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_, 0, 0);
             else
-                graphics->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_, cmd.baseVertexIndex_, 0, 0);
+                graphics_->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_, cmd.baseVertexIndex_, 0, 0);
         }
     }
 }

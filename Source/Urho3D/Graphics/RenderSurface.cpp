@@ -36,7 +36,7 @@ namespace Urho3D
 
 RenderSurface::~RenderSurface()
 {
-    // only release if parent texture hasn't expired, in that case 
+    // only release if parent texture hasn't expired, in that case
     // parent texture was deleted and will have called release on render surface
     if (!parentTexture_.Expired())
     {
@@ -94,6 +94,11 @@ int RenderSurface::GetHeight() const
     return parentTexture_->GetHeight();
 }
 
+IntVector2 RenderSurface::GetSize() const
+{
+    return { GetWidth(), GetHeight() };
+}
+
 TextureUsage RenderSurface::GetUsage() const
 {
     return parentTexture_->GetUsage();
@@ -112,6 +117,16 @@ bool RenderSurface::GetAutoResolve() const
 Viewport* RenderSurface::GetViewport(unsigned index) const
 {
     return index < viewports_.size() ? viewports_[index] : nullptr;
+}
+
+IntVector2 RenderSurface::GetSize(Graphics* graphics, const RenderSurface* renderSurface)
+{
+    return renderSurface ? renderSurface->GetSize() : graphics->GetSize();
+}
+
+int RenderSurface::GetMultiSample(Graphics* graphics, const RenderSurface* renderSurface)
+{
+    return renderSurface ? renderSurface->GetMultiSample() : graphics->GetMultiSample();
 }
 
 }

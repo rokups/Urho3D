@@ -23,7 +23,10 @@
 #pragma once
 
 #include "../Core/Object.h"
+#include "../Core/Signal.h"
 #include "../Graphics/Drawable.h"
+#include "../RenderPipeline/RenderPipelineCamera.h"
+#include "../RenderPipeline/RenderPipelineTexture.h"
 #include "../RenderPipeline/SceneBatchCollectorCallback.h"
 #include "../Scene/Serializable.h"
 
@@ -39,15 +42,24 @@ class View;
 class Viewport;
 class RenderPipelineViewport;
 class ShadowMapAllocator;
+class DrawCommandQueue;
+class SceneBatchCollector;
+class SceneBatchRenderer;
 
+///
 struct RenderPipelineSettings
 {
+    /// Whether to use deferred rendering.
     bool deferred_{};
+    /// Whether to apply gamma correction.
     bool gammaCorrection_{};
 };
 
 ///
-class URHO3D_API RenderPipeline : public Serializable, public SceneBatchCollectorCallback
+class URHO3D_API RenderPipeline
+    : public Serializable
+    , public PipelineStateTracker
+    , public SceneBatchCollectorCallback
 {
     URHO3D_OBJECT(RenderPipeline, Serializable);
 
@@ -71,7 +83,33 @@ public:
     /// Render.
     void Render();
 
+    /// Return default draw queue. Is not automatically executed.
+    DrawCommandQueue* GetDefaultDrawQueue() { return drawQueue_; }
+
+    /// Create transient viewport-scaled screen buffer owned by pipeline state.
+    SharedPtr<RenderPipelineTexture> CreateScreenBuffer(
+        const ScreenBufferParams& params, const Vector2& sizeMultiplier = Vector2::ONE);
+    /// Create transient fixed-sized screen buffer owned by pipeline state.
+    SharedPtr<RenderPipelineTexture> CreateFixedScreenBuffer(
+        const ScreenBufferParams& params, const IntVector2& fixedSize);
+    /// Create persistent viewport-sized screen buffer owned by pipeline state.
+    SharedPtr<RenderPipelineTexture> CreatePersistentScreenBuffer(
+        const ScreenBufferParams& params, const Vector2& sizeMultiplier = Vector2::ONE);
+    /// Create persistent fixed-sized screen buffer owned by pipeline state.
+    SharedPtr<RenderPipelineTexture> CreatePersistentFixedScreenBuffer(
+        const ScreenBufferParams& params, const IntVector2& fixedSize);
+
+    /// Signal when render begins.
+    Signal<void(const FrameInfo& frameInfo)> OnRenderBegin;
+    /// Signal when render end.
+    Signal<void(const FrameInfo& frameInfo)> OnRenderEnd;
+    /// Signal when all cached pipeline states are invalidated.
+    Signal<void()> OnPipelineStatesInvalidated;
+
 protected:
+    /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
+    unsigned RecalculatePipelineStateHash() const override;
+
     unsigned GetNumThreads() const { return numThreads_; }
     void PostTask(std::function<void(unsigned)> task);
     void CompleteTasks();
@@ -87,23 +125,37 @@ protected:
     SharedPtr<PipelineState> CreateLightVolumePipelineState(SceneLight* sceneLight, Geometry* lightGeometry) override;
 
 private:
-    RenderPipelineSettings settings_;
-
     Graphics* graphics_{};
     Renderer* renderer_{};
     WorkQueue* workQueue_{};
 
-    Scene* scene_{};
-    Camera* camera_{};
-    Octree* octree_{};
-
     unsigned numThreads_{};
     unsigned numDrawables_{};
 
+    /// Current pipeline settings.
+    RenderPipelineSettings settings_;
+    /// Current frame info.
     FrameInfo frameInfo_{};
+    /// Default draw queue.
+    SharedPtr<DrawCommandQueue> drawQueue_;
+    /// Main camera of render pipeline.
+    SharedPtr<RenderPipelineCamera> pipelineCamera_;
+    /// Viewport color texture handler.
+    SharedPtr<RenderPipelineTexture> viewportColor_;
+    /// Viewport depth stencil texture handler.
+    SharedPtr<RenderPipelineTexture> viewportDepth_;
+    /// Previous pipeline state hash.
+    unsigned oldPipelineStateHash_{};
 
-    SharedPtr<RenderPipelineViewport> viewport_;
+    SharedPtr<RenderPipelineTexture> deferredFinal_;
+    SharedPtr<RenderPipelineTexture> deferredAlbedo_;
+    SharedPtr<RenderPipelineTexture> deferredNormal_;
+    SharedPtr<RenderPipelineTexture> deferredDepth_;
+
     SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
+    SharedPtr<SceneBatchCollector> sceneBatchCollector_;
+    SharedPtr<SceneBatchRenderer> sceneBatchRenderer_;
+
 };
 
 }

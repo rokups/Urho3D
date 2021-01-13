@@ -1,3 +1,4 @@
+#if 0
 //
 // Copyright (c) 2017-2020 the rbfx project.
 //
@@ -131,10 +132,13 @@ private:
     /// Renderer subsystem.
     Renderer* renderer_{};
 
+    // TODO(renderer): Fixme
+public:
     /// Viewport.
     Viewport* viewport_{};
     /// Destination render target aliased as "viewport".
     RenderSurface* viewportRenderTarget_{};
+private:
     /// Intermediate render targets.
     ea::vector<RenderTargetDesc> renderTargets_;
 
@@ -158,3 +162,4 @@ private:
 };
 
 }
+#endif

@@ -33,7 +33,6 @@
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Viewport.h"
 #include "../RenderPipeline/RenderPipeline.h"
-#include "../RenderPipeline/RenderPipelineViewport.h"
 #include "../RenderPipeline/SceneBatchCollector.h"
 #include "../RenderPipeline/SceneBatchRenderer.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
@@ -148,7 +147,9 @@ RenderPipeline::RenderPipeline(Context* context)
     , graphics_(context_->GetSubsystem<Graphics>())
     , renderer_(context_->GetSubsystem<Renderer>())
     , workQueue_(context_->GetSubsystem<WorkQueue>())
-{}
+    , drawQueue_(MakeShared<DrawCommandQueue>(graphics_))
+{
+}
 
 RenderPipeline::~RenderPipeline()
 {
@@ -402,7 +403,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(SceneLig
     desc.fillMode_ = FILL_SOLID;
 
     // TODO(renderer): Extract this code to collector
-    Vector3 cameraPos = camera_->GetNode()->GetWorldPosition();
+    Vector3 cameraPos = frameInfo_.camera_->GetNode()->GetWorldPosition();
     if (type != LIGHT_DIRECTIONAL)
     {
         float lightDist{};
@@ -412,14 +413,14 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(SceneLig
             lightDist = light->GetFrustum().Distance(cameraPos);
 
         // Draw front faces if not inside light volume
-        if (lightDist < camera_->GetNearClip() * 2.0f)
+        if (lightDist < frameInfo_.camera_->GetNearClip() * 2.0f)
         {
-            desc.cullMode_ = GetEffectiveCullMode(CULL_CW, camera_);
+            desc.cullMode_ = GetEffectiveCullMode(CULL_CW, frameInfo_.camera_);
             desc.depthMode_ = CMP_GREATER;
         }
         else
         {
-            desc.cullMode_ = GetEffectiveCullMode(CULL_CCW, camera_);
+            desc.cullMode_ = GetEffectiveCullMode(CULL_CCW, frameInfo_.camera_);
             desc.depthMode_ = CMP_LESSEQUAL;
         }
     }
@@ -464,34 +465,66 @@ ShadowMap RenderPipeline::GetTemporaryShadowMap(const IntVector2& size)
 
 bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 {
-    scene_ = viewport->GetScene();
-    camera_ = scene_ ? viewport->GetCamera() : nullptr;
-    octree_ = scene_ ? scene_->GetComponent<Octree>() : nullptr;
-    if (!camera_ || !octree_)
+    Camera* camera = viewport->GetCamera();
+
+    frameInfo_.viewport_ = viewport;
+    frameInfo_.renderTarget_ = renderTarget;
+
+    frameInfo_.scene_ = viewport->GetScene();
+    frameInfo_.camera_ = viewport->GetCamera();
+    frameInfo_.cullCamera_ = viewport->GetCullCamera() ? viewport->GetCullCamera() : frameInfo_.camera_;
+    frameInfo_.octree_ = frameInfo_.scene_ ? frameInfo_.scene_->GetComponent<Octree>() : nullptr;
+
+    frameInfo_.viewRect_ = viewport->GetEffectiveRect(renderTarget);
+    frameInfo_.viewSize_ = frameInfo_.viewRect_.Size();
+
+    if (!frameInfo_.camera_ || !frameInfo_.octree_)
         return false;
 
-    numDrawables_ = octree_->GetAllDrawables().size();
+    numDrawables_ = frameInfo_.octree_->GetAllDrawables().size();
 
-    if (!viewport_)
+    // Validate settings
+    if (settings_.deferred_ && !graphics_->GetDeferredSupport())
+        settings_.deferred_ = false;
+
+    // Lazy initialize heavy objects
+    if (!pipelineCamera_ || !shadowMapAllocator_ || !sceneBatchCollector_ || !sceneBatchRenderer_)
     {
-        viewport_ = MakeShared<RenderPipelineViewport>(context_);
-        viewport_->AddRenderTarget("viewport", "rgba");
-        viewport_->AddRenderTarget("albedo", "rgba");
-        viewport_->AddRenderTarget("normal", "rgba");
-        viewport_->AddRenderTarget("depth", "readabledepth");
-    }
-    viewport_->Define(renderTarget, viewport);
-    if (!shadowMapAllocator_)
+        pipelineCamera_ = MakeShared<RenderPipelineCamera>(this);
+        viewportColor_ = MakeShared<ViewportColorTexture>(this);
+        viewportDepth_ = MakeShared<ViewportDepthStencilTexture>(this);
+
         shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
+        sceneBatchCollector_ = MakeShared<SceneBatchCollector>(context_);
+        sceneBatchRenderer_ = MakeShared<SceneBatchRenderer>(context_);
+    }
+
+    // Pre-frame initialize objects
+    pipelineCamera_->Initialize(camera);
+
+    // Initialize or reset deferred rendering
+    if (settings_.deferred_ && !deferredDepth_)
+    {
+        deferredFinal_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
+        deferredAlbedo_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
+        deferredNormal_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
+        deferredDepth_ = CreateScreenBuffer({ Graphics::GetReadableDepthFormat() });
+    }
+    else if (!settings_.deferred_ && deferredDepth_)
+    {
+        deferredFinal_ = nullptr;
+        deferredAlbedo_ = nullptr;
+        deferredNormal_ = nullptr;
+        deferredDepth_ = nullptr;
+    }
 
     return true;
 }
 
 void RenderPipeline::Update(const FrameInfo& frameInfo)
 {
-    frameInfo_ = frameInfo;
-    frameInfo_.camera_ = camera_;
-    frameInfo_.octree_ = octree_;
+    frameInfo_.timeStep_ = frameInfo.timeStep_;
+    frameInfo_.frameNumber_ = frameInfo.frameNumber_;
     numThreads_ = workQueue_->GetNumThreads() + 1;
 }
 
@@ -508,34 +541,31 @@ void RenderPipeline::CompleteTasks()
 void RenderPipeline::CollectDrawables(ea::vector<Drawable*>& drawables, Camera* camera, DrawableFlags flags)
 {
     FrustumOctreeQuery query(drawables, camera->GetFrustum(), flags, camera->GetViewMask());
-    octree_->GetDrawables(query);
+    frameInfo_.octree_->GetDrawables(query);
 }
 
 void RenderPipeline::Render()
 {
-    static SceneBatchCollector sceneBatchCollector(context_);
-    static auto sceneBatchRenderer = MakeShared<SceneBatchRenderer>(context_);
-    static RenderPipelineSettings oldSettings;
+    OnRenderBegin(this, frameInfo_);
 
-    viewport_->BeginFrame();
-    shadowMapAllocator_->Reset();
-
-    // Invalidate cached pipeline states
-    // TODO(renderer): Fix this trash
-    if (viewport_->ArePipelineStatesInvalidated() || memcmp(&oldSettings, &settings_, sizeof(RenderPipelineSettings)))
+    // Invalidate pipeline states if necessary
+    MarkPipelineStateHashDirty();
+    const unsigned pipelineStateHash = GetPipelineStateHash();
+    if (oldPipelineStateHash_ != pipelineStateHash)
     {
-        sceneBatchCollector.InvalidatePipelineStateCache();
-        oldSettings = settings_;
+        oldPipelineStateHash_ = pipelineStateHash;
+        OnPipelineStatesInvalidated(this);
+        // TODO(renderer): Move to event
+        sceneBatchCollector_->InvalidatePipelineStateCache();
     }
 
-    // Set automatic aspect ratio if required
-    if (camera_ && camera_->GetAutoAspectRatio())
-        camera_->SetAspectRatioInternal((float)frameInfo_.viewSize_.x_ / (float)frameInfo_.viewSize_.y_);
+    //viewport_->BeginFrame();
+    shadowMapAllocator_->Reset();
 
     // Collect and process visible drawables
     static ea::vector<Drawable*> drawablesInMainCamera;
     drawablesInMainCamera.clear();
-    CollectDrawables(drawablesInMainCamera, camera_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT);
+    CollectDrawables(drawablesInMainCamera, frameInfo_.cullCamera_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT);
 
     // Process batches
     /*static ScenePassDescription passes[] = {
@@ -545,30 +575,35 @@ void RenderPipeline::Render()
         { ScenePassType::Unlit, "refract" },
         { ScenePassType::Unlit, "postalpha" },
     };*/
-    sceneBatchCollector.SetMaxPixelLights(4);
+    sceneBatchCollector_->SetMaxPixelLights(4);
 
     static auto basePass = MakeShared<OpaqueForwardLightingScenePass>(context_, "PASS_BASE", "base", "litbase", "light");
     static auto alphaPass = MakeShared<AlphaForwardLightingScenePass>(context_, "PASS_ALPHA", "alpha", "alpha", "litalpha");
     static auto deferredPass = MakeShared<UnlitScenePass>(context_, "PASS_DEFERRED", "deferred");
     static auto shadowPass = MakeShared<ShadowScenePass>(context_, "PASS_SHADOW", "shadow");
-    sceneBatchCollector.ResetPasses();
-    sceneBatchCollector.SetShadowPass(shadowPass);
-    sceneBatchCollector.AddScenePass(basePass);
-    sceneBatchCollector.AddScenePass(alphaPass);
-    sceneBatchCollector.AddScenePass(deferredPass);
+    sceneBatchCollector_->ResetPasses();
+    sceneBatchCollector_->SetShadowPass(shadowPass);
+    if (settings_.deferred_)
+    {
+        sceneBatchCollector_->AddScenePass(deferredPass);
+    }
+    else
+    {
+        sceneBatchCollector_->AddScenePass(basePass);
+        sceneBatchCollector_->AddScenePass(alphaPass);
+    }
 
-    sceneBatchCollector.BeginFrame(frameInfo_, *this);
-    sceneBatchCollector.ProcessVisibleDrawables(drawablesInMainCamera);
-    sceneBatchCollector.ProcessVisibleLights();
-    sceneBatchCollector.UpdateGeometries();
-    sceneBatchCollector.CollectSceneBatches();
-    sceneBatchCollector.CollectLightVolumeBatches();
+    sceneBatchCollector_->BeginFrame(frameInfo_, *this);
+    sceneBatchCollector_->ProcessVisibleDrawables(drawablesInMainCamera);
+    sceneBatchCollector_->ProcessVisibleLights();
+    sceneBatchCollector_->UpdateGeometries();
+    sceneBatchCollector_->CollectSceneBatches();
+    sceneBatchCollector_->CollectLightVolumeBatches();
 
     // Collect batches
-    static DrawCommandQueue drawQueue;
-    const auto zone = octree_->GetZone();
+    const auto zone = frameInfo_.octree_->GetZone();
 
-    const auto& visibleLights = sceneBatchCollector.GetVisibleLights();
+    const auto& visibleLights = sceneBatchCollector_->GetVisibleLights();
     for (SceneLight* sceneLight : visibleLights)
     {
         const unsigned numSplits = sceneLight->GetNumSplits();
@@ -577,59 +612,92 @@ void RenderPipeline::Render()
             const SceneLightShadowSplit& split = sceneLight->GetSplit(splitIndex);
             const auto& shadowBatches = shadowPass->GetSortedShadowBatches(split);
 
-            drawQueue.Reset(graphics_);
-            sceneBatchRenderer->RenderShadowBatches(drawQueue, sceneBatchCollector, split.shadowCamera_, zone, shadowBatches);
+            drawQueue_->Reset();
+            sceneBatchRenderer_->RenderShadowBatches(*drawQueue_, *sceneBatchCollector_, split.shadowCamera_, zone, shadowBatches);
             shadowMapAllocator_->BeginShadowMap(split.shadowMap_);
-            drawQueue.Execute(graphics_);
+            drawQueue_->Execute();
         }
     }
 
     // TODO(renderer): Remove this guard
 #ifdef DESKTOP_GRAPHICS
-    // Draw deferred GBuffer
-    viewport_->ClearRenderTarget("viewport", GetDefaultFogColor(graphics_));
-    viewport_->ClearRenderTarget("albedo", Color::TRANSPARENT_BLACK);
-    viewport_->ClearDepthStencil("depth", 1.0f, 0);
-    const ea::string_view geometryBufferTargets[] = { "viewport", "albedo", "normal" };
-    viewport_->SetRenderTargets("depth", geometryBufferTargets);
-    drawQueue.Reset(graphics_);
-    sceneBatchRenderer->RenderUnlitBaseBatches(drawQueue, sceneBatchCollector, camera_, zone, deferredPass->GetBatches());
-    drawQueue.Execute(graphics_);
-
-    // Draw deferred lights
-    GeometryBufferResource geometryBuffer[] = {
-        { TU_ALBEDOBUFFER, viewport_->GetRenderTarget("albedo") },
-        { TU_NORMALBUFFER, viewport_->GetRenderTarget("normal") },
-        { TU_DEPTHBUFFER, viewport_->GetRenderTarget("depth") }
-    };
-
-    const IntVector2 gbufferSize = geometryBuffer[0].texture_->GetSize();
-    const IntRect gbufferRect{ IntVector2::ZERO, gbufferSize };
-
-    drawQueue.Reset(graphics_);
-    sceneBatchRenderer->RenderLightVolumeBatches(drawQueue, sceneBatchCollector, camera_, zone,
-        sceneBatchCollector.GetLightVolumeBatches(), geometryBuffer,
-        viewport_->GetGBufferOffsets(gbufferSize, gbufferRect), viewport_->GetGBufferInvSize(gbufferSize));
-
-    const ea::string_view viewportTarget[] = { "viewport" };
-    viewport_->SetRenderTargets("depth", viewportTarget);
-    drawQueue.Execute(graphics_);
-
-    // Draw forward
-    viewport_->SetViewportRenderTargets(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, GetDefaultFogColor(graphics_), 1.0f, 0);
-    drawQueue.Reset(graphics_);
-    sceneBatchRenderer->RenderUnlitBaseBatches(drawQueue, sceneBatchCollector, camera_, zone, basePass->GetSortedUnlitBaseBatches());
-    sceneBatchRenderer->RenderLitBaseBatches(drawQueue, sceneBatchCollector, camera_, zone, basePass->GetSortedLitBaseBatches());
-    sceneBatchRenderer->RenderLightBatches(drawQueue, sceneBatchCollector, camera_, zone, basePass->GetSortedLightBatches());
-    sceneBatchRenderer->RenderAlphaBatches(drawQueue, sceneBatchCollector, camera_, zone, alphaPass->GetSortedBatches());
-    drawQueue.Execute(graphics_);
-
-    // Post-process
     if (settings_.deferred_)
-        viewport_->CopyToViewportRenderTarget("viewport");
-#endif
+    {
+        // Draw deferred GBuffer
+        deferredFinal_->ClearColor(GetDefaultFogColor(graphics_));
+        deferredAlbedo_->ClearColor();
+        deferredDepth_->ClearDepthStencil();
+        deferredDepth_->SetRenderTargets({ deferredFinal_, deferredAlbedo_, deferredNormal_ });
+        drawQueue_->Reset();
+        sceneBatchRenderer_->RenderUnlitBaseBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, deferredPass->GetBatches());
+        drawQueue_->Execute();
 
-    viewport_->EndFrame();
+        // Draw deferred lights
+        GeometryBufferResource geometryBuffer[] = {
+            { TU_ALBEDOBUFFER, deferredAlbedo_->GetRenderSurface()->GetParentTexture() },
+            { TU_NORMALBUFFER, deferredNormal_->GetRenderSurface()->GetParentTexture() },
+            { TU_DEPTHBUFFER, deferredDepth_->GetRenderSurface()->GetParentTexture() }
+        };
+
+        drawQueue_->Reset();
+        sceneBatchRenderer_->RenderLightVolumeBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone,
+            sceneBatchCollector_->GetLightVolumeBatches(), geometryBuffer,
+            deferredDepth_->GetViewportOffsetAndScale(), deferredDepth_->GetInvSize());
+
+        deferredDepth_->SetRenderTargets({ deferredFinal_ });
+        drawQueue_->Execute();
+
+        viewportColor_->CopyFrom(deferredFinal_);
+    }
+    else
+#endif
+    {
+        viewportColor_->ClearColor(GetDefaultFogColor(graphics_));
+        viewportDepth_->ClearDepthStencil();
+        viewportDepth_->SetRenderTargets({ viewportColor_ });
+
+        drawQueue_->Reset();
+        sceneBatchRenderer_->RenderUnlitBaseBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, basePass->GetSortedUnlitBaseBatches());
+        sceneBatchRenderer_->RenderLitBaseBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, basePass->GetSortedLitBaseBatches());
+        sceneBatchRenderer_->RenderLightBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, basePass->GetSortedLightBatches());
+        sceneBatchRenderer_->RenderAlphaBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, alphaPass->GetSortedBatches());
+        drawQueue_->Execute();
+    }
+
+    OnRenderEnd(this, frameInfo_);
+}
+
+SharedPtr<RenderPipelineTexture> RenderPipeline::CreateScreenBuffer(
+    const ScreenBufferParams& params, const Vector2& sizeMultiplier)
+{
+    return MakeShared<ScreenBufferTexture>(this, params, sizeMultiplier, IntVector2::ZERO, false);
+}
+
+SharedPtr<RenderPipelineTexture> RenderPipeline::CreateFixedScreenBuffer(
+    const ScreenBufferParams& params, const IntVector2& fixedSize)
+{
+    return MakeShared<ScreenBufferTexture>(this, params, Vector2::ONE, fixedSize, false);
+}
+
+SharedPtr<RenderPipelineTexture> RenderPipeline::CreatePersistentScreenBuffer(
+    const ScreenBufferParams& params, const Vector2& sizeMultiplier)
+{
+    return MakeShared<ScreenBufferTexture>(this, params, sizeMultiplier, IntVector2::ZERO, true);
+}
+
+SharedPtr<RenderPipelineTexture> RenderPipeline::CreatePersistentFixedScreenBuffer(
+    const ScreenBufferParams& params, const IntVector2& fixedSize)
+{
+    return MakeShared<ScreenBufferTexture>(this, params, Vector2::ONE, fixedSize, true);
+}
+
+unsigned RenderPipeline::RecalculatePipelineStateHash() const
+{
+    unsigned hash = 0;
+    CombineHash(hash, pipelineCamera_->GetPipelineStateHash());
+    CombineHash(hash, settings_.deferred_);
+    CombineHash(hash, settings_.gammaCorrection_);
+    return hash;
 }
 
 }

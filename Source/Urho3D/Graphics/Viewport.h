@@ -37,6 +37,7 @@ class Scene;
 class XMLFile;
 class View;
 class RenderPipeline;
+class RenderSurface;
 
 /// %Viewport definition either for a render surface or the backbuffer.
 class URHO3D_API Viewport : public Object
@@ -94,6 +95,9 @@ public:
     /// Return view rectangle. A zero rectangle (0 0 0 0) means to use the rendertarget's full dimensions. In this case you could fetch the actual view rectangle from View object, though it will be valid only after the first frame.
     /// @property
     const IntRect& GetRect() const { return rect_; }
+
+    /// Return effective view rectangle.
+    IntRect GetEffectiveRect(RenderSurface* renderTarget) const;
 
     /// Return rendering path.
     /// @property

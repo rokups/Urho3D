@@ -59,6 +59,8 @@ class OcclusionBuffer;
 class Octree;
 class Octant;
 class RayOctreeQuery;
+class RenderSurface;
+class Viewport;
 class Zone;
 struct RayQueryResult;
 struct WorkItem;
@@ -80,9 +82,21 @@ struct FrameInfo
     float timeStep_{};
     /// Viewport size.
     IntVector2 viewSize_;
-    /// Camera being used.
+    /// Viewport rectangle.
+    IntRect viewRect_;
+
+    /// Destination viewport.
+    Viewport* viewport_{};
+    /// Destination render surface.
+    RenderSurface* renderTarget_{};
+
+    /// Scene being rendered.
+    Scene* scene_{};
+    /// Camera being used for rendering.
     Camera* camera_{};
-    /// Octree being used.
+    /// Camera being used for drawable culling.
+    Camera* cullCamera_{};
+    /// Octree being used for queries.
     Octree* octree_{};
 };
 

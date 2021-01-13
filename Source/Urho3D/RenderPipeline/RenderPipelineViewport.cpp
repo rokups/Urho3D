@@ -1,3 +1,4 @@
+#if 0
 //
 // Copyright (c) 2017-2020 the rbfx project.
 //
@@ -121,6 +122,7 @@ RenderPipelineViewport::RenderPipelineViewport(Context* context)
     : Object(context)
     , graphics_(context_->GetSubsystem<Graphics>())
     , renderer_(context_->GetSubsystem<Renderer>())
+    , drawQueue_(graphics_)
 {
     {
         Geometry* quadGeometry = renderer_->GetQuadGeometry();
@@ -344,7 +346,7 @@ void RenderPipelineViewport::CopyToRenderTarget(Texture* sourceTexture, RenderSu
         graphics_->ResetRenderTarget(i);
     graphics_->ResetDepthStencil();
     graphics_->SetViewport(destinationViewportRect);
-    drawQueue_.Execute(graphics_);
+    drawQueue_.Execute();
 }
 
 void RenderPipelineViewport::CopyToRenderTarget(ea::string_view sourceRenderTarget, ea::string_view destinationRenderTarget,
@@ -409,3 +411,4 @@ unsigned RenderPipelineViewport::RecalculatePipelineStateHash() const
 }
 
 }
+#endif

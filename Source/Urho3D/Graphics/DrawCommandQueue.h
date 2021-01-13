@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "../Core/Object.h"
 #include "../Graphics/ConstantBuffer.h"
 #include "../Graphics/ConstantBufferLayout.h"
 #include "../Graphics/Geometry.h"
@@ -33,6 +34,8 @@
 
 namespace Urho3D
 {
+
+class Graphics;
 
 /// Collection of shader resources.
 using ShaderResourceCollection = ea::vector<ea::pair<TextureUnit, Texture*>>;
@@ -79,11 +82,14 @@ struct DrawCommandDescription
 };
 
 /// Queue of draw commands.
-class DrawCommandQueue
+class DrawCommandQueue : public RefCounted
 {
 public:
+    /// Construct.
+    DrawCommandQueue(Graphics* graphics);
+
     /// Reset queue.
-    void Reset(Graphics* graphics, bool preferConstantBuffers = true);
+    void Reset(bool preferConstantBuffers = true);
 
     /// Set pipeline state. Must be called first.
     void SetPipelineState(PipelineState* pipelineState)
@@ -280,9 +286,11 @@ public:
     }
 
     /// Execute commands in the queue.
-    void Execute(Graphics* graphics);
+    void Execute();
 
 private:
+    /// Cached pointer to Graphics.
+    Graphics* graphics_{};
     /// Whether to use constant buffers.
     bool useConstantBuffers_{};
 

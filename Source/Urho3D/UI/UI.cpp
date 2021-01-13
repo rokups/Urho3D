@@ -849,6 +849,7 @@ void UI::Initialize()
 
     graphics_ = graphics;
     renderer_ = GetSubsystem<Renderer>();
+    drawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
     UIBatch::posAdjust = Vector3(Graphics::GetPixelUVOffset(), 0.0f);
 
     // Set initial root element size
@@ -1017,7 +1018,7 @@ void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsign
     projection.m23_ = 0.0f;
     projection.m33_ = 1.0f;
 
-    drawQueue_.Reset(graphics_, false /* prefer uniforms for compatibility with old shaders */);
+    drawQueue_->Reset(false /* prefer uniforms for compatibility with old shaders */);
 
     const float elapsedTime = GetSubsystem<Time>()->GetElapsedTime();
     for (unsigned i = batchStart; i < batchEnd; ++i)
@@ -1030,40 +1031,40 @@ void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsign
         if (!pipelineState)
             continue;
 
-        drawQueue_.SetPipelineState(pipelineState);
+        drawQueue_->SetPipelineState(pipelineState);
 
-        if (drawQueue_.BeginShaderParameterGroup(SP_FRAME))
+        if (drawQueue_->BeginShaderParameterGroup(SP_FRAME))
         {
-            drawQueue_.AddShaderParameter(VSP_ELAPSEDTIME, elapsedTime);
-            drawQueue_.AddShaderParameter(PSP_ELAPSEDTIME, elapsedTime);
-            drawQueue_.CommitShaderParameterGroup(SP_FRAME);
+            drawQueue_->AddShaderParameter(VSP_ELAPSEDTIME, elapsedTime);
+            drawQueue_->AddShaderParameter(PSP_ELAPSEDTIME, elapsedTime);
+            drawQueue_->CommitShaderParameterGroup(SP_FRAME);
         }
 
-        if (drawQueue_.BeginShaderParameterGroup(SP_OBJECT))
+        if (drawQueue_->BeginShaderParameterGroup(SP_OBJECT))
         {
-            drawQueue_.AddShaderParameter(VSP_MODEL, Matrix3x4::IDENTITY);
-            drawQueue_.CommitShaderParameterGroup(SP_OBJECT);
+            drawQueue_->AddShaderParameter(VSP_MODEL, Matrix3x4::IDENTITY);
+            drawQueue_->CommitShaderParameterGroup(SP_OBJECT);
         }
 
-        if (drawQueue_.BeginShaderParameterGroup(SP_CAMERA))
+        if (drawQueue_->BeginShaderParameterGroup(SP_CAMERA))
         {
-            drawQueue_.AddShaderParameter(VSP_VIEWPROJ, projection);
-            drawQueue_.CommitShaderParameterGroup(SP_CAMERA);
+            drawQueue_->AddShaderParameter(VSP_VIEWPROJ, projection);
+            drawQueue_->CommitShaderParameterGroup(SP_CAMERA);
         }
 
-        if (drawQueue_.BeginShaderParameterGroup(SP_MATERIAL))
+        if (drawQueue_->BeginShaderParameterGroup(SP_MATERIAL))
         {
             if (!batch.customMaterial_)
-                drawQueue_.AddShaderParameter(PSP_MATDIFFCOLOR, Color(1.0f, 1.0f, 1.0f, 1.0f));
+                drawQueue_->AddShaderParameter(PSP_MATDIFFCOLOR, Color(1.0f, 1.0f, 1.0f, 1.0f));
             else
             {
                 for (const auto& param : batch.customMaterial_->GetShaderParameters())
-                    drawQueue_.AddShaderParameter(param.first, param.second.value_);
+                    drawQueue_->AddShaderParameter(param.first, param.second.value_);
             }
-            drawQueue_.CommitShaderParameterGroup(SP_MATERIAL);
+            drawQueue_->CommitShaderParameterGroup(SP_MATERIAL);
         }
 
-        drawQueue_.SetBuffers(vertexBuffer_, nullptr);
+        drawQueue_->SetBuffers(vertexBuffer_, nullptr);
 
         IntRect scissor = batch.scissor_;
         scissor.left_ = (int)(scissor.left_ * uiScale_);
@@ -1081,21 +1082,21 @@ void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsign
             scissor.bottom_ = viewSize.y_ - top;
         }
 #endif
-        drawQueue_.SetScissorRect(scissor);
+        drawQueue_->SetScissorRect(scissor);
 
         if (!batch.customMaterial_)
-            drawQueue_.AddShaderResource(TU_DIFFUSE, batch.texture_);
+            drawQueue_->AddShaderResource(TU_DIFFUSE, batch.texture_);
         else
         {
             for (const auto& texture : batch.customMaterial_->GetTextures())
-                drawQueue_.AddShaderResource(texture.first, texture.second);
+                drawQueue_->AddShaderResource(texture.first, texture.second);
         }
-        drawQueue_.CommitShaderResources();
+        drawQueue_->CommitShaderResources();
 
-        drawQueue_.Draw(batch.vertexStart_ / UI_VERTEX_SIZE, (batch.vertexEnd_ - batch.vertexStart_) / UI_VERTEX_SIZE);
+        drawQueue_->Draw(batch.vertexStart_ / UI_VERTEX_SIZE, (batch.vertexEnd_ - batch.vertexStart_) / UI_VERTEX_SIZE);
     }
 
-    drawQueue_.Execute(graphics_);
+    drawQueue_->Execute();
 }
 
 void UI::GetBatches(ea::vector<UIBatch>& batches, ea::vector<float>& vertexData, UIElement* element, IntRect currentScissor)
