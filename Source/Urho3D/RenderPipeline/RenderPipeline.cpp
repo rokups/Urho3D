@@ -598,7 +598,8 @@ void RenderPipeline::Render()
     sceneBatchCollector_->ProcessVisibleLights();
     sceneBatchCollector_->UpdateGeometries();
     sceneBatchCollector_->CollectSceneBatches();
-    sceneBatchCollector_->CollectLightVolumeBatches();
+    if (settings_.deferred_)
+        sceneBatchCollector_->CollectLightVolumeBatches();
 
     // Collect batches
     const auto zone = frameInfo_.octree_->GetZone();

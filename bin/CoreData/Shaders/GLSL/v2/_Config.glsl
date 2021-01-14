@@ -25,6 +25,11 @@
     #else
         #define VERTEX_SHADER_OUT(decl) varying decl;
     #endif
+
+    // Set default precicion to medium for GL ES pixel shader
+    #ifdef GL_ES
+        precision mediump float;
+    #endif
 #endif
 
 // Helpers to declare shader constants
@@ -45,6 +50,14 @@
     #define CBUFFER_UNIFORM(decl) uniform decl;
     #define CBUFFER_END()
     #define UNIFORM_SAMPLER(index, decl) uniform decl;
+#endif
+
+// Hint that attribute is used only by vertex shader (so it can be highp on GL ES)
+// Ignored if not GL ES or if uniform buffers are used
+#if defined(GL_ES) && !defined(URHO3D_USE_CBUFFERS) && defined(STAGE_PIXEL_SHADER)
+    #define CBUFFER_UNIFORM_VS(decl)
+#else
+    #define CBUFFER_UNIFORM_VS(decl) CBUFFER_UNIFORM(decl)
 #endif
 
 // Compatible ivec4 vertex attribite
