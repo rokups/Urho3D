@@ -82,4 +82,11 @@
     #define URHO3D_FLIP_FRAMEBUFFER
 #endif
 
+// Disable precision modifiers if not GL ES
+#ifndef GL_ES
+    #define highp
+    #define mediump
+    #define lowp
+#endif
+
 #endif

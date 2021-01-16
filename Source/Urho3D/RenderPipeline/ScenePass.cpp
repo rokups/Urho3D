@@ -175,7 +175,9 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
             const IntermediateSceneBatch& intermediateBatch = batches[i];
             BaseSceneBatch& sceneBatch = litBaseBatches_[i + offset];
 
-            const auto pixelLights = drawableLighting[sceneBatch.drawableIndex_].GetPixelLights();
+            // TODO(renderer): Optimize lookup
+            const auto drawableIndex = intermediateBatch.geometry_->GetDrawableIndex();
+            const auto pixelLights = drawableLighting[drawableIndex].GetPixelLights();
             const bool hasLitBase = !pixelLights.empty() && pixelLights[0].second == mainLightIndex;
             const unsigned baseLightIndex = hasLitBase ? mainLightIndex : M_MAX_UNSIGNED;
             const unsigned baseLightHash = hasLitBase ? mainLightHash : 0;

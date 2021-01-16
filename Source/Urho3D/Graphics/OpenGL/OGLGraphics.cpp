@@ -1068,10 +1068,10 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 
             bool success = vs->Create();
             if (success)
-                URHO3D_LOGDEBUG("Compiled vertex shader " + vs->GetFullName());
+                URHO3D_LOGDEBUG("Compiled vertex shader {}", vs->GetFullName());
             else
             {
-                URHO3D_LOGERROR("Failed to compile vertex shader " + vs->GetFullName() + ":\n" + vs->GetCompilerOutput());
+                URHO3D_LOGERROR("Failed to compile vertex shader {}:\n{}", vs->GetFullName(), vs->GetCompilerOutput());
                 vs = nullptr;
             }
         }
@@ -1087,10 +1087,10 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 
             bool success = ps->Create();
             if (success)
-                URHO3D_LOGDEBUG("Compiled pixel shader " + ps->GetFullName());
+                URHO3D_LOGDEBUG("Compiled pixel shader {}", ps->GetFullName());
             else
             {
-                URHO3D_LOGERROR("Failed to compile pixel shader " + ps->GetFullName() + ":\n" + ps->GetCompilerOutput());
+                URHO3D_LOGERROR("Failed to compile pixel shader {}:\n{}", ps->GetFullName(), ps->GetCompilerOutput());
                 ps = nullptr;
             }
         }
