@@ -23,7 +23,6 @@
 #pragma once
 
 #include "../Core/Object.h"
-#include "../Core/ThreadedVector.h"
 #include "../RenderPipeline/DrawableLightAccumulator.h"
 #include "../RenderPipeline/SceneBatch.h"
 #include "../RenderPipeline/SceneLight.h"
@@ -95,16 +94,18 @@ protected:
         ea::sort(sortedBatches.begin(), sortedBatches.end());
     }
 
-    /// Sort batches (from ThreadedVector).
+    /// Sort batches (from WorkQueueVector).
     template <class T>
-    static void SortBatches(const ThreadedVector<BaseSceneBatch>& sceneBatches, ea::vector<T>& sortedBatches)
+    static void SortBatches(const WorkQueueVector<BaseSceneBatch>& sceneBatches, ea::vector<T>& sortedBatches)
     {
         const unsigned numBatches = sceneBatches.Size();
         sortedBatches.resize(numBatches);
-        sceneBatches.ForEach([&](unsigned, unsigned elementIndex, const BaseSceneBatch& lightBatch)
+        unsigned elementIndex = 0;
+        for (const BaseSceneBatch& lightBatch : sceneBatches)
         {
             sortedBatches[elementIndex] = T{ &lightBatch };
-        });
+            ++elementIndex;
+        }
         ea::sort(sortedBatches.begin(), sortedBatches.end());
     }
 
@@ -133,20 +134,20 @@ protected:
     /// Lit base scene batches.
     ea::vector<BaseSceneBatch> litBaseBatches_;
     /// Light scene batches.
-    ThreadedVector<BaseSceneBatch> lightBatches_;
+    WorkQueueVector<BaseSceneBatch> lightBatches_;
 
 private:
     /// Unlit scene batches. Map to one base batch.
-    ThreadedVector<IntermediateSceneBatch> unlitBatches_;
+    WorkQueueVector<IntermediateSceneBatch> unlitBatches_;
     /// Lit intermediate batches. Always empty for Unlit passes.
-    ThreadedVector<IntermediateSceneBatch> litBatches_;
+    WorkQueueVector<IntermediateSceneBatch> litBatches_;
 
     /// Temporary vector to store unlit base batches without pipeline states.
-    ThreadedVector<BaseSceneBatch*> unlitBaseBatchesDirty_;
+    WorkQueueVector<BaseSceneBatch*> unlitBaseBatchesDirty_;
     /// Temporary vector to store lit base batches without pipeline states.
-    ThreadedVector<BaseSceneBatch*> litBaseBatchesDirty_;
+    WorkQueueVector<BaseSceneBatch*> litBaseBatchesDirty_;
     /// Temporary vector to store light batches without pipeline states.
-    ThreadedVector<unsigned> lightBatchesDirty_;
+    WorkQueueVector<unsigned> lightBatchesDirty_;
 
     /// Pipeline state cache for unlit batches.
     ScenePipelineStateCache unlitBasePipelineStateCache_;
@@ -282,7 +283,7 @@ protected:
     const unsigned shadowPassIndex_{};
 
     /// Temporary vector to store batches without pipeline states.
-    ThreadedVector<ea::pair<SceneLightShadowSplit*, unsigned>> batchesDirty_;
+    WorkQueueVector<ea::pair<SceneLightShadowSplit*, unsigned>> batchesDirty_;
 
     /// Pipeline state cache.
     ScenePipelineStateCache pipelineStateCache_;

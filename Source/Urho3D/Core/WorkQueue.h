@@ -24,7 +24,7 @@
 
 #include "../Core/Mutex.h"
 #include "../Core/Object.h"
-#include "../Core/ThreadedVector.h"
+#include "../Container/MultiVector.h"
 
 #include <EASTL/list.h>
 #include <EASTL/span.h>
@@ -164,94 +164,69 @@ private:
     int maxNonThreadedWorkMs_;
 };
 
-/// For-each algorithm executed in parallel via WorkQueue over contiguous collection.
-/// Callback signature is `void(unsigned threadIndex, unsigned offset, ea::span<T const> elements)`.
-template <class T, class U>
-void ForEachParallel(WorkQueue* workQueue, unsigned threshold, ea::span<T> collection, const U& callback)
+/// Vector-like collection that can be safely filled from different WorkQueue threads simultaneously.
+template <class T>
+class WorkQueueVector : public MultiVector<T>
 {
-    assert(threshold > 0);
-    const unsigned numElements = collection.size();
-    if (numElements == 0)
-        return;
-
-    const unsigned maxThreads = workQueue->GetNumThreads() + 1;
-    const unsigned maxTasks = ea::max(1u, ea::min(numElements / threshold, maxThreads));
-
-    const unsigned elementsPerTask = (numElements + maxTasks - 1) / maxTasks;
-    for (unsigned taskIndex = 0; taskIndex < maxTasks; ++taskIndex)
+public:
+    /// Insert new element. Thread-safe as long as called from WorkQueue threads (or main thread).
+    auto Insert(const T& value)
     {
-        const unsigned fromIndex = ea::min(taskIndex * elementsPerTask, numElements);
-        const unsigned toIndex = ea::min((taskIndex + 1) * elementsPerTask, numElements);
-        if (fromIndex == toIndex)
-            continue;
-
-        const auto range = collection.subspan(fromIndex, toIndex - fromIndex);
-        workQueue->AddWorkItem([callback, fromIndex, range](unsigned threadIndex)
-        {
-            callback(threadIndex, fromIndex, range);
-        }, M_MAX_UNSIGNED);
+        const unsigned threadIndex = WorkQueue::GetWorkerThreadIndex();
+        return this->PushBack(threadIndex, value);
     }
-    workQueue->Complete(M_MAX_UNSIGNED);
-}
+};
 
-/// For-each algorithm executed in parallel via WorkQueue over vector.
-template <class T, class U>
-void ForEachParallel(WorkQueue* workQueue, unsigned threshold, const ea::vector<T>& collection, const U& callback)
+/// Process arbitrary array in multiple threads. Callback is copied internally.
+/// One copy of callback is always used by at most one thread.
+/// One copy of callback is always invoked from smaller to larger indices.
+/// Signature of callback: void(unsigned beginIndex, unsigned endIndex)
+template <class Callback>
+void ForEachParallel(WorkQueue* workQueue, unsigned bucket, unsigned size, Callback callback)
 {
-    ForEachParallel(workQueue, threshold, ea::span<const T>(collection), callback);
-}
-
-/// For-each algorithm executed in parallel via WorkQueue over ThreadedVector.
-template <class T, class U>
-void ForEachParallel(WorkQueue* workQueue, unsigned threshold, const ThreadedVector<T>& collection, const U& callback)
-{
-    assert(threshold > 0);
-    const unsigned numElements = collection.Size();
-    if (numElements == 0)
-        return;
-
-    const unsigned maxThreads = workQueue->GetNumThreads() + 1;
-    const unsigned maxTasks = ea::max(1u, ea::min(numElements / threshold, maxThreads));
-
-    const unsigned elementsPerTask = (numElements + maxTasks - 1) / maxTasks;
-    for (unsigned taskIndex = 0; taskIndex < maxTasks; ++taskIndex)
+    // Just call in main thread
+    if (size <= bucket)
     {
-        const unsigned fromIndex = ea::min(taskIndex * elementsPerTask, numElements);
-        const unsigned toIndex = ea::min((taskIndex + 1) * elementsPerTask, numElements);
-        if (fromIndex == toIndex)
-            continue;
+        if (size > 0)
+            callback(0, size);
+        return;
+    }
 
-        workQueue->AddWorkItem([callback, &collection, fromIndex, toIndex](unsigned threadIndex)
+    std::atomic<unsigned> offset = 0;
+    const unsigned maxThreads = workQueue->GetNumThreads() + 1;
+    for (unsigned i = 0; i < maxThreads; ++i)
+    {
+        workQueue->AddWorkItem([=, &offset](unsigned /*threadIndex*/) mutable
         {
-            const auto& threadedCollections = collection.GetUnderlyingCollection();
-            unsigned baseIndex = 0;
-            for (const auto& threadCollection : threadedCollections)
+            while (true)
             {
-                // Stop if whole range is processed
-                if (baseIndex >= toIndex)
+                const unsigned beginIndex = offset.fetch_add(bucket, std::memory_order_relaxed);
+                if (beginIndex >= size)
                     break;
 
-                // Skip if didn't get to the range yet
-                const unsigned numElementsInCollection = threadCollection.size();
-                if (baseIndex + numElementsInCollection > fromIndex)
-                {
-                    // Remap range
-                    const unsigned fromSubIndex = ea::max(baseIndex, fromIndex) - baseIndex;
-                    const unsigned toSubIndex = ea::min(toIndex - baseIndex, numElementsInCollection);
-                    if (fromSubIndex != toSubIndex)
-                    {
-                        // Invoke callback for desired range
-                        const ea::span<const T> elements(&threadCollection[fromSubIndex], toSubIndex - fromSubIndex);
-                        callback(threadIndex, baseIndex + fromSubIndex, elements);
-                    }
-                }
-
-                // Update base index
-                baseIndex += threadCollection.size();
+                const unsigned endIndex = ea::min(beginIndex + bucket, size);
+                callback(beginIndex, endIndex);
             }
         }, M_MAX_UNSIGNED);
     }
     workQueue->Complete(M_MAX_UNSIGNED);
+}
+
+/// Process collection in multiple threads.
+/// Signature of callback: void(unsigned index, T&& element)
+template <class Callback, class Collection>
+void ForEachParallel(WorkQueue* workQueue, unsigned bucket, Collection&& collection, const Callback& callback)
+{
+    using namespace std;
+    const auto collectionSize = static_cast<unsigned>(size(collection));
+    ForEachParallel(workQueue, bucket, collectionSize,
+        [iter = begin(collection), iterIndex = 0u, &callback](unsigned beginIndex, unsigned endIndex) mutable
+    {
+        // TODO(renderer): Consider using ea::advance
+        iter += beginIndex - iterIndex;
+        for (iterIndex = beginIndex; iterIndex < endIndex; ++iterIndex, ++iter)
+            callback(iterIndex, *iter);
+    });
 }
 
 }

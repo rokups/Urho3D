@@ -34,7 +34,7 @@ namespace Urho3D
 {
 
 /// Thread index.
-static thread_local unsigned workerThreadIndex_;
+static thread_local unsigned workerThreadIndex_ = M_MAX_UNSIGNED;
 
 /// Worker thread managed by the work queue.
 class WorkerThread : public Thread, public RefCounted

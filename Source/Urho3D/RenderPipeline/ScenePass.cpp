@@ -98,20 +98,20 @@ bool ScenePass::AddSourceBatch(Drawable* drawable, unsigned sourceBatchIndex, Te
         if (litBasePass)
         {
             // Add normal lit batch
-            litBatches_.Insert(workerThreadIndex, { drawable, sourceBatchIndex, litBasePass, lightPass });
+            litBatches_.PushBack(workerThreadIndex, { drawable, sourceBatchIndex, litBasePass, lightPass });
             return true;
         }
         else if (unlitBasePass)
         {
             // Add both unlit and lit batches if there's no lit base
-            unlitBatches_.Insert(workerThreadIndex, { drawable, sourceBatchIndex, unlitBasePass, nullptr });
-            litBatches_.Insert(workerThreadIndex, { drawable, sourceBatchIndex, nullptr, lightPass });
+            unlitBatches_.PushBack(workerThreadIndex, { drawable, sourceBatchIndex, unlitBasePass, nullptr });
+            litBatches_.PushBack(workerThreadIndex, { drawable, sourceBatchIndex, nullptr, lightPass });
             return true;
         }
     }
     else if (unlitBasePass)
     {
-        unlitBatches_.Insert(workerThreadIndex, { drawable, sourceBatchIndex, unlitBasePass, nullptr });
+        unlitBatches_.PushBack(workerThreadIndex, { drawable, sourceBatchIndex, unlitBasePass, nullptr });
         return false;
     }
     return false;
@@ -128,20 +128,16 @@ void ScenePass::CollectUnlitBatches(Camera* camera, ScenePipelineStateCacheCallb
 {
     unlitBaseBatches_.resize(unlitBatches_.Size());
     ForEachParallel(workQueue_, BatchThreshold, unlitBatches_,
-        [&](unsigned threadIndex, unsigned offset, ea::span<IntermediateSceneBatch const> batches)
+        [&](unsigned index, const IntermediateSceneBatch& intermediateBatch)
     {
         Material* defaultMaterial = renderer_->GetDefaultMaterial();
-        for (unsigned i = 0; i < batches.size(); ++i)
-        {
-            const IntermediateSceneBatch& intermediateBatch = batches[i];
-            BaseSceneBatch& sceneBatch = unlitBaseBatches_[i + offset];
+        BaseSceneBatch& sceneBatch = unlitBaseBatches_[index];
 
-            // Add base batch
-            sceneBatch = BaseSceneBatch{ M_MAX_UNSIGNED, intermediateBatch, defaultMaterial };
-            sceneBatch.pipelineState_ = unlitBasePipelineStateCache_.GetPipelineState({ sceneBatch, 0 });
-            if (!sceneBatch.pipelineState_)
-                unlitBaseBatchesDirty_.Insert(threadIndex, &sceneBatch);
-        }
+        // Add base batch
+        sceneBatch = BaseSceneBatch{ M_MAX_UNSIGNED, intermediateBatch, defaultMaterial };
+        sceneBatch.pipelineState_ = unlitBasePipelineStateCache_.GetPipelineState({ sceneBatch, 0 });
+        if (!sceneBatch.pipelineState_)
+            unlitBaseBatchesDirty_.Insert(&sceneBatch);
     });
 
     ScenePipelineStateContext subPassContext;
@@ -149,12 +145,12 @@ void ScenePass::CollectUnlitBatches(Camera* camera, ScenePipelineStateCacheCallb
     subPassContext.camera_ = camera;
     subPassContext.light_ = nullptr;
 
-    unlitBaseBatchesDirty_.ForEach([&](unsigned, unsigned, BaseSceneBatch* sceneBatch)
+    for (BaseSceneBatch* sceneBatch : unlitBaseBatchesDirty_)
     {
         const ScenePipelineStateKey key{ *sceneBatch, 0 };
         subPassContext.drawable_ = sceneBatch->drawable_;
         sceneBatch->pipelineState_ = unlitBasePipelineStateCache_.GetOrCreatePipelineState(key, subPassContext, callback);
-    });
+    };
 }
 
 void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallback& callback,
@@ -167,41 +163,37 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
         : 0;
 
     ForEachParallel(workQueue_, BatchThreshold, litBatches_,
-        [&](unsigned threadIndex, unsigned offset, ea::span<IntermediateSceneBatch const> batches)
+        [&](unsigned index, const IntermediateSceneBatch& intermediateBatch)
     {
         Material* defaultMaterial = renderer_->GetDefaultMaterial();
-        for (unsigned i = 0; i < batches.size(); ++i)
+        BaseSceneBatch& sceneBatch = litBaseBatches_[index];
+
+        // TODO(renderer): Optimize lookup
+        const auto drawableIndex = intermediateBatch.geometry_->GetDrawableIndex();
+        const auto pixelLights = drawableLighting[drawableIndex].GetPixelLights();
+        const bool hasLitBase = !pixelLights.empty() && pixelLights[0].second == mainLightIndex;
+        const unsigned baseLightIndex = hasLitBase ? mainLightIndex : M_MAX_UNSIGNED;
+        const unsigned baseLightHash = hasLitBase ? mainLightHash : 0;
+
+        // Add base batch
+        sceneBatch = BaseSceneBatch{ baseLightIndex, intermediateBatch, defaultMaterial };
+        sceneBatch.pipelineState_ = litBasePipelineStateCache_.GetPipelineState({ sceneBatch, baseLightHash });
+        if (!sceneBatch.pipelineState_)
+            litBaseBatchesDirty_.Insert(&sceneBatch);
+
+        for (unsigned j = hasLitBase ? 1 : 0; j < pixelLights.size(); ++j)
         {
-            const IntermediateSceneBatch& intermediateBatch = batches[i];
-            BaseSceneBatch& sceneBatch = litBaseBatches_[i + offset];
+            const unsigned lightIndex = pixelLights[j].second;
+            const unsigned lightHash = sceneLights[lightIndex]->GetPipelineStateHash();
 
-            // TODO(renderer): Optimize lookup
-            const auto drawableIndex = intermediateBatch.geometry_->GetDrawableIndex();
-            const auto pixelLights = drawableLighting[drawableIndex].GetPixelLights();
-            const bool hasLitBase = !pixelLights.empty() && pixelLights[0].second == mainLightIndex;
-            const unsigned baseLightIndex = hasLitBase ? mainLightIndex : M_MAX_UNSIGNED;
-            const unsigned baseLightHash = hasLitBase ? mainLightHash : 0;
+            BaseSceneBatch lightBatch = sceneBatch;
+            lightBatch.lightIndex_ = lightIndex;
+            lightBatch.pass_ = intermediateBatch.additionalPass_;
 
-            // Add base batch
-            sceneBatch = BaseSceneBatch{ baseLightIndex, intermediateBatch, defaultMaterial };
-            sceneBatch.pipelineState_ = litBasePipelineStateCache_.GetPipelineState({ sceneBatch, baseLightHash });
-            if (!sceneBatch.pipelineState_)
-                litBaseBatchesDirty_.Insert(threadIndex, &sceneBatch);
-
-            for (unsigned j = hasLitBase ? 1 : 0; j < pixelLights.size(); ++j)
-            {
-                const unsigned lightIndex = pixelLights[j].second;
-                const unsigned lightHash = sceneLights[lightIndex]->GetPipelineStateHash();
-
-                BaseSceneBatch lightBatch = sceneBatch;
-                lightBatch.lightIndex_ = lightIndex;
-                lightBatch.pass_ = intermediateBatch.additionalPass_;
-
-                lightBatch.pipelineState_ = lightPipelineStateCache_.GetPipelineState({ lightBatch, lightHash });
-                const unsigned batchIndex = lightBatches_.Insert(threadIndex, lightBatch);
-                if (!lightBatch.pipelineState_)
-                    lightBatchesDirty_.Insert(threadIndex, batchIndex);
-            }
+            lightBatch.pipelineState_ = lightPipelineStateCache_.GetPipelineState({ lightBatch, lightHash });
+            const unsigned batchIndex = lightBatches_.Insert(lightBatch).second;
+            if (!lightBatch.pipelineState_)
+                lightBatchesDirty_.Insert(batchIndex);
         }
     });
 
@@ -213,13 +205,13 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
         baseSubPassContext.light_ = mainLightIndex != M_MAX_UNSIGNED ? sceneLights[mainLightIndex] : nullptr;
         const unsigned baseLightHash = mainLightIndex != M_MAX_UNSIGNED ? mainLightHash : 0;
 
-        litBaseBatchesDirty_.ForEach([&](unsigned, unsigned, BaseSceneBatch* sceneBatch)
+        for (BaseSceneBatch* sceneBatch : litBaseBatchesDirty_)
         {
             baseSubPassContext.drawable_ = sceneBatch->drawable_;
             const ScenePipelineStateKey baseKey{ *sceneBatch, baseLightHash };
             sceneBatch->pipelineState_ = litBasePipelineStateCache_.GetOrCreatePipelineState(
                 baseKey, baseSubPassContext, callback);
-        });
+        }
     }
 
     // Resolve light pipeline states
@@ -228,17 +220,21 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
         lightSubPassContext.shaderDefines_ = lightTag_;
         lightSubPassContext.camera_ = camera;
 
-        lightBatchesDirty_.ForEach([&](unsigned threadIndex, unsigned, unsigned batchIndex)
+        const auto& outerVector = lightBatchesDirty_.GetUnderlyingCollection();
+        for (unsigned threadIndex = 0; threadIndex < outerVector.size(); ++threadIndex)
         {
-            BaseSceneBatch& lightBatch = lightBatches_.Get(threadIndex, batchIndex);
-            const SceneLight* sceneLight = sceneLights[lightBatch.lightIndex_];
-            lightSubPassContext.light_ = sceneLight;
-            lightSubPassContext.drawable_ = lightBatch.drawable_;
+            for (unsigned batchIndex : outerVector[threadIndex])
+            {
+                BaseSceneBatch& lightBatch = lightBatches_[{ threadIndex, batchIndex }];
+                const SceneLight* sceneLight = sceneLights[lightBatch.lightIndex_];
+                lightSubPassContext.light_ = sceneLight;
+                lightSubPassContext.drawable_ = lightBatch.drawable_;
 
-            const ScenePipelineStateKey lightKey{ lightBatch, sceneLight->GetPipelineStateHash() };
-            lightBatch.pipelineState_ = lightPipelineStateCache_.GetOrCreatePipelineState(
-                lightKey, lightSubPassContext, callback);
-        });
+                const ScenePipelineStateKey lightKey{ lightBatch, sceneLight->GetPipelineStateHash() };
+                lightBatch.pipelineState_ = lightPipelineStateCache_.GetOrCreatePipelineState(
+                    lightKey, lightSubPassContext, callback);
+            };
+        }
     }
 }
 
@@ -276,10 +272,10 @@ void AlphaForwardLightingScenePass::SortSceneBatches()
         sortedBatches_[destIndex++] = BaseSceneBatchSortedBackToFront{ &unlitBaseBatches_[i] };
     for (unsigned i = 0; i < numLitBaseBatches; ++i)
         sortedBatches_[destIndex++] = BaseSceneBatchSortedBackToFront{ &litBaseBatches_[i] };
-    lightBatches_.ForEach([&](unsigned, unsigned, const BaseSceneBatch& batch)
+    for (const BaseSceneBatch& batch : lightBatches_)
     {
         sortedBatches_[destIndex++] = BaseSceneBatchSortedBackToFront{ &batch };
-    });
+    }
 
     ea::sort(sortedBatches_.begin(), sortedBatches_.end());
 }
@@ -355,7 +351,7 @@ void ShadowScenePass::CollectShadowBatches(MaterialQuality materialQuality, Scen
             if (!batch.pipelineState_)
             {
                 SceneLightShadowSplit& split = sceneLight->GetMutableSplit(splitIndex);
-                batchesDirty_.Insert(threadIndex, { &split, shadowBatches.size() });
+                batchesDirty_.PushBack(threadIndex, { &split, shadowBatches.size() });
             }
 
             shadowBatches.push_back(batch);
@@ -370,7 +366,7 @@ void ShadowScenePass::FinalizeShadowBatches(Camera* camera, ScenePipelineStateCa
     subPassContext.shadowPass_ = true;
     subPassContext.camera_ = camera;
 
-    batchesDirty_.ForEach([&](unsigned, unsigned, const ea::pair<SceneLightShadowSplit*, unsigned>& splitAndBatch)
+    for (const ea::pair<SceneLightShadowSplit*, unsigned>& splitAndBatch : batchesDirty_)
     {
         SceneLightShadowSplit& split = *splitAndBatch.first;
         BaseSceneBatch& shadowBatch = split.shadowCasterBatches_[splitAndBatch.second];
@@ -379,7 +375,7 @@ void ShadowScenePass::FinalizeShadowBatches(Camera* camera, ScenePipelineStateCa
         const ScenePipelineStateKey baseKey{ shadowBatch, split.sceneLight_->GetPipelineStateHash() };
         shadowBatch.pipelineState_ = pipelineStateCache_.GetOrCreatePipelineState(
             baseKey, subPassContext, callback);
-    });
+    }
 }
 
 ea::span<const BaseSceneBatchSortedByState> ShadowScenePass::GetSortedShadowBatches(const SceneLightShadowSplit& split) const

@@ -154,20 +154,21 @@ void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchColle
 void SceneBatchCollector::ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables)
 {
     ForEachParallel(workQueue_, drawableWorkThreshold_, drawables,
-        [this](unsigned threadIndex, unsigned /*offset*/, ea::span<Drawable* const> drawablesRange)
+        [this](unsigned /*index*/, Drawable* drawable)
     {
-        ProcessVisibleDrawablesForThread(threadIndex, drawablesRange);
+        const unsigned threadIndex = WorkQueue::GetWorkerThreadIndex();
+        ProcessVisibleDrawablesForThread(threadIndex, { &drawable, 1u });
     });
 
     visibleLights_.clear();
-    visibleLightsTemp_.ForEach([&](unsigned, unsigned, Light* light)
+    for (Light* light : visibleLightsTemp_)
     {
         WeakPtr<Light> weakLight(light);
         auto& sceneLight = cachedSceneLights_[weakLight];
         if (!sceneLight)
             sceneLight = ea::make_unique<SceneLight>(light);
         visibleLights_.push_back(sceneLight.get());
-    });
+    };
 }
 
 void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables)
@@ -206,15 +207,15 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
                 sceneZRange_.Accumulate(threadIndex, zRange);
             }
 
-            visibleGeometries_.Insert(threadIndex, drawable);
+            visibleGeometries_.PushBack(threadIndex, drawable);
             transient_.traits_[drawableIndex] |= SceneDrawableData::DrawableVisibleGeometry;
 
             // Queue geometry update
             const UpdateGeometryType updateGeometryType = drawable->GetUpdateGeometryType();
             if (updateGeometryType == UPDATE_MAIN_THREAD)
-                nonThreadedGeometryUpdates_.Insert(threadIndex, drawable);
+                nonThreadedGeometryUpdates_.PushBack(threadIndex, drawable);
             else
-                threadedGeometryUpdates_.Insert(threadIndex, drawable);
+                threadedGeometryUpdates_.PushBack(threadIndex, drawable);
 
             // Collect batches
             const auto& sourceBatches = drawable->GetBatches();
@@ -248,7 +249,7 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
 
             // Skip lights with zero brightness or black color, skip baked lights too
             if (!lightColor.Equals(Color::BLACK) && light->GetLightMaskEffective() != 0)
-                visibleLightsTemp_.Insert(threadIndex, light);
+                visibleLightsTemp_.PushBack(threadIndex, light);
         }
     }
 }
@@ -304,20 +305,17 @@ void SceneBatchCollector::ProcessVisibleLights()
 
     // Update batches for shadow casters
     ForEachParallel(workQueue_, 1u, shadowCastersToBeUpdated_,
-        [&](unsigned threadIndex, unsigned /*offset*/, ea::span<Drawable* const> geometries)
+        [&](unsigned /*index*/, Drawable* drawable)
     {
-        for (Drawable* drawable : geometries)
-        {
-            drawable->UpdateBatches(frameInfo_);
-            drawable->MarkInView(frameInfo_);
+        drawable->UpdateBatches(frameInfo_);
+        drawable->MarkInView(frameInfo_);
 
-            // Queue geometry update
-            const UpdateGeometryType updateGeometryType = drawable->GetUpdateGeometryType();
-            if (updateGeometryType == UPDATE_MAIN_THREAD)
-                nonThreadedGeometryUpdates_.Insert(threadIndex, drawable);
-            else
-                threadedGeometryUpdates_.Insert(threadIndex, drawable);
-        }
+        // Queue geometry update
+        const UpdateGeometryType updateGeometryType = drawable->GetUpdateGeometryType();
+        if (updateGeometryType == UPDATE_MAIN_THREAD)
+            nonThreadedGeometryUpdates_.Insert(drawable);
+        else
+            threadedGeometryUpdates_.Insert(drawable);
     });
 
     // Collect shadow caster batches
@@ -372,7 +370,7 @@ void SceneBatchCollector::AccumulateForwardLighting(unsigned lightIndex)
     Light* light = sceneLight.GetLight();
 
     ForEachParallel(workQueue_, litGeometriesWorkThreshold_, sceneLight.GetLitGeometries(),
-        [&](unsigned /*threadIndex*/, unsigned /*offset*/, ea::span<Drawable* const> geometries)
+        [&](unsigned /*index*/, Drawable* geometry)
     {
         DrawableLightDataAccumulationContext accumContext;
         accumContext.maxPixelLights_ = maxPixelLights_;
@@ -383,13 +381,10 @@ void SceneBatchCollector::AccumulateForwardLighting(unsigned lightIndex)
 
         const float lightIntensityPenalty = 1.0f / light->GetIntensityDivisor();
 
-        for (Drawable* geometry : geometries)
-        {
-            const unsigned drawableIndex = geometry->GetDrawableIndex();
-            const float distance = ea::max(light->GetDistanceTo(geometry), M_LARGE_EPSILON);
-            const float penalty = lightIndex == mainLightIndex_ ? -M_LARGE_VALUE : distance * lightIntensityPenalty;
-            drawableLighting_[drawableIndex].AccumulateLight(accumContext, penalty);
-        }
+        const unsigned drawableIndex = geometry->GetDrawableIndex();
+        const float distance = ea::max(light->GetDistanceTo(geometry), M_LARGE_EPSILON);
+        const float penalty = lightIndex == mainLightIndex_ ? -M_LARGE_VALUE : distance * lightIntensityPenalty;
+        drawableLighting_[drawableIndex].AccumulateLight(accumContext, penalty);
     });
 }
 
@@ -405,14 +400,14 @@ void SceneBatchCollector::CollectSceneBatches()
 void SceneBatchCollector::UpdateGeometries()
 {
     // TODO(renderer): Add multithreading
-    threadedGeometryUpdates_.ForEach([&](unsigned, unsigned, Drawable* drawable)
+    for (Drawable* drawable : threadedGeometryUpdates_)
     {
         drawable->UpdateGeometry(frameInfo_);
-    });
-    nonThreadedGeometryUpdates_.ForEach([&](unsigned, unsigned, Drawable* drawable)
+    };
+    for (Drawable* drawable : nonThreadedGeometryUpdates_)
     {
         drawable->UpdateGeometry(frameInfo_);
-    });
+    };
 }
 
 void SceneBatchCollector::CollectLightVolumeBatches()

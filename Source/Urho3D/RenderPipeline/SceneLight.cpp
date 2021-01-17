@@ -740,11 +740,11 @@ void SceneLight::CollectLitGeometriesAndMaybeShadowCasters(SceneLightProcessCont
     case LIGHT_DIRECTIONAL:
     {
         const unsigned lightMask = light_->GetLightMask();
-        ctx.visibleGeometries_->ForEach([&](unsigned, unsigned, Drawable* drawable)
+        for (Drawable* drawable : *ctx.visibleGeometries_)
         {
             if (drawable->GetLightMask() & lightMask)
                 litGeometries_.push_back(drawable);
-        });
+        };
         break;
     }
     }
@@ -941,7 +941,7 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
         const unsigned drawableIndex = drawable->GetDrawableIndex();
         const bool isUpdated = ctx.drawableData_->isUpdated_[drawableIndex].test_and_set(std::memory_order_relaxed);
         if (!isUpdated)
-            ctx.geometriesToBeUpdates_->Insert(workerThreadIndex, drawable);
+            ctx.geometriesToBeUpdates_->PushBack(workerThreadIndex, drawable);
 
         // Project shadow caster bounding box to light view space for visibility check
         lightViewBox = drawable->GetWorldBoundingBox().Transformed(lightView);

@@ -22,7 +22,6 @@
 
 #pragma once
 
-#include "../Core/ThreadedVector.h"
 #include "../Graphics/Light.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/PipelineStateTracker.h"
@@ -93,11 +92,11 @@ struct SceneLightProcessContext
     /// Z range of visible scene.
     DrawableZRange sceneZRange_{};
     /// All visible geometries.
-    const ThreadedVector<Drawable*>* visibleGeometries_{};
+    const WorkQueueVector<Drawable*>* visibleGeometries_{};
     /// Drawable data.
     SceneDrawableData* drawableData_{};
     /// Geometries that has to be updated.
-    ThreadedVector<Drawable*>* geometriesToBeUpdates_{};
+    WorkQueueVector<Drawable*>* geometriesToBeUpdates_{};
 };
 
 /// Scene light shadow split.

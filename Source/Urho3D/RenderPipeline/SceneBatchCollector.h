@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "../Core/ThreadedVector.h"
+#include "../Core/WorkQueue.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Light.h"
 #include "../Graphics/Material.h"
@@ -152,9 +152,9 @@ private:
     ea::vector<SharedPtr<ScenePass>> passes2_;
 
     /// Visible geometries.
-    ThreadedVector<Drawable*> visibleGeometries_;
+    WorkQueueVector<Drawable*> visibleGeometries_;
     /// Temporary thread-safe collection of visible lights.
-    ThreadedVector<Light*> visibleLightsTemp_;
+    WorkQueueVector<Light*> visibleLightsTemp_;
     /// Visible lights.
     ea::vector<SceneLight*> visibleLights_;
     /// Index of main directional light in visible lights collection.
@@ -163,11 +163,11 @@ private:
     SceneZRange sceneZRange_;
 
     /// Shadow caster drawables to be updated.
-    ThreadedVector<Drawable*> shadowCastersToBeUpdated_;
+    WorkQueueVector<Drawable*> shadowCastersToBeUpdated_;
     /// Geometries to be updated from worker threads.
-    ThreadedVector<Drawable*> threadedGeometryUpdates_;
+    WorkQueueVector<Drawable*> threadedGeometryUpdates_;
     /// Geometries to be updated from main thread.
-    ThreadedVector<Drawable*> nonThreadedGeometryUpdates_;
+    WorkQueueVector<Drawable*> nonThreadedGeometryUpdates_;
 
     /// Common drawable data index.
     SceneDrawableData transient_;
