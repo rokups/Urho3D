@@ -165,6 +165,48 @@ protected:
     unsigned index_{};
 };
 
+/// Acceleration structure for zone search.
+class URHO3D_API ZoneLookupIndex
+{
+public:
+    /// Construct.
+    explicit ZoneLookupIndex(Context* context);
+    /// Add zone.
+    void AddZone(Zone* zone);
+    /// Update zone parameters.
+    void UpdateZone(Zone* zone);
+    /// Remove zone.
+    void RemoveZone(Zone* zone);
+    /// Commit all updates.
+    void Commit();
+
+    /// Query zone for given position and mask.
+    CachedDrawableZone QueryZone(const Vector3& position, unsigned zoneMask) const;
+    /// Return background zone.
+    Zone* GetBackgroundZone() const;
+
+private:
+    /// Cached zone parameters.
+    struct ZoneData
+    {
+        /// Local bounding box.
+        BoundingBox boundingBox_;
+        /// Inverse world transform.
+        Matrix3x4 inverseWorldTransform_;
+        /// Zone mask.
+        unsigned zoneMask_{};
+    };
+
+    /// Default zone.
+    Zone* defaultZone_{};
+    /// Zones.
+    ea::vector<Zone*> zones_;
+    /// Cached zone parameters.
+    ea::vector<ZoneData> zonesData_;
+    /// Whether zones are dirty.
+    bool zonesDirty_{};
+};
+
 /// %Octree component. Should be added only to the root scene node.
 class URHO3D_API Octree : public Component
 {
@@ -191,10 +233,12 @@ public:
     /// Remove a manually added drawable.
     void RemoveManualDrawable(Drawable* drawable);
 
-    /// Called when drawable is added into octree.
-    void OnDrawableAdded(Drawable* drawable);
-    /// Called when drawable is removed from octree.
-    void OnDrawableRemoved(Drawable* drawable, Octant* octant);
+    /// Add drawable is added to octree. For internal use only.
+    void AddDrawable(Drawable* drawable);
+    /// Remove drawable from octree. For internal use only.
+    void RemoveDrawable(Drawable* drawable, Octant* octant);
+    /// Notify Octree that zone parameters changed. For internal use only.
+    void MarkZoneDirty(Zone* zone);
 
     /// Return drawable objects by a query.
     /// @nobind
@@ -203,9 +247,12 @@ public:
     void Raycast(RayOctreeQuery& query) const;
     /// Return the closest drawable object by a ray query.
     void RaycastSingle(RayOctreeQuery& query) const;
-    /// Return active Zone or default renderer zone if none found.
-    /// Behavior is underfined if there are multiple active zones.
-    Zone* GetZone(unsigned viewMask = DEFAULT_VIEWMASK) const;
+    /// Return best zone for drawable.
+    CachedDrawableZone QueryZone(Drawable* drawable) const;
+    /// Return best zone for drawable with given center in world space and zone mask.
+    CachedDrawableZone QueryZone(const Vector3& drawablePosition, unsigned zoneMask) const;
+    /// Return background zone (arbitrary zone with 0 priority or lower). Zones with positive priority are ignored.
+    Zone* GetBackgroundZone() const;
     /// Return active Skybox. Behavior is underfined if there are multiple active skyboxes.
     Skybox* GetSkybox(unsigned viewMask = DEFAULT_VIEWMASK) const;
 
@@ -251,6 +298,8 @@ private:
     unsigned numLevels_;
     /// World bounding box.
     BoundingBox worldBoundingBox_;
+    /// Zones.
+    ZoneLookupIndex zones_;
 };
 
 }

@@ -198,9 +198,17 @@ Rect BoundingBox::Projected(const Matrix4& projection) const
 
 float BoundingBox::DistanceToPoint(const Vector3& point) const
 {
-    const Vector3 offset = Center() - point;
-    const Vector3 absOffset(Abs(offset.x_), Abs(offset.y_), Abs(offset.z_));
+    const Vector3 absOffset = VectorAbs(Center() - point);
     return VectorMax(Vector3::ZERO, absOffset - HalfSize()).Length();
+}
+
+float BoundingBox::SignedDistanceToPoint(const Vector3& point) const
+{
+    const Vector3 absOffset = VectorAbs(Center() - point);
+    const Vector3 delta = absOffset - HalfSize();
+    const float outerDistance = VectorMax(Vector3::ZERO, delta).Length();
+    const float innerDistance = -ea::min(-delta.x_, ea::min(-delta.y_, -delta.z_));
+    return innerDistance < 0 ? innerDistance : outerDistance;
 }
 
 Intersection BoundingBox::IsInside(const Sphere& sphere) const

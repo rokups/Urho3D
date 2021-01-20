@@ -100,6 +100,17 @@ struct FrameInfo
     Octree* octree_{};
 };
 
+/// Cached info about current zone.
+struct CachedDrawableZone
+{
+    /// Pointer to Zone.
+    Zone* zone_{};
+    /// Node position at the moment of last caching.
+    Vector3 cachePosition_;
+    /// Cache invalidation distance (squared).
+    float cacheInvalidationDistanceSquared_{ -1.0f };
+};
+
 /// Source data for a 3D geometry draw call.
 struct URHO3D_API SourceBatch
 {
@@ -322,9 +333,12 @@ public:
     /// Return index in octree.
     unsigned GetDrawableIndex() const { return drawableIndex_; }
 
+    /// Return whether the drawable is added to Octree.
+    bool IsInOctree() const { return drawableIndex_ != M_MAX_UNSIGNED; }
+
     /// Return current zone.
     /// @property
-    Zone* GetZone() const { return zone_; }
+    Zone* GetZone() const { return cachedZone_.zone_; }
 
     /// Return whether current zone is inconclusive or dirty due to the drawable moving.
     bool IsZoneDirty() const { return zoneDirty_; }
@@ -361,6 +375,15 @@ public:
 
     /// Return mutable light probe tetrahedron hint.
     unsigned& GetMutableLightProbeTetrahedronHint() { return lightProbeTetrahedronHint_; }
+
+    /// Return mutable cached zone data.
+    CachedDrawableZone& GetMutableCachedZone() { return cachedZone_; }
+
+    /// Return combined light masks of Drawable and its currently cached Zone.
+    unsigned GetLightMaskInZone() const;
+
+    /// Return combined shadow masks of Drawable and its currently cached Zone.
+    unsigned GetShadowMaskInZone() const;
 
     /// Add a per-pixel light affecting the object this frame.
     void AddLight(Light* light)
@@ -431,7 +454,7 @@ protected:
     /// Index of Drawable in Scene. May be updated.
     unsigned drawableIndex_{ M_MAX_UNSIGNED };
     /// Current zone.
-    Zone* zone_;
+    CachedDrawableZone cachedZone_;
     /// View mask.
     unsigned viewMask_;
     /// Light mask.

@@ -316,8 +316,13 @@ void ShadowScenePass::CollectShadowBatches(MaterialQuality materialQuality, Scen
     Material* defaultMaterial = renderer_->GetDefaultMaterial();
     const auto& shadowCasters = sceneLight->GetShadowCasters(splitIndex);
     auto& shadowBatches = sceneLight->GetMutableShadowBatches(splitIndex);
+    const unsigned lightMask = sceneLight->GetLight()->GetLightMask();
     for (Drawable* drawable : shadowCasters)
     {
+        // Check shadow mask now when zone is ready
+        if (drawable->GetShadowMaskInZone() & lightMask == 0)
+            continue;
+
         // Check shadow distance
         float maxShadowDistance = drawable->GetShadowDistance();
         const float drawDistance = drawable->GetDrawDistance();

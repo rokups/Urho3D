@@ -238,6 +238,10 @@ void Zone::OnMarkedDirty(Node* node)
 
     Drawable::OnMarkedDirty(node);
 
+    // Notify Octree
+    if (octant_)
+        octant_->GetOctree()->MarkZoneDirty(this);
+
     // Clear zone reference from all drawables inside the bounding box, and mark gradient dirty in neighbor zones
     ClearDrawablesZone();
 
@@ -324,10 +328,12 @@ void Zone::OnRemoveFromOctree()
 
 void Zone::ClearDrawablesZone()
 {
-    if (octant_ && lastWorldBoundingBox_.Defined())
+    const BoundingBox& currentWorldBoundingBox = GetWorldBoundingBox();
+    const BoundingBox dirtyWorldBoundingBox = currentWorldBoundingBox.Megred(lastWorldBoundingBox_);
+    if (octant_)
     {
         ea::vector<Drawable*> result;
-        BoxOctreeQuery query(result, lastWorldBoundingBox_, DRAWABLE_GEOMETRY | DRAWABLE_ZONE);
+        BoxOctreeQuery query(result, dirtyWorldBoundingBox, DRAWABLE_GEOMETRY | DRAWABLE_ZONE);
         octant_->GetOctree()->GetDrawables(query);
 
         for (auto i = result.begin(); i != result.end(); ++i)
@@ -345,7 +351,7 @@ void Zone::ClearDrawablesZone()
         }
     }
 
-    lastWorldBoundingBox_ = GetWorldBoundingBox();
+    lastWorldBoundingBox_ = currentWorldBoundingBox;
     lastAmbientStartZone_.Reset();
     lastAmbientEndZone_.Reset();
 }

@@ -171,7 +171,7 @@ bool LightBaker::UpdateSettings()
     Scene* scene = GetScene();
     auto octree = scene->GetComponent<Octree>();
     auto gi = scene->GetComponent<GlobalIllumination>();
-    Zone* zone = octree->GetZone();
+    Zone* zone = octree->GetBackgroundZone();
     Skybox* skybox = octree->GetSkybox();
 
     if (!gi)

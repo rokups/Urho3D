@@ -54,49 +54,6 @@ namespace
 /// Unused vector of drawables.
 static ea::vector<Drawable*> unusedDrawablesVector;
 
-/// %Frustum octree query for first zone.
-class ZoneOctreeQuery : public OctreeQuery
-{
-public:
-    /// Construct with frustum and query parameters.
-    ZoneOctreeQuery(unsigned viewMask = DEFAULT_VIEWMASK)
-        : OctreeQuery(unusedDrawablesVector, DRAWABLE_ZONE, viewMask) {}
-
-    /// Intersection test for an octant.
-    Intersection TestOctant(const BoundingBox& box, bool inside) override
-    {
-        if (inside)
-            return INSIDE;
-        else
-            return box.IsInside(Vector3::ZERO);
-    }
-
-    /// Intersection test for drawables.
-    void TestDrawables(Drawable** start, Drawable** end, bool inside) override
-    {
-        if (zone_)
-            return;
-
-        while (start != end)
-        {
-            Drawable* drawable = *start++;
-
-            if ((drawable->GetDrawableFlags() & DRAWABLE_ZONE) && (drawable->GetViewMask() & viewMask_))
-            {
-                zone_ = drawable->Cast<Zone>();
-                break;
-            }
-        }
-    }
-
-    /// Return zone.
-    Zone* GetZone() const { return zone_; }
-
-private:
-    /// Zone.
-    Zone* zone_{};
-};
-
 /// %Frustum octree query for first skybox.
 class SkyboxOctreeQuery : public OctreeQuery
 {
@@ -423,11 +380,98 @@ void Octant::GetDrawablesOnlyInternal(RayOctreeQuery& query, ea::vector<Drawable
     }
 }
 
+ZoneLookupIndex::ZoneLookupIndex(Context* context)
+{
+    if (auto renderer = context->GetSubsystem<Renderer>())
+        defaultZone_ = renderer->GetDefaultZone();
+}
+
+void ZoneLookupIndex::AddZone(Zone* zone)
+{
+    assert(!zones_.contains(zone));
+    zones_.push_back(zone);
+    zonesDirty_ = true;
+}
+
+void ZoneLookupIndex::UpdateZone(Zone* zone)
+{
+    assert(zones_.contains(zone));
+    zonesDirty_ = true;
+}
+
+void ZoneLookupIndex::RemoveZone(Zone* zone)
+{
+    const unsigned index = zones_.index_of(zone);
+    assert(index < zones_.size());
+    zones_.erase_at(index);
+}
+
+void ZoneLookupIndex::Commit()
+{
+    if (!zonesDirty_)
+        return;
+    zonesDirty_ = false;
+
+    // Sort zones by priority from high to low
+    const auto greaterPriority = [](Zone* lhs, Zone* rhs) { return lhs->GetPriority() > rhs->GetPriority(); };
+    ea::sort(zones_.begin(), zones_.end(), greaterPriority);
+
+    // Update cached data
+    zonesData_.resize(zones_.size());
+    for (unsigned i = 0; i < zones_.size(); ++i)
+    {
+        Zone* zone = zones_[i];
+        ZoneData& data = zonesData_[i];
+        data.zoneMask_ = zone->GetZoneMask();
+        data.boundingBox_ = zone->GetBoundingBox();
+        data.inverseWorldTransform_ = zone->GetInverseWorldTransform();
+    }
+}
+
+CachedDrawableZone ZoneLookupIndex::QueryZone(const Vector3& position, unsigned zoneMask) const
+{
+    float minDistanceToOtherZone = M_LARGE_VALUE;
+    float distanceToBestZone = M_LARGE_VALUE;
+    Zone* bestZone = nullptr;
+
+    const unsigned numZones = zones_.size();
+    for (unsigned i = 0; i < numZones; ++i)
+    {
+        const ZoneData& data = zonesData_[i];
+        if (data.zoneMask_ & zoneMask == 0)
+            continue;
+
+        const Vector3 localPosition = data.inverseWorldTransform_ * position;
+        const float signedDistance = data.boundingBox_.SignedDistanceToPoint(localPosition);
+
+        if (signedDistance > 0.0f)
+        {
+            // Zone cannot affect point, keep distance for cache
+            minDistanceToOtherZone = ea::min(minDistanceToOtherZone, signedDistance);
+        }
+        else if (!bestZone)
+        {
+            // Zone may affect point
+            bestZone = zones_[i];
+            distanceToBestZone = -signedDistance;
+        }
+    }
+
+    const float cacheInvalidationDistance = ea::min(minDistanceToOtherZone, distanceToBestZone);
+    return { bestZone ? bestZone : defaultZone_, position, cacheInvalidationDistance * cacheInvalidationDistance };
+}
+
+Zone* ZoneLookupIndex::GetBackgroundZone() const
+{
+    return !zones_.empty() && zones_.back()->GetPriority() <= 0 ? zones_.back() : defaultZone_;
+}
+
 Octree::Octree(Context* context) :
     Component(context),
     rootOctant_(BoundingBox(-DEFAULT_OCTREE_SIZE, DEFAULT_OCTREE_SIZE), 0, nullptr, this),
     numLevels_(DEFAULT_OCTREE_LEVELS),
-    worldBoundingBox_(rootOctant_.GetWorldBoundingBox())
+    worldBoundingBox_(rootOctant_.GetWorldBoundingBox()),
+    zones_(context)
 {
     // If the engine is running headless, subscribe to RenderUpdate events for manually updating the octree
     // to allow raycasts and animation update
@@ -585,6 +629,7 @@ void Octree::Update(const FrameInfo& frame)
     }
 
     drawableUpdates_.clear();
+    zones_.Commit();
 }
 
 void Octree::AddManualDrawable(Drawable* drawable)
@@ -592,7 +637,7 @@ void Octree::AddManualDrawable(Drawable* drawable)
     if (!drawable || drawable->GetOctant())
         return;
 
-    OnDrawableAdded(drawable);
+    AddDrawable(drawable);
 }
 
 void Octree::RemoveManualDrawable(Drawable* drawable)
@@ -602,25 +647,61 @@ void Octree::RemoveManualDrawable(Drawable* drawable)
 
     Octant* octant = drawable->GetOctant();
     if (octant && octant->GetOctree() == this)
-        OnDrawableRemoved(drawable, octant);
+        RemoveDrawable(drawable, octant);
 }
 
-void Octree::OnDrawableAdded(Drawable* drawable)
+void Octree::AddDrawable(Drawable* drawable)
 {
-    assert(drawable->GetDrawableIndex() == M_MAX_UNSIGNED);
+    if (drawable->GetDrawableIndex() != M_MAX_UNSIGNED)
+    {
+        URHO3D_LOGERROR("Cannot add Drawable that is already added to Octree");
+        assert(0);
+        return;
+    }
+
+    // Add drawable to index
     const unsigned index = drawables_.size();
     drawables_.push_back(drawable);
     drawable->SetDrawableIndex(index);
 
+    // Insert drawable to common Octree
     rootOctant_.InsertDrawable(drawable);
+
+    // Insert drawable to zone index
+    if (drawable->GetDrawableFlags().Test(DRAWABLE_ZONE))
+    {
+        const auto zone = dynamic_cast<Zone*>(drawable);
+        if (!zone)
+        {
+            URHO3D_LOGERROR("Only Zone can be flagged as DRAWABLE_ZONE");
+            return;
+        }
+        zones_.AddZone(zone);
+    }
 }
 
-void Octree::OnDrawableRemoved(Drawable* drawable, Octant* octant)
+void Octree::RemoveDrawable(Drawable* drawable, Octant* octant)
 {
+    const unsigned index = drawable->GetDrawableIndex();
+    if (index >= drawables_.size() || drawables_[index] != drawable)
+    {
+        URHO3D_LOGERROR("Cannot remove Drawable that doesn't belong to Octree");
+        assert(0);
+        return;
+    }
+
+    // Remove drawable from Octree
     octant->RemoveDrawable(drawable);
 
-    const unsigned index = drawable->GetDrawableIndex();
-    assert(index != M_MAX_UNSIGNED && drawables_[index] == drawable);
+    // Remove drawable from Zone index
+    if (drawable->GetDrawableFlags().Test(DRAWABLE_ZONE))
+    {
+        const auto zone = dynamic_cast<Zone*>(drawable);
+        assert(zone);
+        zones_.RemoveZone(zone);
+    }
+
+    // Remove drawable from index
     if (drawables_.size() > 1)
     {
         Drawable* replacement = drawables_.back();
@@ -629,6 +710,11 @@ void Octree::OnDrawableRemoved(Drawable* drawable, Octant* octant)
     }
     drawables_.pop_back();
     drawable->SetDrawableIndex(M_MAX_UNSIGNED);
+}
+
+void Octree::MarkZoneDirty(Zone* zone)
+{
+    zones_.UpdateZone(zone);
 }
 
 void Octree::GetDrawables(OctreeQuery& query) const
@@ -686,12 +772,19 @@ void Octree::RaycastSingle(RayOctreeQuery& query) const
     }
 }
 
-Zone* Octree::GetZone(unsigned viewMask) const
+CachedDrawableZone Octree::QueryZone(Drawable* drawable) const
 {
-    ZoneOctreeQuery query(viewMask);
-    GetDrawables(query);
-    Zone* zone = query.GetZone();
-    return zone ? zone : context_->GetSubsystem<Renderer>()->GetDefaultZone();
+    return zones_.QueryZone(drawable->GetWorldBoundingBox().Center(), drawable->GetZoneMask());
+}
+
+CachedDrawableZone Octree::QueryZone(const Vector3& drawablePosition, unsigned zoneMask) const
+{
+    return zones_.QueryZone(drawablePosition, zoneMask);
+}
+
+Zone* Octree::GetBackgroundZone() const
+{
+    return zones_.GetBackgroundZone();
 }
 
 Skybox* Octree::GetSkybox(unsigned viewMask) const

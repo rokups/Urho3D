@@ -196,7 +196,15 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
         // For geometries, find zone, clear lights and calculate view space Z range
         if (drawable->GetDrawableFlags() & DRAWABLE_GEOMETRY)
         {
+            const BoundingBox& boundingBox = drawable->GetWorldBoundingBox();
             const DrawableZRange zRange = zRangeEvaluator.Evaluate(drawable);
+
+            // Update zone
+            const Vector3 drawableCenter = boundingBox.Center();
+            CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
+            const float drawableCacheDistanceSquared = (cachedZone.cachePosition_ - drawableCenter).LengthSquared();
+            if (drawableCacheDistanceSquared >= cachedZone.cacheInvalidationDistanceSquared_)
+                cachedZone = octree_->QueryZone(drawableCenter, drawable->GetZoneMask());
 
             // Do not add "infinite" objects like skybox to prevent shadow map focusing behaving erroneously
             if (!zRange.IsValid())
@@ -309,6 +317,15 @@ void SceneBatchCollector::ProcessVisibleLights()
     {
         drawable->UpdateBatches(frameInfo_);
         drawable->MarkInView(frameInfo_);
+
+        // Update zone
+        // TODO(renderer): Try to remove copypaste
+        const BoundingBox& boundingBox = drawable->GetWorldBoundingBox();
+        const Vector3 drawableCenter = boundingBox.Center();
+        CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
+        const float drawableCacheDistanceSquared = (cachedZone.cachePosition_ - drawableCenter).LengthSquared();
+        if (drawableCacheDistanceSquared >= cachedZone.cacheInvalidationDistanceSquared_)
+            cachedZone = octree_->QueryZone(drawableCenter, drawable->GetZoneMask());
 
         // Queue geometry update
         const UpdateGeometryType updateGeometryType = drawable->GetUpdateGeometryType();

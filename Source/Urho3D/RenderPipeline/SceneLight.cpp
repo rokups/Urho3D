@@ -88,7 +88,7 @@ struct PointLightLitGeometriesQuery : public SphereOctreeQuery
             && (inside || sphere_.IsInsideFast(drawable->GetWorldBoundingBox()));
         const bool isLit = isInside
             && (traits & SceneDrawableData::DrawableVisibleGeometry)
-            && (drawable->GetLightMask() & lightMask_);
+            && (drawable->GetLightMaskInZone() & lightMask_);
         const bool isShadowCaster = shadowCasters_ && isInside
             && drawable->GetCastShadows()
             && (drawable->GetShadowMask() & lightMask_);
@@ -141,7 +141,7 @@ struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
             && (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()));
         const bool isLit = isInside
             && (traits & SceneDrawableData::DrawableVisibleGeometry)
-            && (drawable->GetLightMask() & lightMask_);
+            && (drawable->GetLightMaskInZone() & lightMask_);
         const bool isShadowCaster = shadowCasters_ && isInside
             && drawable->GetCastShadows()
             && (drawable->GetShadowMask() & lightMask_);
@@ -742,7 +742,7 @@ void SceneLight::CollectLitGeometriesAndMaybeShadowCasters(SceneLightProcessCont
         const unsigned lightMask = light_->GetLightMask();
         for (Drawable* drawable : *ctx.visibleGeometries_)
         {
-            if (drawable->GetLightMask() & lightMask)
+            if (drawable->GetLightMaskInZone() & lightMask)
                 litGeometries_.push_back(drawable);
         };
         break;

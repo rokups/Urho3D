@@ -69,7 +69,6 @@ Drawable::Drawable(Context* context, DrawableFlags drawableFlags) :
     updateQueued_(false),
     zoneDirty_(false),
     octant_(nullptr),
-    zone_(nullptr),
     viewMask_(DEFAULT_VIEWMASK),
     lightMask_(DEFAULT_LIGHTMASK),
     shadowMask_(DEFAULT_SHADOWMASK),
@@ -208,6 +207,7 @@ void Drawable::SetZoneMask(unsigned mask)
 {
     zoneMask_ = mask;
     // Mark dirty to reset cached zone
+    cachedZone_.cacheInvalidationDistanceSquared_ = -1.0f;
     OnMarkedDirty(node_);
     MarkNetworkUpdate();
 }
@@ -279,9 +279,24 @@ bool Drawable::IsInView(const FrameInfo& frame, bool anyCamera) const
     return viewFrameNumber_ == frame.frameNumber_ && (anyCamera || viewCameras_.contains(frame.camera_));
 }
 
+unsigned Drawable::GetLightMaskInZone() const
+{
+    const unsigned zoneLightMask = cachedZone_.zone_ ? cachedZone_.zone_->GetLightMask() : 0xffffffff;
+    return zoneLightMask & lightMask_;
+}
+
+unsigned Drawable::GetShadowMaskInZone() const
+{
+    const unsigned zoneShadowMask = cachedZone_.zone_ ? cachedZone_.zone_->GetShadowMask() : 0xffffffff;
+    return zoneShadowMask & shadowMask_;
+}
+
 void Drawable::SetZone(Zone* zone, bool temporary)
 {
-    zone_ = zone;
+    if (zone)
+        cachedZone_.zone_ = zone;
+    else
+        cachedZone_ = {};
 
     // If the zone assignment was temporary (inconclusive) set the dirty flag so that it will be re-evaluated on the next frame
     zoneDirty_ = temporary;
@@ -392,7 +407,7 @@ void Drawable::AddToOctree()
     {
         auto* octree = scene->GetComponent<Octree>();
         if (octree)
-            octree->OnDrawableAdded(this);
+            octree->AddDrawable(this);
         else
             URHO3D_LOGERROR("No Octree component in scene, drawable will not render");
     }
@@ -414,7 +429,7 @@ void Drawable::RemoveFromOctree()
         // Perform subclass specific deinitialization if necessary
         OnRemoveFromOctree();
 
-        octree->OnDrawableRemoved(this, octant_);
+        octree->RemoveDrawable(this, octant_);
     }
 }
 

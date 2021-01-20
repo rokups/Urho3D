@@ -254,6 +254,15 @@ public:
 #endif
     }
 
+    /// Return this bounding box merged with another shape.
+    template <class T>
+    BoundingBox Megred(const T& other) const
+    {
+        BoundingBox copy = *this;
+        copy.Merge(other);
+        return copy;
+    }
+
     /// Return true if this bounding box is defined via a previous call to Define() or Merge().
     bool Defined() const
     {
@@ -280,6 +289,8 @@ public:
     Rect Projected(const Matrix4& projection) const;
     /// Return distance to point.
     float DistanceToPoint(const Vector3& point) const;
+    /// Return signed distance to point. Negative if point is inside bounding box.
+    float SignedDistanceToPoint(const Vector3& point) const;
 
     /// Test if a point is inside.
     Intersection IsInside(const Vector3& point) const
