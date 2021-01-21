@@ -743,6 +743,8 @@ public:
     static unsigned GetDepthStencilFormat();
     /// Return the API-specific readable hardware depth format, or 0 if not supported.
     static unsigned GetReadableDepthFormat();
+    /// Return the API-specific readable hardware depth-stencil format, or 0 if not supported.
+    static unsigned GetReadableDepthStencilFormat();
     /// Return the API-specific texture format from a textual description, for example "rgb".
     static unsigned GetFormat(const ea::string& formatName);
 

@@ -256,6 +256,7 @@ static const unsigned glElementComponents[] =
 static unsigned glesDepthStencilFormat = GL_DEPTH_COMPONENT16;
 static unsigned glesReadableDepthFormat = GL_DEPTH_COMPONENT;
 #endif
+static unsigned glReadableDepthStencilFormat = 0;
 
 static ea::string extensions;
 
@@ -2721,6 +2722,11 @@ unsigned Graphics::GetReadableDepthFormat()
 #endif
 }
 
+unsigned Graphics::GetReadableDepthStencilFormat()
+{
+    return glReadableDepthStencilFormat;
+}
+
 unsigned Graphics::GetFormat(const ea::string& formatName)
 {
     ea::string nameLower = formatName.to_lower();
@@ -2812,6 +2818,9 @@ void Graphics::CheckFeatureSupport()
     if (renderer.contains("Intel", false))
         dummyColorFormat_ = GetRGBAFormat();
 #endif
+    // Check if can use depth-stencil for textures
+    if (gl3Support || (CheckExtension("GL_EXT_packed_depth_stencil") && CheckExtension("GL_ARB_depth_texture")))
+        glReadableDepthStencilFormat = GL_DEPTH24_STENCIL8_EXT;
 #else
     // Check for supported compressed texture formats
 #ifdef __EMSCRIPTEN__
@@ -2833,7 +2842,11 @@ void Graphics::CheckFeatureSupport()
     if (CheckExtension("GL_OES_depth24"))
         glesDepthStencilFormat = GL_DEPTH_COMPONENT24_OES;
     if (CheckExtension("GL_OES_packed_depth_stencil"))
+    {
         glesDepthStencilFormat = GL_DEPTH24_STENCIL8_OES;
+        if (CheckExtension("GL_OES_depth_texture"))
+            glReadableDepthStencilFormat = GL_DEPTH24_STENCIL8_OES;
+    }
 #ifdef __EMSCRIPTEN__
     if (!CheckExtension("WEBGL_depth_texture"))
 #else

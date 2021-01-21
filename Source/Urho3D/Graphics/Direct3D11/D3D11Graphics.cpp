@@ -1864,6 +1864,11 @@ unsigned Graphics::GetReadableDepthFormat()
     return DXGI_FORMAT_R24G8_TYPELESS;
 }
 
+unsigned Graphics::GetReadableDepthStencilFormat()
+{
+    return DXGI_FORMAT_R24G8_TYPELESS;
+}
+
 unsigned Graphics::GetFormat(const ea::string& formatName)
 {
     ea::string nameLower = formatName.to_lower();

@@ -2169,6 +2169,11 @@ unsigned Graphics::GetReadableDepthFormat()
     return readableDepthFormat;
 }
 
+unsigned Graphics::GetReadableDepthStencilFormat()
+{
+    return readableDepthFormat;
+}
+
 unsigned Graphics::GetFormat(const ea::string& formatName)
 {
     ea::string nameLower = formatName.to_lower();

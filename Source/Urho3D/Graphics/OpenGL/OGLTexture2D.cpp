@@ -398,9 +398,10 @@ bool Texture2D::Create()
     // Create a renderbuffer instead of a texture if depth texture is not properly supported, or if this will be a packed
     // depth stencil texture
 #ifndef GL_ES_VERSION_2_0
-    if (format == Graphics::GetDepthStencilFormat())
+    if (format == Graphics::GetDepthStencilFormat() && !Graphics::GetReadableDepthStencilFormat())
 #else
-    if (format == GL_DEPTH_COMPONENT16 || format == GL_DEPTH_COMPONENT24_OES || format == GL_DEPTH24_STENCIL8_OES ||
+    if (format == GL_DEPTH_COMPONENT16 || format == GL_DEPTH_COMPONENT24_OES ||
+        (format == GL_DEPTH24_STENCIL8_OES && !Graphics::GetReadableDepthStencilFormat()) ||
         (format == GL_DEPTH_COMPONENT && !graphics_->GetShadowMapFormat()))
 #endif
     {

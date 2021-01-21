@@ -810,6 +810,7 @@ void Renderer::Render()
     // Render custom views.
     for (RenderPipeline* renderPipelineView : renderPipelineViews_)
     {
+        PrepareViewRender();
         renderPipelineView->Render();
     }
 
@@ -1074,7 +1075,7 @@ Texture2D* Renderer::GetShadowMap(Light* light, Camera* camera, unsigned viewWid
 Texture* Renderer::GetScreenBuffer(int width, int height, unsigned format, int multiSample, bool autoResolve, bool cubemap, bool filtered, bool srgb,
     unsigned persistentKey)
 {
-    bool depthStencil = (format == Graphics::GetDepthStencilFormat()) || (format == Graphics::GetReadableDepthFormat());
+    bool depthStencil = (format == Graphics::GetDepthStencilFormat()) || (format == Graphics::GetReadableDepthFormat()) || format == Graphics::GetReadableDepthStencilFormat();
     if (depthStencil)
     {
         filtered = false;

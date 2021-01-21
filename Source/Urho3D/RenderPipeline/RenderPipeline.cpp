@@ -488,7 +488,8 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
     numDrawables_ = frameInfo_.octree_->GetAllDrawables().size();
 
     // Validate settings
-    if (settings_.deferred_ && !graphics_->GetDeferredSupport())
+    if (settings_.deferred_ && !graphics_->GetDeferredSupport()
+        && !Graphics::GetReadableDepthStencilFormat())
         settings_.deferred_ = false;
 
     // Lazy initialize heavy objects
@@ -512,7 +513,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         deferredFinal_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
         deferredAlbedo_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
         deferredNormal_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
-        deferredDepth_ = CreateScreenBuffer({ Graphics::GetReadableDepthFormat() });
+        deferredDepth_ = CreateScreenBuffer({ Graphics::GetReadableDepthStencilFormat() });
     }
     else if (!settings_.deferred_ && deferredDepth_)
     {
