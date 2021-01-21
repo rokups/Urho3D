@@ -202,11 +202,14 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
         ScenePipelineStateContext baseSubPassContext;
         baseSubPassContext.shaderDefines_ = litBaseTag_;
         baseSubPassContext.camera_ = camera;
-        baseSubPassContext.light_ = mainLightIndex != M_MAX_UNSIGNED ? sceneLights[mainLightIndex] : nullptr;
-        const unsigned baseLightHash = mainLightIndex != M_MAX_UNSIGNED ? mainLightHash : 0;
+        baseSubPassContext.litBasePass_ = true;
 
         for (BaseSceneBatch* sceneBatch : litBaseBatchesDirty_)
         {
+            const SceneLight* sceneLight = sceneBatch->lightIndex_ != M_MAX_UNSIGNED ? sceneLights[sceneBatch->lightIndex_] : nullptr;
+            baseSubPassContext.light_ = sceneLight;
+            const unsigned baseLightHash = sceneLight ? sceneLight->GetPipelineStateHash() : 0;
+
             baseSubPassContext.drawable_ = sceneBatch->drawable_;
             const ScenePipelineStateKey baseKey{ *sceneBatch, baseLightHash };
             sceneBatch->pipelineState_ = litBasePipelineStateCache_.GetOrCreatePipelineState(

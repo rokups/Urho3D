@@ -281,6 +281,9 @@ SharedPtr<PipelineState> RenderPipeline::CreatePipelineState(
 
     commonDefines += ctx.shaderDefines_;
 
+    if (ctx.litBasePass_)
+        commonDefines += "NUMVERTEXLIGHTS=4 ";
+
     if (light)
     {
         commonDefines += "PERPIXEL ";
@@ -291,7 +294,7 @@ SharedPtr<PipelineState> RenderPipeline::CreatePipelineState(
         switch (light->GetLightType())
         {
         case LIGHT_DIRECTIONAL:
-            commonDefines += "DIRLIGHT NUMVERTEXLIGHTS=4 ";
+            commonDefines += "DIRLIGHT ";
             break;
         case LIGHT_POINT:
             commonDefines += "POINTLIGHT ";

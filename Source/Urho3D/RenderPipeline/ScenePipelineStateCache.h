@@ -107,6 +107,8 @@ struct ScenePipelineStateContext
 {
     /// Pass shader defines.
     ea::string shaderDefines_;
+    ///
+    bool litBasePass_{};
     /// Whether it is shadow pass.
     bool shadowPass_{};
     /// Cull camera.
