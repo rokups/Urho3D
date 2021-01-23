@@ -335,6 +335,14 @@ SharedPtr<PipelineState> RenderPipeline::CreatePipelineState(
     const CullMode cullMode = passCullMode != MAX_CULLMODES ? passCullMode : materialCullMode;
     desc.cullMode_ = ctx.shadowPass_ ? cullMode : GetEffectiveCullMode(cullMode, ctx.camera_);
 
+    if (ctx.shaderDefines_.contains("PASS_DEFERRED"))
+    {
+        desc.stencilEnabled_ = true;
+        desc.stencilPass_ = OP_REF;
+        desc.writeMask_ = PORTABLE_LIGHTMASK;
+        desc.stencilRef_ = ctx.drawable_->GetLightMaskInZone() & PORTABLE_LIGHTMASK;
+    }
+
     return renderer_->GetOrCreatePipelineState(desc);
 }
 
@@ -436,6 +444,11 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(SceneLig
 
     desc.vertexShader_ = graphics_->GetShader(VS, "v2/DeferredLight", vertexDefines);
     desc.pixelShader_ = graphics_->GetShader(PS, "v2/DeferredLight", pixelDefiles);
+
+    desc.stencilEnabled_ = true;
+    desc.stencilMode_ = CMP_NOTEQUAL;
+    desc.compareMask_ = light->GetLightMaskEffective() & PORTABLE_LIGHTMASK;
+    desc.stencilRef_ = 0;
 
     return renderer_->GetOrCreatePipelineState(desc);
 }

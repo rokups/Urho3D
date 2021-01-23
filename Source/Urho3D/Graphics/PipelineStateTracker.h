@@ -100,6 +100,9 @@ public:
         return newHash;
     }
 
+    /// Mark pipeline state hash as dirty.
+    void MarkPipelineStateHashDirty();
+
 protected:
     /// Create dependency onto another pipeline state.
     PipelineStateDependency CreateDependency(PipelineStateTracker* dependency);
@@ -107,8 +110,6 @@ protected:
     void AddObserverReference(PipelineStateTracker* dependant);
     /// Remove reference to dependant pipeline state tracker.
     void RemoveObserverReference(PipelineStateTracker* dependant);
-    /// Mark pipeline state hash as dirty.
-    void MarkPipelineStateHashDirty();
 
 private:
     /// Vector of dependants with reference counters.

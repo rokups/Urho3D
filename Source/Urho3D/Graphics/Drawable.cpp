@@ -194,6 +194,7 @@ void Drawable::SetViewMask(unsigned mask)
 void Drawable::SetLightMask(unsigned mask)
 {
     lightMask_ = mask;
+    MarkPipelineStateHashDirty();
     MarkNetworkUpdate();
 }
 
@@ -289,6 +290,11 @@ unsigned Drawable::GetShadowMaskInZone() const
 {
     const unsigned zoneShadowMask = cachedZone_.zone_ ? cachedZone_.zone_->GetShadowMask() : 0xffffffff;
     return zoneShadowMask & shadowMask_;
+}
+
+unsigned Drawable::RecalculatePipelineStateHash() const
+{
+    return GetLightMaskInZone() & PORTABLE_LIGHTMASK;
 }
 
 void Drawable::SetZone(Zone* zone, bool temporary)

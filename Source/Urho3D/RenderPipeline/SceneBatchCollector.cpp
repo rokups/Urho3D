@@ -204,7 +204,10 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
             CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
             const float drawableCacheDistanceSquared = (cachedZone.cachePosition_ - drawableCenter).LengthSquared();
             if (drawableCacheDistanceSquared >= cachedZone.cacheInvalidationDistanceSquared_)
+            {
                 cachedZone = octree_->QueryZone(drawableCenter, drawable->GetZoneMask());
+                drawable->MarkPipelineStateHashDirty();
+            }
 
             // Do not add "infinite" objects like skybox to prevent shadow map focusing behaving erroneously
             if (!zRange.IsValid())
@@ -325,7 +328,10 @@ void SceneBatchCollector::ProcessVisibleLights()
         CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
         const float drawableCacheDistanceSquared = (cachedZone.cachePosition_ - drawableCenter).LengthSquared();
         if (drawableCacheDistanceSquared >= cachedZone.cacheInvalidationDistanceSquared_)
+        {
             cachedZone = octree_->QueryZone(drawableCenter, drawable->GetZoneMask());
+            drawable->MarkPipelineStateHashDirty();
+        }
 
         // Queue geometry update
         const UpdateGeometryType updateGeometryType = drawable->GetUpdateGeometryType();

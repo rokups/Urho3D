@@ -47,6 +47,7 @@ static const unsigned DEFAULT_VIEWMASK = M_MAX_UNSIGNED;
 static const unsigned DEFAULT_LIGHTMASK = M_MAX_UNSIGNED;
 static const unsigned DEFAULT_SHADOWMASK = M_MAX_UNSIGNED;
 static const unsigned DEFAULT_ZONEMASK = M_MAX_UNSIGNED;
+static const unsigned PORTABLE_LIGHTMASK = 0xf;
 static const int MAX_VERTEX_LIGHTS = 4;
 static const float ANIMATION_LOD_BASESCALE = 2500.0f;
 
@@ -405,7 +406,7 @@ public:
 
 protected:
     /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
-    unsigned RecalculatePipelineStateHash() const override { return 0; }
+    unsigned RecalculatePipelineStateHash() const override;
 
     /// Handle node being assigned.
     void OnNodeSet(Node* node) override;
