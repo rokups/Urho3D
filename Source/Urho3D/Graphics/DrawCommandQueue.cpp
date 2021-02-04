@@ -188,27 +188,42 @@ void DrawCommandQueue::Execute()
         }
 
         // Invoke appropriate draw command
+#ifdef URHO3D_D3D9
+        const unsigned vertexStart = cmd.vertexStart_;
+        const unsigned vertexCount = cmd.vertexCount_;
+#else
+        const unsigned vertexStart = 0;
+        const unsigned vertexCount = 0;
+#endif
         if (cmd.instanceCount_ != 0)
         {
             if (cmd.baseVertexIndex_ == 0)
             {
-                graphics_->DrawInstanced(currentPrimitiveType,
-                    cmd.indexStart_, cmd.indexCount_, 0, 0, cmd.instanceCount_);
+                graphics_->DrawInstanced(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_,
+                    vertexStart, vertexCount, cmd.instanceCount_);
             }
             else
             {
-                graphics_->DrawInstanced(currentPrimitiveType,
-                    cmd.indexStart_, cmd.indexCount_, cmd.baseVertexIndex_, 0, 0, cmd.instanceCount_);
+                graphics_->DrawInstanced(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_,
+                    cmd.baseVertexIndex_, vertexStart, vertexCount, cmd.instanceCount_);
             }
         }
         else
         {
             if (!currentIndexBuffer)
+            {
                 graphics_->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_);
+            }
             else if (cmd.baseVertexIndex_ == 0)
-                graphics_->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_, 0, 0);
+            {
+                graphics_->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_,
+                    vertexStart, vertexCount);
+            }
             else
-                graphics_->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_, cmd.baseVertexIndex_, 0, 0);
+            {
+                graphics_->Draw(currentPrimitiveType, cmd.indexStart_, cmd.indexCount_,
+                    cmd.baseVertexIndex_, vertexStart, vertexCount);
+            }
         }
     }
 }

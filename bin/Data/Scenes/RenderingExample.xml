@@ -37,8 +37,8 @@
 				<attribute name="Bounding Box Min" value="-1000 -1000 -1000" />
 				<attribute name="Bounding Box Max" value="1000 1000 1000" />
 				<attribute name="Ambient Color" value="0.17273 0.180021 0.264286 1" />
-				<attribute name="Light Mask" value="-16" />
-				<attribute name="Shadow Mask" value="-16" />
+				<attribute name="Light Mask" value="-8" />
+				<attribute name="Shadow Mask" value="-8" />
 			</component>
 		</node>
 		<node id="51">
@@ -55,7 +55,7 @@
 				<attribute name="Brightness Multiplier" value="0.700000" />
 				<attribute name="Cast Shadows" value="true" />
 				<attribute name="CSM Splits" value="5 12 30 200" />
-				<attribute name="Light Mask" value="-16" />
+				<attribute name="Light Mask" value="-8" />
 			</component>
 		</node>
 	</node>
