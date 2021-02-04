@@ -31,7 +31,7 @@ namespace Urho3D
 
 PipelineState::PipelineState(Context* context)
     : Object(context)
-    , graphics_(context_->GetSubsystem<Graphics>())
+    , GPUObject(context_->GetSubsystem<Graphics>())
 {
 }
 
@@ -44,8 +44,8 @@ bool PipelineState::Create(const PipelineStateDesc& desc)
     }
 
     desc_ = desc;
+    OnDeviceReset();
 #ifndef URHO3D_D3D9
-    constantBufferLayout_ = graphics_->GetConstantBufferLayout(desc_.vertexShader_, desc_.pixelShader_);
     if (!constantBufferLayout_)
     {
         URHO3D_LOGERROR("Constant buffer layout of pipeline state is invalid");
@@ -71,6 +71,23 @@ void PipelineState::Apply()
     graphics_->SetFillMode(desc_.fillMode_);
     graphics_->SetCullMode(desc_.cullMode_);
     graphics_->SetDepthBias(desc_.constantDepthBias_, desc_.slopeScaledDepthBias_);
+}
+
+void PipelineState::OnDeviceLost()
+{
+    constantBufferLayout_ = nullptr;
+}
+
+void PipelineState::OnDeviceReset()
+{
+#ifndef URHO3D_D3D9
+    constantBufferLayout_ = graphics_->GetConstantBufferLayout(desc_.vertexShader_, desc_.pixelShader_);
+#endif
+}
+
+void PipelineState::Release()
+{
+    constantBufferLayout_ = nullptr;
 }
 
 }

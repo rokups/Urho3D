@@ -25,6 +25,7 @@
 #include "../Container/Hash.h"
 #include "../Container/RefCounted.h"
 #include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/GPUObject.h"
 #include "../Graphics/IndexBuffer.h"
 #include "../Graphics/VertexBuffer.h"
 
@@ -173,7 +174,7 @@ struct PipelineStateDesc
 };
 
 /// Pipeline state.
-class PipelineState : public Object
+class PipelineState : public Object, public GPUObject
 {
     URHO3D_OBJECT(PipelineState, Object);
 
@@ -201,9 +202,14 @@ public:
         return hash;
     }
 
+    /// Mark the GPU resource destroyed on graphics context destruction.
+    virtual void OnDeviceLost();
+    /// Recreate the GPU resource and restore data if applicable.
+    virtual void OnDeviceReset();
+    /// Unconditionally release the GPU resource.
+    virtual void Release();
+
 private:
-    /// Graphics subsystem.
-    Graphics* graphics_{};
     /// Description.
     PipelineStateDesc desc_;
     /// Layout of constant buffers.
