@@ -46,9 +46,18 @@ class DrawCommandQueue;
 class SceneBatchCollector;
 class SceneBatchRenderer;
 
+enum class AmbientMode
+{
+    Constant,
+    Flat,
+    Directional,
+};
+
 ///
 struct RenderPipelineSettings
 {
+    ///
+    AmbientMode ambientMode_{ AmbientMode::Flat };
     /// Whether to use deferred rendering.
     bool deferred_{};
     /// Whether to apply gamma correction.

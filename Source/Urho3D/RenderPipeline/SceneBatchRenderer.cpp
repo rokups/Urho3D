@@ -74,11 +74,11 @@ Vector4 GetCameraDepthReconstructParameter(const Camera* camera)
 }
 
 /// Return shader parameter for zone fog.
-Vector4 GetZoneFogParameter(const Zone* zone, const Camera* camera)
+Vector4 GetFogParameter(const Camera* camera)
 {
     const float farClip = camera->GetFarClip();
-    float fogStart = Min(zone->GetFogStart(), farClip);
-    float fogEnd = Min(zone->GetFogEnd(), farClip);
+    float fogStart = Min(camera->GetEffectiveFogStart(), farClip);
+    float fogEnd = Min(camera->GetEffectiveFogStart(), farClip);
     if (fogStart >= fogEnd * (1.0f - M_LARGE_EPSILON))
         fogStart = fogEnd * (1.0f - M_LARGE_EPSILON);
     const float fogRange = Max(fogEnd - fogStart, M_EPSILON);
@@ -125,14 +125,10 @@ void AddCameraShaderParameters(DrawCommandQueue& drawQueue, const Camera* camera
     drawQueue.AddShaderParameter(VSP_FRUSTUMSIZE, farVector);
 
     drawQueue.AddShaderParameter(VSP_VIEWPROJ, camera->GetEffectiveGPUViewProjection(constantDepthBias));
-}
 
-/// Add zone-specific shader parameters.
-void AddZoneShaderParameters(DrawCommandQueue& drawQueue, const Camera* camera, const Zone* zone)
-{
-    drawQueue.AddShaderParameter(PSP_AMBIENTCOLOR, zone->GetAmbientColor());
-    drawQueue.AddShaderParameter(PSP_FOGCOLOR, zone->GetFogColor());
-    drawQueue.AddShaderParameter(PSP_FOGPARAMS, GetZoneFogParameter(zone, camera));
+    drawQueue.AddShaderParameter(PSP_AMBIENTCOLOR, camera->GetEffectiveAmbientColor());
+    drawQueue.AddShaderParameter(PSP_FOGCOLOR, camera->GetEffectiveFogColor());
+    drawQueue.AddShaderParameter(PSP_FOGPARAMS, GetFogParameter(camera));
 }
 
 }
@@ -207,7 +203,6 @@ void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, c
 
     bool frameDirty = true;
     bool cameraDirty = true;
-    bool zoneDirty = true;
     float previousConstantDepthBias = 0.0f;
     const SceneLight* previousLight = nullptr;
 
@@ -256,14 +251,6 @@ void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, c
             drawQueue.CommitShaderParameterGroup(SP_CAMERA);
             cameraDirty = false;
             previousConstantDepthBias = constantDepthBias;
-        }
-
-        // Add zone parameters
-        if (drawQueue.BeginShaderParameterGroup(SP_ZONE, !zoneDirty))
-        {
-            AddZoneShaderParameters(drawQueue, camera, zone);
-            drawQueue.CommitShaderParameterGroup(SP_ZONE);
-            zoneDirty = false;
         }
 
         // Add light parameters
@@ -342,7 +329,6 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
 
     bool frameDirty = true;
     bool cameraDirty = true;
-    bool zoneDirty = true;
     float previousConstantDepthBias = 0.0f;
     const SceneLight* previousLight = nullptr;
     SceneBatchCollector::VertexLightCollection previousVertexLights;
@@ -393,14 +379,6 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
             drawQueue.CommitShaderParameterGroup(SP_CAMERA);
             cameraDirty = false;
             previousConstantDepthBias = constantDepthBias;
-        }
-
-        // Add zone parameters
-        if (drawQueue.BeginShaderParameterGroup(SP_ZONE, !zoneDirty))
-        {
-            AddZoneShaderParameters(drawQueue, camera, zone);
-            drawQueue.CommitShaderParameterGroup(SP_ZONE);
-            zoneDirty = false;
         }
 
         // Add light parameters
@@ -485,7 +463,7 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
         // Add object parameters
         if (drawQueue.BeginShaderParameterGroup(SP_OBJECT, true))
         {
-            SphericalHarmonicsDot9 sh;
+            const SphericalHarmonicsDot9& sh = sceneBatchCollector.GetAmbientLight(batch.drawableIndex_);
             drawQueue.AddShaderParameter(VSP_SHAR, sh.Ar_);
             drawQueue.AddShaderParameter(VSP_SHAG, sh.Ag_);
             drawQueue.AddShaderParameter(VSP_SHAB, sh.Ab_);
@@ -493,6 +471,7 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
             drawQueue.AddShaderParameter(VSP_SHBG, sh.Bg_);
             drawQueue.AddShaderParameter(VSP_SHBB, sh.Bb_);
             drawQueue.AddShaderParameter(VSP_SHC, sh.C_);
+            drawQueue.AddShaderParameter(VSP_AMBIENT, Vector4(sh.EvaluateAverage(), 1.0f));
             switch (batch.geometryType_)
             {
             case GEOM_INSTANCED:

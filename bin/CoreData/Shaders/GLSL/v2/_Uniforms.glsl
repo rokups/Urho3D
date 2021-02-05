@@ -19,9 +19,6 @@ CBUFFER_BEGIN(1, Camera)
     CBUFFER_UNIFORM(highp vec4 cClipPlane)
     CBUFFER_UNIFORM(mediump vec4 cDepthReconstruct)
     CBUFFER_UNIFORM(mediump vec2 cGBufferInvSize)
-CBUFFER_END()
-
-CBUFFER_BEGIN(2, Zone)
     CBUFFER_UNIFORM(mediump vec4 cAmbientColor)
     CBUFFER_UNIFORM(mediump vec4 cFogParams)
     CBUFFER_UNIFORM(mediump vec3 cFogColor)
@@ -72,7 +69,8 @@ CBUFFER_END()
 #ifdef STAGE_VERTEX_SHADER
 CBUFFER_BEGIN(5, Object)
     CBUFFER_UNIFORM(highp mat4 cModel)
-#ifdef SPHERICALHARMONICS
+
+#if defined(URHO3D_AMBIENT_DIRECTIONAL)
     CBUFFER_UNIFORM(mediump vec4 cSHAr)
     CBUFFER_UNIFORM(mediump vec4 cSHAg)
     CBUFFER_UNIFORM(mediump vec4 cSHAb)
@@ -80,9 +78,10 @@ CBUFFER_BEGIN(5, Object)
     CBUFFER_UNIFORM(mediump vec4 cSHBg)
     CBUFFER_UNIFORM(mediump vec4 cSHBb)
     CBUFFER_UNIFORM(mediump vec4 cSHC)
-#else
+#elif defined(URHO3D_AMBIENT_FLAT)
     CBUFFER_UNIFORM(mediump vec4 cAmbient)
 #endif
+
 #ifdef GEOM_BILLBOARD
     CBUFFER_UNIFORM(mediump mat3 cBillboardRot)
 #endif

@@ -71,14 +71,14 @@ void main()
     #endif
 
     #if defined(PASS_BASE_LITBASE) || defined(PASS_ALPHA_LITBASE)
-        vVertexLight = GetAmbientLight(vec4(vNormal, 1)) + cAmbientColor.rgb;
+        vVertexLight = GetAmbientLight(vec4(vNormal, 1));
 
         #ifdef NUMVERTEXLIGHTS
             for (int i = 0; i < NUMVERTEXLIGHTS; ++i)
                 vVertexLight += GetVertexLight(i, worldPos, vNormal) * cVertexLights[i * 3].rgb;
         #endif
     #elif defined(PASS_DEFERRED)
-        vVertexLight = GetAmbientLight(vec4(vNormal, 1)) + cAmbientColor.rgb;
+        vVertexLight = GetAmbientLight(vec4(vNormal, 1));
     #endif
 
     vec4 projWorldPos = vec4(worldPos, 1.0);
@@ -169,7 +169,7 @@ void main()
         #ifdef AMBIENT
             finalColor += vVertexLight * diffColor.rgb;
             #ifdef LIGHTMAP
-                finalColor += (texture2D(sEmissiveMap, vTexCoord2).rgb * 2.0 + cAmbientColor.rgb) * diffColor.rgb;
+                finalColor += texture2D(sEmissiveMap, vTexCoord2).rgb * 2.0 * diffColor.rgb;
             #elif defined(EMISSIVEMAP)
                 finalColor += cMatEmissiveColor * texture2D(sEmissiveMap, vTexCoord.xy).rgb;
             #else
@@ -187,16 +187,16 @@ void main()
         float specPower = cMatSpecColor.a / 255.0;
 
         vec3 finalColor = vVertexLight * diffColor.rgb;
-        #ifdef AO
+        /*#ifdef AO
             // If using AO, the vertex light ambient is black, calculate occluded ambient here
             finalColor += texture2D(sEmissiveMap, vTexCoord2).rgb * cAmbientColor.rgb * diffColor.rgb;
-        #endif
+        #endif*/
 
         #ifdef ENVCUBEMAP
             finalColor += cMatEnvMapColor * textureCube(sEnvCubeMap, reflect(vReflectionVec, normal)).rgb;
         #endif
         #ifdef LIGHTMAP
-            finalColor += (texture2D(sEmissiveMap, vTexCoord2).rgb * 2.0 + cAmbientColor.rgb) * diffColor.rgb;
+            finalColor += texture2D(sEmissiveMap, vTexCoord2).rgb * 2.0 * diffColor.rgb;
         #elif defined(EMISSIVEMAP)
             finalColor += cMatEmissiveColor * texture2D(sEmissiveMap, vTexCoord.xy).rgb;
         #else

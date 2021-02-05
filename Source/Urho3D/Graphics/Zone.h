@@ -52,6 +52,8 @@ public:
     /// Set ambient color.
     /// @property
     void SetAmbientColor(const Color& color);
+    /// Set ambient brightness.
+    void SetAmbientBrightness(float brightness);
     /// Set fog color.
     /// @property
     void SetFogColor(const Color& color);
@@ -90,6 +92,9 @@ public:
     /// Return zone's own ambient color, disregarding gradient mode.
     /// @property
     const Color& GetAmbientColor() const { return ambientColor_; }
+
+    /// Return ambient brightness.
+    float GetAmbientBrightness() const { return ambientBrightness_; }
 
     /// Return ambient start color. Not safe to call from worker threads due to possible octree query.
     /// @property
@@ -173,6 +178,8 @@ protected:
     BoundingBox lastWorldBoundingBox_;
     /// Ambient color.
     Color ambientColor_;
+    /// Ambient brightness.
+    float ambientBrightness_{ 1.0f };
     /// Cached ambient start color.
     Color ambientStartColor_;
     /// Cached ambient end color.

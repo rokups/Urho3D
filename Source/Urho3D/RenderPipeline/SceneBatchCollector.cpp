@@ -27,9 +27,11 @@
 #include "../Core/WorkQueue.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/Geometry.h"
+#include "../Graphics/GlobalIllumination.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/OctreeQuery.h"
 #include "../Graphics/Renderer.h"
+#include "../Graphics/Zone.h"
 #include "../RenderPipeline/SceneBatchCollector.h"
 #include "../Scene/Scene.h"
 
@@ -252,6 +254,15 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
             // Reset light accumulator
             // TODO(renderer): Don't do it if unlit
             drawableLighting_[drawableIndex].Reset();
+
+            // TODO(renderer): Move
+            drawableLighting_[drawableIndex].sh_ = SphericalHarmonicsDot9(cachedZone.zone_->GetAmbientColor());
+            if (auto gi = frameInfo_.scene_->GetComponent<GlobalIllumination>())
+            {
+                unsigned& hint = drawable->GetMutableLightProbeTetrahedronHint();
+                const Vector3& samplePosition = drawable->GetWorldBoundingBox().Center();
+                drawableLighting_[drawableIndex].sh_ += gi->SampleAmbientSH(samplePosition, hint);
+            }
         }
         else if (drawable->GetDrawableFlags() & DRAWABLE_LIGHT)
         {

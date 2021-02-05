@@ -141,6 +141,13 @@ Color GetDefaultFogColor(Graphics* graphics)
 #endif
 }
 
+static const ea::vector<ea::string> ambientModeNames =
+{
+    "Constant",
+    "Flat",
+    "Directional",
+};
+
 }
 
 RenderPipeline::RenderPipeline(Context* context)
@@ -160,6 +167,7 @@ void RenderPipeline::RegisterObject(Context* context)
 {
     context->RegisterFactory<RenderPipeline>();
 
+    URHO3D_ENUM_ATTRIBUTE("Ambient Mode", settings_.ambientMode_, ambientModeNames, AmbientMode::Flat, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Deferred Rendering", bool, settings_.deferred_, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Gamma Correction", bool, settings_.gammaCorrection_, false, AM_DEFAULT);
 }
@@ -175,6 +183,10 @@ SharedPtr<PipelineState> RenderPipeline::CreatePipelineState(
     Material* material = key.material_;
     Pass* pass = key.pass_;
     Light* light = ctx.light_ ? ctx.light_->GetLight() : nullptr;
+
+    // TODO(renderer): Remove this hack
+    if (!pass)
+        return nullptr;
 
     PipelineStateDesc desc;
     ea::string commonDefines;
@@ -193,6 +205,27 @@ SharedPtr<PipelineState> RenderPipeline::CreatePipelineState(
     // Update shadow parameters
     if (ctx.shadowPass_)
         shadowMapAllocator_->ExportPipelineState(desc, light->GetShadowBias());
+
+    // Add lightmap
+    // TODO(renderer): Get batch index as input?
+    if (ctx.drawable_->GetBatches()[0].lightmapScaleOffset_)
+        commonDefines += "LIGHTMAP ";
+
+    // Add ambient vertex defines
+    switch (settings_.ambientMode_)
+    {
+    case AmbientMode::Constant:
+        vertexShaderDefines += "URHO3D_AMBIENT_CONSTANT ";
+        break;
+    case AmbientMode::Flat:
+        vertexShaderDefines += "URHO3D_AMBIENT_FLAT ";
+        break;
+    case AmbientMode::Directional:
+        vertexShaderDefines += "URHO3D_AMBIENT_DIRECTIONAL ";
+        break;
+    default:
+        break;
+    }
 
     // Add vertex input layout defines
     for (const VertexElement& element : desc.vertexElements_)
@@ -744,6 +777,7 @@ unsigned RenderPipeline::RecalculatePipelineStateHash() const
 {
     unsigned hash = 0;
     CombineHash(hash, pipelineCamera_->GetPipelineStateHash());
+    CombineHash(hash, static_cast<unsigned>(settings_.ambientMode_));
     CombineHash(hash, settings_.deferred_);
     CombineHash(hash, settings_.gammaCorrection_);
     return hash;

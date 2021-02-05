@@ -74,6 +74,7 @@ void Zone::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("Bounding Box Min", Vector3, boundingBox_.min_, MarkNodeDirty, DEFAULT_BOUNDING_BOX_MIN, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Bounding Box Max", Vector3, boundingBox_.max_, MarkNodeDirty, DEFAULT_BOUNDING_BOX_MAX, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Ambient Color", Color, ambientColor_, DEFAULT_AMBIENT_COLOR, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Ambient Brightness", float, ambientBrightness_, 1.0f, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Fog Color", Color, fogColor_, DEFAULT_FOG_COLOR, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Fog Start", float, fogStart_, DEFAULT_FOG_START, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Fog End", float, fogEnd_, DEFAULT_FOG_END, AM_DEFAULT);
@@ -106,6 +107,12 @@ void Zone::SetBoundingBox(const BoundingBox& box)
 void Zone::SetAmbientColor(const Color& color)
 {
     ambientColor_ = color;
+    MarkNetworkUpdate();
+}
+
+void Zone::SetAmbientBrightness(float brightness)
+{
+    ambientBrightness_ = brightness;
     MarkNetworkUpdate();
 }
 

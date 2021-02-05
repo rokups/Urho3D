@@ -23,8 +23,10 @@
 #include "../Precompiled.h"
 
 #include "../Graphics/Drawable.h"
+#include "../Graphics/Octree.h"
 #include "../RenderPipeline/RenderPipeline.h"
 #include "../RenderPipeline/RenderPipelineCamera.h"
+#include "../Scene/Node.h"
 
 #include "../DebugNew.h"
 
@@ -53,6 +55,11 @@ void RenderPipelineCamera::OnRenderBegin(const FrameInfo& frameInfo)
     if (frameInfo.renderTarget_)
         flipCamera_ = true;
 #endif
+
+    // Update current camera zone
+    const Vector3 cameraPosition = camera_->GetNode()->GetWorldPosition();
+    Zone* cameraZone = frameInfo.octree_->QueryZone(cameraPosition, camera_->GetZoneMask()).zone_;
+    camera_->SetZone(cameraZone);
 
     MarkPipelineStateHashDirty();
 

@@ -21,7 +21,7 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
     return value;
 }
 
-#ifdef SPHERICALHARMONICS
+#if defined(URHO3D_AMBIENT_DIRECTIONAL)
     #ifdef GEOM_INSTANCED
         #define iSHAr iTexCoord7
         #define iSHAg iTexCoord8
@@ -41,7 +41,7 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
     #endif
 
     #define GetAmbientLight(normal) LinearToGammaSpace(EvaluateSH01(normal, iSHAr, iSHAg, iSHAb) + EvaluateSH2(normal, iSHBr, iSHBg, iSHBb, iSHC))
-#else
+#elif defined(URHO3D_AMBIENT_FLAT)
     #ifdef GEOM_INSTANCED
         #define iAmbient iTexCoord7
     #else
@@ -49,6 +49,8 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
     #endif
 
     #define GetAmbientLight(normal) iAmbient.rgb
+#elif defined(URHO3D_AMBIENT_CONSTANT)
+    #define GetAmbientLight(normal) cAmbientColor.rgb
 #endif
 
 #ifdef NUMVERTEXLIGHTS

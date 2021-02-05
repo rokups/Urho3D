@@ -105,6 +105,8 @@ public:
     VertexLightCollection GetVertexLightIndices(unsigned drawableIndex) const { return drawableLighting_[drawableIndex].GetVertexLights(); }
     /// Return vertex lights for drawable (as pointers).
     ea::array<SceneLight*, MaxVertexLights> GetVertexLights(unsigned drawableIndex) const;
+    /// Return ambient light.
+    const SphericalHarmonicsDot9& GetAmbientLight(unsigned drawableIndex) const { return drawableLighting_[drawableIndex].sh_; }
 
 private:
     /// Update source batches and collect pass batches for single thread.
