@@ -29,7 +29,8 @@
 #include "../Graphics/Technique.h"
 #include "../Math/NumericRange.h"
 #include "../Math/SphericalHarmonics.h"
-#include "../RenderPipeline/DrawableLightAccumulator.h"
+#include "../RenderPipeline/LightAccumulator.h"
+#include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/SceneBatch.h"
 #include "../RenderPipeline/SceneBatchCollectorCallback.h"
 #include "../RenderPipeline/SceneDrawableData.h"
@@ -60,7 +61,7 @@ public:
     using VertexLightCollection = ea::array<unsigned, MaxVertexLights>;
 
     /// Construct.
-    SceneBatchCollector(Context* context);
+    SceneBatchCollector(Context* context, DrawableProcessor* dp);
     /// Destruct.
     ~SceneBatchCollector();
 
@@ -102,11 +103,11 @@ public:
     ea::span<const LightVolumeBatch> GetLightVolumeBatches() const { return lightVolumeBatches_; }
 
     /// Return vertex lights for drawable (as indices in the array of visible lights).
-    VertexLightCollection GetVertexLightIndices(unsigned drawableIndex) const { return drawableLighting_[drawableIndex].GetVertexLights(); }
+    VertexLightCollection GetVertexLightIndices(unsigned drawableIndex) const { return dp_->GET_LIGHT()[drawableIndex].GetVertexLights(); }
     /// Return vertex lights for drawable (as pointers).
     ea::array<SceneLight*, MaxVertexLights> GetVertexLights(unsigned drawableIndex) const;
     /// Return ambient light.
-    const SphericalHarmonicsDot9& GetAmbientLight(unsigned drawableIndex) const { return drawableLighting_[drawableIndex].sh_; }
+    const SphericalHarmonicsDot9& GetAmbientLight(unsigned drawableIndex) const { return dp_->GET_LIGHT()[drawableIndex].sh_; }
 
 private:
     /// Update source batches and collect pass batches for single thread.
@@ -131,6 +132,7 @@ private:
     WorkQueue* workQueue_{};
     /// Renderer.
     Renderer* renderer_{};
+    DrawableProcessor* dp_{};
     /// Pipeline state factory.
     SceneBatchCollectorCallback* callback_{};
     /// Number of worker threads.
@@ -154,27 +156,27 @@ private:
     ea::vector<SharedPtr<ScenePass>> passes2_;
 
     /// Visible geometries.
-    WorkQueueVector<Drawable*> visibleGeometries_;
+    //WorkQueueVector<Drawable*> visibleGeometries_;
     /// Temporary thread-safe collection of visible lights.
-    WorkQueueVector<Light*> visibleLightsTemp_;
+    //WorkQueueVector<Light*> visibleLightsTemp_;
     /// Visible lights.
     ea::vector<SceneLight*> visibleLights_;
     /// Index of main directional light in visible lights collection.
     unsigned mainLightIndex_{ M_MAX_UNSIGNED };
     /// Scene Z range.
-    SceneZRange sceneZRange_;
+    //SceneZRange sceneZRange_;
 
     /// Shadow caster drawables to be updated.
     WorkQueueVector<Drawable*> shadowCastersToBeUpdated_;
     /// Geometries to be updated from worker threads.
-    WorkQueueVector<Drawable*> threadedGeometryUpdates_;
+    //WorkQueueVector<Drawable*> threadedGeometryUpdates_;
     /// Geometries to be updated from main thread.
-    WorkQueueVector<Drawable*> nonThreadedGeometryUpdates_;
+    //WorkQueueVector<Drawable*> nonThreadedGeometryUpdates_;
 
     /// Common drawable data index.
-    SceneDrawableData transient_;
+    //SceneDrawableData transient_;
     /// Drawable lighting data index.
-    ea::vector<DrawableLightAccumulator<MaxPixelLights, MaxVertexLights>> drawableLighting_;
+    //ea::vector<DrawableLightAccumulator<MaxPixelLights, MaxVertexLights>> drawableLighting_;
     /// Light volume batches.
     ea::vector<LightVolumeBatch> lightVolumeBatches_;
 

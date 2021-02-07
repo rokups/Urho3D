@@ -78,10 +78,11 @@ struct DrawableZRangeEvaluator
 
 }
 
-SceneBatchCollector::SceneBatchCollector(Context* context)
+SceneBatchCollector::SceneBatchCollector(Context* context, DrawableProcessor* dp)
     : Object(context)
     , workQueue_(context->GetSubsystem<WorkQueue>())
     , renderer_(context->GetSubsystem<Renderer>())
+    , dp_(dp)
 {}
 
 SceneBatchCollector::~SceneBatchCollector()
@@ -136,15 +137,15 @@ void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchColle
         materialQuality_ = QUALITY_LOW;
 
     // Reset containers
-    visibleGeometries_.Clear(numThreads_);
-    visibleLightsTemp_.Clear(numThreads_);
-    sceneZRange_.Clear(numThreads_);
+    //visibleGeometries_.Clear(numThreads_);
+    //visibleLightsTemp_.Clear(numThreads_);
+    //sceneZRange_.Clear(numThreads_);
     shadowCastersToBeUpdated_.Clear(numThreads_);
-    threadedGeometryUpdates_.Clear(numThreads_);
-    nonThreadedGeometryUpdates_.Clear(numThreads_);
+    //threadedGeometryUpdates_.Clear(numThreads_);
+    //nonThreadedGeometryUpdates_.Clear(numThreads_);
 
-    transient_.Reset(numDrawables_);
-    drawableLighting_.resize(numDrawables_);
+    //transient_.Reset(numDrawables_);
+    //drawableLighting_.resize(numDrawables_);
 
     // Initialize passes
     if (shadowPass_)
@@ -155,15 +156,17 @@ void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchColle
 
 void SceneBatchCollector::ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables)
 {
-    ForEachParallel(workQueue_, drawableWorkThreshold_, drawables,
-        [this](unsigned /*index*/, Drawable* drawable)
+    dp_->ProcessVisibleDrawables(drawables);
+
+    /*ForEachParallel(workQueue_, drawableWorkThreshold_, drawables,
+        [this](unsigned index, Drawable* drawable)
     {
         const unsigned threadIndex = WorkQueue::GetWorkerThreadIndex();
         ProcessVisibleDrawablesForThread(threadIndex, { &drawable, 1u });
-    });
+    });*/
 
     visibleLights_.clear();
-    for (Light* light : visibleLightsTemp_)
+    for (Light* light : dp_->GetVisibleLights())
     {
         WeakPtr<Light> weakLight(light);
         auto& sceneLight = cachedSceneLights_[weakLight];
@@ -175,6 +178,7 @@ void SceneBatchCollector::ProcessVisibleDrawables(const ea::vector<Drawable*>& d
 
 void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables)
 {
+#if 0
     Material* defaultMaterial = renderer_->GetDefaultMaterial();
     const DrawableZRangeEvaluator zRangeEvaluator{ camera_ };
 
@@ -253,7 +257,7 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
 
             // Reset light accumulator
             // TODO(renderer): Don't do it if unlit
-            drawableLighting_[drawableIndex].Reset();
+            drawableLighting_[drawableIndex].ResetLights();
 
             // TODO(renderer): Move
             drawableLighting_[drawableIndex].sh_ = SphericalHarmonicsDot9(cachedZone.zone_->GetAmbientColor());
@@ -274,6 +278,7 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
                 visibleLightsTemp_.PushBack(threadIndex, light);
         }
     }
+#endif
 }
 
 void SceneBatchCollector::ProcessVisibleLights()
@@ -285,9 +290,10 @@ void SceneBatchCollector::ProcessVisibleLights()
     // Update lit geometries and shadow casters
     SceneLightProcessContext sceneLightProcessContext;
     sceneLightProcessContext.frameInfo_ = frameInfo_;
-    sceneLightProcessContext.sceneZRange_ = sceneZRange_.Get();
-    sceneLightProcessContext.visibleGeometries_ = &visibleGeometries_;
-    sceneLightProcessContext.drawableData_ = &transient_;
+    sceneLightProcessContext.dp_ = dp_;
+    //sceneLightProcessContext.sceneZRange_ = dp_->GetSceneZRange();
+    //sceneLightProcessContext.visibleGeometries_ = &dp_->GetVisibleGeometries();
+    //sceneLightProcessContext.drawableData_ = &transient_;
     sceneLightProcessContext.geometriesToBeUpdates_ = &shadowCastersToBeUpdated_;
     for (unsigned i = 0; i < visibleLights_.size(); ++i)
     {
@@ -347,9 +353,9 @@ void SceneBatchCollector::ProcessVisibleLights()
         // Queue geometry update
         const UpdateGeometryType updateGeometryType = drawable->GetUpdateGeometryType();
         if (updateGeometryType == UPDATE_MAIN_THREAD)
-            nonThreadedGeometryUpdates_.Insert(drawable);
+            dp_->GET_NTGU().Insert(drawable);
         else
-            threadedGeometryUpdates_.Insert(drawable);
+            dp_->GET_TGU().Insert(drawable);
     });
 
     // Collect shadow caster batches
@@ -418,7 +424,7 @@ void SceneBatchCollector::AccumulateForwardLighting(unsigned lightIndex)
         const unsigned drawableIndex = geometry->GetDrawableIndex();
         const float distance = ea::max(light->GetDistanceTo(geometry), M_LARGE_EPSILON);
         const float penalty = lightIndex == mainLightIndex_ ? -M_LARGE_VALUE : distance * lightIntensityPenalty;
-        drawableLighting_[drawableIndex].AccumulateLight(accumContext, penalty);
+        dp_->GET_LIGHT()[drawableIndex].AccumulateLight(accumContext, penalty);
     });
 }
 
@@ -426,22 +432,23 @@ void SceneBatchCollector::CollectSceneBatches()
 {
     for (ScenePass* pass : passes2_)
     {
-        pass->CollectSceneBatches(mainLightIndex_, visibleLights_, drawableLighting_, camera_, *callback_);
+        pass->CollectSceneBatches(mainLightIndex_, visibleLights_, dp_->GET_LIGHT(), camera_, *callback_);
         pass->SortSceneBatches();
     }
 }
 
 void SceneBatchCollector::UpdateGeometries()
 {
+    dp_->ProcessGeometryUpdates();
     // TODO(renderer): Add multithreading
-    for (Drawable* drawable : threadedGeometryUpdates_)
+    /*for (Drawable* drawable : threadedGeometryUpdates_)
     {
         drawable->UpdateGeometry(frameInfo_);
     };
     for (Drawable* drawable : nonThreadedGeometryUpdates_)
     {
         drawable->UpdateGeometry(frameInfo_);
-    };
+    };*/
 }
 
 void SceneBatchCollector::CollectLightVolumeBatches()

@@ -440,6 +440,7 @@ void RibbonTrail::OnWorldBoundingBoxUpdate()
         worldBox.Merge(BoundingBox(p - scale, p + scale));
     }
 
+    // TODO(renderer): Get rid of NaN
     worldBoundingBox_ = worldBox;
 }
 

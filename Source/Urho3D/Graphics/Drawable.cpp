@@ -49,6 +49,12 @@ namespace Urho3D
 
 const char* GEOMETRY_CATEGORY = "Geometry";
 
+static const ea::vector<ea::string> giTypeNames = {
+    "None",
+    "Use LightMap",
+    "Blend Light Probes"
+};
+
 SourceBatch::SourceBatch() = default;
 
 SourceBatch::SourceBatch(const SourceBatch& batch) = default;
@@ -100,6 +106,7 @@ void Drawable::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE("Light Mask", int, lightMask_, DEFAULT_LIGHTMASK, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Shadow Mask", int, shadowMask_, DEFAULT_SHADOWMASK, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Zone Mask", GetZoneMask, SetZoneMask, unsigned, DEFAULT_ZONEMASK, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE("Global Illumination", giType_, giTypeNames, GlobalIlluminationType::None, AM_DEFAULT);
 }
 
 void Drawable::OnSetEnabled()
@@ -243,6 +250,12 @@ void Drawable::SetOccludee(bool enable)
     }
 }
 
+void Drawable::SetGlobalIlluminationType(GlobalIlluminationType type)
+{
+    giType_ = type;
+    MarkNetworkUpdate();
+}
+
 void Drawable::MarkForUpdate()
 {
     if (!updateQueued_ && octant_)
@@ -294,7 +307,10 @@ unsigned Drawable::GetShadowMaskInZone() const
 
 unsigned Drawable::RecalculatePipelineStateHash() const
 {
-    return GetLightMaskInZone() & PORTABLE_LIGHTMASK;
+    unsigned hash = 0;
+    CombineHash(hash, GetLightMaskInZone() & PORTABLE_LIGHTMASK);
+    CombineHash(hash, static_cast<unsigned>(giType_));
+    return hash;
 }
 
 void Drawable::SetZone(Zone* zone, bool temporary)

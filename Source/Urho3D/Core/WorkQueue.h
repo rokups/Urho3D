@@ -229,4 +229,11 @@ void ForEachParallel(WorkQueue* workQueue, unsigned bucket, Collection&& collect
     });
 }
 
+/// Process collection in multiple threads with default bucket size.
+template <class Callback, class Collection>
+void ForEachParallel(WorkQueue* workQueue, Collection&& collection, const Callback& callback)
+{
+    ForEachParallel(workQueue, 1u, collection, callback);
+}
+
 }

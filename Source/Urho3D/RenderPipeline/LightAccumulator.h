@@ -26,16 +26,17 @@
 #include "../Math/SphericalHarmonics.h"
 
 #include <EASTL/fixed_vector.h>
-#include <EASTL/sort.h>
 #include <EASTL/vector_multimap.h>
 
 namespace Urho3D
 {
 
-/// Context used for light accumulation.
-struct DrawableLightDataAccumulationContext
+/// Common parameters for light accumulation.
+struct LightAccumulatorContext
 {
-    /// Max number of pixel lights
+    /// Max number of vertex lights.
+    unsigned maxVertexLights_{ 4 };
+    /// Max number of pixel lights.
     unsigned maxPixelLights_{ 1 };
     /// Light importance.
     LightImportance lightImportance_{};
@@ -45,11 +46,11 @@ struct DrawableLightDataAccumulationContext
     const ea::vector<Light*>* lights_;
 };
 
-/// Accumulated light data for drawable.
+/// Accumulated light for forward rendering.
 /// MaxPixelLights: Max number of per-pixel lights supported. Important lights may override this limit.
-/// MaxVertexLights: Max number of per-vertex lights supported.
+/// MaxVertexLights: Max number of per-vertex lights supported. Actual limit may be lower.
 template <unsigned MaxPixelLights, unsigned MaxVertexLights>
-struct DrawableLightAccumulator
+struct LightAccumulatorBase
 {
     /// Max number of lights that don't require allocations.
     static const unsigned NumElements = ea::max(MaxPixelLights + 1, 4u) + MaxVertexLights;
@@ -59,8 +60,8 @@ struct DrawableLightAccumulator
     /// Container for vertex lights.
     using VertexLightContainer = ea::array<unsigned, MaxVertexLights>;
 
-    /// Reset accumulator.
-    void Reset()
+    /// Reset lights.
+    void ResetLights()
     {
         lights_.clear();
         numImportantLights_ = 0;
@@ -68,7 +69,7 @@ struct DrawableLightAccumulator
     }
 
     /// Accumulate light.
-    void AccumulateLight(const DrawableLightDataAccumulationContext& ctx, float penalty)
+    void AccumulateLight(const LightAccumulatorContext& ctx, float penalty)
     {
         switch (ctx.lightImportance_)
         {
@@ -95,14 +96,15 @@ struct DrawableLightAccumulator
         // Add new light
         lights_.emplace(penalty, ctx.lightIndex_);
 
-        // First N important and automatic lights are per-pixel
-        firstVertexLight_ = ea::max(numImportantLights_, ea::min(numImportantLights_ + numAutoLights_, ctx.maxPixelLights_));
+        // First N important plus automatic lights are per-pixel
+        firstVertexLight_ = ea::max(numImportantLights_,
+            ea::min(numImportantLights_ + numAutoLights_, ctx.maxPixelLights_));
 
         // If too many lights, drop the least important one
-        const unsigned maxLights = MaxVertexLights + firstVertexLight_;
+        const unsigned maxLights = ctx.maxVertexLights_ + firstVertexLight_;
         if (lights_.size() > maxLights)
         {
-            // TODO(renderer): Update SH
+            // TODO(renderer): Accumulate into SH
             lights_.pop_back();
         }
     }
@@ -125,6 +127,8 @@ struct DrawableLightAccumulator
         return { lights_.data(), ea::min(static_cast<unsigned>(lights_.size()), firstVertexLight_) };
     }
 
+    /// TODO(renderer): Make private
+
     /// Container of per-pixel and per-pixel lights.
     Container lights_;
     /// Accumulated SH lights.
@@ -136,5 +140,13 @@ struct DrawableLightAccumulator
     /// First vertex light.
     unsigned firstVertexLight_{};
 };
+
+/// Default light accumulator.
+using LightAccumulator = LightAccumulatorBase<4, 4>;
+
+// TODO(renderer): Remove me
+using DrawableLightDataAccumulationContext = LightAccumulatorContext;
+template <unsigned MaxPixelLights, unsigned MaxVertexLights>
+using DrawableLightAccumulator = LightAccumulatorBase<MaxPixelLights, MaxVertexLights>;
 
 }

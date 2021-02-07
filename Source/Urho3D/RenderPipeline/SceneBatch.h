@@ -25,12 +25,14 @@
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Material.h"
 #include "../Graphics/Technique.h"
+#include "../RenderPipeline/DrawableProcessor.h"
 
 namespace Urho3D
 {
 
 /// Intermediate batch that may map onto one or many actual batches.
-struct IntermediateSceneBatch
+using IntermediateSceneBatch = GeometryBatch;
+/*struct IntermediateSceneBatch
 {
     /// Geometry.
     Drawable* geometry_{};
@@ -40,7 +42,7 @@ struct IntermediateSceneBatch
     Pass* basePass_{};
     /// Additional material pass for forward rendering.
     Pass* additionalPass_{};
-};
+};*/
 
 /// Base or lit base scene batch for specific sub-pass.
 // TODO(renderer): Sort by vertex lights

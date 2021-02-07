@@ -246,6 +246,15 @@ struct SphericalHarmonicsDot9
         return *this;
     }
 
+    /// Accumulate spherical harmonics with constant value.
+    SphericalHarmonicsDot9& operator +=(const Vector3& rhs)
+    {
+        Ar_.w_ += rhs.x_;
+        Ag_.w_ += rhs.y_;
+        Ab_.w_ += rhs.z_;
+        return *this;
+    }
+
     /// Scale spherical harmonics (inplace).
     SphericalHarmonicsDot9& operator *=(float rhs)
     {

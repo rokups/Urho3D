@@ -90,9 +90,9 @@ struct SceneDrawableData
     enum Trait : TraitType
     {
         /// Whether the drawable has geometry visible from the main camera.
-        DrawableVisibleGeometry = 1 << 0,
+        //DrawableVisibleGeometry = 1 << 0,
         /// Whether the drawable is lit using forward rendering.
-        ForwardLit = 1 << 1,
+        //ForwardLit = 1 << 1,
     };
 
     /// Whether the drawable batches have been updated in this frame.

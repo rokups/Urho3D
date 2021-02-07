@@ -23,10 +23,11 @@
 #pragma once
 
 #include "../Core/Object.h"
-#include "../RenderPipeline/DrawableLightAccumulator.h"
+#include "../RenderPipeline/LightAccumulator.h"
 #include "../RenderPipeline/SceneBatch.h"
 #include "../RenderPipeline/SceneLight.h"
 #include "../RenderPipeline/ScenePipelineStateCache.h"
+#include "../RenderPipeline/DrawableProcessor.h"
 /*
 #include "../Graphics/Light.h"
 #include "../Graphics/SceneDrawableData.h"
@@ -37,6 +38,7 @@
 
 #include <EASTL/string.h>
 #include <EASTL/vector.h>
+#include <EASTL/sort.h>
 
 namespace Urho3D
 {
@@ -45,9 +47,9 @@ class Renderer;
 class WorkQueue;
 
 /// Scene pass interface.
-class ScenePass : public Object
+class ScenePass : public SceneRenderingPass
 {
-    URHO3D_OBJECT(ScenePass, Object);
+    URHO3D_OBJECT(ScenePass, SceneRenderingPass);
 
 public:
     /// Max number of vertex lights for forward rendering.
@@ -60,7 +62,7 @@ public:
     using DrawableLightingData = ea::vector<DrawableLightAccumulator<MaxPixelLights, MaxVertexLights>>;
 
     /// Construct.
-    ScenePass(Context* context,
+    ScenePass(RenderPipeline* renderPipeline,
         const ea::string& unlitBaseTag, const ea::string& litBaseTag, const ea::string& lightTag,
         unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
@@ -69,7 +71,7 @@ public:
     /// Clear in the beginning of the frame.
     virtual void BeginFrame();
     /// Add source batch. Try to keep it non-virtual to optimize processing. Return whether it was lit.
-    bool AddSourceBatch(Drawable* drawable, unsigned sourceBatchIndex, Technique* technique);
+    //bool AddSourceBatch(Drawable* drawable, unsigned sourceBatchIndex, Technique* technique);
     /// Collect scene batches.
     virtual void CollectSceneBatches(unsigned mainLightIndex, ea::span<SceneLight*> sceneLights,
         const DrawableLightingData& drawableLighting, Camera* camera, ScenePipelineStateCacheCallback& callback);
@@ -117,11 +119,11 @@ protected:
     unsigned numThreads_{};
 
     /// Unlit base pass index.
-    const unsigned unlitBasePassIndex_{};
+    /*const unsigned unlitBasePassIndex_{};
     /// Lit base pass index.
     const unsigned litBasePassIndex_{};
     /// Additional light pass index.
-    const unsigned lightPassIndex_{};
+    const unsigned lightPassIndex_{};*/
     /// Shader define for unlit base pass.
     const ea::string unlitBaseTag_;
     /// Shader define for lit base pass.
@@ -138,9 +140,9 @@ protected:
 
 private:
     /// Unlit scene batches. Map to one base batch.
-    WorkQueueVector<IntermediateSceneBatch> unlitBatches_;
+    /*WorkQueueVector<IntermediateSceneBatch> unlitBatches_;
     /// Lit intermediate batches. Always empty for Unlit passes.
-    WorkQueueVector<IntermediateSceneBatch> litBatches_;
+    WorkQueueVector<IntermediateSceneBatch> litBatches_;*/
 
     /// Temporary vector to store unlit base batches without pipeline states.
     WorkQueueVector<BaseSceneBatch*> unlitBaseBatchesDirty_;
@@ -164,7 +166,7 @@ class ForwardLightingScenePass : public ScenePass
 
 public:
     /// Construct.
-    ForwardLightingScenePass(Context* context, const ea::string& tag,
+    ForwardLightingScenePass(RenderPipeline* renderPipeline, const ea::string& tag,
         const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass);
 
 private:
@@ -225,7 +227,7 @@ class UnlitScenePass : public ScenePass
 
 public:
     /// Construct.
-    UnlitScenePass(Context* context, const ea::string& tag, const ea::string& pass);
+    UnlitScenePass(RenderPipeline* renderPipeline, const ea::string& tag, const ea::string& pass);
 
     /// Sort scene batches.
     virtual void SortSceneBatches() override;

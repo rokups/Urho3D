@@ -28,6 +28,7 @@
 #include "../RenderPipeline/RenderPipelineCamera.h"
 #include "../RenderPipeline/RenderPipelineTexture.h"
 #include "../RenderPipeline/SceneBatchCollectorCallback.h"
+#include "../RenderPipeline/ScenePass.h"
 #include "../Scene/Serializable.h"
 
 namespace Urho3D
@@ -43,6 +44,7 @@ class Viewport;
 class RenderPipelineViewport;
 class ShadowMapAllocator;
 class DrawCommandQueue;
+class DrawableProcessor;
 class SceneBatchCollector;
 class SceneBatchRenderer;
 
@@ -108,6 +110,10 @@ public:
     SharedPtr<RenderPipelineTexture> CreatePersistentFixedScreenBuffer(
         const ScreenBufferParams& params, const IntVector2& fixedSize);
 
+    /// Signal when update begins.
+    Signal<void(const FrameInfo& frameInfo)> OnUpdateBegin;
+    /// Signal when update end.
+    Signal<void(const FrameInfo& frameInfo)> OnUpdateEnd;
     /// Signal when render begins.
     Signal<void(const FrameInfo& frameInfo)> OnRenderBegin;
     /// Signal when render end.
@@ -119,14 +125,8 @@ protected:
     /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
     unsigned RecalculatePipelineStateHash() const override;
 
-    unsigned GetNumThreads() const { return numThreads_; }
-    void PostTask(std::function<void(unsigned)> task);
-    void CompleteTasks();
-
-    //void ClearViewport(ClearTargetFlags flags, const Color& color, float depth, unsigned stencil) override;
-    void CollectDrawables(ea::vector<Drawable*>& drawables, Camera* camera, DrawableFlags flags);
-    bool HasShadow(Light* light);
-    ShadowMap GetTemporaryShadowMap(const IntVector2& size);
+    bool HasShadow(Light* light) override;
+    ShadowMap GetTemporaryShadowMap(const IntVector2& size) override;
 
     SharedPtr<PipelineState> CreatePipelineState(
         const ScenePipelineStateKey& key, const ScenePipelineStateContext& ctx) override;
@@ -138,13 +138,13 @@ private:
     Renderer* renderer_{};
     WorkQueue* workQueue_{};
 
-    unsigned numThreads_{};
-    unsigned numDrawables_{};
-
     /// Current pipeline settings.
     RenderPipelineSettings settings_;
     /// Current frame info.
     FrameInfo frameInfo_{};
+    /// Previous pipeline state hash.
+    unsigned oldPipelineStateHash_{};
+
     /// Default draw queue.
     SharedPtr<DrawCommandQueue> drawQueue_;
     /// Main camera of render pipeline.
@@ -153,17 +153,24 @@ private:
     SharedPtr<RenderPipelineTexture> viewportColor_;
     /// Viewport depth stencil texture handler.
     SharedPtr<RenderPipelineTexture> viewportDepth_;
-    /// Previous pipeline state hash.
-    unsigned oldPipelineStateHash_{};
+
+    SharedPtr<OpaqueForwardLightingScenePass> basePass_;
+    SharedPtr<AlphaForwardLightingScenePass> alphaPass_;
+    SharedPtr<UnlitScenePass> deferredPass_;
+    SharedPtr<ShadowScenePass> shadowPass_;
 
     SharedPtr<RenderPipelineTexture> deferredFinal_;
     SharedPtr<RenderPipelineTexture> deferredAlbedo_;
     SharedPtr<RenderPipelineTexture> deferredNormal_;
     SharedPtr<RenderPipelineTexture> deferredDepth_;
 
+    ea::vector<Drawable*> occluders_;
+    ea::vector<Drawable*> drawables_;
     SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
+    SharedPtr<DrawableProcessor> drawableProcessor_;
     SharedPtr<SceneBatchCollector> sceneBatchCollector_;
     SharedPtr<SceneBatchRenderer> sceneBatchRenderer_;
+    SharedPtr<OcclusionBuffer> occlusionBuffer_;
 
 };
 

@@ -43,7 +43,7 @@ public:
 
     /// Iterator base.
     template <class OuterIterator, class InnerIterator>
-    class BaseIterator
+    class BaseIterator : public ea::iterator<EASTL_ITC_NS::forward_iterator_tag, T>
     {
     public:
         /// Construct default.

@@ -36,6 +36,7 @@ namespace Urho3D
 {
 
 class SceneLight;
+class DrawableProcessor;
 
 /// Scene light shadow parameters.
 struct SceneLightShaderParameters
@@ -89,12 +90,13 @@ struct SceneLightProcessContext
 {
     /// Frame info.
     FrameInfo frameInfo_;
+    DrawableProcessor* dp_{};
     /// Z range of visible scene.
-    DrawableZRange sceneZRange_{};
+    //DrawableZRange sceneZRange_{};
     /// All visible geometries.
-    const WorkQueueVector<Drawable*>* visibleGeometries_{};
+    //const WorkQueueVector<Drawable*>* visibleGeometries_{};
     /// Drawable data.
-    SceneDrawableData* drawableData_{};
+    //SceneDrawableData* drawableData_{};
     /// Geometries that has to be updated.
     WorkQueueVector<Drawable*>* geometriesToBeUpdates_{};
 };
@@ -121,7 +123,7 @@ struct SceneLightShadowSplit
 
     /// Setup shadow camera for directional light split.
     void SetupDirLightShadowCamera(Light* light, Camera* cullCamera, const ea::vector<Drawable*>& litGeometries,
-        const DrawableZRange& sceneZRange, const ea::vector<DrawableZRange>& drawableZRanges);
+        const DrawableProcessor* drawableProcessor);
     /// Quantize a directional light shadow camera view to eliminate swimming.
     void QuantizeDirLightShadowCamera(const FocusParameters& parameters, const BoundingBox& viewBox);
     /// Finalize shadow camera view after shadow casters and the shadow map are known.

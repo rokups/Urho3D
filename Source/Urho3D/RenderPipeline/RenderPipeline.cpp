@@ -30,10 +30,12 @@
 #include "../Graphics/DebugRenderer.h"
 #include "../Graphics/DrawCommandQueue.h"
 #include "../Graphics/IndexBuffer.h"
+#include "../Graphics/OcclusionBuffer.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Viewport.h"
 #include "../RenderPipeline/RenderPipeline.h"
+#include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/SceneBatchCollector.h"
 #include "../RenderPipeline/SceneBatchRenderer.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
@@ -59,6 +61,74 @@ namespace Urho3D
 
 namespace
 {
+
+/// %Frustum octree query for occluders.
+class OccluderOctreeQuery : public FrustumOctreeQuery
+{
+public:
+    /// Construct with frustum and query parameters.
+    OccluderOctreeQuery(ea::vector<Drawable*>& result, const Frustum& frustum, unsigned viewMask = DEFAULT_VIEWMASK) :
+        FrustumOctreeQuery(result, frustum, DRAWABLE_GEOMETRY, viewMask)
+    {
+    }
+
+    /// Intersection test for drawables.
+    void TestDrawables(Drawable** start, Drawable** end, bool inside) override
+    {
+        for (Drawable* drawable : MakeIteratorRange(start, end))
+        {
+            const DrawableFlags flags = drawable->GetDrawableFlags();
+            if (flags == DRAWABLE_GEOMETRY && drawable->IsOccluder() && (drawable->GetViewMask() & viewMask_))
+            {
+                if (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()))
+                    result_.push_back(drawable);
+            }
+        }
+    }
+};
+
+/// %Frustum octree query with occlusion.
+class OccludedFrustumOctreeQuery : public FrustumOctreeQuery
+{
+public:
+    /// Construct with frustum, occlusion buffer and query parameters.
+    OccludedFrustumOctreeQuery(ea::vector<Drawable*>& result, const Frustum& frustum, OcclusionBuffer* buffer,
+                               DrawableFlags drawableFlags = DRAWABLE_ANY, unsigned viewMask = DEFAULT_VIEWMASK) :
+        FrustumOctreeQuery(result, frustum, drawableFlags, viewMask),
+        buffer_(buffer)
+    {
+    }
+
+    /// Intersection test for an octant.
+    Intersection TestOctant(const BoundingBox& box, bool inside) override
+    {
+        if (inside)
+            return buffer_->IsVisible(box) ? INSIDE : OUTSIDE;
+        else
+        {
+            Intersection result = frustum_.IsInside(box);
+            if (result != OUTSIDE && !buffer_->IsVisible(box))
+                result = OUTSIDE;
+            return result;
+        }
+    }
+
+    /// Intersection test for drawables. Note: drawable occlusion is performed later in worker threads.
+    void TestDrawables(Drawable** start, Drawable** end, bool inside) override
+    {
+        for (Drawable* drawable : MakeIteratorRange(start, end))
+        {
+            if ((drawable->GetDrawableFlags() & drawableFlags_) && (drawable->GetViewMask() & viewMask_))
+            {
+                if (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()))
+                    result_.push_back(drawable);
+            }
+        }
+    }
+
+    /// Occlusion buffer.
+    OcclusionBuffer* buffer_;
+};
 
 enum class SampleConversionType
 {
@@ -155,7 +225,6 @@ RenderPipeline::RenderPipeline(Context* context)
     , graphics_(context_->GetSubsystem<Graphics>())
     , renderer_(context_->GetSubsystem<Renderer>())
     , workQueue_(context_->GetSubsystem<WorkQueue>())
-    , drawQueue_(MakeShared<DrawCommandQueue>(graphics_))
 {
 }
 
@@ -531,22 +600,27 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
     if (!frameInfo_.camera_ || !frameInfo_.octree_)
         return false;
 
-    numDrawables_ = frameInfo_.octree_->GetAllDrawables().size();
-
     // Validate settings
     if (settings_.deferred_ && !graphics_->GetDeferredSupport()
         && !Graphics::GetReadableDepthStencilFormat())
         settings_.deferred_ = false;
 
     // Lazy initialize heavy objects
-    if (!pipelineCamera_ || !shadowMapAllocator_ || !sceneBatchCollector_ || !sceneBatchRenderer_)
+    if (!drawQueue_)
     {
+        drawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
+
         pipelineCamera_ = MakeShared<RenderPipelineCamera>(this);
         viewportColor_ = MakeShared<ViewportColorTexture>(this);
         viewportDepth_ = MakeShared<ViewportDepthStencilTexture>(this);
 
+        shadowPass_ = MakeShared<ShadowScenePass>(context_, "PASS_SHADOW", "shadow");
+
+        drawableProcessor_ = MakeShared<DrawableProcessor>(this);
+        sceneBatchCollector_ = MakeShared<SceneBatchCollector>(context_, drawableProcessor_);
+        sceneBatchCollector_->SetShadowPass(shadowPass_);
+
         shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
-        sceneBatchCollector_ = MakeShared<SceneBatchCollector>(context_);
         sceneBatchRenderer_ = MakeShared<SceneBatchRenderer>(context_);
     }
 
@@ -554,19 +628,40 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
     pipelineCamera_->Initialize(camera);
 
     // Initialize or reset deferred rendering
-    if (settings_.deferred_ && !deferredDepth_)
+    // TODO(renderer): Make it more clean
+    if (settings_.deferred_ && !deferredPass_)
     {
+        basePass_ = nullptr;
+        alphaPass_ = nullptr;
+        deferredPass_ = MakeShared<UnlitScenePass>(this, "PASS_DEFERRED", "deferred");
+
         deferredFinal_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
         deferredAlbedo_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
         deferredNormal_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
         deferredDepth_ = CreateScreenBuffer({ Graphics::GetReadableDepthStencilFormat() });
+
+        drawableProcessor_->SetPasses({ deferredPass_ });
+
+        sceneBatchCollector_->ResetPasses();
+        sceneBatchCollector_->AddScenePass(deferredPass_);
     }
-    else if (!settings_.deferred_ && deferredDepth_)
+
+    if (!settings_.deferred_ && !basePass_)
     {
+        basePass_ = MakeShared<OpaqueForwardLightingScenePass>(this, "PASS_BASE", "base", "litbase", "light");
+        alphaPass_ = MakeShared<AlphaForwardLightingScenePass>(this, "PASS_ALPHA", "alpha", "alpha", "litalpha");
+        deferredPass_ = nullptr;
+
         deferredFinal_ = nullptr;
         deferredAlbedo_ = nullptr;
         deferredNormal_ = nullptr;
         deferredDepth_ = nullptr;
+
+        drawableProcessor_->SetPasses({ basePass_, alphaPass_ });
+
+        sceneBatchCollector_->ResetPasses();
+        sceneBatchCollector_->AddScenePass(basePass_);
+        sceneBatchCollector_->AddScenePass(alphaPass_);
     }
 
     return true;
@@ -574,25 +669,28 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
 void RenderPipeline::Update(const FrameInfo& frameInfo)
 {
+    // Setup frame info
     frameInfo_.timeStep_ = frameInfo.timeStep_;
     frameInfo_.frameNumber_ = frameInfo.frameNumber_;
-    numThreads_ = workQueue_->GetNumThreads() + 1;
-}
+    frameInfo_.numThreads_ = workQueue_->GetNumThreads() + 1;
 
-void RenderPipeline::PostTask(std::function<void(unsigned)> task)
-{
-    workQueue_->AddWorkItem(ea::move(task), M_MAX_UNSIGNED);
-}
+    // Begin update event
+    OnUpdateBegin(this, frameInfo_);
 
-void RenderPipeline::CompleteTasks()
-{
-    workQueue_->Complete(M_MAX_UNSIGNED);
-}
+    // Collect occluders
+    // TODO(renderer): Make optional
+    OccluderOctreeQuery occluderQuery(occluders_,
+        frameInfo_.cullCamera_->GetFrustum(), frameInfo_.cullCamera_->GetViewMask());
+    frameInfo_.octree_->GetDrawables(occluderQuery);
 
-void RenderPipeline::CollectDrawables(ea::vector<Drawable*>& drawables, Camera* camera, DrawableFlags flags)
-{
-    FrustumOctreeQuery query(drawables, camera->GetFrustum(), flags, camera->GetViewMask());
-    frameInfo_.octree_->GetDrawables(query);
+    // Collect visible drawables
+    // TODO(renderer): Add occlusion culling
+    FrustumOctreeQuery drawableQuery(drawables_, frameInfo_.cullCamera_->GetFrustum(),
+        DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, frameInfo_.cullCamera_->GetViewMask());
+    frameInfo_.octree_->GetDrawables(drawableQuery);
+
+    // End update event
+    OnUpdateEnd(this, frameInfo_);
 }
 
 void RenderPipeline::Render()
@@ -613,10 +711,60 @@ void RenderPipeline::Render()
     //viewport_->BeginFrame();
     shadowMapAllocator_->Reset();
 
-    // Collect and process visible drawables
-    static ea::vector<Drawable*> drawablesInMainCamera;
-    drawablesInMainCamera.clear();
-    CollectDrawables(drawablesInMainCamera, frameInfo_.cullCamera_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT);
+    // Collect and process occluders
+    // TODO(renderer): Fix me
+#if 0
+    const unsigned maxOccluderTriangles_ = renderer_->GetMaxOccluderTriangles();
+    unsigned activeOccluders_ = 0;
+    if (maxOccluderTriangles_ > 0 && occluders.size() > 0)
+    {
+        //UpdateOccluders(occluders_, cullCamera_);
+        occlusionBuffer_ = MakeShared<OcclusionBuffer>(context_);
+        occlusionBuffer_->SetSize(256, 256, true);
+        occlusionBuffer_->SetView(frameInfo_.cullCamera_);
+        occlusionBuffer_->SetMaxTriangles((unsigned)maxOccluderTriangles_);
+        occlusionBuffer_->Clear();
+
+        if (!occlusionBuffer_->IsThreaded())
+        {
+            // If not threaded, draw occluders one by one and test the next occluder against already rasterized depth
+            for (unsigned i = 0; i < occluders.size(); ++i)
+            {
+                Drawable* occluder = occluders[i];
+                if (i > 0)
+                {
+                    // For subsequent occluders, do a test against the pixel-level occlusion occlusionBuffer_ to see if rendering is necessary
+                    if (!occlusionBuffer_->IsVisible(occluder->GetWorldBoundingBox()))
+                        continue;
+                }
+
+                // Check for running out of triangles
+                ++activeOccluders_;
+                bool success = occluder->DrawOcclusion(occlusionBuffer_);
+                // Draw triangles submitted by this occluder
+                occlusionBuffer_->DrawTriangles();
+                if (!success)
+                    break;
+            }
+        }
+        else
+        {
+            // In threaded mode submit all triangles first, then render (cannot test in this case)
+            for (unsigned i = 0; i < occluders.size(); ++i)
+            {
+                // Check for running out of triangles
+                ++activeOccluders_;
+                if (!occluders[i]->DrawOcclusion(occlusionBuffer_))
+                    break;
+            }
+
+            occlusionBuffer_->DrawTriangles();
+        }
+
+        // Finally build the depth mip levels
+        occlusionBuffer_->BuildDepthHierarchy();
+    }
+#endif
 
     // Process batches
     /*static ScenePassDescription passes[] = {
@@ -628,24 +776,8 @@ void RenderPipeline::Render()
     };*/
     sceneBatchCollector_->SetMaxPixelLights(4);
 
-    static auto basePass = MakeShared<OpaqueForwardLightingScenePass>(context_, "PASS_BASE", "base", "litbase", "light");
-    static auto alphaPass = MakeShared<AlphaForwardLightingScenePass>(context_, "PASS_ALPHA", "alpha", "alpha", "litalpha");
-    static auto deferredPass = MakeShared<UnlitScenePass>(context_, "PASS_DEFERRED", "deferred");
-    static auto shadowPass = MakeShared<ShadowScenePass>(context_, "PASS_SHADOW", "shadow");
-    sceneBatchCollector_->ResetPasses();
-    sceneBatchCollector_->SetShadowPass(shadowPass);
-    if (settings_.deferred_)
-    {
-        sceneBatchCollector_->AddScenePass(deferredPass);
-    }
-    else
-    {
-        sceneBatchCollector_->AddScenePass(basePass);
-        sceneBatchCollector_->AddScenePass(alphaPass);
-    }
-
     sceneBatchCollector_->BeginFrame(frameInfo_, *this);
-    sceneBatchCollector_->ProcessVisibleDrawables(drawablesInMainCamera);
+    sceneBatchCollector_->ProcessVisibleDrawables(drawables_);
     sceneBatchCollector_->ProcessVisibleLights();
     sceneBatchCollector_->UpdateGeometries();
     sceneBatchCollector_->CollectSceneBatches();
@@ -662,7 +794,7 @@ void RenderPipeline::Render()
         for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
         {
             const SceneLightShadowSplit& split = sceneLight->GetSplit(splitIndex);
-            const auto& shadowBatches = shadowPass->GetSortedShadowBatches(split);
+            const auto& shadowBatches = shadowPass_->GetSortedShadowBatches(split);
 
             drawQueue_->Reset();
             sceneBatchRenderer_->RenderShadowBatches(*drawQueue_, *sceneBatchCollector_, split.shadowCamera_, zone, shadowBatches);
@@ -681,7 +813,7 @@ void RenderPipeline::Render()
         deferredDepth_->ClearDepthStencil();
         deferredDepth_->SetRenderTargets({ deferredFinal_, deferredAlbedo_, deferredNormal_ });
         drawQueue_->Reset();
-        sceneBatchRenderer_->RenderUnlitBaseBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, deferredPass->GetBatches());
+        sceneBatchRenderer_->RenderUnlitBaseBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, deferredPass_->GetBatches());
         drawQueue_->Execute();
 
         // Draw deferred lights
@@ -709,10 +841,10 @@ void RenderPipeline::Render()
         viewportDepth_->SetRenderTargets({ viewportColor_ });
 
         drawQueue_->Reset();
-        sceneBatchRenderer_->RenderUnlitBaseBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, basePass->GetSortedUnlitBaseBatches());
-        sceneBatchRenderer_->RenderLitBaseBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, basePass->GetSortedLitBaseBatches());
-        sceneBatchRenderer_->RenderLightBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, basePass->GetSortedLightBatches());
-        sceneBatchRenderer_->RenderAlphaBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, alphaPass->GetSortedBatches());
+        sceneBatchRenderer_->RenderUnlitBaseBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, basePass_->GetSortedUnlitBaseBatches());
+        sceneBatchRenderer_->RenderLitBaseBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, basePass_->GetSortedLitBaseBatches());
+        sceneBatchRenderer_->RenderLightBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, basePass_->GetSortedLightBatches());
+        sceneBatchRenderer_->RenderAlphaBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, alphaPass_->GetSortedBatches());
         drawQueue_->Execute();
     }
 

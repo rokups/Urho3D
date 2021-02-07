@@ -29,6 +29,8 @@
 #include "../Graphics/Technique.h"
 #include "../RenderPipeline/ScenePass.h"
 
+#include <EASTL/sort.h>
+
 #include "../DebugNew.h"
 
 namespace Urho3D
@@ -47,15 +49,15 @@ ea::string NormalizeShaderDefine(ea::string_view define)
 
 }
 
-ScenePass::ScenePass(Context* context,
+ScenePass::ScenePass(RenderPipeline* renderPipeline,
     const ea::string& unlitBaseTag, const ea::string& litBaseTag, const ea::string& lightTag,
     unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
-    : Object(context)
+    : SceneRenderingPass(renderPipeline, true, unlitBasePassIndex, litBasePassIndex, lightPassIndex)
     , workQueue_(context_->GetSubsystem<WorkQueue>())
     , renderer_(context_->GetSubsystem<Renderer>())
-    , unlitBasePassIndex_(unlitBasePassIndex)
+    /*, unlitBasePassIndex_(unlitBasePassIndex)
     , litBasePassIndex_(litBasePassIndex)
-    , lightPassIndex_(lightPassIndex)
+    , lightPassIndex_(lightPassIndex)*/
     , unlitBaseTag_(NormalizeShaderDefine(unlitBaseTag))
     , litBaseTag_(NormalizeShaderDefine(litBaseTag))
     , lightTag_(NormalizeShaderDefine(lightTag))
@@ -85,7 +87,7 @@ void ScenePass::BeginFrame()
     lightBatches_.Clear(numThreads_);
 }
 
-bool ScenePass::AddSourceBatch(Drawable* drawable, unsigned sourceBatchIndex, Technique* technique)
+/*bool ScenePass::AddSourceBatch(Drawable* drawable, unsigned sourceBatchIndex, Technique* technique)
 {
     const unsigned workerThreadIndex = WorkQueue::GetWorkerThreadIndex();
 
@@ -115,7 +117,7 @@ bool ScenePass::AddSourceBatch(Drawable* drawable, unsigned sourceBatchIndex, Te
         return false;
     }
     return false;
-}
+}*/
 
 void ScenePass::CollectSceneBatches(unsigned mainLightIndex, ea::span<SceneLight*> sceneLights,
     const DrawableLightingData& drawableLighting, Camera* camera, ScenePipelineStateCacheCallback& callback)
@@ -188,7 +190,7 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
 
             BaseSceneBatch lightBatch = sceneBatch;
             lightBatch.lightIndex_ = lightIndex;
-            lightBatch.pass_ = intermediateBatch.additionalPass_;
+            lightBatch.pass_ = intermediateBatch.lightPass_;
 
             lightBatch.pipelineState_ = lightPipelineStateCache_.GetPipelineState({ lightBatch, lightHash });
             const unsigned batchIndex = lightBatches_.Insert(lightBatch).second;
@@ -241,9 +243,9 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
     }
 }
 
-ForwardLightingScenePass::ForwardLightingScenePass(Context* context, const ea::string& tag,
+ForwardLightingScenePass::ForwardLightingScenePass(RenderPipeline* renderPipeline, const ea::string& tag,
     const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass)
-    : ScenePass(context,
+    : ScenePass(renderPipeline,
         Format("{0} {0}_UNLIT", tag),
         Format("{0} {0}_LITBASE", tag),
         Format("{0} {0}_LIGHT", tag),
@@ -283,8 +285,8 @@ void AlphaForwardLightingScenePass::SortSceneBatches()
     ea::sort(sortedBatches_.begin(), sortedBatches_.end());
 }
 
-UnlitScenePass::UnlitScenePass(Context* context, const ea::string& tag, const ea::string& pass)
-    : ScenePass(context, tag, "", "", Technique::GetPassIndex(pass), M_MAX_UNSIGNED, M_MAX_UNSIGNED)
+UnlitScenePass::UnlitScenePass(RenderPipeline* renderPipeline, const ea::string& tag, const ea::string& pass)
+    : ScenePass(renderPipeline, tag, "", "", Technique::GetPassIndex(pass), M_MAX_UNSIGNED, M_MAX_UNSIGNED)
 {
 }
 

@@ -96,6 +96,10 @@ public:
     /// Return ambient brightness.
     float GetAmbientBrightness() const { return ambientBrightness_; }
 
+    /// Return zone's ambient light in linear space.
+    /// TODO(renderer): Cache this value
+    const Color GetLinearAmbient() const { return ambientColor_.GammaToLinear() * ambientBrightness_; }
+
     /// Return ambient start color. Not safe to call from worker threads due to possible octree query.
     /// @property
     const Color& GetAmbientStartColor();

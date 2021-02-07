@@ -55,10 +55,10 @@ struct PointLightLitGeometriesQuery : public SphereOctreeQuery
 
     /// Construct.
     PointLightLitGeometriesQuery(ea::vector<Drawable*>& result, ea::vector<Drawable*>* shadowCasters,
-        const SceneDrawableData& transientData, Light* light, unsigned viewMask)
+        const DrawableProcessor* drawableProcessor, Light* light, unsigned viewMask)
         : SphereOctreeQuery(result, GetLightSphere(light), DRAWABLE_GEOMETRY, viewMask)
         , shadowCasters_(shadowCasters)
-        , transientData_(&transientData)
+        , drawableProcessor_(drawableProcessor)
         , lightMask_(light->GetLightMaskEffective())
     {
         if (shadowCasters_)
@@ -81,13 +81,13 @@ struct PointLightLitGeometriesQuery : public SphereOctreeQuery
     ea::pair<bool, bool> IsLitOrShadowCaster(Drawable* drawable, bool inside) const
     {
         const unsigned drawableIndex = drawable->GetDrawableIndex();
-        const unsigned traits = transientData_->traits_[drawableIndex];
+        const unsigned geometryFlags = drawableProcessor_->GetGeometryRenderFlags(drawableIndex);
 
         const bool isInside = (drawable->GetDrawableFlags() & drawableFlags_)
             && (drawable->GetViewMask() & viewMask_)
             && (inside || sphere_.IsInsideFast(drawable->GetWorldBoundingBox()));
         const bool isLit = isInside
-            && (traits & SceneDrawableData::DrawableVisibleGeometry)
+            && (geometryFlags & GeometryRenderFlag::Visible)
             && (drawable->GetLightMaskInZone() & lightMask_);
         const bool isShadowCaster = shadowCasters_ && isInside
             && drawable->GetCastShadows()
@@ -98,7 +98,7 @@ struct PointLightLitGeometriesQuery : public SphereOctreeQuery
     /// Result array of shadow casters, if applicable.
     ea::vector<Drawable*>* shadowCasters_{};
     /// Visiblity cache.
-    const SceneDrawableData* transientData_{};
+    const DrawableProcessor* drawableProcessor_{};
     /// Light mask to check.
     unsigned lightMask_{};
 };
@@ -108,10 +108,10 @@ struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
 {
     /// Construct.
     SpotLightLitGeometriesQuery(ea::vector<Drawable*>& result, ea::vector<Drawable*>* shadowCasters,
-        const SceneDrawableData& transientData, Light* light, unsigned viewMask)
+        const DrawableProcessor* drawableProcessor, Light* light, unsigned viewMask)
         : FrustumOctreeQuery(result, light->GetFrustum(), DRAWABLE_GEOMETRY, viewMask)
         , shadowCasters_(shadowCasters)
-        , transientData_(&transientData)
+        , drawableProcessor_(drawableProcessor)
         , lightMask_(light->GetLightMaskEffective())
     {
         if (shadowCasters_)
@@ -134,13 +134,13 @@ struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
     ea::pair<bool, bool> IsLitOrShadowCaster(Drawable* drawable, bool inside) const
     {
         const unsigned drawableIndex = drawable->GetDrawableIndex();
-        const unsigned traits = transientData_->traits_[drawableIndex];
+        const unsigned geometryFlags = drawableProcessor_->GetGeometryRenderFlags(drawableIndex);
 
         const bool isInside = (drawable->GetDrawableFlags() & drawableFlags_)
             && (drawable->GetViewMask() & viewMask_)
             && (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()));
         const bool isLit = isInside
-            && (traits & SceneDrawableData::DrawableVisibleGeometry)
+            && (geometryFlags & GeometryRenderFlag::Visible)
             && (drawable->GetLightMaskInZone() & lightMask_);
         const bool isShadowCaster = shadowCasters_ && isInside
             && drawable->GetCastShadows()
@@ -151,7 +151,7 @@ struct SpotLightLitGeometriesQuery : public FrustumOctreeQuery
     /// Result array of shadow casters, if applicable.
     ea::vector<Drawable*>* shadowCasters_{};
     /// Visiblity cache.
-    const SceneDrawableData* transientData_{};
+    const DrawableProcessor* drawableProcessor_{};
     /// Light mask to check.
     unsigned lightMask_{};
 };
@@ -232,20 +232,20 @@ Matrix4 CalculateSpotMatrix(Light* light)
 }
 
 void SceneLightShadowSplit::SetupDirLightShadowCamera(Light* light, Camera* cullCamera,
-    const ea::vector<Drawable*>& litGeometries,
-    const DrawableZRange& sceneZRange, const ea::vector<DrawableZRange>& drawableZRanges)
+    const ea::vector<Drawable*>& litGeometries, const DrawableProcessor* drawableProcessor)
 {
     Node* shadowCameraNode = shadowCamera_->GetNode();
     Node* lightNode = light->GetNode();
     float extrusionDistance = Min(cullCamera->GetFarClip(), light->GetShadowMaxExtrusion());
     const FocusParameters& parameters = light->GetShadowFocus();
+    const FloatRange sceneZRange = drawableProcessor->GetSceneZRange();
 
     // Calculate initial position & rotation
     Vector3 pos = cullCamera->GetNode()->GetWorldPosition() - extrusionDistance * lightNode->GetWorldDirection();
     shadowCameraNode->SetTransform(pos, lightNode->GetWorldRotation());
 
     // Use the scene Z bounds to limit frustum size if applicable
-    const DrawableZRange splitZRange = parameters.focus_ ? sceneZRange & zRange_ : zRange_;
+    const FloatRange splitZRange = parameters.focus_ ? (sceneZRange & zRange_) : zRange_;
 
     // Calculate main camera shadowed frustum in light's view space
     Frustum splitFrustum = cullCamera->GetSplitFrustum(splitZRange.first, splitZRange.second);
@@ -259,8 +259,8 @@ void SceneLightShadowSplit::SetupDirLightShadowCamera(Light* light, Camera* cull
 
         for (Drawable* drawable : litGeometries)
         {
-            const DrawableZRange& drawableZRange = drawableZRanges[drawable->GetDrawableIndex()];
-            if (drawableZRange.Interset(splitZRange))
+            const FloatRange& geometryZRange = drawableProcessor->GetGeometryZRange(drawable->GetDrawableIndex());
+            if (geometryZRange.Interset(splitZRange))
                 litGeometriesBox.Merge(drawable->GetWorldBoundingBox());
         }
 
@@ -461,6 +461,7 @@ void SceneLight::UpdateLitGeometriesAndShadowCasters(SceneLightProcessContext& c
     Camera* cullCamera = ctx.frameInfo_.camera_;
     Octree* octree = ctx.frameInfo_.octree_;
     const Frustum& frustum = cullCamera->GetFrustum();
+    const FloatRange& sceneZRange = ctx.dp_->GetSceneZRange();
 
     if (hasShadow_)
     {
@@ -481,7 +482,7 @@ void SceneLight::UpdateLitGeometriesAndShadowCasters(SceneLightProcessContext& c
             // For directional light check that the split is inside the visible scene: if not, can skip the split
             if (lightType == LIGHT_DIRECTIONAL)
             {
-                if (!ctx.sceneZRange_.Interset(splits_[i].zRange_))
+                if (!sceneZRange.Interset(splits_[i].zRange_))
                     continue;
 
                 // Reuse lit geometry query for all except directional lights
@@ -726,21 +727,21 @@ void SceneLight::CollectLitGeometriesAndMaybeShadowCasters(SceneLightProcessCont
     case LIGHT_SPOT:
     {
         SpotLightLitGeometriesQuery query(litGeometries_, hasShadow_ ? &tempShadowCasters_ : nullptr,
-            *ctx.drawableData_, light_, ctx.frameInfo_.camera_->GetViewMask());
+            ctx.dp_, light_, ctx.frameInfo_.camera_->GetViewMask());
         octree->GetDrawables(query);
         break;
     }
     case LIGHT_POINT:
     {
         PointLightLitGeometriesQuery query(litGeometries_, hasShadow_ ? &tempShadowCasters_ : nullptr,
-            *ctx.drawableData_, light_, ctx.frameInfo_.camera_->GetViewMask());
+            ctx.dp_, light_, ctx.frameInfo_.camera_->GetViewMask());
         octree->GetDrawables(query);
         break;
     }
     case LIGHT_DIRECTIONAL:
     {
         const unsigned lightMask = light_->GetLightMask();
-        for (Drawable* drawable : *ctx.visibleGeometries_)
+        for (Drawable* drawable : ctx.dp_->GetVisibleGeometries())
         {
             if (drawable->GetLightMaskInZone() & lightMask)
                 litGeometries_.push_back(drawable);
@@ -792,8 +793,7 @@ void SceneLight::SetupShadowCameras(SceneLightProcessContext& ctx)
             // Setup the shadow camera for the split
             Camera* shadowCamera = GetOrCreateShadowCamera(i);
             splits_[i].zRange_ = { nearSplit, farSplit };
-            splits_[i].SetupDirLightShadowCamera(light_, ctx.frameInfo_.camera_, litGeometries_,
-                ctx.sceneZRange_, ctx.drawableData_->zRange_);
+            splits_[i].SetupDirLightShadowCamera(light_, ctx.frameInfo_.camera_, litGeometries_, ctx.dp_);
 
             nearSplit = farSplit;
             ++numSplits_;
@@ -861,7 +861,7 @@ bool SceneLight::IsShadowCasterVisible(SceneLightProcessContext& ctx,
     {
         // If light is not directional, can do a simple check: if object is visible, its shadow is too
         const unsigned drawableIndex = drawable->GetDrawableIndex();
-        if (ctx.drawableData_->traits_[drawableIndex] & SceneDrawableData::DrawableVisibleGeometry)
+        if (ctx.dp_->GetGeometryRenderFlags(drawableIndex) & GeometryRenderFlag::Visible)
             return true;
 
         // For perspective lights, extrusion direction depends on the position of the shadow caster
@@ -897,6 +897,7 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
     const Matrix3x4& lightView = shadowCamera->GetView();
     const Matrix4& lightProj = shadowCamera->GetProjection();
     LightType type = light_->GetLightType();
+    const FloatRange& sceneZRange = ctx.dp_->GetSceneZRange();
 
     splits_[splitIndex].shadowCasterBox_.Clear();
 
@@ -905,10 +906,10 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
     // frustum, so that shadow casters do not get rendered into unnecessary splits
     Frustum lightViewFrustum;
     if (type != LIGHT_DIRECTIONAL)
-        lightViewFrustum = cullCamera->GetSplitFrustum(ctx.sceneZRange_.first, ctx.sceneZRange_.second).Transformed(lightView);
+        lightViewFrustum = cullCamera->GetSplitFrustum(sceneZRange.first, sceneZRange.second).Transformed(lightView);
     else
     {
-        const DrawableZRange splitZRange = ctx.sceneZRange_ & splits_[splitIndex].zRange_;
+        const DrawableZRange splitZRange = sceneZRange & splits_[splitIndex].zRange_;
         lightViewFrustum = cullCamera->GetSplitFrustum(splitZRange.first, splitZRange.second).Transformed(lightView);
     }
 
@@ -939,7 +940,7 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
         // Note: as lights are processed threaded, it is possible a drawable's UpdateBatches() function is called several
         // times. However, this should not cause problems as no scene modification happens at this point.
         const unsigned drawableIndex = drawable->GetDrawableIndex();
-        const bool isUpdated = ctx.drawableData_->isUpdated_[drawableIndex].test_and_set(std::memory_order_relaxed);
+        const bool isUpdated = ctx.dp_->GET_UPDATED(drawableIndex).test_and_set(std::memory_order_relaxed);
         if (!isUpdated)
             ctx.geometriesToBeUpdates_->PushBack(workerThreadIndex, drawable);
 

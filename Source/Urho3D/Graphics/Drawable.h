@@ -74,6 +74,14 @@ enum UpdateGeometryType
     UPDATE_WORKER_THREAD
 };
 
+/// Global illumination mode.
+enum class GlobalIlluminationType
+{
+    None,
+    UseLightMap,
+    BlendLightProbes,
+};
+
 /// Rendering frame update parameters.
 struct FrameInfo
 {
@@ -81,6 +89,8 @@ struct FrameInfo
     unsigned frameNumber_{};
     /// Time elapsed since last frame.
     float timeStep_{};
+    /// Number of threads used by WorkQueue.
+    unsigned numThreads_{};
     /// Viewport size.
     IntVector2 viewSize_;
     /// Viewport rectangle.
@@ -237,6 +247,8 @@ public:
     /// Set occludee flag.
     /// @property
     void SetOccludee(bool enable);
+    /// Set GI type.
+    void SetGlobalIlluminationType(GlobalIlluminationType type);
     /// Mark for update and octree reinsertion. Update is automatically queued when the drawable's scene node moves or changes scale.
     void MarkForUpdate();
 
@@ -294,6 +306,9 @@ public:
     /// Return occludee flag.
     /// @property
     bool IsOccludee() const { return occludee_; }
+
+    /// Return global illumination type.
+    GlobalIlluminationType GetGlobalIlluminationType() const { return giType_; }
 
     /// Return whether is in view this frame from any viewport camera. Excludes shadow map cameras.
     /// @property
@@ -438,6 +453,8 @@ protected:
     ea::vector<SourceBatch> batches_;
     /// Drawable flags.
     DrawableFlags drawableFlags_;
+    /// Global illumination type.
+    GlobalIlluminationType giType_{};
     /// Bounding box dirty flag.
     bool worldBoundingBoxDirty_;
     /// Shadowcaster flag.
