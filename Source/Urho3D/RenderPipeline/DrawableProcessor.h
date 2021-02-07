@@ -145,20 +145,29 @@ public:
     /// Return geometry Z range.
     const FloatRange& GetGeometryZRange(unsigned drawableIndex) const { return geometryZRanges_[drawableIndex]; }
 
-    /// Process geometry updates.
-    void ProcessGeometryUpdates();
+    /// Queue drawable update. Ignored if already updated or queued.
+    /// Safe to call from WorkQueue thread.
+    void QueueDrawableUpdate(Drawable* drawable);
+    /// Update queued drawables.
+    void ProcessQueuedDrawables();
+
+    /// Update drawable geometries if needed.
+    void UpdateGeometries();
 
     // TODO(renderer): Remove me
-    std::atomic_flag& GET_UPDATED(unsigned drawableIndex) { return isDrawableUpdated_[drawableIndex]; }
     auto& GET_LIGHT() { return geometryLighting_; }
-    auto& GET_TGU() { return threadedGeometryUpdates_; }
-    auto& GET_NTGU() { return nonThreadedGeometryUpdates_; }
 
 protected:
     /// Called when update begins.
     void OnUpdateBegin(const FrameInfo& frameInfo);
-    /// Process drawable.
-    void ProcessDrawable(Drawable* drawable);
+    /// Process visible drawable.
+    void ProcessVisibleDrawable(Drawable* drawable);
+    /// Process queued invisible drawable.
+    void ProcessQueuedDrawable(Drawable* drawable);
+    /// Update zone of drawable.
+    void UpdateDrawableZone(const BoundingBox& boundingBox, Drawable* drawable);
+    /// Queue drawable geometry update.
+    void QueueDrawableGeometryUpdate(unsigned threadIndex, Drawable* drawable);
     /// Calculate Z range of bounding box.
     FloatRange CalculateBoundingBoxZRange(const BoundingBox& boundingBox) const;
 
@@ -220,6 +229,9 @@ private:
 
     /// Visible lights.
     WorkQueueVector<Light*> visibleLights_;
+
+    /// Delayed drawable updates.
+    WorkQueueVector<Drawable*> queuedDrawableUpdates_{};
 };
 
 }

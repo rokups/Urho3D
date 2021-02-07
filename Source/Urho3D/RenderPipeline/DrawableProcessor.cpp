@@ -133,7 +133,10 @@ void DrawableProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
     visibleGeometries_.Clear(frameInfo_.numThreads_);
     threadedGeometryUpdates_.Clear(frameInfo_.numThreads_);
     nonThreadedGeometryUpdates_.Clear(frameInfo_.numThreads_);
+
     visibleLights_.Clear(frameInfo_.numThreads_);
+
+    queuedDrawableUpdates_.Clear(frameInfo_.numThreads_);
 }
 
 void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables)
@@ -141,7 +144,7 @@ void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& dra
     ForEachParallel(workQueue_, drawables,
         [&](unsigned /*index*/, Drawable* drawable)
     {
-        ProcessDrawable(drawable);
+        ProcessVisibleDrawable(drawable);
     });
 
     // Compute scene Z range
@@ -149,7 +152,31 @@ void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& dra
         sceneZRange_ |= range;
 }
 
-void DrawableProcessor::ProcessDrawable(Drawable* drawable)
+void DrawableProcessor::UpdateDrawableZone(const BoundingBox& boundingBox, Drawable* drawable)
+{
+    const Vector3 drawableCenter = boundingBox.Center();
+    CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
+    const float drawableCacheDistanceSquared = (cachedZone.cachePosition_ - drawableCenter).LengthSquared();
+
+    // Force update if bounding box is invalid
+    const bool forcedUpdate = !std::isfinite(drawableCacheDistanceSquared);
+    if (forcedUpdate || drawableCacheDistanceSquared >= cachedZone.cacheInvalidationDistanceSquared_)
+    {
+        cachedZone = frameInfo_.octree_->QueryZone(drawableCenter, drawable->GetZoneMask());
+        drawable->MarkPipelineStateHashDirty();
+    }
+}
+
+void DrawableProcessor::QueueDrawableGeometryUpdate(unsigned threadIndex, Drawable* drawable)
+{
+    const UpdateGeometryType updateGeometryType = drawable->GetUpdateGeometryType();
+    if (updateGeometryType == UPDATE_MAIN_THREAD)
+        nonThreadedGeometryUpdates_.PushBack(threadIndex, drawable);
+    else
+        threadedGeometryUpdates_.PushBack(threadIndex, drawable);
+}
+
+void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
 {
     // TODO(renderer): Add occlusion culling
     const unsigned drawableIndex = drawable->GetDrawableIndex();
@@ -157,6 +184,7 @@ void DrawableProcessor::ProcessDrawable(Drawable* drawable)
 
     drawable->UpdateBatches(frameInfo_);
     drawable->MarkInView(frameInfo_);
+
     isDrawableUpdated_[drawableIndex].test_and_set(std::memory_order_relaxed);
 
     // Skip if too far
@@ -174,14 +202,7 @@ void DrawableProcessor::ProcessDrawable(Drawable* drawable)
         const FloatRange zRange = CalculateBoundingBoxZRange(boundingBox);
 
         // Update zone
-        const Vector3 drawableCenter = boundingBox.Center();
-        CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
-        const float drawableCacheDistanceSquared = (cachedZone.cachePosition_ - drawableCenter).LengthSquared();
-        if (!zRange.IsValid() || drawableCacheDistanceSquared >= cachedZone.cacheInvalidationDistanceSquared_)
-        {
-            cachedZone = frameInfo_.octree_->QueryZone(drawableCenter, drawable->GetZoneMask());
-            drawable->MarkPipelineStateHashDirty();
-        }
+        UpdateDrawableZone(boundingBox, drawable);
 
         // Do not add "infinite" objects like skybox to prevent shadow map focusing behaving erroneously
         if (!zRange.IsValid())
@@ -239,6 +260,7 @@ void DrawableProcessor::ProcessDrawable(Drawable* drawable)
                 lightAccumulator.sh_ = {};
 
             // Apply ambient from Zone
+            const CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
             lightAccumulator.sh_ += cachedZone.zone_->GetLinearAmbient().ToVector3();
         }
 
@@ -254,11 +276,7 @@ void DrawableProcessor::ProcessDrawable(Drawable* drawable)
             flag |= GeometryRenderFlag::ForwardLit;
 
         // Queue geometry update
-        const UpdateGeometryType updateGeometryType = drawable->GetUpdateGeometryType();
-        if (updateGeometryType == UPDATE_MAIN_THREAD)
-            nonThreadedGeometryUpdates_.PushBack(threadIndex, drawable);
-        else
-            threadedGeometryUpdates_.PushBack(threadIndex, drawable);
+        QueueDrawableGeometryUpdate(threadIndex, drawable);
     }
     else if (drawable->GetDrawableFlags() & DRAWABLE_LIGHT)
     {
@@ -271,13 +289,47 @@ void DrawableProcessor::ProcessDrawable(Drawable* drawable)
     }
 }
 
-void DrawableProcessor::ProcessGeometryUpdates()
+void DrawableProcessor::QueueDrawableUpdate(Drawable* drawable)
 {
-    // TODO(renderer): Add multithreading
-    for (Drawable* drawable : threadedGeometryUpdates_)
+    const unsigned drawableIndex = drawable->GetDrawableIndex();
+    const bool isUpdated = isDrawableUpdated_[drawableIndex].test_and_set(std::memory_order_relaxed);
+    if (!isUpdated)
+        queuedDrawableUpdates_.Insert(drawable);
+}
+
+void DrawableProcessor::ProcessQueuedDrawables()
+{
+    ForEachParallel(workQueue_, queuedDrawableUpdates_,
+        [&](unsigned /*index*/, Drawable* drawable)
     {
-        drawable->UpdateGeometry(frameInfo_);
-    };
+        ProcessQueuedDrawable(drawable);
+    });
+    queuedDrawableUpdates_.Clear(frameInfo_.numThreads_);
+}
+
+void DrawableProcessor::ProcessQueuedDrawable(Drawable* drawable)
+{
+    drawable->UpdateBatches(frameInfo_);
+    drawable->MarkInView(frameInfo_);
+
+    const BoundingBox& boundingBox = drawable->GetWorldBoundingBox();
+    UpdateDrawableZone(boundingBox, drawable);
+    QueueDrawableGeometryUpdate(WorkQueue::GetWorkerThreadIndex(), drawable);
+}
+
+void DrawableProcessor::UpdateGeometries()
+{
+    // Update in worker threads
+    ForEachParallel(workQueue_, threadedGeometryUpdates_,
+        [&](unsigned /*index*/, Drawable* drawable)
+    {
+        if (drawable->GetUpdateGeometryType() == UPDATE_MAIN_THREAD)
+            nonThreadedGeometryUpdates_.Insert(drawable);
+        else
+            drawable->UpdateGeometry(frameInfo_);
+    });
+
+    // Update in main thread
     for (Drawable* drawable : nonThreadedGeometryUpdates_)
     {
         drawable->UpdateGeometry(frameInfo_);

@@ -30,6 +30,7 @@
 namespace Urho3D
 {
 
+#if 0
 /// Min and max Z value of drawable(s).
 using DrawableZRange = NumericRange<float>;
 
@@ -115,5 +116,7 @@ struct SceneDrawableData
         zRange_.resize(numDrawables);
     }
 };
+
+#endif
 
 }

@@ -167,7 +167,7 @@ private:
     //SceneZRange sceneZRange_;
 
     /// Shadow caster drawables to be updated.
-    WorkQueueVector<Drawable*> shadowCastersToBeUpdated_;
+    //WorkQueueVector<Drawable*> shadowCastersToBeUpdated_;
     /// Geometries to be updated from worker threads.
     //WorkQueueVector<Drawable*> threadedGeometryUpdates_;
     /// Geometries to be updated from main thread.

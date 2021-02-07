@@ -98,7 +98,7 @@ struct SceneLightProcessContext
     /// Drawable data.
     //SceneDrawableData* drawableData_{};
     /// Geometries that has to be updated.
-    WorkQueueVector<Drawable*>* geometriesToBeUpdates_{};
+    //WorkQueueVector<Drawable*>* geometriesToBeUpdates_{};
 };
 
 /// Scene light shadow split.
@@ -117,7 +117,7 @@ struct SceneLightShadowSplit
     /// Combined bounding box of shadow casters in light projection space. Only used for focused spot lights.
     BoundingBox shadowCasterBox_{};
     /// Shadow camera Z range (directional lights only).
-    DrawableZRange zRange_{};
+    FloatRange zRange_{};
     /// Shadow map for split.
     ShadowMap shadowMap_;
 

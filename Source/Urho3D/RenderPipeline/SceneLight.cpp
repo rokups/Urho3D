@@ -909,7 +909,7 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
         lightViewFrustum = cullCamera->GetSplitFrustum(sceneZRange.first, sceneZRange.second).Transformed(lightView);
     else
     {
-        const DrawableZRange splitZRange = sceneZRange & splits_[splitIndex].zRange_;
+        const FloatRange splitZRange = sceneZRange & splits_[splitIndex].zRange_;
         lightViewFrustum = cullCamera->GetSplitFrustum(splitZRange.first, splitZRange.second).Transformed(lightView);
     }
 
@@ -937,12 +937,7 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
             continue;
 
         // Check shadow distance
-        // Note: as lights are processed threaded, it is possible a drawable's UpdateBatches() function is called several
-        // times. However, this should not cause problems as no scene modification happens at this point.
-        const unsigned drawableIndex = drawable->GetDrawableIndex();
-        const bool isUpdated = ctx.dp_->GET_UPDATED(drawableIndex).test_and_set(std::memory_order_relaxed);
-        if (!isUpdated)
-            ctx.geometriesToBeUpdates_->PushBack(workerThreadIndex, drawable);
+        ctx.dp_->QueueDrawableUpdate(drawable);
 
         // Project shadow caster bounding box to light view space for visibility check
         lightViewBox = drawable->GetWorldBoundingBox().Transformed(lightView);

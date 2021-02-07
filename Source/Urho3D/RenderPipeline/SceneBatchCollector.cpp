@@ -44,7 +44,7 @@ namespace
 {
 
 /// Helper class to evaluate min and max Z of the drawable.
-struct DrawableZRangeEvaluator
+/*struct DrawableZRangeEvaluator
 {
     explicit DrawableZRangeEvaluator(Camera* camera)
         : viewMatrix_(camera->GetView())
@@ -74,7 +74,7 @@ struct DrawableZRangeEvaluator
     Matrix3x4 viewMatrix_;
     Vector3 viewZ_;
     Vector3 absViewZ_;
-};
+};*/
 
 }
 
@@ -140,7 +140,7 @@ void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchColle
     //visibleGeometries_.Clear(numThreads_);
     //visibleLightsTemp_.Clear(numThreads_);
     //sceneZRange_.Clear(numThreads_);
-    shadowCastersToBeUpdated_.Clear(numThreads_);
+    //shadowCastersToBeUpdated_.Clear(numThreads_);
     //threadedGeometryUpdates_.Clear(numThreads_);
     //nonThreadedGeometryUpdates_.Clear(numThreads_);
 
@@ -294,7 +294,7 @@ void SceneBatchCollector::ProcessVisibleLights()
     //sceneLightProcessContext.sceneZRange_ = dp_->GetSceneZRange();
     //sceneLightProcessContext.visibleGeometries_ = &dp_->GetVisibleGeometries();
     //sceneLightProcessContext.drawableData_ = &transient_;
-    sceneLightProcessContext.geometriesToBeUpdates_ = &shadowCastersToBeUpdated_;
+    //sceneLightProcessContext.geometriesToBeUpdates_ = &shadowCastersToBeUpdated_;
     for (unsigned i = 0; i < visibleLights_.size(); ++i)
     {
         workQueue_->AddWorkItem([this, i, &sceneLightProcessContext](unsigned threadIndex)
@@ -332,6 +332,8 @@ void SceneBatchCollector::ProcessVisibleLights()
     }
 
     // Update batches for shadow casters
+    dp_->ProcessQueuedDrawables();
+#if 0
     ForEachParallel(workQueue_, 1u, shadowCastersToBeUpdated_,
         [&](unsigned /*index*/, Drawable* drawable)
     {
@@ -357,6 +359,7 @@ void SceneBatchCollector::ProcessVisibleLights()
         else
             dp_->GET_TGU().Insert(drawable);
     });
+#endif
 
     // Collect shadow caster batches
     for (SceneLight* sceneLight : visibleLights_)
@@ -439,7 +442,7 @@ void SceneBatchCollector::CollectSceneBatches()
 
 void SceneBatchCollector::UpdateGeometries()
 {
-    dp_->ProcessGeometryUpdates();
+    dp_->UpdateGeometries();
     // TODO(renderer): Add multithreading
     /*for (Drawable* drawable : threadedGeometryUpdates_)
     {
