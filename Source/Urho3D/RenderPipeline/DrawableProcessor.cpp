@@ -33,12 +33,41 @@
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../Scene/Scene.h"
 
+#include <EASTL/sort.h>
+
 #include "../DebugNew.h"
 
 namespace Urho3D
 {
 
-SceneRenderingPass::SceneRenderingPass(RenderPipeline* renderPipeline, bool needAmbient,
+namespace
+{
+
+/// Calculate light penalty for drawable for given absolute light penalty and light settings
+/// Order of penalties, from lower to higher:
+/// -2:      Important directional lights;
+/// -1:      Important point and spot lights;
+///  0 .. 2: Automatic lights;
+///  3 .. 5: Not important lights.
+float GetDrawableLightPenalty(float intensityPenalty, LightImportance importance, LightType type)
+{
+    switch (importance)
+    {
+    case LI_IMPORTANT:
+        return type == LIGHT_DIRECTIONAL ? -2 : -1;
+    case LI_AUTO:
+        return intensityPenalty <= 1.0f ? intensityPenalty : 2.0f - 1.0f / intensityPenalty;
+    case LI_NOT_IMPORTANT:
+        return intensityPenalty <= 1.0f ? 3.0f + intensityPenalty : 5.0f - 1.0f / intensityPenalty;
+    default:
+        assert(0);
+        return M_LARGE_VALUE;
+    }
+}
+
+}
+
+DrawableProcessorPass::DrawableProcessorPass(RenderPipeline* renderPipeline, bool needAmbient,
     unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
     : Object(renderPipeline->GetContext())
     , needAmbient_(needAmbient)
@@ -49,7 +78,7 @@ SceneRenderingPass::SceneRenderingPass(RenderPipeline* renderPipeline, bool need
 
 }
 
-SceneRenderingPass::AddResult SceneRenderingPass::AddBatch(unsigned threadIndex,
+DrawableProcessorPass::AddResult DrawableProcessorPass::AddBatch(unsigned threadIndex,
     Drawable* drawable, unsigned sourceBatchIndex, Technique* technique)
 {
     Pass* unlitBasePass = technique->GetPass(unlitBasePassIndex_);
@@ -80,7 +109,7 @@ SceneRenderingPass::AddResult SceneRenderingPass::AddBatch(unsigned threadIndex,
     return { false, false };
 }
 
-void SceneRenderingPass::OnUpdateBegin(const FrameInfo& frameInfo)
+void DrawableProcessorPass::OnUpdateBegin(const FrameInfo& frameInfo)
 {
     litBatches_.Clear(frameInfo.numThreads_);
     unlitBatches_.Clear(frameInfo.numThreads_);
@@ -95,7 +124,7 @@ DrawableProcessor::DrawableProcessor(RenderPipeline* renderPipeline)
     renderPipeline->OnUpdateBegin.Subscribe(this, &DrawableProcessor::OnUpdateBegin);
 }
 
-void DrawableProcessor::SetPasses(ea::vector<SharedPtr<SceneRenderingPass>> scenePasses)
+void DrawableProcessor::SetPasses(ea::vector<SharedPtr<DrawableProcessorPass>> scenePasses)
 {
     scenePasses_ = ea::move(scenePasses);
 }
@@ -134,7 +163,7 @@ void DrawableProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
     threadedGeometryUpdates_.Clear(frameInfo_.numThreads_);
     nonThreadedGeometryUpdates_.Clear(frameInfo_.numThreads_);
 
-    visibleLights_.Clear(frameInfo_.numThreads_);
+    visibleLightsTemp_.Clear(frameInfo_.numThreads_);
 
     queuedDrawableUpdates_.Clear(frameInfo_.numThreads_);
 }
@@ -146,6 +175,12 @@ void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& dra
     {
         ProcessVisibleDrawable(drawable);
     });
+
+    // Compose collected lights
+    visibleLights_.resize(visibleLightsTemp_.Size());
+    ea::copy(visibleLightsTemp_.Begin(), visibleLightsTemp_.End(), visibleLights_.begin());
+    const auto compareID = [](Light* lhs, Light* rhs) { return lhs->GetID() < rhs->GetID(); };
+    ea::sort(visibleLights_.begin(), visibleLights_.end(), compareID);
 
     // Compute scene Z range
     for (const FloatRange& range : sceneZRangeTemp_)
@@ -229,9 +264,9 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
                 continue;
 
             // Update scene passes
-            for (SceneRenderingPass* pass : scenePasses_)
+            for (DrawableProcessorPass* pass : scenePasses_)
             {
-                const SceneRenderingPass::AddResult result = pass->AddBatch(threadIndex, drawable, i, technique);
+                const DrawableProcessorPass::AddResult result = pass->AddBatch(threadIndex, drawable, i, technique);
                 if (result.litAdded_)
                     isForwardLit = true;
                 if (result.litAdded_ || (result.unlitAdded_ && pass->NeedAmbient()))
@@ -285,8 +320,37 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
 
         // Skip lights with zero brightness or black color, skip baked lights too
         if (!lightColor.Equals(Color::BLACK) && light->GetLightMaskEffective() != 0)
-            visibleLights_.PushBack(threadIndex, light);
+            visibleLightsTemp_.PushBack(threadIndex, light);
     }
+}
+
+void DrawableProcessor::ProcessForwardLighting(unsigned lightIndex, const ea::vector<Drawable*>& litGeometries)
+{
+    if (lightIndex >= visibleLights_.size())
+    {
+        URHO3D_LOGERROR("Invalid light index {}", lightIndex);
+        return;
+    }
+
+    Light* light = visibleLights_[lightIndex];
+    const LightType lightType = light->GetLightType();
+    const float lightIntensityPenalty = 1.0f / light->GetIntensityDivisor();
+
+    LightAccumulatorContext ctx;
+    ctx.maxVertexLights_ = settings_.maxVertexLights_;
+    ctx.maxPixelLights_ = settings_.maxPixelLights_;
+    ctx.lightImportance_ = light->GetLightImportance();
+    ctx.lightIndex_ = lightIndex;
+    ctx.lights_ = &visibleLights_;
+
+    ForEachParallel(workQueue_, litGeometries,
+        [&](unsigned /*index*/, Drawable* geometry)
+    {
+        const float distance = ea::max(light->GetDistanceTo(geometry), M_LARGE_EPSILON);
+        const float penalty = GetDrawableLightPenalty(distance * lightIntensityPenalty, ctx.lightImportance_, lightType);
+        const unsigned drawableIndex = geometry->GetDrawableIndex();
+        geometryLighting_[drawableIndex].AccumulateLight(ctx, penalty);
+    });
 }
 
 void DrawableProcessor::QueueDrawableUpdate(Drawable* drawable)

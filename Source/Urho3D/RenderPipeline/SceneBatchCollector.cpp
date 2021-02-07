@@ -315,12 +315,13 @@ void SceneBatchCollector::ProcessVisibleLights()
         const IntVector2 rhsSize = rhs->GetShadowMapSize();
         if (lhsSize != rhsSize)
             return lhsSize.Length() > rhsSize.Length();
-        return lhs->GetLight()->GetID() > rhs->GetLight()->GetID();
+        return lhs->GetLight()->GetID() < rhs->GetLight()->GetID();
     };
-    ea::sort(visibleLights_.begin(), visibleLights_.end(), compareShadowMapSize);
+    auto visibleLightsSortedBySM = visibleLights_;
+    ea::sort(visibleLightsSortedBySM.begin(), visibleLightsSortedBySM.end(), compareShadowMapSize);
 
     // Assign shadow maps and finalize shadow parameters
-    for (SceneLight* sceneLight : visibleLights_)
+    for (SceneLight* sceneLight : visibleLightsSortedBySM)
     {
         const IntVector2 shadowMapSize = sceneLight->GetShadowMapSize();
         if (shadowMapSize != IntVector2::ZERO)
@@ -410,6 +411,8 @@ unsigned SceneBatchCollector::FindMainLight() const
 void SceneBatchCollector::AccumulateForwardLighting(unsigned lightIndex)
 {
     SceneLight& sceneLight = *visibleLights_[lightIndex];
+    dp_->ProcessForwardLighting(lightIndex, sceneLight.GetLitGeometries());
+    #if 0
     Light* light = sceneLight.GetLight();
 
     ForEachParallel(workQueue_, litGeometriesWorkThreshold_, sceneLight.GetLitGeometries(),
@@ -429,13 +432,14 @@ void SceneBatchCollector::AccumulateForwardLighting(unsigned lightIndex)
         const float penalty = lightIndex == mainLightIndex_ ? -M_LARGE_VALUE : distance * lightIntensityPenalty;
         dp_->GET_LIGHT()[drawableIndex].AccumulateLight(accumContext, penalty);
     });
+    #endif
 }
 
 void SceneBatchCollector::CollectSceneBatches()
 {
     for (ScenePass* pass : passes2_)
     {
-        pass->CollectSceneBatches(mainLightIndex_, visibleLights_, dp_->GET_LIGHT(), camera_, *callback_);
+        pass->CollectSceneBatches(mainLightIndex_, visibleLights_, dp_, camera_, *callback_);
         pass->SortSceneBatches();
     }
 }

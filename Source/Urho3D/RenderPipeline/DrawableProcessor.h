@@ -66,7 +66,7 @@ struct GeometryBatch
     Pass* lightPass_{};
 };
 
-/// Base interface of scene rendering pass.
+/// Interface of scene pass used by drawable processor.
 ///
 /// Consists of 3 sub-passes:
 /// 1) Unlit Base: Render geometry without any specific light source. Ambient lighting may or may not be applied.
@@ -79,20 +79,22 @@ struct GeometryBatch
 /// 3) Unlit Base: batch is rendered once.
 ///
 /// Other combinations are invalid.
-class SceneRenderingPass : public Object
+class URHO3D_API DrawableProcessorPass : public Object
 {
-    URHO3D_OBJECT(SceneRenderingPass, Object);
+    URHO3D_OBJECT(DrawableProcessorPass, Object);
 
 public:
     /// Add batch result.
     struct AddResult
     {
+        /// Whether lit batch was added.
         bool unlitAdded_{};
+        /// Whether unlit batch was added.
         bool litAdded_{};
     };
 
     /// Construct.
-    SceneRenderingPass(RenderPipeline* renderPipeline, bool needAmbient,
+    DrawableProcessorPass(RenderPipeline* renderPipeline, bool needAmbient,
         unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
     /// Add source batch of drawable. Return whether forward lit batch was added.
@@ -121,6 +123,15 @@ protected:
     WorkQueueVector<GeometryBatch> litBatches_;
 };
 
+/// Drawable processor settings.
+struct DrawableProcessorSettings
+{
+    /// Max number of vertex lights.
+    unsigned maxVertexLights_{ 4 };
+    /// Max number of pixel lights.
+    unsigned maxPixelLights_{ 4 };
+};
+
 /// Drawable processing utility.
 class URHO3D_API DrawableProcessor : public Object
 {
@@ -130,7 +141,9 @@ public:
     /// Construct.
     explicit DrawableProcessor(RenderPipeline* renderPipeline);
     /// Set passes.
-    void SetPasses(ea::vector<SharedPtr<SceneRenderingPass>> scenePasses);
+    void SetPasses(ea::vector<SharedPtr<DrawableProcessorPass>> scenePasses);
+    /// Set settings.
+    void SetSettings(const DrawableProcessorSettings& settings) { settings_ = settings; }
 
     /// Process visible geometries and lights.
     void ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables);
@@ -144,6 +157,11 @@ public:
     unsigned char GetGeometryRenderFlags(unsigned drawableIndex) const { return geometryFlags_[drawableIndex]; }
     /// Return geometry Z range.
     const FloatRange& GetGeometryZRange(unsigned drawableIndex) const { return geometryZRanges_[drawableIndex]; }
+    /// Return geometry forward lighting.
+    const LightAccumulator& GetGeometryLighting(unsigned drawableIndex) const { return geometryLighting_[drawableIndex]; }
+
+    /// Accumulate forward lighting for specified light source and geometries.
+    void ProcessForwardLighting(unsigned lightIndex, const ea::vector<Drawable*>& litGeometries);
 
     /// Queue drawable update. Ignored if already updated or queued.
     /// Safe to call from WorkQueue thread.
@@ -153,9 +171,6 @@ public:
 
     /// Update drawable geometries if needed.
     void UpdateGeometries();
-
-    // TODO(renderer): Remove me
-    auto& GET_LIGHT() { return geometryLighting_; }
 
 protected:
     /// Called when update begins.
@@ -189,7 +204,9 @@ private:
     Material* defaultMaterial_{};
 
     /// Scene passes sinks.
-    ea::vector<SharedPtr<SceneRenderingPass>> scenePasses_;
+    ea::vector<SharedPtr<DrawableProcessorPass>> scenePasses_;
+    /// Settings.
+    DrawableProcessorSettings settings_;
 
     /// Frame info.
     FrameInfo frameInfo_;
@@ -227,8 +244,10 @@ private:
     /// Geometries to be updated from main thread.
     WorkQueueVector<Drawable*> nonThreadedGeometryUpdates_;
 
+    /// Visible lights (temporary collection for threading).
+    WorkQueueVector<Light*> visibleLightsTemp_;
     /// Visible lights.
-    WorkQueueVector<Light*> visibleLights_;
+    ea::vector<Light*> visibleLights_;
 
     /// Delayed drawable updates.
     WorkQueueVector<Drawable*> queuedDrawableUpdates_{};

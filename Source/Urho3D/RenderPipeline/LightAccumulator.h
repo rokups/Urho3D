@@ -71,27 +71,10 @@ struct LightAccumulatorBase
     /// Accumulate light.
     void AccumulateLight(const LightAccumulatorContext& ctx, float penalty)
     {
-        switch (ctx.lightImportance_)
-        {
-        case LI_IMPORTANT:
-            // Important lights are never optimized out
-            penalty = -1.0f;
+        if (ctx.lightImportance_ == LI_IMPORTANT)
             ++numImportantLights_;
-            break;
-        case LI_AUTO:
-            // Penalty for automatic lights is mapped to [0, 2]
-            if (penalty > 1.0f)
-                penalty = 2.0f - 1.0f / penalty;
+        else if (ctx.lightImportance_ == LI_AUTO)
             ++numAutoLights_;
-            break;
-        case LI_NOT_IMPORTANT:
-            // Penalty for not important lights is mapped to [3, 5]
-            if (penalty <= 1.0f)
-                penalty = 3.0f + penalty;
-            else
-                penalty = 5.0f - 1.0f / penalty;
-            break;
-        }
 
         // Add new light
         lights_.emplace(penalty, ctx.lightIndex_);

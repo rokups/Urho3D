@@ -47,9 +47,9 @@ class Renderer;
 class WorkQueue;
 
 /// Scene pass interface.
-class ScenePass : public SceneRenderingPass
+class ScenePass : public DrawableProcessorPass
 {
-    URHO3D_OBJECT(ScenePass, SceneRenderingPass);
+    URHO3D_OBJECT(ScenePass, DrawableProcessorPass);
 
 public:
     /// Max number of vertex lights for forward rendering.
@@ -74,7 +74,7 @@ public:
     //bool AddSourceBatch(Drawable* drawable, unsigned sourceBatchIndex, Technique* technique);
     /// Collect scene batches.
     virtual void CollectSceneBatches(unsigned mainLightIndex, ea::span<SceneLight*> sceneLights,
-        const DrawableLightingData& drawableLighting, Camera* camera, ScenePipelineStateCacheCallback& callback);
+        const DrawableProcessor* drawableProcessor, Camera* camera, ScenePipelineStateCacheCallback& callback);
     /// Sort scene batches.
     virtual void SortSceneBatches() = 0;
 
@@ -83,7 +83,7 @@ protected:
     void CollectUnlitBatches(Camera* camera, ScenePipelineStateCacheCallback& callback);
     /// Collect lit base and light batches.
     void CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallback& callback,
-        unsigned mainLightIndex, ea::span<SceneLight*> sceneLights, const DrawableLightingData& drawableLighting);
+        unsigned mainLightIndex, ea::span<SceneLight*> sceneLights, const DrawableProcessor* drawableProcessor);
 
     /// Sort batches (from vector).
     template <class T>

@@ -52,7 +52,7 @@ ea::string NormalizeShaderDefine(ea::string_view define)
 ScenePass::ScenePass(RenderPipeline* renderPipeline,
     const ea::string& unlitBaseTag, const ea::string& litBaseTag, const ea::string& lightTag,
     unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
-    : SceneRenderingPass(renderPipeline, true, unlitBasePassIndex, litBasePassIndex, lightPassIndex)
+    : DrawableProcessorPass(renderPipeline, true, unlitBasePassIndex, litBasePassIndex, lightPassIndex)
     , workQueue_(context_->GetSubsystem<WorkQueue>())
     , renderer_(context_->GetSubsystem<Renderer>())
     /*, unlitBasePassIndex_(unlitBasePassIndex)
@@ -120,10 +120,10 @@ void ScenePass::BeginFrame()
 }*/
 
 void ScenePass::CollectSceneBatches(unsigned mainLightIndex, ea::span<SceneLight*> sceneLights,
-    const DrawableLightingData& drawableLighting, Camera* camera, ScenePipelineStateCacheCallback& callback)
+    const DrawableProcessor* drawableProcessor, Camera* camera, ScenePipelineStateCacheCallback& callback)
 {
     CollectUnlitBatches(camera, callback);
-    CollectLitBatches(camera, callback, mainLightIndex, sceneLights, drawableLighting);
+    CollectLitBatches(camera, callback, mainLightIndex, sceneLights, drawableProcessor);
 }
 
 void ScenePass::CollectUnlitBatches(Camera* camera, ScenePipelineStateCacheCallback& callback)
@@ -156,7 +156,7 @@ void ScenePass::CollectUnlitBatches(Camera* camera, ScenePipelineStateCacheCallb
 }
 
 void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallback& callback,
-    unsigned mainLightIndex, ea::span<SceneLight*> sceneLights, const DrawableLightingData& drawableLighting)
+    unsigned mainLightIndex, ea::span<SceneLight*> sceneLights, const DrawableProcessor* drawableProcessor)
 {
     litBaseBatches_.resize(litBatches_.Size());
 
@@ -172,7 +172,8 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
 
         // TODO(renderer): Optimize lookup
         const auto drawableIndex = intermediateBatch.geometry_->GetDrawableIndex();
-        const auto pixelLights = drawableLighting[drawableIndex].GetPixelLights();
+        const auto& lighting = drawableProcessor->GetGeometryLighting(drawableIndex);
+        const auto pixelLights = lighting.GetPixelLights();
         const bool hasLitBase = !pixelLights.empty() && pixelLights[0].second == mainLightIndex;
         const unsigned baseLightIndex = hasLitBase ? mainLightIndex : M_MAX_UNSIGNED;
         const unsigned baseLightHash = hasLitBase ? mainLightHash : 0;
