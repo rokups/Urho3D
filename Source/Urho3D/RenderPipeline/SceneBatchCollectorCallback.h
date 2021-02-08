@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "../RenderPipeline/ScenePipelineStateCache.h"
+#include "../RenderPipeline/BatchStateCache.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
 
 namespace Urho3D

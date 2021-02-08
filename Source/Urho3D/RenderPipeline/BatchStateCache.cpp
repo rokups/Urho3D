@@ -24,25 +24,25 @@
 
 #include "../Graphics/Geometry.h"
 #include "../Graphics/Technique.h"
-#include "../RenderPipeline/ScenePipelineStateCache.h"
+#include "../RenderPipeline/BatchStateCache.h"
 
 #include "../DebugNew.h"
 
 namespace Urho3D
 {
 
-void ScenePipelineStateCache::Invalidate()
+void BatchStateCache::Invalidate()
 {
     cache_.clear();
 }
 
-PipelineState* ScenePipelineStateCache::GetPipelineState(const ScenePipelineStateKey& key) const
+PipelineState* BatchStateCache::GetPipelineState(const ScenePipelineStateKey& key) const
 {
     const auto iter = cache_.find(key);
     if (iter == cache_.end() || iter->second.invalidated_.load(std::memory_order_relaxed))
         return nullptr;
 
-    const ScenePipelineStateEntry& entry = iter->second;
+    const CachedBatchState& entry = iter->second;
     if (key.geometry_->GetPipelineStateHash() != entry.geometryHash_
         || key.material_->GetPipelineStateHash() != entry.materialHash_
         || key.pass_->GetPipelineStateHash() != entry.passHash_)
@@ -54,10 +54,10 @@ PipelineState* ScenePipelineStateCache::GetPipelineState(const ScenePipelineStat
     return entry.pipelineState_;
 }
 
-PipelineState* ScenePipelineStateCache::GetOrCreatePipelineState(const ScenePipelineStateKey& key,
-    ScenePipelineStateContext& ctx, ScenePipelineStateCacheCallback& callback)
+PipelineState* BatchStateCache::GetOrCreatePipelineState(const ScenePipelineStateKey& key,
+    ScenePipelineStateContext& ctx, BatchStateCacheCallback& callback)
 {
-    ScenePipelineStateEntry& entry = cache_[key];
+    CachedBatchState& entry = cache_[key];
     if (!entry.pipelineState_ || entry.invalidated_.load(std::memory_order_relaxed)
         || key.geometry_->GetPipelineStateHash() != entry.geometryHash_
         || key.material_->GetPipelineStateHash() != entry.materialHash_

@@ -36,7 +36,7 @@
 #include "../RenderPipeline/SceneDrawableData.h"
 #include "../RenderPipeline/SceneLight.h"
 #include "../RenderPipeline/ScenePass.h"
-#include "../RenderPipeline/ScenePipelineStateCache.h"
+#include "../RenderPipeline/BatchStateCache.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
 
 #include <EASTL/fixed_vector.h>

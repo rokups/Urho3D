@@ -24,7 +24,6 @@
 
 #include "../Core/Object.h"
 #include "../Core/WorkQueue.h"
-#include "../Container/FlagSet.h"
 #include "../Math/NumericRange.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../RenderPipeline/LightAccumulator.h"
@@ -36,6 +35,8 @@ namespace Urho3D
 
 class RenderPipeline;
 class GlobalIllumination;
+class Pass;
+class Technique;
 struct FrameInfo;
 
 /// Flags related to geometry rendering.
