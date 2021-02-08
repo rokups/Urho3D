@@ -25,7 +25,7 @@
 #include "../Core/Object.h"
 #include "../RenderPipeline/LightAccumulator.h"
 #include "../RenderPipeline/SceneBatch.h"
-#include "../RenderPipeline/SceneLight.h"
+#include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/BatchStateCache.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 /*

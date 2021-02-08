@@ -34,7 +34,7 @@
 #include "../RenderPipeline/SceneBatch.h"
 #include "../RenderPipeline/SceneBatchCollectorCallback.h"
 #include "../RenderPipeline/SceneDrawableData.h"
-#include "../RenderPipeline/SceneLight.h"
+#include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/ScenePass.h"
 #include "../RenderPipeline/BatchStateCache.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
@@ -181,7 +181,7 @@ private:
     ea::vector<LightVolumeBatch> lightVolumeBatches_;
 
     /// Cached lights data.
-    ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<SceneLight>> cachedSceneLights_;
+    //ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<SceneLight>> cachedSceneLights_;
 };
 
 }

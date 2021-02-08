@@ -31,6 +31,7 @@
 #include "../IO/Log.h"
 #include "../RenderPipeline/RenderPipeline.h"
 #include "../RenderPipeline/DrawableProcessor.h"
+#include "../RenderPipeline/LightProcessor.h"
 #include "../Scene/Scene.h"
 
 #include <EASTL/sort.h>
@@ -115,6 +116,23 @@ void DrawableProcessorPass::OnUpdateBegin(const FrameInfo& frameInfo)
     unlitBatches_.Clear(frameInfo.numThreads_);
 }
 
+LightProcessorCache::LightProcessorCache()
+{
+}
+
+LightProcessorCache::~LightProcessorCache()
+{
+}
+
+LightProcessor* LightProcessorCache::GetLightProcessor(Light* light)
+{
+    WeakPtr<Light> weakLight(light);
+    auto& lightProcessor = cache_[weakLight];
+    if (!lightProcessor)
+        lightProcessor = ea::make_unique<LightProcessor>(light);
+    return lightProcessor.get();
+}
+
 DrawableProcessor::DrawableProcessor(RenderPipeline* renderPipeline)
     : Object(renderPipeline->GetContext())
     , workQueue_(GetSubsystem<WorkQueue>())
@@ -176,11 +194,15 @@ void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& dra
         ProcessVisibleDrawable(drawable);
     });
 
-    // Compose collected lights
+    // Sort lights by component ID for stability
     visibleLights_.resize(visibleLightsTemp_.Size());
     ea::copy(visibleLightsTemp_.Begin(), visibleLightsTemp_.End(), visibleLights_.begin());
     const auto compareID = [](Light* lhs, Light* rhs) { return lhs->GetID() < rhs->GetID(); };
     ea::sort(visibleLights_.begin(), visibleLights_.end(), compareID);
+
+    lightProcessors_.clear();
+    for (Light* light : visibleLights_)
+        lightProcessors_.push_back(lightProcessorCache_.GetLightProcessor(light));
 
     // Compute scene Z range
     for (const FloatRange& range : sceneZRangeTemp_)

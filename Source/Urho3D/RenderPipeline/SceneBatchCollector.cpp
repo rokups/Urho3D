@@ -165,15 +165,15 @@ void SceneBatchCollector::ProcessVisibleDrawables(const ea::vector<Drawable*>& d
         ProcessVisibleDrawablesForThread(threadIndex, { &drawable, 1u });
     });*/
 
-    visibleLights_.clear();
-    for (Light* light : dp_->GetVisibleLights())
+    visibleLights_ = dp_->GetLightProcessors();
+    /*for (Light* light : dp_->GetVisibleLights())
     {
         WeakPtr<Light> weakLight(light);
         auto& sceneLight = cachedSceneLights_[weakLight];
         if (!sceneLight)
             sceneLight = ea::make_unique<SceneLight>(light);
         visibleLights_.push_back(sceneLight.get());
-    };
+    };*/
 }
 
 void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables)

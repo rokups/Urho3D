@@ -124,6 +124,26 @@ protected:
     WorkQueueVector<GeometryBatch> litBatches_;
 };
 
+// TODO(renderer): Rename class
+using LightProcessor = class SceneLight;
+
+/// Cache of light processors.
+// TODO(renderer): Add automatic expiration by time
+class LightProcessorCache
+{
+public:
+    /// Construct.
+    LightProcessorCache();
+    /// Destruct.
+    ~LightProcessorCache();
+    /// Get existing or create new light processor. Lightweight. Not thread safe.
+    LightProcessor* GetLightProcessor(Light* light);
+
+private:
+    /// Weak cache.
+    ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<LightProcessor>> cache_;
+};
+
 /// Drawable processor settings.
 struct DrawableProcessorSettings
 {
@@ -152,6 +172,8 @@ public:
     const auto& GetVisibleGeometries() const { return visibleGeometries_; }
     /// Return visible lights.
     const auto& GetVisibleLights() const { return visibleLights_; }
+    /// Return light processors for visible lights.
+    const auto& GetLightProcessors() const { return lightProcessors_; }
     /// Return scene Z range.
     const FloatRange& GetSceneZRange() const { return sceneZRange_; }
     /// Return geometry render flags.
@@ -249,6 +271,10 @@ private:
     WorkQueueVector<Light*> visibleLightsTemp_;
     /// Visible lights.
     ea::vector<Light*> visibleLights_;
+    /// Light processors for visible lights.
+    ea::vector<LightProcessor*> lightProcessors_;
+    /// Light processor cache.
+    LightProcessorCache lightProcessorCache_;
 
     /// Delayed drawable updates.
     WorkQueueVector<Drawable*> queuedDrawableUpdates_{};
