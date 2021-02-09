@@ -41,7 +41,6 @@ class Scene;
 class XMLFile;
 class View;
 class Viewport;
-class RenderPipelineViewport;
 class ShadowMapAllocator;
 class DrawCommandQueue;
 class DrawableProcessor;

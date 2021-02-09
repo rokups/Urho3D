@@ -888,6 +888,10 @@ bool LightProcessor::IsShadowCasterVisible(SceneLightProcessContext& ctx,
 void LightProcessor::ProcessShadowCasters(SceneLightProcessContext& ctx,
     const ea::vector<Drawable*>& drawables, unsigned splitIndex)
 {
+    auto& split = splits_[splitIndex];
+    ctx.dp_->PreprocessShadowCasters(split.shadowCasters_,
+        drawables, split.zRange_, light_, split.shadowCamera_);
+    return;
     const unsigned workerThreadIndex = WorkQueue::GetWorkerThreadIndex();
     unsigned lightMask = light_->GetLightMaskEffective();
     Camera* cullCamera = ctx.frameInfo_.camera_;

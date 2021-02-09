@@ -167,6 +167,9 @@ public:
     /// Set settings.
     void SetSettings(const DrawableProcessorSettings& settings) { settings_ = settings; }
 
+    /// Return current frame info.
+    const FrameInfo& GetFrameInfo() const { return frameInfo_; }
+
     /// Process visible geometries and lights.
     void ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables);
 

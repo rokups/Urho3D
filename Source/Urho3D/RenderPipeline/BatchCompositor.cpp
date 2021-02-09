@@ -43,11 +43,21 @@ namespace Urho3D
 namespace
 {
 
+/// Batch creation tag.
+enum class CreateBatchTag
+{
+    /// Create batch as is.
+    Default,
+    /// Override light index to invalid.
+    Unlit
+};
+
 /// Create batch.
-PipelineBatch CreatePipelineBatch(const BatchStateCreateKey& key, PipelineState* pipelineState)
+PipelineBatch CreatePipelineBatch(const BatchStateCreateKey& key, PipelineState* pipelineState,
+    CreateBatchTag tag = CreateBatchTag::Default)
 {
     PipelineBatch batch;
-    batch.lightIndex_ = key.lightIndex_;
+    batch.lightIndex_ = tag == CreateBatchTag::Unlit ? M_MAX_UNSIGNED : key.lightIndex_;
     batch.drawableIndex_ = key.drawable_->GetDrawableIndex();
     batch.sourceBatchIndex_ = key.sourceBatchIndex_;
     batch.geometryType_ = key.geometryType_;
@@ -140,7 +150,7 @@ bool BatchCompositorPass::InitializeKey(BatchStateCreateKey& key, const Geometry
     key.drawable_ = geometryBatch.geometry_;
     key.sourceBatchIndex_ = geometryBatch.sourceBatchIndex_;
     key.light_ = nullptr;
-    key.lightIndex_ = 0;
+    key.lightIndex_ = M_MAX_UNSIGNED;
     return true;
 }
 
@@ -169,6 +179,7 @@ void BatchCompositorPass::ProcessGeometryBatch(const GeometryBatch& geometryBatc
         if (geometryBatch.litBasePass_ && !pixelLights.empty())
         {
             const unsigned firstLightIndex = pixelLights[0].second;
+            // TODO(renderer): Make this check optional
             const Light* firstLight = drawableProcessor_->GetLight(firstLightIndex);
             if (firstLight->GetLightType() == LIGHT_DIRECTIONAL)
             {
@@ -195,7 +206,7 @@ void BatchCompositorPass::ProcessGeometryBatch(const GeometryBatch& geometryBatc
     {
         key.lightHash_ = 0;
         key.light_ = nullptr;
-        key.lightIndex_ = 0;
+        key.lightIndex_ = M_MAX_UNSIGNED;
 
         key.pass_ = geometryBatch.unlitBasePass_;
         AddPipelineBatch(key, unlitBaseCache_, baseBatches_, delayedUnlitBaseBatches_);
@@ -299,7 +310,7 @@ void BatchCompositor::BeginShadowBatchesComposition(unsigned lightIndex, unsigne
 
             PipelineState* pipelineState = shadowCache_.GetPipelineState(key);
             if (pipelineState)
-                shadowBatches.push_back(CreatePipelineBatch(key, pipelineState));
+                shadowBatches.push_back(CreatePipelineBatch(key, pipelineState, CreateBatchTag::Unlit));
             else
                 delayedShadowBatches_.Insert({ &split, key });
         }
@@ -318,7 +329,7 @@ void BatchCompositor::FinalizeShadowBatchesComposition()
         SceneLightShadowSplit& split = *splitAndKey.first;
         PipelineState* pipelineState = shadowCache_.GetOrCreatePipelineState(key, ctx, *batchStateCacheCallback_);
         if (pipelineState)
-            split.shadowCasterBatches_.push_back(CreatePipelineBatch(key, pipelineState));
+            split.shadowCasterBatches_.push_back(CreatePipelineBatch(key, pipelineState, CreateBatchTag::Unlit));
     }
 }
 

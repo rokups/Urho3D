@@ -77,7 +77,7 @@ struct PipelineBatch
 };
 
 /// Batch composition utility of scene pass.
-class BatchCompositorPass : public DrawableProcessorPass
+class URHO3D_API BatchCompositorPass : public DrawableProcessorPass
 {
     URHO3D_OBJECT(BatchCompositorPass, DrawableProcessorPass);
 
@@ -144,7 +144,7 @@ private:
 };
 
 /// Batch composition utility for shadow batches.
-class BatchCompositor : public Object
+class URHO3D_API BatchCompositor : public Object
 {
     URHO3D_OBJECT(BatchCompositor, Object);
 

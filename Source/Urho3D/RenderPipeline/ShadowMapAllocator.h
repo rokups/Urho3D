@@ -65,7 +65,7 @@ enum class ShadowMapType
 
 /// Utility to allocate shadow maps in texture pool.
 // TODO(renderer): Track pipeline state changes caused by renderer settings
-class ShadowMapAllocator : public Object
+class URHO3D_API ShadowMapAllocator : public Object
 {
     URHO3D_OBJECT(ShadowMapAllocator, Object);
 

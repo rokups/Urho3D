@@ -24,6 +24,7 @@
 
 #include "../Core/Object.h"
 #include "../Graphics/DrawCommandQueue.h"
+// TODO(renderer): We don't need this include
 #include "../RenderPipeline/SceneBatch.h"
 
 #include <EASTL/span.h>
@@ -31,7 +32,7 @@
 namespace Urho3D
 {
 
-class SceneBatchCollector;
+class DrawableProcessor;
 
 /// Geometry buffer texture for deferred renderer.
 struct GeometryBufferResource
@@ -52,32 +53,31 @@ public:
     explicit SceneBatchRenderer(Context* context);
 
     /// Render unlit base batches. Safe to call from worker thread.
-    void RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
-        Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedByState> batches);
+    void RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
+        Camera* camera, Zone* zone, ea::span<const PipelineBatchByState> batches);
     /// Render lit base batches. Safe to call from worker thread.
-    void RenderLitBaseBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
-        Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedByState> batches);
+    void RenderLitBaseBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
+        Camera* camera, Zone* zone, ea::span<const PipelineBatchByState> batches);
     /// Render light batches. Safe to call from worker thread.
-    void RenderLightBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
-        Camera* camera, Zone* zone, ea::span<const LightBatchSortedByState> batches);
+    //void RenderLightBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
+    //    Camera* camera, Zone* zone, ea::span<const LightBatchSortedByState> batches);
     /// Render unlit and lit alpha batches. Safe to call from worker thread.
-    void RenderAlphaBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
-        Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedBackToFront> batches);
+    void RenderAlphaBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
+        Camera* camera, Zone* zone, ea::span<const PipelineBatchBackToFront> batches);
     /// Render shadow batches. Safe to call from worker thread.
-    void RenderShadowBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
-        Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedByState> batches);
+    void RenderShadowBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
+        Camera* camera, Zone* zone, ea::span<const PipelineBatchByState> batches);
 
     /// Render light volume batches for deferred rendering.
-    void RenderLightVolumeBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
+    void RenderLightVolumeBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
         Camera* camera, Zone* zone, ea::span<const LightVolumeBatch> batches,
         ea::span<const GeometryBufferResource> geometryBuffer, const Vector4& geometryBufferOffset, const Vector2& geometryBufferInvSize);
 
 private:
     /// Render generic batches.
-    template <bool HasLight, class BatchType, class GetBatchLightCallback>
-    void RenderBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
-        Camera* camera, Zone* zone, ea::span<const BatchType> batches,
-        const GetBatchLightCallback& getBatchLight);
+    template <bool HasLight, class BatchType>
+    void RenderBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
+        Camera* camera, Zone* zone, ea::span<const BatchType> batches);
 
     /// Graphics subsystem.
     Graphics* graphics_{};

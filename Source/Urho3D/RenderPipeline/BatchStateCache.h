@@ -66,7 +66,7 @@ struct BatchStateLookupKey
 
     /// Construct from base, litbase, light or shadow batch.
     // TODO(renderer): Remove
-    BatchStateLookupKey(const BaseSceneBatch& sceneBatch, unsigned lightHash)
+    BatchStateLookupKey(const PipelineBatch& sceneBatch, unsigned lightHash)
         : drawableHash_(sceneBatch.drawable_->GetPipelineStateHash())
         , lightHash_(lightHash)
         , geometryType_(sceneBatch.geometryType_)
@@ -165,7 +165,7 @@ public:
 };
 
 /// Pipeline state cache for RenderPipeline batches.
-class BatchStateCache
+class URHO3D_API BatchStateCache
 {
 public:
     /// Invalidate cache.

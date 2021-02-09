@@ -48,7 +48,7 @@ class Renderer;
 class WorkQueue;
 
 /// Scene pass interface.
-class ScenePass : public BatchCompositorPass
+class URHO3D_API ScenePass : public BatchCompositorPass
 {
     URHO3D_OBJECT(ScenePass, BatchCompositorPass);
 
@@ -88,7 +88,7 @@ protected:
 
     /// Sort batches (from vector).
     template <class T>
-    static void SortBatches(const ea::vector<BaseSceneBatch>& sceneBatches, ea::vector<T>& sortedBatches)
+    static void SortBatches(const ea::vector<PipelineBatch>& sceneBatches, ea::vector<T>& sortedBatches)
     {
         const unsigned numBatches = sceneBatches.size();
         sortedBatches.resize(numBatches);
@@ -99,12 +99,12 @@ protected:
 
     /// Sort batches (from WorkQueueVector).
     template <class T>
-    static void SortBatches(const WorkQueueVector<BaseSceneBatch>& sceneBatches, ea::vector<T>& sortedBatches)
+    static void SortBatches(const WorkQueueVector<PipelineBatch>& sceneBatches, ea::vector<T>& sortedBatches)
     {
         const unsigned numBatches = sceneBatches.Size();
         sortedBatches.resize(numBatches);
         unsigned elementIndex = 0;
-        for (const BaseSceneBatch& lightBatch : sceneBatches)
+        for (const PipelineBatch& lightBatch : sceneBatches)
         {
             sortedBatches[elementIndex] = T{ &lightBatch };
             ++elementIndex;
@@ -133,11 +133,11 @@ protected:
     const ea::string lightTag_;
 
     /// Unlit base scene batches.
-    //ea::vector<BaseSceneBatch> unlitBaseBatches_;
+    //ea::vector<PipelineBatch> unlitBaseBatches_;
     /// Lit base scene batches.
-    //ea::vector<BaseSceneBatch> litBaseBatches_;
+    //ea::vector<PipelineBatch> litBaseBatches_;
     /// Light scene batches.
-    //WorkQueueVector<BaseSceneBatch> lightBatches_;
+    //WorkQueueVector<PipelineBatch> lightBatches_;
 
 private:
     /// Unlit scene batches. Map to one base batch.
@@ -146,9 +146,9 @@ private:
     WorkQueueVector<IntermediateSceneBatch> litBatches_;*/
 
     /// Temporary vector to store unlit base batches without pipeline states.
-    //WorkQueueVector<BaseSceneBatch*> unlitBaseBatchesDirty_;
+    //WorkQueueVector<PipelineBatch*> unlitBaseBatchesDirty_;
     /// Temporary vector to store lit base batches without pipeline states.
-    //WorkQueueVector<BaseSceneBatch*> litBaseBatchesDirty_;
+    //WorkQueueVector<PipelineBatch*> litBaseBatchesDirty_;
     /// Temporary vector to store light batches without pipeline states.
     //WorkQueueVector<unsigned> lightBatchesDirty_;
 
@@ -161,7 +161,7 @@ private:
 };
 
 /// Scene pass for forward lighting.
-class ForwardLightingScenePass : public ScenePass
+class URHO3D_API ForwardLightingScenePass : public ScenePass
 {
     URHO3D_OBJECT(ForwardLightingScenePass, ScenePass);
 
@@ -174,7 +174,7 @@ private:
 };
 
 /// Scene pass for forward lighting (opaque objects).
-class OpaqueForwardLightingScenePass : public ForwardLightingScenePass
+class URHO3D_API OpaqueForwardLightingScenePass : public ForwardLightingScenePass
 {
     URHO3D_OBJECT(OpaqueForwardLightingScenePass, ForwardLightingScenePass);
 
@@ -186,23 +186,23 @@ public:
     virtual void SortSceneBatches() override;
 
     /// Return sorted unlit base batches.
-    ea::span<const BaseSceneBatchSortedByState> GetSortedUnlitBaseBatches() const { return sortedUnlitBaseBatches_; }
+    ea::span<const PipelineBatchByState> GetSortedUnlitBaseBatches() const { return sortedUnlitBaseBatches_; }
     /// Return sorted lit base batches.
-    ea::span<const BaseSceneBatchSortedByState> GetSortedLitBaseBatches() const { return sortedLitBaseBatches_; }
+    ea::span<const PipelineBatchByState> GetSortedLitBaseBatches() const { return sortedLitBaseBatches_; }
     /// Return sorted unlit base batches.
-    ea::span<const LightBatchSortedByState> GetSortedLightBatches() const { return sortedLightBatches_; }
+    ea::span<const PipelineBatchByState> GetSortedLightBatches() const { return sortedLightBatches_; }
 
 protected:
     /// Sorted unlit base batches.
-    ea::vector<BaseSceneBatchSortedByState> sortedUnlitBaseBatches_;
+    ea::vector<PipelineBatchByState> sortedUnlitBaseBatches_;
     /// Sorted lit base batches.
-    ea::vector<BaseSceneBatchSortedByState> sortedLitBaseBatches_;
+    ea::vector<PipelineBatchByState> sortedLitBaseBatches_;
     /// Sorted light batches.
-    ea::vector<LightBatchSortedByState> sortedLightBatches_;
+    ea::vector<PipelineBatchByState> sortedLightBatches_;
 };
 
 /// Scene pass for forward lighting (translucent objects).
-class AlphaForwardLightingScenePass : public ForwardLightingScenePass
+class URHO3D_API AlphaForwardLightingScenePass : public ForwardLightingScenePass
 {
     URHO3D_OBJECT(AlphaForwardLightingScenePass, ForwardLightingScenePass);
 
@@ -214,15 +214,15 @@ public:
     virtual void SortSceneBatches() override;
 
     /// Return sorted unlit base batches.
-    ea::span<const BaseSceneBatchSortedBackToFront> GetSortedBatches() const { return sortedBatches_; }
+    ea::span<const PipelineBatchBackToFront> GetSortedBatches() const { return sortedBatches_; }
 
 protected:
     /// Sorted batches.
-    ea::vector<BaseSceneBatchSortedBackToFront> sortedBatches_;
+    ea::vector<PipelineBatchBackToFront> sortedBatches_;
 };
 
 /// Scene pass for unlit/deferred rendered objects.
-class UnlitScenePass : public ScenePass
+class URHO3D_API UnlitScenePass : public ScenePass
 {
     URHO3D_OBJECT(UnlitScenePass, ScenePass);
 
@@ -234,15 +234,15 @@ public:
     virtual void SortSceneBatches() override;
 
     /// Return sorted batches.
-    ea::span<const BaseSceneBatchSortedByState> GetBatches() const { return sortedBatches_; }
+    ea::span<const PipelineBatchByState> GetBatches() const { return sortedBatches_; }
 
 private:
     /// Sorted batches.
-    ea::vector<BaseSceneBatchSortedByState> sortedBatches_;
+    ea::vector<PipelineBatchByState> sortedBatches_;
 };
 
 /// Scene pass for shadow rendering.
-class ShadowScenePass : public BatchCompositor
+class URHO3D_API ShadowScenePass : public BatchCompositor
 {
     URHO3D_OBJECT(ShadowScenePass, BatchCompositor);
 
@@ -259,12 +259,12 @@ public:
     /// Finalize shadow batches. Called from main thread.
     virtual void FinalizeShadowBatches(Camera* camera, ScenePipelineStateCacheCallback& callback);
     /// Sort and return shadow batches. Safe to call from worker thread.
-    ea::span<const BaseSceneBatchSortedByState> GetSortedShadowBatches(const SceneLightShadowSplit& split) const;
+    ea::span<const PipelineBatchByState> GetSortedShadowBatches(const SceneLightShadowSplit& split) const;
 
 protected:
     /// Sort batches (from vector).
     template <class T>
-    static void SortBatches(const ea::vector<BaseSceneBatch>& sceneBatches, ea::vector<T>& sortedBatches)
+    static void SortBatches(const ea::vector<PipelineBatch>& sceneBatches, ea::vector<T>& sortedBatches)
     {
         const unsigned numBatches = sceneBatches.size();
         sortedBatches.resize(numBatches);

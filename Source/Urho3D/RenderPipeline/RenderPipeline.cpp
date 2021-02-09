@@ -824,7 +824,7 @@ void RenderPipeline::Render()
             const auto& shadowBatches = shadowPass_->GetSortedShadowBatches(split);
 
             drawQueue_->Reset();
-            sceneBatchRenderer_->RenderShadowBatches(*drawQueue_, *sceneBatchCollector_, split.shadowCamera_, zone, shadowBatches);
+            sceneBatchRenderer_->RenderShadowBatches(*drawQueue_, *drawableProcessor_, split.shadowCamera_, zone, shadowBatches);
             shadowMapAllocator_->BeginShadowMap(split.shadowMap_);
             drawQueue_->Execute();
         }
@@ -840,7 +840,7 @@ void RenderPipeline::Render()
         deferredDepth_->ClearDepthStencil();
         deferredDepth_->SetRenderTargets({ deferredFinal_, deferredAlbedo_, deferredNormal_ });
         drawQueue_->Reset();
-        sceneBatchRenderer_->RenderUnlitBaseBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, deferredPass_->GetBatches());
+        sceneBatchRenderer_->RenderUnlitBaseBatches(*drawQueue_, *drawableProcessor_, frameInfo_.camera_, zone, deferredPass_->GetBatches());
         drawQueue_->Execute();
 
         // Draw deferred lights
@@ -851,7 +851,7 @@ void RenderPipeline::Render()
         };
 
         drawQueue_->Reset();
-        sceneBatchRenderer_->RenderLightVolumeBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone,
+        sceneBatchRenderer_->RenderLightVolumeBatches(*drawQueue_, *drawableProcessor_, frameInfo_.camera_, zone,
             sceneBatchCollector_->GetLightVolumeBatches(), geometryBuffer,
             deferredDepth_->GetViewportOffsetAndScale(), deferredDepth_->GetInvSize());
 
@@ -868,10 +868,10 @@ void RenderPipeline::Render()
         viewportDepth_->SetRenderTargets({ viewportColor_ });
 
         drawQueue_->Reset();
-        sceneBatchRenderer_->RenderUnlitBaseBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, basePass_->GetSortedUnlitBaseBatches());
-        sceneBatchRenderer_->RenderLitBaseBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, basePass_->GetSortedLitBaseBatches());
-        sceneBatchRenderer_->RenderLightBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, basePass_->GetSortedLightBatches());
-        sceneBatchRenderer_->RenderAlphaBatches(*drawQueue_, *sceneBatchCollector_, frameInfo_.camera_, zone, alphaPass_->GetSortedBatches());
+        sceneBatchRenderer_->RenderUnlitBaseBatches(*drawQueue_, *drawableProcessor_, frameInfo_.camera_, zone, basePass_->GetSortedUnlitBaseBatches());
+        sceneBatchRenderer_->RenderLitBaseBatches(*drawQueue_, *drawableProcessor_, frameInfo_.camera_, zone, basePass_->GetSortedLitBaseBatches());
+        sceneBatchRenderer_->RenderLitBaseBatches(*drawQueue_, *drawableProcessor_, frameInfo_.camera_, zone, basePass_->GetSortedLightBatches());
+        sceneBatchRenderer_->RenderAlphaBatches(*drawQueue_, *drawableProcessor_, frameInfo_.camera_, zone, alphaPass_->GetSortedBatches());
         drawQueue_->Execute();
     }
 

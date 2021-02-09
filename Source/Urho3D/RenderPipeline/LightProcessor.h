@@ -113,7 +113,7 @@ struct SceneLightShadowSplit
     /// Shadow casters.
     ea::vector<Drawable*> shadowCasters_;
     /// Shadow caster batches.
-    ea::vector<BaseSceneBatch> shadowCasterBatches_;
+    ea::vector<PipelineBatch> shadowCasterBatches_;
     /// Combined bounding box of shadow casters in light projection space. Only used for focused spot lights.
     //BoundingBox shadowCasterBox_{};
     /// Shadow camera Z range (directional lights only).
@@ -133,7 +133,7 @@ struct SceneLightShadowSplit
 };
 
 /// Per-viewport light data.
-class LightProcessor : public PipelineStateTracker
+class URHO3D_API LightProcessor : public PipelineStateTracker
 {
 public:
     /// Construct.
@@ -172,9 +172,9 @@ public:
     /// Return shadow casters for given split.
     const ea::vector<Drawable*>& GetShadowCasters(unsigned splitIndex) const { return splits_[splitIndex].shadowCasters_; }
     /// Return mutable shadow batches for given split.
-    ea::vector<BaseSceneBatch>& GetMutableShadowBatches(unsigned splitIndex) { return splits_[splitIndex].shadowCasterBatches_; }
+    ea::vector<PipelineBatch>& GetMutableShadowBatches(unsigned splitIndex) { return splits_[splitIndex].shadowCasterBatches_; }
     /// Return shadow batches for given split.
-    const ea::vector<BaseSceneBatch>& GetShadowBatches(unsigned splitIndex) const { return splits_[splitIndex].shadowCasterBatches_; }
+    const ea::vector<PipelineBatch>& GetShadowBatches(unsigned splitIndex) const { return splits_[splitIndex].shadowCasterBatches_; }
 
 private:
     /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
