@@ -246,12 +246,14 @@ void RenderPipeline::ApplyAttributes()
 }
 
 SharedPtr<PipelineState> RenderPipeline::CreatePipelineState(
-    const ScenePipelineStateKey& key, const ScenePipelineStateContext& ctx)
+    const BatchStateCreateKey& key, const BatchStateCreateContext& ctx)
 {
     Geometry* geometry = key.geometry_;
     Material* material = key.material_;
     Pass* pass = key.pass_;
-    Light* light = ctx.light_ ? ctx.light_->GetLight() : nullptr;
+    Light* light = key.light_ ? key.light_->GetLight() : nullptr;
+    const bool isLitBasePass = ctx.subpassIndex_ == 1;
+    const bool isShadowPass = ctx.pass_ == shadowPass_;
 
     // TODO(renderer): Remove this hack
     if (!pass)
@@ -272,12 +274,12 @@ SharedPtr<PipelineState> RenderPipeline::CreatePipelineState(
         return nullptr;
 
     // Update shadow parameters
-    if (ctx.shadowPass_)
+    if (isShadowPass)
         shadowMapAllocator_->ExportPipelineState(desc, light->GetShadowBias());
 
     // Add lightmap
     // TODO(renderer): Get batch index as input?
-    if (ctx.drawable_->GetBatches()[0].lightmapScaleOffset_)
+    if (key.drawable_->GetBatches()[0].lightmapScaleOffset_)
         commonDefines += "LIGHTMAP ";
 
     // Add ambient vertex defines
@@ -381,15 +383,38 @@ SharedPtr<PipelineState> RenderPipeline::CreatePipelineState(
         break;
     }
 
-    commonDefines += ctx.shaderDefines_;
+    if (isShadowPass)
+        commonDefines += "PASS_SHADOW ";
+    else if (ctx.pass_ == deferredPass_)
+        commonDefines += "PASS_DEFERRED ";
+    else if (ctx.pass_ == basePass_)
+    {
+        commonDefines += "PASS_BASE ";
+        switch (ctx.subpassIndex_)
+        {
+        case 0: commonDefines += "PASS_BASE_UNLIT "; break;
+        case 1: commonDefines += "PASS_BASE_LITBASE "; break;
+        case 2: commonDefines += "PASS_BASE_LIGHT "; break;
+        }
+    }
+    else if (ctx.pass_ == alphaPass_)
+    {
+        commonDefines += "PASS_ALPHA ";
+        switch (ctx.subpassIndex_)
+        {
+        case 0: commonDefines += "PASS_ALPHA_UNLIT "; break;
+        case 1: commonDefines += "PASS_ALPHA_LITBASE "; break;
+        case 2: commonDefines += "PASS_ALPHA_LIGHT "; break;
+        }
+    }
 
-    if (ctx.litBasePass_)
+    if (isLitBasePass)
         commonDefines += "NUMVERTEXLIGHTS=4 ";
 
     if (light)
     {
         commonDefines += "PERPIXEL ";
-        if (ctx.light_->HasShadow())
+        if (key.light_->HasShadow())
         {
             commonDefines += "SHADOW SIMPLE_SHADOW ";
         }
@@ -433,22 +458,22 @@ SharedPtr<PipelineState> RenderPipeline::CreatePipelineState(
 
     desc.fillMode_ = FILL_SOLID;
     const CullMode passCullMode = pass->GetCullMode();
-    const CullMode materialCullMode = ctx.shadowPass_ ? material->GetShadowCullMode() : material->GetCullMode();
+    const CullMode materialCullMode = isShadowPass ? material->GetShadowCullMode() : material->GetCullMode();
     const CullMode cullMode = passCullMode != MAX_CULLMODES ? passCullMode : materialCullMode;
-    desc.cullMode_ = ctx.shadowPass_ ? cullMode : GetEffectiveCullMode(cullMode, ctx.camera_);
+    desc.cullMode_ = isShadowPass ? cullMode : GetEffectiveCullMode(cullMode, frameInfo_.cullCamera_);
 
-    if (ctx.shaderDefines_.contains("PASS_DEFERRED"))
+    if (ctx.pass_ == deferredPass_)
     {
         desc.stencilEnabled_ = true;
         desc.stencilPass_ = OP_REF;
         desc.writeMask_ = PORTABLE_LIGHTMASK;
-        desc.stencilRef_ = ctx.drawable_->GetLightMaskInZone() & PORTABLE_LIGHTMASK;
+        desc.stencilRef_ = key.drawable_->GetLightMaskInZone() & PORTABLE_LIGHTMASK;
     }
 
     return renderer_->GetOrCreatePipelineState(desc);
 }
 
-SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(SceneLight* sceneLight, Geometry* lightGeometry)
+SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightProcessor* sceneLight, Geometry* lightGeometry)
 {
     ea::string vertexDefines;
     ea::string pixelDefiles = "HWDEPTH ";
@@ -614,10 +639,10 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         viewportColor_ = MakeShared<ViewportColorTexture>(this);
         viewportDepth_ = MakeShared<ViewportDepthStencilTexture>(this);
 
-        shadowPass_ = MakeShared<ShadowScenePass>(context_, "PASS_SHADOW", "shadow");
-
         drawableProcessor_ = MakeShared<DrawableProcessor>(this);
-        sceneBatchCollector_ = MakeShared<SceneBatchCollector>(context_, drawableProcessor_);
+        shadowPass_ = MakeShared<ShadowScenePass>(this, drawableProcessor_, "PASS_SHADOW", "shadow");
+        batchCompositor_ = shadowPass_; //MakeShared<BatchCompositor>(this);
+        sceneBatchCollector_ = MakeShared<SceneBatchCollector>(context_, drawableProcessor_, batchCompositor_);
         sceneBatchCollector_->SetShadowPass(shadowPass_);
 
         shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
@@ -633,7 +658,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
     {
         basePass_ = nullptr;
         alphaPass_ = nullptr;
-        deferredPass_ = MakeShared<UnlitScenePass>(this, "PASS_DEFERRED", "deferred");
+        deferredPass_ = MakeShared<UnlitScenePass>(this, drawableProcessor_, "PASS_DEFERRED", "deferred");
 
         deferredFinal_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
         deferredAlbedo_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
@@ -641,6 +666,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         deferredDepth_ = CreateScreenBuffer({ Graphics::GetReadableDepthStencilFormat() });
 
         drawableProcessor_->SetPasses({ deferredPass_ });
+        batchCompositor_->SetPasses({ deferredPass_ });
 
         sceneBatchCollector_->ResetPasses();
         sceneBatchCollector_->AddScenePass(deferredPass_);
@@ -648,8 +674,8 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
     if (!settings_.deferred_ && !basePass_)
     {
-        basePass_ = MakeShared<OpaqueForwardLightingScenePass>(this, "PASS_BASE", "base", "litbase", "light");
-        alphaPass_ = MakeShared<AlphaForwardLightingScenePass>(this, "PASS_ALPHA", "alpha", "alpha", "litalpha");
+        basePass_ = MakeShared<OpaqueForwardLightingScenePass>(this, drawableProcessor_, "PASS_BASE", "base", "litbase", "light");
+        alphaPass_ = MakeShared<AlphaForwardLightingScenePass>(this, drawableProcessor_, "PASS_ALPHA", "alpha", "alpha", "litalpha");
         deferredPass_ = nullptr;
 
         deferredFinal_ = nullptr;
@@ -658,6 +684,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         deferredDepth_ = nullptr;
 
         drawableProcessor_->SetPasses({ basePass_, alphaPass_ });
+        batchCompositor_->SetPasses({ basePass_, alphaPass_ });
 
         sceneBatchCollector_->ResetPasses();
         sceneBatchCollector_->AddScenePass(basePass_);
@@ -788,7 +815,7 @@ void RenderPipeline::Render()
     const auto zone = frameInfo_.octree_->GetBackgroundZone();
 
     const auto& visibleLights = sceneBatchCollector_->GetVisibleLights();
-    for (SceneLight* sceneLight : visibleLights)
+    for (LightProcessor* sceneLight : visibleLights)
     {
         const unsigned numSplits = sceneLight->GetNumSplits();
         for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)

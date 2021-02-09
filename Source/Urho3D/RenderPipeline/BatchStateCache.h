@@ -24,16 +24,21 @@
 
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/PipelineState.h"
-#include "../RenderPipeline/SceneBatch.h"
+//#include "../RenderPipeline/SceneBatch.h"
 
 namespace Urho3D
 {
 
-class SceneLight;
+class Geometry;
+class Material;
+class Pass;
+class Drawable;
+class LightProcessor;
+//class BatchCompositorPass;
 
-/// Key for caching pipeline states for PipelineBatch.
+/// Key used to lookup cached pipeline states for PipelineBatch.
 ///
-/// PipelineState creation may depend only on variables that contribute to BatchStateKey:
+/// PipelineState creation may depend only on variables that contribute to BatchStateLookupKey:
 ///
 /// - Parameters of Drawable that contribute to hash calculation. Key does not depend on Drawable for better reuse.
 /// - Parameters of relevant Light or LightProcessor that contribute to hash calculation. Relevant for forward rendering only.
@@ -41,7 +46,7 @@ class SceneLight;
 /// - Hashed state of Geometry.
 /// - Hashed state of Material.
 /// - Hashed state of Pass.
-struct BatchStateKey
+struct BatchStateLookupKey
 {
     /// Drawable settings that affect pipeline state.
     unsigned drawableHash_{};
@@ -57,11 +62,11 @@ struct BatchStateKey
     Pass* pass_{};
 
     /// Construct default.
-    BatchStateKey() = default;
+    /*BatchStateLookupKey() = default;
 
     /// Construct from base, litbase, light or shadow batch.
     // TODO(renderer): Remove
-    BatchStateKey(const BaseSceneBatch& sceneBatch, unsigned lightHash)
+    BatchStateLookupKey(const BaseSceneBatch& sceneBatch, unsigned lightHash)
         : drawableHash_(sceneBatch.drawable_->GetPipelineStateHash())
         , lightHash_(lightHash)
         , geometryType_(sceneBatch.geometryType_)
@@ -69,10 +74,10 @@ struct BatchStateKey
         , material_(sceneBatch.material_)
         , pass_(sceneBatch.pass_)
     {
-    }
+    }*/
 
     /// Compare.
-    bool operator ==(const BatchStateKey& rhs) const
+    bool operator ==(const BatchStateLookupKey& rhs) const
     {
         return drawableHash_ == rhs.drawableHash_
             && lightHash_ == rhs.lightHash_
@@ -96,6 +101,21 @@ struct BatchStateKey
     }
 };
 
+/// Key used to create cached pipeline states for PipelineBatch.
+/// Contains actual objects instead of hashes.
+struct BatchStateCreateKey : public BatchStateLookupKey
+{
+    /// Drawable geometry that requested this state.
+    Drawable* drawable_{};
+    /// Index of source batch within geometry.
+    unsigned sourceBatchIndex_{};
+    /// Light processor corresponging to per-pixel forward light.
+    LightProcessor* light_{};
+    /// Index of per-pixel forward light.
+    unsigned lightIndex_{};
+};
+
+
 /// Pipeline state cache entry. May be invalid.
 struct CachedBatchState
 {
@@ -113,21 +133,24 @@ struct CachedBatchState
 };
 
 /// External context that is not present in the key but is necessary to create new pipeline state.
-/// TODO(renderer): Do something about it
-struct ScenePipelineStateContext
+struct BatchStateCreateContext
 {
+    /// Pointer to the pass.
+    Object* pass_{};
+    /// Index of subpass.
+    unsigned subpassIndex_{};
     /// Pass shader defines.
-    ea::string shaderDefines_;
+    //ea::string shaderDefines_;
     ///
-    bool litBasePass_{};
+    //bool litBasePass_{};
     /// Whether it is shadow pass.
-    bool shadowPass_{};
+    //bool shadowPass_{};
     /// Cull camera.
-    Camera* camera_{};
+    //Camera* camera_{};
     /// Scene light.
-    const SceneLight* light_{};
+    //const LightProcessor* light_{};
     /// Drawable.
-    Drawable* drawable_{};
+    //Drawable* drawable_{};
 };
 
 /// Pipeline state cache callback used to create actual pipeline state.
@@ -138,7 +161,7 @@ public:
     /// Only attributes that constribute to pipeline state hashes are safe to use.
     // TODO(renderer): Rename into something less generic
     virtual SharedPtr<PipelineState> CreatePipelineState(
-        const BatchStateKey& key, const ScenePipelineStateContext& ctx) = 0;
+        const BatchStateCreateKey& key, const BatchStateCreateContext& ctx) = 0;
 };
 
 /// Pipeline state cache for RenderPipeline batches.
@@ -148,18 +171,18 @@ public:
     /// Invalidate cache.
     void Invalidate();
     /// Return existing pipeline state. Thread-safe.
-    PipelineState* GetPipelineState(const BatchStateKey& key) const;
+    PipelineState* GetPipelineState(const BatchStateLookupKey& key) const;
     /// Return existing or create new pipeline state. Not thread safe.
-    PipelineState* GetOrCreatePipelineState(const BatchStateKey& key,
-        ScenePipelineStateContext& ctx, BatchStateCacheCallback& callback);
+    PipelineState* GetOrCreatePipelineState(const BatchStateCreateKey& key,
+        BatchStateCreateContext& ctx, BatchStateCacheCallback& callback);
 
 private:
     /// Cached states, possibly invalid.
-    ea::unordered_map<BatchStateKey, CachedBatchState> cache_;
+    ea::unordered_map<BatchStateLookupKey, CachedBatchState> cache_;
 };
 
 // TODO(renderer): Remove me
-using ScenePipelineStateKey = BatchStateKey;
+using ScenePipelineStateKey = BatchStateLookupKey;
 using ScenePipelineStateCache = BatchStateCache;
 using ScenePipelineStateCacheCallback = BatchStateCacheCallback;
 

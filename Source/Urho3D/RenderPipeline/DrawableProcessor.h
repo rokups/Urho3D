@@ -37,6 +37,7 @@ class RenderPipeline;
 class GlobalIllumination;
 class Pass;
 class Technique;
+class LightProcessor;
 struct FrameInfo;
 
 /// Flags related to geometry rendering.
@@ -61,9 +62,11 @@ struct GeometryBatch
     Drawable* geometry_{};
     /// Index of source batch within geometry.
     unsigned sourceBatchIndex_{};
-    /// Base pass.
-    Pass* basePass_{};
-    /// Additive light pass for forward rendering.
+    /// Unlit base pass (no direct lighting).
+    Pass* unlitBasePass_{};
+    /// Lit base pass (direct lighting from one light source).
+    Pass* litBasePass_{};
+    /// Additive light pass (direct lighting from one light source).
     Pass* lightPass_{};
 };
 
@@ -75,7 +78,10 @@ struct GeometryBatch
 /// 3) Light: Render geometry in additive mode with single light source.
 ///
 /// There are 3 types of batches:
-/// 1) Lit Base + Light: batch is rendered with forward lighting in N passes, where N is number of per-pixel lights.
+/// 1) Unlit Base + Lit Base + Light:
+///    Batch is rendered in N passes if the first per-pixel light can be rendered together with ambient.
+///    Batch is rendered in N + 1 passes otherwise.
+///    N is equal to the number per-pixel lights affecting object.
 /// 2) Unlit Base + Light: batch is rendered with forward lighting in N + 1 passes.
 /// 3) Unlit Base: batch is rendered once.
 ///
@@ -88,9 +94,9 @@ public:
     /// Add batch result.
     struct AddResult
     {
+        /// Whether the batch was added.
+        bool added_{};
         /// Whether lit batch was added.
-        bool unlitAdded_{};
-        /// Whether unlit batch was added.
         bool litAdded_{};
     };
 
@@ -118,14 +124,9 @@ protected:
     /// Called when update begins.
     virtual void OnUpdateBegin(const FrameInfo& frameInfo);
 
-    /// Unlit batches. Light pass is always empty.
-    WorkQueueVector<GeometryBatch> unlitBatches_;
-    /// Lit batches. Base pass may be empty. Light pass cannot be empty.
-    WorkQueueVector<GeometryBatch> litBatches_;
+    /// Geometry batches.
+    WorkQueueVector<GeometryBatch> geometryBatches_;
 };
-
-// TODO(renderer): Rename class
-using LightProcessor = class SceneLight;
 
 /// Cache of light processors.
 // TODO(renderer): Add automatic expiration by time
@@ -162,12 +163,13 @@ public:
     /// Construct.
     explicit DrawableProcessor(RenderPipeline* renderPipeline);
     /// Set passes.
-    void SetPasses(ea::vector<SharedPtr<DrawableProcessorPass>> scenePasses);
+    void SetPasses(ea::vector<SharedPtr<DrawableProcessorPass>> passes);
     /// Set settings.
     void SetSettings(const DrawableProcessorSettings& settings) { settings_ = settings; }
 
     /// Process visible geometries and lights.
     void ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables);
+
     /// Return visible geometries.
     const auto& GetVisibleGeometries() const { return visibleGeometries_; }
     /// Return visible lights.
@@ -182,12 +184,18 @@ public:
     const FloatRange& GetGeometryZRange(unsigned drawableIndex) const { return geometryZRanges_[drawableIndex]; }
     /// Return geometry forward lighting.
     const LightAccumulator& GetGeometryLighting(unsigned drawableIndex) const { return geometryLighting_[drawableIndex]; }
+    /// Return visible light by index.
+    Light* GetLight(unsigned lightIndex) const { return visibleLights_[lightIndex]; }
+    /// Return light processor by index.
+    LightProcessor* GetLightProcessor(unsigned lightIndex) const { return lightProcessors_[lightIndex]; }
 
     /// Accumulate forward lighting for specified light source and geometries.
     void ProcessForwardLighting(unsigned lightIndex, const ea::vector<Drawable*>& litGeometries);
 
-    /// Queue drawable update. Ignored if already updated or queued.
-    /// Safe to call from WorkQueue thread.
+    /// Pre-process shadow caster candidates. Safe to call from worker thread.
+    void PreprocessShadowCasters(ea::vector<Drawable*>& shadowCasters,
+        const ea::vector<Drawable*>& drawables, const FloatRange& zRange, Light* light, Camera* shadowCamera);
+    /// Queue drawable update. Ignored if already updated or queued. Safe to call from worker thread.
     void QueueDrawableUpdate(Drawable* drawable);
     /// Update queued drawables.
     void ProcessQueuedDrawables();
@@ -208,6 +216,10 @@ protected:
     void QueueDrawableGeometryUpdate(unsigned threadIndex, Drawable* drawable);
     /// Calculate Z range of bounding box.
     FloatRange CalculateBoundingBoxZRange(const BoundingBox& boundingBox) const;
+    /// Check visibility of shadow caster.
+    bool IsShadowCasterVisible(
+        Drawable* drawable, BoundingBox lightViewBox, Camera* shadowCamera, const Matrix3x4& lightView,
+        const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox) const;
 
 private:
     /// Whether the drawable is already updated for this pipeline and frame.
@@ -227,7 +239,7 @@ private:
     Material* defaultMaterial_{};
 
     /// Scene passes sinks.
-    ea::vector<SharedPtr<DrawableProcessorPass>> scenePasses_;
+    ea::vector<SharedPtr<DrawableProcessorPass>> passes_;
     /// Settings.
     DrawableProcessorSettings settings_;
 

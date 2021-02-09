@@ -26,6 +26,7 @@
 #include "../Graphics/Material.h"
 #include "../Graphics/Technique.h"
 #include "../RenderPipeline/DrawableProcessor.h"
+#include "../RenderPipeline/BatchCompositor.h"
 
 namespace Urho3D
 {
@@ -46,7 +47,8 @@ using IntermediateSceneBatch = GeometryBatch;
 
 /// Base or lit base scene batch for specific sub-pass.
 // TODO(renderer): Sort by vertex lights
-struct BaseSceneBatch
+using BaseSceneBatch = PipelineBatch;
+/*struct BaseSceneBatch
 {
     /// Light index (if applicable).
     unsigned lightIndex_{ M_MAX_UNSIGNED };
@@ -84,7 +86,7 @@ struct BaseSceneBatch
     }
     /// Return source batch.
     const SourceBatch& GetSourceBatch() const { return drawable_->GetBatches()[sourceBatchIndex_]; }
-};
+};*/
 
 /// Scene batch sorted by pipeline state, material and geometry. Also sorted front to back.
 struct BaseSceneBatchSortedByState

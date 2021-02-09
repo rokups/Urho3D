@@ -437,14 +437,14 @@ Matrix4 SceneLightShadowSplit::CalculateShadowMatrix(float subPixelOffset) const
     return texAdjust * shadowProj * shadowView;
 }
 
-SceneLight::SceneLight(Light* light)
+LightProcessor::LightProcessor(Light* light)
     : light_(light)
 {
     for (SceneLightShadowSplit& split : splits_)
         split.sceneLight_ = this;
 }
 
-void SceneLight::BeginFrame(bool hasShadow)
+void LightProcessor::BeginFrame(bool hasShadow)
 {
     litGeometries_.clear();
     tempShadowCasters_.clear();
@@ -453,7 +453,7 @@ void SceneLight::BeginFrame(bool hasShadow)
     MarkPipelineStateHashDirty();
 }
 
-void SceneLight::UpdateLitGeometriesAndShadowCasters(SceneLightProcessContext& ctx)
+void LightProcessor::UpdateLitGeometriesAndShadowCasters(SceneLightProcessContext& ctx)
 {
     CollectLitGeometriesAndMaybeShadowCasters(ctx);
 
@@ -497,7 +497,7 @@ void SceneLight::UpdateLitGeometriesAndShadowCasters(SceneLightProcessContext& c
     }
 }
 
-void SceneLight::FinalizeShadowMap()
+void LightProcessor::FinalizeShadowMap()
 {
     // Skip if doesn't have shadow or shadow casters
     if (!hasShadow_)
@@ -516,7 +516,7 @@ void SceneLight::FinalizeShadowMap()
     shadowMapSize_ = IntVector2{ shadowMapSplitSize_, shadowMapSplitSize_ } * GetSplitsGridSize();
 }
 
-void SceneLight::SetShadowMap(const ShadowMap& shadowMap)
+void LightProcessor::SetShadowMap(const ShadowMap& shadowMap)
 {
     // If failed to allocate, reset shadows
     if (!shadowMap.texture_)
@@ -535,7 +535,7 @@ void SceneLight::SetShadowMap(const ShadowMap& shadowMap)
     }
 }
 
-void SceneLight::FinalizeShaderParameters(Camera* cullCamera, float subPixelOffset)
+void LightProcessor::FinalizeShaderParameters(Camera* cullCamera, float subPixelOffset)
 {
     Node* lightNode = light_->GetNode();
     const LightType lightType = light_->GetLightType();
@@ -703,7 +703,7 @@ void SceneLight::FinalizeShaderParameters(Camera* cullCamera, float subPixelOffs
     }*/
 }
 
-unsigned SceneLight::RecalculatePipelineStateHash() const
+unsigned LightProcessor::RecalculatePipelineStateHash() const
 {
     const BiasParameters& biasParameters = light_->GetShadowBias();
 
@@ -719,7 +719,7 @@ unsigned SceneLight::RecalculatePipelineStateHash() const
     return hash;
 }
 
-void SceneLight::CollectLitGeometriesAndMaybeShadowCasters(SceneLightProcessContext& ctx)
+void LightProcessor::CollectLitGeometriesAndMaybeShadowCasters(SceneLightProcessContext& ctx)
 {
     Octree* octree = ctx.frameInfo_.octree_;
     switch (light_->GetLightType())
@@ -751,7 +751,7 @@ void SceneLight::CollectLitGeometriesAndMaybeShadowCasters(SceneLightProcessCont
     }
 }
 
-Camera* SceneLight::GetOrCreateShadowCamera(unsigned split)
+Camera* LightProcessor::GetOrCreateShadowCamera(unsigned split)
 {
     SharedPtr<Camera>& camera = splits_[split].shadowCamera_;
     if (!camera)
@@ -766,7 +766,7 @@ Camera* SceneLight::GetOrCreateShadowCamera(unsigned split)
     return splits_[split].shadowCamera_;
 }
 
-void SceneLight::SetupShadowCameras(SceneLightProcessContext& ctx)
+void LightProcessor::SetupShadowCameras(SceneLightProcessContext& ctx)
 {
     Camera* cullCamera = ctx.frameInfo_.camera_;
 
@@ -847,7 +847,7 @@ void SceneLight::SetupShadowCameras(SceneLightProcessContext& ctx)
     }
 }
 
-bool SceneLight::IsShadowCasterVisible(SceneLightProcessContext& ctx,
+bool LightProcessor::IsShadowCasterVisible(SceneLightProcessContext& ctx,
     Drawable* drawable, BoundingBox lightViewBox, Camera* shadowCamera, const Matrix3x4& lightView,
     const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox)
 {
@@ -885,7 +885,7 @@ bool SceneLight::IsShadowCasterVisible(SceneLightProcessContext& ctx,
     }
 }
 
-void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
+void LightProcessor::ProcessShadowCasters(SceneLightProcessContext& ctx,
     const ea::vector<Drawable*>& drawables, unsigned splitIndex)
 {
     const unsigned workerThreadIndex = WorkQueue::GetWorkerThreadIndex();
@@ -899,7 +899,7 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
     LightType type = light_->GetLightType();
     const FloatRange& sceneZRange = ctx.dp_->GetSceneZRange();
 
-    splits_[splitIndex].shadowCasterBox_.Clear();
+    //splits_[splitIndex].shadowCasterBox_.Clear();
 
     // Transform scene frustum into shadow camera's view space for shadow caster visibility check. For point & spot lights,
     // we can use the whole scene frustum. For directional lights, use the intersection of the scene frustum and the split
@@ -948,7 +948,7 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
             if (type == LIGHT_SPOT && light_->GetShadowFocus().focus_)
             {
                 lightProjBox = lightViewBox.Projected(lightProj);
-                splits_[splitIndex].shadowCasterBox_.Merge(lightProjBox);
+                //splits_[splitIndex].shadowCasterBox_.Merge(lightProjBox);
             }
 
             splits_[splitIndex].shadowCasters_.push_back(drawable);
@@ -956,7 +956,7 @@ void SceneLight::ProcessShadowCasters(SceneLightProcessContext& ctx,
     }
 }
 
-IntVector2 SceneLight::GetSplitsGridSize() const
+IntVector2 LightProcessor::GetSplitsGridSize() const
 {
     if (numSplits_ == 1)
         return { 1, 1 };

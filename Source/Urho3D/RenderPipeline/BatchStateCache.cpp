@@ -23,6 +23,7 @@
 #include "../Precompiled.h"
 
 #include "../Graphics/Geometry.h"
+#include "../Graphics/Material.h"
 #include "../Graphics/Technique.h"
 #include "../RenderPipeline/BatchStateCache.h"
 
@@ -36,7 +37,7 @@ void BatchStateCache::Invalidate()
     cache_.clear();
 }
 
-PipelineState* BatchStateCache::GetPipelineState(const ScenePipelineStateKey& key) const
+PipelineState* BatchStateCache::GetPipelineState(const BatchStateLookupKey& key) const
 {
     const auto iter = cache_.find(key);
     if (iter == cache_.end() || iter->second.invalidated_.load(std::memory_order_relaxed))
@@ -54,8 +55,8 @@ PipelineState* BatchStateCache::GetPipelineState(const ScenePipelineStateKey& ke
     return entry.pipelineState_;
 }
 
-PipelineState* BatchStateCache::GetOrCreatePipelineState(const ScenePipelineStateKey& key,
-    ScenePipelineStateContext& ctx, BatchStateCacheCallback& callback)
+PipelineState* BatchStateCache::GetOrCreatePipelineState(const BatchStateCreateKey& key,
+    BatchStateCreateContext& ctx, BatchStateCacheCallback& callback)
 {
     CachedBatchState& entry = cache_[key];
     if (!entry.pipelineState_ || entry.invalidated_.load(std::memory_order_relaxed)

@@ -28,7 +28,7 @@
 namespace Urho3D
 {
 
-class SceneLight;
+class LightProcessor;
 
 /// Callback interface for SceneBatchCollector.
 class SceneBatchCollectorCallback : public ScenePipelineStateCacheCallback
@@ -39,7 +39,7 @@ public:
     /// Return temporary shadow map of given size.
     virtual ShadowMap GetTemporaryShadowMap(const IntVector2& size) = 0;
     /// Return new or existing pipeline state for deferred light volume.
-    virtual SharedPtr<PipelineState> CreateLightVolumePipelineState(SceneLight* sceneLight, Geometry* lightGeometry) = 0;
+    virtual SharedPtr<PipelineState> CreateLightVolumePipelineState(LightProcessor* sceneLight, Geometry* lightGeometry) = 0;
 };
 
 }

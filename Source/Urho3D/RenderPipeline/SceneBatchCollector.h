@@ -31,6 +31,7 @@
 #include "../Math/SphericalHarmonics.h"
 #include "../RenderPipeline/LightAccumulator.h"
 #include "../RenderPipeline/DrawableProcessor.h"
+#include "../RenderPipeline/BatchCompositor.h"
 #include "../RenderPipeline/SceneBatch.h"
 #include "../RenderPipeline/SceneBatchCollectorCallback.h"
 #include "../RenderPipeline/SceneDrawableData.h"
@@ -61,7 +62,7 @@ public:
     using VertexLightCollection = ea::array<unsigned, MaxVertexLights>;
 
     /// Construct.
-    SceneBatchCollector(Context* context, DrawableProcessor* dp);
+    SceneBatchCollector(Context* context, DrawableProcessor* dp, BatchCompositor* bc);
     /// Destruct.
     ~SceneBatchCollector();
 
@@ -94,18 +95,18 @@ public:
     /// Return main light index.
     unsigned GetMainLightIndex() const { return mainLightIndex_; }
     /// Return main light.
-    SceneLight* GetMainLight() const { return mainLightIndex_ != M_MAX_UNSIGNED ? visibleLights_[mainLightIndex_] : nullptr; }
+    LightProcessor* GetMainLight() const { return mainLightIndex_ != M_MAX_UNSIGNED ? visibleLights_[mainLightIndex_] : nullptr; }
     /// Return visible light by index.
-    const SceneLight* GetVisibleLight(unsigned i) const { return visibleLights_[i]; }
+    const LightProcessor* GetVisibleLight(unsigned i) const { return visibleLights_[i]; }
     /// Return all visible lights.
-    const ea::vector<SceneLight*>& GetVisibleLights() const { return visibleLights_; }
+    const ea::vector<LightProcessor*>& GetVisibleLights() const { return visibleLights_; }
     /// Return light volume batches.
     ea::span<const LightVolumeBatch> GetLightVolumeBatches() const { return lightVolumeBatches_; }
 
     /// Return vertex lights for drawable (as indices in the array of visible lights).
     VertexLightCollection GetVertexLightIndices(unsigned drawableIndex) const { return dp_->GetGeometryLighting(drawableIndex).GetVertexLights(); }
     /// Return vertex lights for drawable (as pointers).
-    ea::array<SceneLight*, MaxVertexLights> GetVertexLights(unsigned drawableIndex) const;
+    ea::array<LightProcessor*, MaxVertexLights> GetVertexLights(unsigned drawableIndex) const;
     /// Return ambient light.
     const SphericalHarmonicsDot9& GetAmbientLight(unsigned drawableIndex) const { return dp_->GetGeometryLighting(drawableIndex).sh_; }
 
@@ -133,6 +134,7 @@ private:
     /// Renderer.
     Renderer* renderer_{};
     DrawableProcessor* dp_{};
+    BatchCompositor* bc_{};
     /// Pipeline state factory.
     SceneBatchCollectorCallback* callback_{};
     /// Number of worker threads.
@@ -160,7 +162,7 @@ private:
     /// Temporary thread-safe collection of visible lights.
     //WorkQueueVector<Light*> visibleLightsTemp_;
     /// Visible lights.
-    ea::vector<SceneLight*> visibleLights_;
+    ea::vector<LightProcessor*> visibleLights_;
     /// Index of main directional light in visible lights collection.
     unsigned mainLightIndex_{ M_MAX_UNSIGNED };
     /// Scene Z range.
@@ -181,7 +183,7 @@ private:
     ea::vector<LightVolumeBatch> lightVolumeBatches_;
 
     /// Cached lights data.
-    //ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<SceneLight>> cachedSceneLights_;
+    //ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<LightProcessor>> cachedSceneLights_;
 };
 
 }

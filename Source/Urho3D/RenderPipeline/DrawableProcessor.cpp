@@ -76,44 +76,26 @@ DrawableProcessorPass::DrawableProcessorPass(RenderPipeline* renderPipeline, boo
     , litBasePassIndex_(litBasePassIndex)
     , lightPassIndex_(lightPassIndex)
 {
-
+    renderPipeline->OnUpdateBegin.Subscribe(this, &DrawableProcessorPass::OnUpdateBegin);
 }
 
 DrawableProcessorPass::AddResult DrawableProcessorPass::AddBatch(unsigned threadIndex,
     Drawable* drawable, unsigned sourceBatchIndex, Technique* technique)
 {
     Pass* unlitBasePass = technique->GetPass(unlitBasePassIndex_);
-    Pass* litBasePass = technique->GetPass(litBasePassIndex_);
     Pass* lightPass = technique->GetPass(lightPassIndex_);
+    Pass* litBasePass = lightPass ? technique->GetPass(litBasePassIndex_) : nullptr;
 
-    if (lightPass)
-    {
-        if (litBasePass)
-        {
-            // Add lit batch
-            litBatches_.PushBack(threadIndex, { drawable, sourceBatchIndex, litBasePass, lightPass });
-            return { false, true };
-        }
-        else if (unlitBasePass)
-        {
-            // Add both unlit and lit batches if there's no lit base
-            unlitBatches_.PushBack(threadIndex, { drawable, sourceBatchIndex, unlitBasePass, nullptr });
-            litBatches_.PushBack(threadIndex, { drawable, sourceBatchIndex, nullptr, lightPass });
-            return { true, true };
-        }
-    }
-    else if (unlitBasePass)
-    {
-        unlitBatches_.PushBack(threadIndex, { drawable, sourceBatchIndex, unlitBasePass, nullptr });
-        return { true, false };
-    }
-    return { false, false };
+    if (!unlitBasePass)
+        return { false, false };
+
+    geometryBatches_.PushBack(threadIndex, { drawable, sourceBatchIndex, unlitBasePass, litBasePass, lightPass });
+    return { true, !!lightPass };
 }
 
 void DrawableProcessorPass::OnUpdateBegin(const FrameInfo& frameInfo)
 {
-    litBatches_.Clear(frameInfo.numThreads_);
-    unlitBatches_.Clear(frameInfo.numThreads_);
+    geometryBatches_.Clear(frameInfo.numThreads_);
 }
 
 LightProcessorCache::LightProcessorCache()
@@ -142,9 +124,9 @@ DrawableProcessor::DrawableProcessor(RenderPipeline* renderPipeline)
     renderPipeline->OnUpdateBegin.Subscribe(this, &DrawableProcessor::OnUpdateBegin);
 }
 
-void DrawableProcessor::SetPasses(ea::vector<SharedPtr<DrawableProcessorPass>> scenePasses)
+void DrawableProcessor::SetPasses(ea::vector<SharedPtr<DrawableProcessorPass>> passes)
 {
-    scenePasses_ = ea::move(scenePasses);
+    passes_ = ea::move(passes);
 }
 
 void DrawableProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
@@ -286,12 +268,12 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
                 continue;
 
             // Update scene passes
-            for (DrawableProcessorPass* pass : scenePasses_)
+            for (DrawableProcessorPass* pass : passes_)
             {
                 const DrawableProcessorPass::AddResult result = pass->AddBatch(threadIndex, drawable, i, technique);
                 if (result.litAdded_)
                     isForwardLit = true;
-                if (result.litAdded_ || (result.unlitAdded_ && pass->NeedAmbient()))
+                if (result.litAdded_ || (result.added_ && pass->NeedAmbient()))
                     needAmbient = true;
             }
         }
@@ -373,6 +355,117 @@ void DrawableProcessor::ProcessForwardLighting(unsigned lightIndex, const ea::ve
         const unsigned drawableIndex = geometry->GetDrawableIndex();
         geometryLighting_[drawableIndex].AccumulateLight(ctx, penalty);
     });
+}
+
+// TODO(renderer): Refactor and reuse me
+bool DrawableProcessor::IsShadowCasterVisible(
+    Drawable* drawable, BoundingBox lightViewBox, Camera* shadowCamera, const Matrix3x4& lightView,
+    const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox) const
+{
+    if (shadowCamera->IsOrthographic())
+    {
+        // Extrude the light space bounding box up to the far edge of the frustum's light space bounding box
+        lightViewBox.max_.z_ = Max(lightViewBox.max_.z_, lightViewFrustumBox.max_.z_);
+        return lightViewFrustum.IsInsideFast(lightViewBox) != OUTSIDE;
+    }
+    else
+    {
+        // If light is not directional, can do a simple check: if object is visible, its shadow is too
+        const unsigned drawableIndex = drawable->GetDrawableIndex();
+        if (geometryFlags_[drawableIndex] & GeometryRenderFlag::Visible)
+            return true;
+
+        // For perspective lights, extrusion direction depends on the position of the shadow caster
+        Vector3 center = lightViewBox.Center();
+        Ray extrusionRay(center, center);
+
+        float extrusionDistance = shadowCamera->GetFarClip();
+        float originalDistance = Clamp(center.Length(), M_EPSILON, extrusionDistance);
+
+        // Because of the perspective, the bounding box must also grow when it is extruded to the distance
+        float sizeFactor = extrusionDistance / originalDistance;
+
+        // Calculate the endpoint box and merge it to the original. Because it's axis-aligned, it will be larger
+        // than necessary, so the test will be conservative
+        Vector3 newCenter = extrusionDistance * extrusionRay.direction_;
+        Vector3 newHalfSize = lightViewBox.Size() * sizeFactor * 0.5f;
+        BoundingBox extrudedBox(newCenter - newHalfSize, newCenter + newHalfSize);
+        lightViewBox.Merge(extrudedBox);
+
+        return lightViewFrustum.IsInsideFast(lightViewBox) != OUTSIDE;
+    }
+}
+
+void DrawableProcessor::PreprocessShadowCasters(ea::vector<Drawable*>& shadowCasters,
+    const ea::vector<Drawable*>& drawables, const FloatRange& zRange, Light* light, Camera* shadowCamera)
+{
+    const unsigned workerThreadIndex = WorkQueue::GetWorkerThreadIndex();
+    unsigned lightMask = light->GetLightMaskEffective();
+    Camera* cullCamera = frameInfo_.cullCamera_;
+
+    //Camera* shadowCamera = splits_[splitIndex].shadowCamera_;
+    const Frustum& shadowCameraFrustum = shadowCamera->GetFrustum();
+    const Matrix3x4& lightView = shadowCamera->GetView();
+    const Matrix4& lightProj = shadowCamera->GetProjection();
+    LightType type = light->GetLightType();
+    const FloatRange& sceneZRange = sceneZRange_;
+
+    //splits_[splitIndex].shadowCasterBox_.Clear();
+    shadowCasters.clear();
+
+    // Transform scene frustum into shadow camera's view space for shadow caster visibility check. For point & spot lights,
+    // we can use the whole scene frustum. For directional lights, use the intersection of the scene frustum and the split
+    // frustum, so that shadow casters do not get rendered into unnecessary splits
+    Frustum lightViewFrustum;
+    if (type != LIGHT_DIRECTIONAL)
+        lightViewFrustum = cullCamera->GetSplitFrustum(sceneZRange.first, sceneZRange.second).Transformed(lightView);
+    else
+    {
+        const FloatRange splitZRange = sceneZRange & zRange;
+        lightViewFrustum = cullCamera->GetSplitFrustum(splitZRange.first, splitZRange.second).Transformed(lightView);
+    }
+
+    BoundingBox lightViewFrustumBox(lightViewFrustum);
+
+    // Check for degenerate split frustum: in that case there is no need to get shadow casters
+    if (lightViewFrustum.vertices_[0] == lightViewFrustum.vertices_[4])
+        return;
+
+    BoundingBox lightViewBox;
+    BoundingBox lightProjBox;
+
+    for (auto i = drawables.begin(); i != drawables.end(); ++i)
+    {
+        Drawable* drawable = *i;
+        // In case this is a point or spot light query result reused for optimization, we may have non-shadowcasters included.
+        // Check for that first
+        if (!drawable->GetCastShadows())
+            continue;
+        // Check shadow mask
+        if (!(drawable->GetShadowMask() & lightMask))
+            continue;
+        // For point light, check that this drawable is inside the split shadow camera frustum
+        if (type == LIGHT_POINT && shadowCameraFrustum.IsInsideFast(drawable->GetWorldBoundingBox()) == OUTSIDE)
+            continue;
+
+        // Check shadow distance
+        QueueDrawableUpdate(drawable);
+
+        // Project shadow caster bounding box to light view space for visibility check
+        lightViewBox = drawable->GetWorldBoundingBox().Transformed(lightView);
+
+        if (IsShadowCasterVisible(drawable, lightViewBox, shadowCamera, lightView, lightViewFrustum, lightViewFrustumBox))
+        {
+            // Merge to shadow caster bounding box (only needed for focused spot lights) and add to the list
+            if (type == LIGHT_SPOT && light->GetShadowFocus().focus_)
+            {
+                lightProjBox = lightViewBox.Projected(lightProj);
+                //splits_[splitIndex].shadowCasterBox_.Merge(lightProjBox);
+            }
+
+            shadowCasters.push_back(drawable);
+        }
+    }
 }
 
 void DrawableProcessor::QueueDrawableUpdate(Drawable* drawable)

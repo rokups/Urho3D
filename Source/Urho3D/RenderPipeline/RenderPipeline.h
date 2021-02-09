@@ -129,9 +129,9 @@ protected:
     ShadowMap GetTemporaryShadowMap(const IntVector2& size) override;
 
     SharedPtr<PipelineState> CreatePipelineState(
-        const ScenePipelineStateKey& key, const ScenePipelineStateContext& ctx) override;
+        const BatchStateCreateKey& key, const BatchStateCreateContext& ctx) override;
     /// Return new or existing pipeline state for deferred light volume.
-    SharedPtr<PipelineState> CreateLightVolumePipelineState(SceneLight* sceneLight, Geometry* lightGeometry) override;
+    SharedPtr<PipelineState> CreateLightVolumePipelineState(LightProcessor* sceneLight, Geometry* lightGeometry) override;
 
 private:
     Graphics* graphics_{};
@@ -168,6 +168,7 @@ private:
     ea::vector<Drawable*> drawables_;
     SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
     SharedPtr<DrawableProcessor> drawableProcessor_;
+    SharedPtr<BatchCompositor> batchCompositor_;
     SharedPtr<SceneBatchCollector> sceneBatchCollector_;
     SharedPtr<SceneBatchRenderer> sceneBatchRenderer_;
     SharedPtr<OcclusionBuffer> occlusionBuffer_;

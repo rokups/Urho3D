@@ -27,6 +27,7 @@
 #include "../RenderPipeline/SceneBatch.h"
 #include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/BatchStateCache.h"
+#include "../RenderPipeline/BatchCompositor.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 /*
 #include "../Graphics/Light.h"
@@ -47,9 +48,9 @@ class Renderer;
 class WorkQueue;
 
 /// Scene pass interface.
-class ScenePass : public DrawableProcessorPass
+class ScenePass : public BatchCompositorPass
 {
-    URHO3D_OBJECT(ScenePass, DrawableProcessorPass);
+    URHO3D_OBJECT(ScenePass, BatchCompositorPass);
 
 public:
     /// Max number of vertex lights for forward rendering.
@@ -62,7 +63,7 @@ public:
     using DrawableLightingData = ea::vector<DrawableLightAccumulator<MaxPixelLights, MaxVertexLights>>;
 
     /// Construct.
-    ScenePass(RenderPipeline* renderPipeline,
+    ScenePass(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor,
         const ea::string& unlitBaseTag, const ea::string& litBaseTag, const ea::string& lightTag,
         unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
@@ -73,7 +74,7 @@ public:
     /// Add source batch. Try to keep it non-virtual to optimize processing. Return whether it was lit.
     //bool AddSourceBatch(Drawable* drawable, unsigned sourceBatchIndex, Technique* technique);
     /// Collect scene batches.
-    virtual void CollectSceneBatches(unsigned mainLightIndex, ea::span<SceneLight*> sceneLights,
+    virtual void CollectSceneBatches(unsigned mainLightIndex, ea::span<LightProcessor*> sceneLights,
         const DrawableProcessor* drawableProcessor, Camera* camera, ScenePipelineStateCacheCallback& callback);
     /// Sort scene batches.
     virtual void SortSceneBatches() = 0;
@@ -83,7 +84,7 @@ protected:
     void CollectUnlitBatches(Camera* camera, ScenePipelineStateCacheCallback& callback);
     /// Collect lit base and light batches.
     void CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallback& callback,
-        unsigned mainLightIndex, ea::span<SceneLight*> sceneLights, const DrawableProcessor* drawableProcessor);
+        unsigned mainLightIndex, ea::span<LightProcessor*> sceneLights, const DrawableProcessor* drawableProcessor);
 
     /// Sort batches (from vector).
     template <class T>
@@ -132,11 +133,11 @@ protected:
     const ea::string lightTag_;
 
     /// Unlit base scene batches.
-    ea::vector<BaseSceneBatch> unlitBaseBatches_;
+    //ea::vector<BaseSceneBatch> unlitBaseBatches_;
     /// Lit base scene batches.
-    ea::vector<BaseSceneBatch> litBaseBatches_;
+    //ea::vector<BaseSceneBatch> litBaseBatches_;
     /// Light scene batches.
-    WorkQueueVector<BaseSceneBatch> lightBatches_;
+    //WorkQueueVector<BaseSceneBatch> lightBatches_;
 
 private:
     /// Unlit scene batches. Map to one base batch.
@@ -145,18 +146,18 @@ private:
     WorkQueueVector<IntermediateSceneBatch> litBatches_;*/
 
     /// Temporary vector to store unlit base batches without pipeline states.
-    WorkQueueVector<BaseSceneBatch*> unlitBaseBatchesDirty_;
+    //WorkQueueVector<BaseSceneBatch*> unlitBaseBatchesDirty_;
     /// Temporary vector to store lit base batches without pipeline states.
-    WorkQueueVector<BaseSceneBatch*> litBaseBatchesDirty_;
+    //WorkQueueVector<BaseSceneBatch*> litBaseBatchesDirty_;
     /// Temporary vector to store light batches without pipeline states.
-    WorkQueueVector<unsigned> lightBatchesDirty_;
+    //WorkQueueVector<unsigned> lightBatchesDirty_;
 
     /// Pipeline state cache for unlit batches.
-    ScenePipelineStateCache unlitBasePipelineStateCache_;
+    //ScenePipelineStateCache unlitBasePipelineStateCache_;
     /// Pipeline state cache for lit batches.
-    ScenePipelineStateCache litBasePipelineStateCache_;
+    //ScenePipelineStateCache litBasePipelineStateCache_;
     /// Pipeline state cache for additional light batches.
-    ScenePipelineStateCache lightPipelineStateCache_;
+    //ScenePipelineStateCache lightPipelineStateCache_;
 };
 
 /// Scene pass for forward lighting.
@@ -166,7 +167,7 @@ class ForwardLightingScenePass : public ScenePass
 
 public:
     /// Construct.
-    ForwardLightingScenePass(RenderPipeline* renderPipeline, const ea::string& tag,
+    ForwardLightingScenePass(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag,
         const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass);
 
 private:
@@ -227,7 +228,7 @@ class UnlitScenePass : public ScenePass
 
 public:
     /// Construct.
-    UnlitScenePass(RenderPipeline* renderPipeline, const ea::string& tag, const ea::string& pass);
+    UnlitScenePass(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag, const ea::string& pass);
 
     /// Sort scene batches.
     virtual void SortSceneBatches() override;
@@ -241,20 +242,20 @@ private:
 };
 
 /// Scene pass for shadow rendering.
-class ShadowScenePass : public Object
+class ShadowScenePass : public BatchCompositor
 {
-    URHO3D_OBJECT(ShadowScenePass, Object);
+    URHO3D_OBJECT(ShadowScenePass, BatchCompositor);
 
 public:
     /// Construct.
-    ShadowScenePass(Context* context, const ea::string& tag, const ea::string& shadowPass);
+    ShadowScenePass(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag, const ea::string& shadowPass);
 
     /// Invalidate pipeline state caches.
     virtual void InvalidatePipelineStateCache();
     /// Clear in the beginning of the frame.
     virtual void BeginFrame();
     /// Collect shadow batches for given light. Shall be safe to call from worker thread.
-    virtual void CollectShadowBatches(MaterialQuality materialQuality, SceneLight* sceneLight, unsigned splitIndex);
+    virtual void CollectShadowBatches(MaterialQuality materialQuality, LightProcessor* sceneLight, unsigned splitIndex);
     /// Finalize shadow batches. Called from main thread.
     virtual void FinalizeShadowBatches(Camera* camera, ScenePipelineStateCacheCallback& callback);
     /// Sort and return shadow batches. Safe to call from worker thread.
@@ -285,10 +286,10 @@ protected:
     const unsigned shadowPassIndex_{};
 
     /// Temporary vector to store batches without pipeline states.
-    WorkQueueVector<ea::pair<SceneLightShadowSplit*, unsigned>> batchesDirty_;
+    //WorkQueueVector<ea::pair<SceneLightShadowSplit*, unsigned>> batchesDirty_;
 
     /// Pipeline state cache.
-    ScenePipelineStateCache pipelineStateCache_;
+    //ScenePipelineStateCache pipelineStateCache_;
 };
 
 }

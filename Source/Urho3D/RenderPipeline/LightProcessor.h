@@ -35,7 +35,7 @@
 namespace Urho3D
 {
 
-class SceneLight;
+class LightProcessor;
 class DrawableProcessor;
 
 /// Scene light shadow parameters.
@@ -105,7 +105,7 @@ struct SceneLightProcessContext
 struct SceneLightShadowSplit
 {
     /// Owner light.
-    SceneLight* sceneLight_{};
+    LightProcessor* sceneLight_{};
     /// Shadow camera node.
     SharedPtr<Node> shadowCameraNode_;
     /// Shadow camera.
@@ -115,7 +115,7 @@ struct SceneLightShadowSplit
     /// Shadow caster batches.
     ea::vector<BaseSceneBatch> shadowCasterBatches_;
     /// Combined bounding box of shadow casters in light projection space. Only used for focused spot lights.
-    BoundingBox shadowCasterBox_{};
+    //BoundingBox shadowCasterBox_{};
     /// Shadow camera Z range (directional lights only).
     FloatRange zRange_{};
     /// Shadow map for split.
@@ -133,11 +133,11 @@ struct SceneLightShadowSplit
 };
 
 /// Per-viewport light data.
-class SceneLight : public PipelineStateTracker
+class LightProcessor : public PipelineStateTracker
 {
 public:
     /// Construct.
-    explicit SceneLight(Light* light);
+    explicit LightProcessor(Light* light);
 
     /// Clear in the beginning of the frame.
     void BeginFrame(bool hasShadow);

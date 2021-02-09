@@ -149,7 +149,7 @@ void SceneBatchRenderer::RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, con
 void SceneBatchRenderer::RenderLitBaseBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
     Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedByState> batches)
 {
-    SceneLight* mainLight = sceneBatchCollector.GetMainLight();
+    LightProcessor* mainLight = sceneBatchCollector.GetMainLight();
     const auto getBatchLight = [&](const BaseSceneBatchSortedByState& batch)
     {
         return mainLight;
@@ -160,7 +160,7 @@ void SceneBatchRenderer::RenderLitBaseBatches(DrawCommandQueue& drawQueue, const
 void SceneBatchRenderer::RenderLightBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
     Camera* camera, Zone* zone, ea::span<const LightBatchSortedByState> batches)
 {
-    const ea::vector<SceneLight*>& visibleLights = sceneBatchCollector.GetVisibleLights();
+    const ea::vector<LightProcessor*>& visibleLights = sceneBatchCollector.GetVisibleLights();
     const auto getBatchLight = [&](const LightBatchSortedByState& batch)
     {
         return visibleLights[batch.lightIndex_];
@@ -171,7 +171,7 @@ void SceneBatchRenderer::RenderLightBatches(DrawCommandQueue& drawQueue, const S
 void SceneBatchRenderer::RenderAlphaBatches(DrawCommandQueue& drawQueue, const SceneBatchCollector& sceneBatchCollector,
     Camera* camera, Zone* zone, ea::span<const BaseSceneBatchSortedBackToFront> batches)
 {
-    const ea::vector<SceneLight*>& visibleLights = sceneBatchCollector.GetVisibleLights();
+    const ea::vector<LightProcessor*>& visibleLights = sceneBatchCollector.GetVisibleLights();
     const auto getBatchLight = [&](const BaseSceneBatchSortedBackToFront& batch)
     {
         const unsigned lightIndex = batch.sceneBatch_->lightIndex_;
@@ -194,7 +194,7 @@ void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, c
     // TODO(renderer): Remove copypaste
     const FrameInfo& frameInfo = sceneBatchCollector.GetFrameInfo();
     const Scene* scene = frameInfo.octree_->GetScene();
-    const ea::vector<SceneLight*>& visibleLights = sceneBatchCollector.GetVisibleLights();
+    const ea::vector<LightProcessor*>& visibleLights = sceneBatchCollector.GetVisibleLights();
     Node* cameraNode = camera->GetNode();
 
     static const SceneLightShaderParameters defaultLightParams;
@@ -204,7 +204,7 @@ void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, c
     bool frameDirty = true;
     bool cameraDirty = true;
     float previousConstantDepthBias = 0.0f;
-    const SceneLight* previousLight = nullptr;
+    const LightProcessor* previousLight = nullptr;
 
     for (const LightVolumeBatch& batch : batches)
     {
@@ -218,7 +218,7 @@ void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, c
         }
 
         // Get used light
-        const SceneLight* light = visibleLights[batch.lightIndex_];
+        const LightProcessor* light = visibleLights[batch.lightIndex_];
         const bool lightDirty = light != previousLight;
         if (lightDirty)
         {
@@ -320,7 +320,7 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
 {
     const FrameInfo& frameInfo = sceneBatchCollector.GetFrameInfo();
     const Scene* scene = frameInfo.octree_->GetScene();
-    const ea::vector<SceneLight*>& visibleLights = sceneBatchCollector.GetVisibleLights();
+    const ea::vector<LightProcessor*>& visibleLights = sceneBatchCollector.GetVisibleLights();
     Node* cameraNode = camera->GetNode();
 
     static const SceneLightShaderParameters defaultLightParams;
@@ -330,7 +330,7 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
     bool frameDirty = true;
     bool cameraDirty = true;
     float previousConstantDepthBias = 0.0f;
-    const SceneLight* previousLight = nullptr;
+    const LightProcessor* previousLight = nullptr;
     SceneBatchCollector::VertexLightCollection previousVertexLights;
     Material* previousMaterial = nullptr;
 
@@ -348,7 +348,7 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const SceneB
         }
 
         // Get used light
-        const SceneLight* light = getBatchLight(sortedBatch);
+        const LightProcessor* light = getBatchLight(sortedBatch);
         const bool lightDirty = light != previousLight;
         if (lightDirty)
         {
