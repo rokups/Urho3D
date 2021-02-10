@@ -185,10 +185,6 @@ private:
     Camera* GetOrCreateShadowCamera(unsigned split);
     /// Setup shadow cameras.
     void SetupShadowCameras(SceneLightProcessContext& ctx);
-    /// Check visibility of one shadow caster.
-    bool IsShadowCasterVisible(SceneLightProcessContext& ctx,
-        Drawable* drawable, BoundingBox lightViewBox, Camera* shadowCamera, const Matrix3x4& lightView,
-        const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox);
     /// Process shadow casters' visibilities and build their combined view- or projection-space bounding box.
     void ProcessShadowCasters(SceneLightProcessContext& ctx,
         const ea::vector<Drawable*>& drawables, unsigned splitIndex);

@@ -334,7 +334,7 @@ void SceneBatchCollector::ProcessVisibleLights()
     }
 
     // Update batches for shadow casters
-    dp_->ProcessQueuedDrawables();
+    dp_->ProcessShadowCasters();
 #if 0
     ForEachParallel(workQueue_, 1u, shadowCastersToBeUpdated_,
         [&](unsigned /*index*/, Drawable* drawable)

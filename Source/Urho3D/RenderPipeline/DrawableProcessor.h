@@ -197,11 +197,9 @@ public:
 
     /// Pre-process shadow caster candidates. Safe to call from worker thread.
     void PreprocessShadowCasters(ea::vector<Drawable*>& shadowCasters,
-        const ea::vector<Drawable*>& drawables, const FloatRange& zRange, Light* light, Camera* shadowCamera);
-    /// Queue drawable update. Ignored if already updated or queued. Safe to call from worker thread.
-    void QueueDrawableUpdate(Drawable* drawable);
-    /// Update queued drawables.
-    void ProcessQueuedDrawables();
+        const ea::vector<Drawable*>& candidates, const FloatRange& frustumSubRange, Light* light, Camera* shadowCamera);
+    /// Finalize shadow casters processing.
+    void ProcessShadowCasters();
 
     /// Update drawable geometries if needed.
     void UpdateGeometries();
@@ -214,15 +212,13 @@ protected:
     /// Process queued invisible drawable.
     void ProcessQueuedDrawable(Drawable* drawable);
     /// Update zone of drawable.
-    void UpdateDrawableZone(const BoundingBox& boundingBox, Drawable* drawable);
-    /// Queue drawable geometry update.
+    void UpdateDrawableZone(const BoundingBox& boundingBox, Drawable* drawable) const;
+    /// Queue drawable update. Ignored if already updated or queued. Safe to call from worker thread.
+    void QueueDrawableUpdate(Drawable* drawable);
+    /// Queue drawable geometry update. Safe to call from worker thread.
     void QueueDrawableGeometryUpdate(unsigned threadIndex, Drawable* drawable);
     /// Calculate Z range of bounding box.
     FloatRange CalculateBoundingBoxZRange(const BoundingBox& boundingBox) const;
-    /// Check visibility of shadow caster.
-    bool IsShadowCasterVisible(
-        Drawable* drawable, BoundingBox lightViewBox, Camera* shadowCamera, const Matrix3x4& lightView,
-        const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox) const;
 
 private:
     /// Whether the drawable is already updated for this pipeline and frame.

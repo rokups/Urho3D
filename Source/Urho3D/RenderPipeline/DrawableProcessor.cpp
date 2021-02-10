@@ -66,6 +66,49 @@ float GetDrawableLightPenalty(float intensityPenalty, LightImportance importance
     }
 }
 
+/// Return whether shadow of bounding box is inside frustum (orthogonal light source).
+bool IsBoundingBoxShadowInOrthoFrustum(const BoundingBox& boundingBox,
+    const Frustum& frustum, const BoundingBox& frustumBoundingBox)
+{
+    // Extrude the bounding box up to the far edge of the frustum's light space bounding box
+    BoundingBox extrudedBoundingBox = boundingBox;
+    extrudedBoundingBox.max_.z_ = Max(extrudedBoundingBox.max_.z_, frustumBoundingBox.max_.z_);
+    return frustum.IsInsideFast(extrudedBoundingBox) != OUTSIDE;
+}
+
+/// Return whether shadow of bounding box is inside frustum (perspective light source).
+bool IsBoundingBoxShadowInPerspectiveFrustum(const BoundingBox& boundingBox,
+    const Frustum& frustum, float extrusionDistance)
+{
+    // Extrusion direction depends on the position of the shadow caster
+    const Vector3 center = boundingBox.Center();
+    const Ray extrusionRay(center, center);
+
+    // Because of the perspective, the bounding box must also grow when it is extruded to the distance
+    const float originalDistance = Clamp(center.Length(), M_EPSILON, extrusionDistance);
+    const float sizeFactor = extrusionDistance / originalDistance;
+
+    // Calculate the endpoint box and merge it to the original. Because it's axis-aligned, it will be larger
+    // than necessary, so the test will be conservative
+    const Vector3 newCenter = extrusionDistance * extrusionRay.direction_;
+    const Vector3 newHalfSize = boundingBox.Size() * sizeFactor * 0.5f;
+
+    BoundingBox extrudedBox(newCenter - newHalfSize, newCenter + newHalfSize);
+    extrudedBox.Merge(boundingBox);
+
+    return frustum.IsInsideFast(extrudedBox) != OUTSIDE;
+}
+
+/// Return whether the shadow caster is visible.
+bool IsShadowCasterVisible(const BoundingBox& lightSpaceBoundingBox, Camera* shadowCamera,
+    const Frustum& lightSpaceFrustum, const BoundingBox& lightSpaceFrustumBoundingBox)
+{
+    if (shadowCamera->IsOrthographic())
+        return IsBoundingBoxShadowInOrthoFrustum(lightSpaceBoundingBox, lightSpaceFrustum, lightSpaceFrustumBoundingBox);
+    else
+        return IsBoundingBoxShadowInPerspectiveFrustum(lightSpaceBoundingBox, lightSpaceFrustum, shadowCamera->GetFarClip());
+}
+
 }
 
 DrawableProcessorPass::DrawableProcessorPass(RenderPipeline* renderPipeline, bool needAmbient,
@@ -191,7 +234,7 @@ void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& dra
         sceneZRange_ |= range;
 }
 
-void DrawableProcessor::UpdateDrawableZone(const BoundingBox& boundingBox, Drawable* drawable)
+void DrawableProcessor::UpdateDrawableZone(const BoundingBox& boundingBox, Drawable* drawable) const
 {
     const Vector3 drawableCenter = boundingBox.Center();
     CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
@@ -357,112 +400,38 @@ void DrawableProcessor::ProcessForwardLighting(unsigned lightIndex, const ea::ve
     });
 }
 
-// TODO(renderer): Refactor and reuse me
-bool DrawableProcessor::IsShadowCasterVisible(
-    Drawable* drawable, BoundingBox lightViewBox, Camera* shadowCamera, const Matrix3x4& lightView,
-    const Frustum& lightViewFrustum, const BoundingBox& lightViewFrustumBox) const
-{
-    if (shadowCamera->IsOrthographic())
-    {
-        // Extrude the light space bounding box up to the far edge of the frustum's light space bounding box
-        lightViewBox.max_.z_ = Max(lightViewBox.max_.z_, lightViewFrustumBox.max_.z_);
-        return lightViewFrustum.IsInsideFast(lightViewBox) != OUTSIDE;
-    }
-    else
-    {
-        // If light is not directional, can do a simple check: if object is visible, its shadow is too
-        const unsigned drawableIndex = drawable->GetDrawableIndex();
-        if (geometryFlags_[drawableIndex] & GeometryRenderFlag::Visible)
-            return true;
-
-        // For perspective lights, extrusion direction depends on the position of the shadow caster
-        Vector3 center = lightViewBox.Center();
-        Ray extrusionRay(center, center);
-
-        float extrusionDistance = shadowCamera->GetFarClip();
-        float originalDistance = Clamp(center.Length(), M_EPSILON, extrusionDistance);
-
-        // Because of the perspective, the bounding box must also grow when it is extruded to the distance
-        float sizeFactor = extrusionDistance / originalDistance;
-
-        // Calculate the endpoint box and merge it to the original. Because it's axis-aligned, it will be larger
-        // than necessary, so the test will be conservative
-        Vector3 newCenter = extrusionDistance * extrusionRay.direction_;
-        Vector3 newHalfSize = lightViewBox.Size() * sizeFactor * 0.5f;
-        BoundingBox extrudedBox(newCenter - newHalfSize, newCenter + newHalfSize);
-        lightViewBox.Merge(extrudedBox);
-
-        return lightViewFrustum.IsInsideFast(lightViewBox) != OUTSIDE;
-    }
-}
-
 void DrawableProcessor::PreprocessShadowCasters(ea::vector<Drawable*>& shadowCasters,
-    const ea::vector<Drawable*>& drawables, const FloatRange& zRange, Light* light, Camera* shadowCamera)
+    const ea::vector<Drawable*>& candidates, const FloatRange& frustumSubRange, Light* light, Camera* shadowCamera)
 {
-    const unsigned workerThreadIndex = WorkQueue::GetWorkerThreadIndex();
-    unsigned lightMask = light->GetLightMaskEffective();
-    Camera* cullCamera = frameInfo_.cullCamera_;
-
-    //Camera* shadowCamera = splits_[splitIndex].shadowCamera_;
-    const Frustum& shadowCameraFrustum = shadowCamera->GetFrustum();
-    const Matrix3x4& lightView = shadowCamera->GetView();
-    const Matrix4& lightProj = shadowCamera->GetProjection();
-    LightType type = light->GetLightType();
-    const FloatRange& sceneZRange = sceneZRange_;
-
-    //splits_[splitIndex].shadowCasterBox_.Clear();
     shadowCasters.clear();
 
-    // Transform scene frustum into shadow camera's view space for shadow caster visibility check. For point & spot lights,
-    // we can use the whole scene frustum. For directional lights, use the intersection of the scene frustum and the split
-    // frustum, so that shadow casters do not get rendered into unnecessary splits
-    Frustum lightViewFrustum;
-    if (type != LIGHT_DIRECTIONAL)
-        lightViewFrustum = cullCamera->GetSplitFrustum(sceneZRange.first, sceneZRange.second).Transformed(lightView);
-    else
-    {
-        const FloatRange splitZRange = sceneZRange & zRange;
-        lightViewFrustum = cullCamera->GetSplitFrustum(splitZRange.first, splitZRange.second).Transformed(lightView);
-    }
+    const Frustum& shadowCameraFrustum = shadowCamera->GetFrustum();
+    const Matrix3x4& worldToLightSpace = shadowCamera->GetView();
+    const LightType lightType = light->GetLightType();
 
-    BoundingBox lightViewFrustumBox(lightViewFrustum);
+    // Convert frustum (or sub-frustum) to shadow camera space
+    const FloatRange splitZRange = lightType != LIGHT_DIRECTIONAL ? sceneZRange_ : (sceneZRange_ & frustumSubRange);
+    const Frustum frustum = frameInfo_.cullCamera_->GetSplitFrustum(splitZRange.first, splitZRange.second);
+    const Frustum lightSpaceFrustum = frustum.Transformed(worldToLightSpace);
+    const BoundingBox lightSpaceFrustumBoundingBox(lightSpaceFrustum);
 
     // Check for degenerate split frustum: in that case there is no need to get shadow casters
-    if (lightViewFrustum.vertices_[0] == lightViewFrustum.vertices_[4])
+    if (lightSpaceFrustum.vertices_[0] == lightSpaceFrustum.vertices_[4])
         return;
 
-    BoundingBox lightViewBox;
-    BoundingBox lightProjBox;
-
-    for (auto i = drawables.begin(); i != drawables.end(); ++i)
+    for (Drawable* drawable : candidates)
     {
-        Drawable* drawable = *i;
-        // In case this is a point or spot light query result reused for optimization, we may have non-shadowcasters included.
-        // Check for that first
-        if (!drawable->GetCastShadows())
-            continue;
-        // Check shadow mask
-        if (!(drawable->GetShadowMask() & lightMask))
-            continue;
         // For point light, check that this drawable is inside the split shadow camera frustum
-        if (type == LIGHT_POINT && shadowCameraFrustum.IsInsideFast(drawable->GetWorldBoundingBox()) == OUTSIDE)
+        if (lightType == LIGHT_POINT && shadowCameraFrustum.IsInsideFast(drawable->GetWorldBoundingBox()) == OUTSIDE)
             continue;
 
-        // Check shadow distance
-        QueueDrawableUpdate(drawable);
-
-        // Project shadow caster bounding box to light view space for visibility check
-        lightViewBox = drawable->GetWorldBoundingBox().Transformed(lightView);
-
-        if (IsShadowCasterVisible(drawable, lightViewBox, shadowCamera, lightView, lightViewFrustum, lightViewFrustumBox))
+        // Queue shadow caster if it's visible
+        const BoundingBox lightSpaceBoundingBox = drawable->GetWorldBoundingBox().Transformed(worldToLightSpace);
+        const bool isDrawableVisible = !!(geometryFlags_[drawable->GetDrawableIndex()] & GeometryRenderFlag::Visible);
+        if (isDrawableVisible
+            || IsShadowCasterVisible(lightSpaceBoundingBox, shadowCamera, lightSpaceFrustum, lightSpaceFrustumBoundingBox))
         {
-            // Merge to shadow caster bounding box (only needed for focused spot lights) and add to the list
-            if (type == LIGHT_SPOT && light->GetShadowFocus().focus_)
-            {
-                lightProjBox = lightViewBox.Projected(lightProj);
-                //splits_[splitIndex].shadowCasterBox_.Merge(lightProjBox);
-            }
-
+            QueueDrawableUpdate(drawable);
             shadowCasters.push_back(drawable);
         }
     }
@@ -476,7 +445,7 @@ void DrawableProcessor::QueueDrawableUpdate(Drawable* drawable)
         queuedDrawableUpdates_.Insert(drawable);
 }
 
-void DrawableProcessor::ProcessQueuedDrawables()
+void DrawableProcessor::ProcessShadowCasters()
 {
     ForEachParallel(workQueue_, queuedDrawableUpdates_,
         [&](unsigned /*index*/, Drawable* drawable)

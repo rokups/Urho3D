@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "../Core/NonCopyable.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/PipelineState.h"
 //#include "../RenderPipeline/SceneBatch.h"
@@ -165,7 +166,7 @@ public:
 };
 
 /// Pipeline state cache for RenderPipeline batches.
-class URHO3D_API BatchStateCache
+class URHO3D_API BatchStateCache : public NonCopyable
 {
 public:
     /// Invalidate cache.
