@@ -29,7 +29,7 @@
 #include "../Graphics/Renderer.h"
 #include "../Graphics/Zone.h"
 #include "../IO/Log.h"
-#include "../RenderPipeline/RenderPipeline.h"
+#include "../RenderPipeline/RenderPipelineInterface.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/LightProcessor.h"
 #include "../Scene/Scene.h"
@@ -111,7 +111,7 @@ bool IsShadowCasterVisible(const BoundingBox& lightSpaceBoundingBox, Camera* sha
 
 }
 
-DrawableProcessorPass::DrawableProcessorPass(RenderPipeline* renderPipeline, bool needAmbient,
+DrawableProcessorPass::DrawableProcessorPass(RenderPipelineInterface* renderPipeline, bool needAmbient,
     unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
     : Object(renderPipeline->GetContext())
     , needAmbient_(needAmbient)
@@ -158,7 +158,7 @@ LightProcessor* LightProcessorCache::GetLightProcessor(Light* light, DrawablePro
     return lightProcessor.get();
 }
 
-DrawableProcessor::DrawableProcessor(RenderPipeline* renderPipeline)
+DrawableProcessor::DrawableProcessor(RenderPipelineInterface* renderPipeline)
     : Object(renderPipeline->GetContext())
     , workQueue_(GetSubsystem<WorkQueue>())
     , renderer_(GetSubsystem<Renderer>())

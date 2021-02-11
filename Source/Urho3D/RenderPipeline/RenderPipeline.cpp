@@ -221,7 +221,7 @@ static const ea::vector<ea::string> ambientModeNames =
 }
 
 RenderPipeline::RenderPipeline(Context* context)
-    : Serializable(context)
+    : RenderPipelineInterface(context)
     , graphics_(context_->GetSubsystem<Graphics>())
     , renderer_(context_->GetSubsystem<Renderer>())
     , workQueue_(context_->GetSubsystem<WorkQueue>())

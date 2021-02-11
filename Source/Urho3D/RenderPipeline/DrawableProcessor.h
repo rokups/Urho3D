@@ -33,7 +33,7 @@
 namespace Urho3D
 {
 
-class RenderPipeline;
+class RenderPipelineInterface;
 class GlobalIllumination;
 class Pass;
 class Technique;
@@ -102,7 +102,7 @@ public:
     };
 
     /// Construct.
-    DrawableProcessorPass(RenderPipeline* renderPipeline, bool needAmbient,
+    DrawableProcessorPass(RenderPipelineInterface* renderPipeline, bool needAmbient,
         unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
     /// Add source batch of drawable. Return whether forward lit batch was added.
@@ -162,7 +162,7 @@ class URHO3D_API DrawableProcessor : public Object
 
 public:
     /// Construct.
-    explicit DrawableProcessor(RenderPipeline* renderPipeline);
+    explicit DrawableProcessor(RenderPipelineInterface* renderPipeline);
     /// Set passes.
     void SetPasses(ea::vector<SharedPtr<DrawableProcessorPass>> passes);
     /// Set settings.

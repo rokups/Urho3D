@@ -25,15 +25,9 @@
 #include "../IO/Log.h"
 #include "../Graphics/Renderer.h"
 #include "../RenderPipeline/BatchCompositor.h"
-#include "../RenderPipeline/RenderPipeline.h"
-/*#include "../Core/Context.h"
-#include "../Core/StringUtils.h"
-#include "../Core/WorkQueue.h"
-#include "../Graphics/Renderer.h"
-#include "../Graphics/Technique.h"
-#include "../RenderPipeline/ScenePass.h"
-
-#include <EASTL/sort.h>*/
+#include "../RenderPipeline/LightProcessor.h"
+#include "../RenderPipeline/RenderPipelineInterface.h"
+#include "../Scene/Node.h"
 
 #include "../DebugNew.h"
 
@@ -81,7 +75,7 @@ void AddPipelineBatch(const BatchStateCreateKey& key, BatchStateCache& cache,
 
 }
 
-BatchCompositorPass::BatchCompositorPass(RenderPipeline* renderPipeline,
+BatchCompositorPass::BatchCompositorPass(RenderPipelineInterface* renderPipeline,
     const DrawableProcessor* drawableProcessor, bool needAmbient,
     unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
     : DrawableProcessorPass(renderPipeline, needAmbient, unlitBasePassIndex, litBasePassIndex, lightPassIndex)
@@ -228,7 +222,7 @@ void BatchCompositorPass::ResolveDelayedBatches(unsigned index, const WorkQueueV
     }
 }
 
-BatchCompositor::BatchCompositor(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor,
+BatchCompositor::BatchCompositor(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
     unsigned shadowPassIndex)
     : Object(renderPipeline->GetContext())
     , shadowPassIndex_(shadowPassIndex)

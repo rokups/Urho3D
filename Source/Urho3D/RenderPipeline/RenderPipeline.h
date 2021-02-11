@@ -27,7 +27,7 @@
 #include "../Graphics/Drawable.h"
 #include "../RenderPipeline/RenderPipelineCamera.h"
 #include "../RenderPipeline/RenderPipelineTexture.h"
-#include "../RenderPipeline/SceneBatchCollectorCallback.h"
+#include "../RenderPipeline/RenderPipelineInterface.h"
 #include "../RenderPipeline/ScenePass.h"
 #include "../Scene/Serializable.h"
 
@@ -67,11 +67,10 @@ struct RenderPipelineSettings
 
 ///
 class URHO3D_API RenderPipeline
-    : public Serializable
-    , public PipelineStateTracker
-    , public SceneBatchCollectorCallback
+    : public PipelineStateTracker
+    , public RenderPipelineInterface
 {
-    URHO3D_OBJECT(RenderPipeline, Serializable);
+    URHO3D_OBJECT(RenderPipeline, RenderPipelineInterface);
 
 public:
     /// Construct with defaults.
@@ -94,7 +93,7 @@ public:
     void Render();
 
     /// Return default draw queue. Is not automatically executed.
-    DrawCommandQueue* GetDefaultDrawQueue() { return drawQueue_; }
+    DrawCommandQueue* GetDefaultDrawQueue() override { return drawQueue_; }
 
     /// Create transient viewport-scaled screen buffer owned by pipeline state.
     SharedPtr<RenderPipelineTexture> CreateScreenBuffer(
@@ -108,17 +107,6 @@ public:
     /// Create persistent fixed-sized screen buffer owned by pipeline state.
     SharedPtr<RenderPipelineTexture> CreatePersistentFixedScreenBuffer(
         const ScreenBufferParams& params, const IntVector2& fixedSize);
-
-    /// Signal when update begins.
-    Signal<void(const FrameInfo& frameInfo)> OnUpdateBegin;
-    /// Signal when update end.
-    Signal<void(const FrameInfo& frameInfo)> OnUpdateEnd;
-    /// Signal when render begins.
-    Signal<void(const FrameInfo& frameInfo)> OnRenderBegin;
-    /// Signal when render end.
-    Signal<void(const FrameInfo& frameInfo)> OnRenderEnd;
-    /// Signal when all cached pipeline states are invalidated.
-    Signal<void()> OnPipelineStatesInvalidated;
 
 protected:
     /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.

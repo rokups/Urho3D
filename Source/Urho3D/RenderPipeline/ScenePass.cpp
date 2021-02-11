@@ -49,7 +49,7 @@ ea::string NormalizeShaderDefine(ea::string_view define)
 
 }
 
-ScenePass::ScenePass(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor,
+ScenePass::ScenePass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
     const ea::string& unlitBaseTag, const ea::string& litBaseTag, const ea::string& lightTag,
     unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
     : BatchCompositorPass(renderPipeline, drawableProcessor, true, unlitBasePassIndex, litBasePassIndex, lightPassIndex)
@@ -249,7 +249,7 @@ void ScenePass::CollectLitBatches(Camera* camera, ScenePipelineStateCacheCallbac
 #endif
 }
 
-ForwardLightingScenePass::ForwardLightingScenePass(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag,
+ForwardLightingScenePass::ForwardLightingScenePass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag,
     const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass)
     : ScenePass(renderPipeline, drawableProcessor,
         Format("{0} {0}_UNLIT", tag),
@@ -289,7 +289,7 @@ void AlphaForwardLightingScenePass::SortSceneBatches()
     ea::sort(sortedBatches_.begin(), sortedBatches_.end());
 }
 
-UnlitScenePass::UnlitScenePass(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag, const ea::string& pass)
+UnlitScenePass::UnlitScenePass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag, const ea::string& pass)
     : ScenePass(renderPipeline, drawableProcessor, tag, "", "", Technique::GetPassIndex(pass), M_MAX_UNSIGNED, M_MAX_UNSIGNED)
 {
 }
@@ -299,7 +299,7 @@ void UnlitScenePass::SortSceneBatches()
     SortBatches(baseBatches_, sortedBatches_);
 }
 
-ShadowScenePass::ShadowScenePass(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag, const ea::string& shadowPass)
+ShadowScenePass::ShadowScenePass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag, const ea::string& shadowPass)
     : BatchCompositor(renderPipeline, drawableProcessor, Technique::GetPassIndex(shadowPass))
     , workQueue_(context_->GetSubsystem<WorkQueue>())
     , renderer_(context_->GetSubsystem<Renderer>())

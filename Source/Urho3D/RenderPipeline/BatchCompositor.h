@@ -91,8 +91,8 @@ public:
     };
 
     /// Construct.
-    BatchCompositorPass(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor, bool needAmbient,
-        unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
+    BatchCompositorPass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
+        bool needAmbient, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
     /// Compose batches.
     void ComposeBatches();
@@ -150,7 +150,7 @@ class URHO3D_API BatchCompositor : public Object
 
 public:
     /// Construct.
-    explicit BatchCompositor(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor,
+    explicit BatchCompositor(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
         unsigned shadowPassIndex);
     /// Set passes.
     void SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes);

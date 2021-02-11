@@ -33,7 +33,7 @@
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/TextureCube.h"
 #include "../Graphics/Viewport.h"
-#include "../RenderPipeline/RenderPipeline.h"
+#include "../RenderPipeline/RenderPipelineInterface.h"
 #include "../RenderPipeline/RenderPipelineTexture.h"
 #include "../IO/Log.h"
 
@@ -158,7 +158,7 @@ static ThreadSafeIndex persistentScreenBuffers;
 
 }
 
-RenderPipelineTexture::RenderPipelineTexture(RenderPipeline* renderPipeline)
+RenderPipelineTexture::RenderPipelineTexture(RenderPipelineInterface* renderPipeline)
     : Object(renderPipeline->GetContext())
     , renderer_(GetSubsystem<Renderer>())
     , graphics_(GetSubsystem<Graphics>())
@@ -397,7 +397,7 @@ bool RenderPipelineTexture::CheckRendering() const
 }
 
 ScreenBufferTexture::ScreenBufferTexture(
-    RenderPipeline* renderPipeline, const ScreenBufferParams& params,
+    RenderPipelineInterface* renderPipeline, const ScreenBufferParams& params,
     const Vector2& sizeMultiplier, const IntVector2& fixedSize, bool persistent)
     : RenderPipelineTexture(renderPipeline)
     , params_(params)
@@ -440,7 +440,7 @@ IntRect ScreenBufferTexture::GetViewportRect() const
     return CheckRendering() ? IntRect{ IntVector2::ZERO, currentSize_ } : IntRect::ZERO;
 }
 
-ViewportColorTexture::ViewportColorTexture(RenderPipeline* renderPipeline)
+ViewportColorTexture::ViewportColorTexture(RenderPipelineInterface* renderPipeline)
     : RenderPipelineTexture(renderPipeline)
 {
 }
@@ -467,7 +467,7 @@ void ViewportColorTexture::OnRenderBegin(const FrameInfo& frameInfo)
     viewportRect_ = frameInfo.viewRect_;
 }
 
-ViewportDepthStencilTexture::ViewportDepthStencilTexture(RenderPipeline* renderPipeline)
+ViewportDepthStencilTexture::ViewportDepthStencilTexture(RenderPipelineInterface* renderPipeline)
     : RenderPipelineTexture(renderPipeline)
 {
 }

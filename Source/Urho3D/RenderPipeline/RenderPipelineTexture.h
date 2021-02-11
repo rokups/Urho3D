@@ -33,7 +33,7 @@ namespace Urho3D
 class DrawCommandQueue;
 class PipelineState;
 class RenderSurface;
-class RenderPipeline;
+class RenderPipelineInterface;
 class Texture;
 class Viewport;
 struct FrameInfo;
@@ -99,7 +99,7 @@ public:
 
 protected:
     /// Construct.
-    RenderPipelineTexture(RenderPipeline* renderPipeline);
+    RenderPipelineTexture(RenderPipelineInterface* renderPipeline);
     /// Destruct.
     ~RenderPipelineTexture() override;
     /// Called when render begins.
@@ -152,7 +152,7 @@ class URHO3D_API ScreenBufferTexture : public RenderPipelineTexture
 
 public:
     /// Construct.
-    ScreenBufferTexture(RenderPipeline* renderPipeline, const ScreenBufferParams& params,
+    ScreenBufferTexture(RenderPipelineInterface* renderPipeline, const ScreenBufferParams& params,
         const Vector2& sizeMultiplier, const IntVector2& fixedSize, bool persistent);
     /// Destruct.
     ~ScreenBufferTexture() override;
@@ -192,7 +192,7 @@ class URHO3D_API ViewportColorTexture : public RenderPipelineTexture
 
 public:
     /// Construct.
-    ViewportColorTexture(RenderPipeline* renderPipeline);
+    ViewportColorTexture(RenderPipelineInterface* renderPipeline);
 
     /// Not supported.
     void ClearDepthStencil(float depth, unsigned stencil, CubeMapFace face) override;
@@ -224,7 +224,7 @@ class URHO3D_API ViewportDepthStencilTexture : public RenderPipelineTexture
 
 public:
     /// Construct.
-    ViewportDepthStencilTexture(RenderPipeline* renderPipeline);
+    ViewportDepthStencilTexture(RenderPipelineInterface* renderPipeline);
 
     /// Clear as color texture. No-op for depth-stencil texture.
     void ClearColor(const Color& color, CubeMapFace face) override;

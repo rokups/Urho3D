@@ -63,7 +63,7 @@ public:
     using DrawableLightingData = ea::vector<DrawableLightAccumulator<MaxPixelLights, MaxVertexLights>>;
 
     /// Construct.
-    ScenePass(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor,
+    ScenePass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
         const ea::string& unlitBaseTag, const ea::string& litBaseTag, const ea::string& lightTag,
         unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
@@ -167,7 +167,7 @@ class URHO3D_API ForwardLightingScenePass : public ScenePass
 
 public:
     /// Construct.
-    ForwardLightingScenePass(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag,
+    ForwardLightingScenePass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag,
         const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass);
 
 private:
@@ -228,7 +228,7 @@ class URHO3D_API UnlitScenePass : public ScenePass
 
 public:
     /// Construct.
-    UnlitScenePass(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag, const ea::string& pass);
+    UnlitScenePass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag, const ea::string& pass);
 
     /// Sort scene batches.
     virtual void SortSceneBatches() override;
@@ -248,7 +248,7 @@ class URHO3D_API ShadowScenePass : public BatchCompositor
 
 public:
     /// Construct.
-    ShadowScenePass(RenderPipeline* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag, const ea::string& shadowPass);
+    ShadowScenePass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag, const ea::string& shadowPass);
 
     /// Invalidate pipeline state caches.
     virtual void InvalidatePipelineStateCache();

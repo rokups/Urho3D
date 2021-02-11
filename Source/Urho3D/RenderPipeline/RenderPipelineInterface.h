@@ -22,43 +22,39 @@
 
 #pragma once
 
-#include "../Core/Object.h"
-#include "../Graphics/Camera.h"
-#include "../Graphics/GraphicsDefs.h"
-#include "../Graphics/PipelineStateTracker.h"
+#include "../Core/Signal.h"
+#include "../RenderPipeline/SceneBatchCollectorCallback.h"
+#include "../Scene/Serializable.h"
 
 namespace Urho3D
 {
 
-class RenderPipelineInterface;
-class RenderSurface;
-class Viewport;
+class DrawCommandQueue;
 struct FrameInfo;
 
-/// Main camera of render pipeline. May be flipped if necessary.
-class URHO3D_API RenderPipelineCamera : public Object, public PipelineStateTracker
+/// Base interface of render pipeline required by Render Pipeline classes.
+class URHO3D_API RenderPipelineInterface
+    : public Serializable
+    , public SceneBatchCollectorCallback
 {
-    URHO3D_OBJECT(RenderPipelineCamera, Object);
+    URHO3D_OBJECT(RenderPipelineInterface, Serializable);
 
 public:
     /// Construct.
-    explicit RenderPipelineCamera(RenderPipelineInterface* renderPipeline);
-    /// Initialize camera.
-    void Initialize(Camera* camera);
+    using Serializable::Serializable;
+    /// Return default draw queue that can be reused.
+    virtual DrawCommandQueue* GetDefaultDrawQueue() = 0;
 
-protected:
-    /// Called when render begins.
-    void OnRenderBegin(const FrameInfo& frameInfo);
-    /// Called when render ends.
-    void OnRenderEnd(const FrameInfo& frameInfo);
-    /// Mark pipeline state hash as dirty.
-    unsigned RecalculatePipelineStateHash() const override;
-
-private:
-    /// Whether to flip camera.
-    bool flipCamera_{};
-    /// Camera.
-    WeakPtr<Camera> camera_{};
+    /// Signal when update begins.
+    Signal<void(const FrameInfo& frameInfo)> OnUpdateBegin;
+    /// Signal when update end.
+    Signal<void(const FrameInfo& frameInfo)> OnUpdateEnd;
+    /// Signal when render begins.
+    Signal<void(const FrameInfo& frameInfo)> OnRenderBegin;
+    /// Signal when render end.
+    Signal<void(const FrameInfo& frameInfo)> OnRenderEnd;
+    /// Signal when all cached pipeline states are invalidated.
+    Signal<void()> OnPipelineStatesInvalidated;
 };
 
 }

@@ -24,7 +24,7 @@
 
 #include "../Graphics/Drawable.h"
 #include "../Graphics/Octree.h"
-#include "../RenderPipeline/RenderPipeline.h"
+#include "../RenderPipeline/RenderPipelineInterface.h"
 #include "../RenderPipeline/RenderPipelineCamera.h"
 #include "../Scene/Node.h"
 
@@ -33,7 +33,7 @@
 namespace Urho3D
 {
 
-RenderPipelineCamera::RenderPipelineCamera(RenderPipeline* renderPipeline)
+RenderPipelineCamera::RenderPipelineCamera(RenderPipelineInterface* renderPipeline)
     : Object(renderPipeline->GetContext())
 {
     renderPipeline->OnRenderBegin.Subscribe(this, &RenderPipelineCamera::OnRenderBegin);
