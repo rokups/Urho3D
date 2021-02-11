@@ -253,7 +253,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     Pass* pass = key.pass_;
     Light* light = key.light_ ? key.light_->GetLight() : nullptr;
     const bool isLitBasePass = ctx.subpassIndex_ == 1;
-    const bool isShadowPass = ctx.pass_ == shadowPass_;
+    const bool isShadowPass = ctx.pass_ == batchCompositor_;
 
     // TODO(renderer): Remove this hack
     if (!pass)
@@ -640,10 +640,8 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         viewportDepth_ = MakeShared<ViewportDepthStencilTexture>(this);
 
         drawableProcessor_ = MakeShared<DrawableProcessor>(this);
-        shadowPass_ = MakeShared<ShadowScenePass>(this, drawableProcessor_, "PASS_SHADOW", "shadow");
-        batchCompositor_ = shadowPass_; //MakeShared<BatchCompositor>(this);
+        batchCompositor_ = MakeShared<BatchCompositor>(this, drawableProcessor_, Technique::GetPassIndex("shadow"));
         sceneBatchCollector_ = MakeShared<SceneBatchCollector>(context_, drawableProcessor_, batchCompositor_);
-        sceneBatchCollector_->SetShadowPass(shadowPass_);
 
         shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
         sceneBatchRenderer_ = MakeShared<SceneBatchRenderer>(context_);
@@ -814,6 +812,7 @@ void RenderPipeline::Render()
     // Collect batches
     const auto zone = frameInfo_.octree_->GetBackgroundZone();
 
+    static thread_local ea::vector<PipelineBatchByState> shadowBatches;
     const auto& visibleLights = sceneBatchCollector_->GetVisibleLights();
     for (LightProcessor* sceneLight : visibleLights)
     {
@@ -821,7 +820,7 @@ void RenderPipeline::Render()
         for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
         {
             const ShadowSplitProcessor& split = sceneLight->GetSplit(splitIndex);
-            const auto& shadowBatches = shadowPass_->GetSortedShadowBatches(split);
+            split.SortShadowBatches(shadowBatches);
 
             drawQueue_->Reset();
             sceneBatchRenderer_->RenderShadowBatches(*drawQueue_, *drawableProcessor_, split.shadowCamera_, zone, shadowBatches);

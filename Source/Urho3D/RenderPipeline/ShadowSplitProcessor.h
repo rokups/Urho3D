@@ -35,6 +35,7 @@ class Drawable;
 class Light;
 class LightProcessor;
 class Node;
+struct PipelineBatchByState;
 struct ShadowMap;
 
 /// Class that manages single shadow split processing.
@@ -58,6 +59,8 @@ public:
 
     /// Calculate shadow matrix.
     Matrix4 CalculateShadowMatrix(float subPixelOffset) const;
+    /// Sort and return shadow batches. Array is cleared automatically.
+    void SortShadowBatches(ea::vector<PipelineBatchByState>& sortedBatches) const;
 
 private:
     /// Initialize base directional camera w/o any focusing and adjusting.

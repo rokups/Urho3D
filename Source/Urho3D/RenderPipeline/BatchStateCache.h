@@ -62,21 +62,6 @@ struct BatchStateLookupKey
     /// Pass of the material technique to be used.
     Pass* pass_{};
 
-    /// Construct default.
-    /*BatchStateLookupKey() = default;
-
-    /// Construct from base, litbase, light or shadow batch.
-    // TODO(renderer): Remove
-    BatchStateLookupKey(const PipelineBatch& sceneBatch, unsigned lightHash)
-        : drawableHash_(sceneBatch.drawable_->GetPipelineStateHash())
-        , lightHash_(lightHash)
-        , geometryType_(sceneBatch.geometryType_)
-        , geometry_(sceneBatch.geometry_)
-        , material_(sceneBatch.material_)
-        , pass_(sceneBatch.pass_)
-    {
-    }*/
-
     /// Compare.
     bool operator ==(const BatchStateLookupKey& rhs) const
     {
@@ -140,18 +125,6 @@ struct BatchStateCreateContext
     Object* pass_{};
     /// Index of subpass.
     unsigned subpassIndex_{};
-    /// Pass shader defines.
-    //ea::string shaderDefines_;
-    ///
-    //bool litBasePass_{};
-    /// Whether it is shadow pass.
-    //bool shadowPass_{};
-    /// Cull camera.
-    //Camera* camera_{};
-    /// Scene light.
-    //const LightProcessor* light_{};
-    /// Drawable.
-    //Drawable* drawable_{};
 };
 
 /// Pipeline state cache callback used to create actual pipeline state.

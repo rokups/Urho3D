@@ -40,44 +40,6 @@
 namespace Urho3D
 {
 
-namespace
-{
-
-/// Helper class to evaluate min and max Z of the drawable.
-/*struct DrawableZRangeEvaluator
-{
-    explicit DrawableZRangeEvaluator(Camera* camera)
-        : viewMatrix_(camera->GetView())
-        , viewZ_(viewMatrix_.m20_, viewMatrix_.m21_, viewMatrix_.m22_)
-        , absViewZ_(viewZ_.Abs())
-    {
-    }
-
-    DrawableZRange Evaluate(Drawable* drawable) const
-    {
-        const BoundingBox& boundingBox = drawable->GetWorldBoundingBox();
-        const Vector3 center = boundingBox.Center();
-        const Vector3 edge = boundingBox.Size() * 0.5f;
-
-        // Ignore "infinite" objects like skybox
-        if (edge.LengthSquared() >= M_LARGE_VALUE * M_LARGE_VALUE)
-            return {};
-
-        const float viewCenterZ = viewZ_.DotProduct(center) + viewMatrix_.m23_;
-        const float viewEdgeZ = absViewZ_.DotProduct(edge);
-        const float minZ = viewCenterZ - viewEdgeZ;
-        const float maxZ = viewCenterZ + viewEdgeZ;
-
-        return { minZ, maxZ };
-    }
-
-    Matrix3x4 viewMatrix_;
-    Vector3 viewZ_;
-    Vector3 absViewZ_;
-};*/
-
-}
-
 SceneBatchCollector::SceneBatchCollector(Context* context, DrawableProcessor* dp, BatchCompositor* bc)
     : Object(context)
     , workQueue_(context->GetSubsystem<WorkQueue>())
@@ -104,11 +66,6 @@ void SceneBatchCollector::ResetPasses()
     passes2_.clear();
 }
 
-void SceneBatchCollector::SetShadowPass(const SharedPtr<ShadowScenePass>& shadowPass)
-{
-    shadowPass_ = shadowPass;
-}
-
 void SceneBatchCollector::AddScenePass(const SharedPtr<ScenePass>& pass)
 {
     passes2_.push_back(pass);
@@ -116,8 +73,6 @@ void SceneBatchCollector::AddScenePass(const SharedPtr<ScenePass>& pass)
 
 void SceneBatchCollector::InvalidatePipelineStateCache()
 {
-    if (shadowPass_)
-        shadowPass_->InvalidatePipelineStateCache();
     for (ScenePass* pass : passes2_)
         pass->InvalidatePipelineStateCache();
 }
@@ -137,20 +92,7 @@ void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchColle
     if (camera_->GetViewOverrideFlags() & VO_LOW_MATERIAL_QUALITY)
         materialQuality_ = QUALITY_LOW;
 
-    // Reset containers
-    //visibleGeometries_.Clear(numThreads_);
-    //visibleLightsTemp_.Clear(numThreads_);
-    //sceneZRange_.Clear(numThreads_);
-    //shadowCastersToBeUpdated_.Clear(numThreads_);
-    //threadedGeometryUpdates_.Clear(numThreads_);
-    //nonThreadedGeometryUpdates_.Clear(numThreads_);
-
-    //transient_.Reset(numDrawables_);
-    //drawableLighting_.resize(numDrawables_);
-
     // Initialize passes
-    if (shadowPass_)
-        shadowPass_->BeginFrame();
     for (ScenePass* pass : passes2_)
         pass->BeginFrame();
 }
@@ -158,144 +100,23 @@ void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchColle
 void SceneBatchCollector::ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables)
 {
     dp_->ProcessVisibleDrawables(drawables);
-
-    /*ForEachParallel(workQueue_, drawableWorkThreshold_, drawables,
-        [this](unsigned index, Drawable* drawable)
-    {
-        const unsigned threadIndex = WorkQueue::GetWorkerThreadIndex();
-        ProcessVisibleDrawablesForThread(threadIndex, { &drawable, 1u });
-    });*/
-
     visibleLights_ = dp_->GetLightProcessors();
-    /*for (Light* light : dp_->GetVisibleLights())
-    {
-        WeakPtr<Light> weakLight(light);
-        auto& sceneLight = cachedSceneLights_[weakLight];
-        if (!sceneLight)
-            sceneLight = ea::make_unique<LightProcessor>(light);
-        visibleLights_.push_back(sceneLight.get());
-    };*/
 }
 
 void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables)
 {
-#if 0
-    Material* defaultMaterial = renderer_->GetDefaultMaterial();
-    const DrawableZRangeEvaluator zRangeEvaluator{ camera_ };
-
-    for (Drawable* drawable : drawables)
-    {
-        // TODO(renderer): Add occlusion culling
-        const unsigned drawableIndex = drawable->GetDrawableIndex();
-
-        drawable->UpdateBatches(frameInfo_);
-        drawable->MarkInView(frameInfo_);
-        transient_.isUpdated_[drawableIndex].test_and_set(std::memory_order_relaxed);
-
-        // Skip if too far
-        const float maxDistance = drawable->GetDrawDistance();
-        if (maxDistance > 0.0f)
-        {
-            if (drawable->GetDistance() > maxDistance)
-                return;
-        }
-
-        // For geometries, find zone, clear lights and calculate view space Z range
-        if (drawable->GetDrawableFlags() & DRAWABLE_GEOMETRY)
-        {
-            const BoundingBox& boundingBox = drawable->GetWorldBoundingBox();
-            const DrawableZRange zRange = zRangeEvaluator.Evaluate(drawable);
-
-            // Update zone
-            const Vector3 drawableCenter = boundingBox.Center();
-            CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
-            const float drawableCacheDistanceSquared = (cachedZone.cachePosition_ - drawableCenter).LengthSquared();
-            if (drawableCacheDistanceSquared >= cachedZone.cacheInvalidationDistanceSquared_)
-            {
-                cachedZone = octree_->QueryZone(drawableCenter, drawable->GetZoneMask());
-                drawable->MarkPipelineStateHashDirty();
-            }
-
-            // Do not add "infinite" objects like skybox to prevent shadow map focusing behaving erroneously
-            if (!zRange.IsValid())
-                transient_.zRange_[drawableIndex] = { M_LARGE_VALUE, M_LARGE_VALUE };
-            else
-            {
-                transient_.zRange_[drawableIndex] = zRange;
-                sceneZRange_.Accumulate(threadIndex, zRange);
-            }
-
-            visibleGeometries_.PushBack(threadIndex, drawable);
-            transient_.traits_[drawableIndex] |= SceneDrawableData::DrawableVisibleGeometry;
-
-            // Queue geometry update
-            const UpdateGeometryType updateGeometryType = drawable->GetUpdateGeometryType();
-            if (updateGeometryType == UPDATE_MAIN_THREAD)
-                nonThreadedGeometryUpdates_.PushBack(threadIndex, drawable);
-            else
-                threadedGeometryUpdates_.PushBack(threadIndex, drawable);
-
-            // Collect batches
-            const auto& sourceBatches = drawable->GetBatches();
-            for (unsigned i = 0; i < sourceBatches.size(); ++i)
-            {
-                const SourceBatch& sourceBatch = sourceBatches[i];
-
-                // Find current technique
-                Material* material = sourceBatch.material_ ? sourceBatch.material_ : defaultMaterial;
-                Technique* technique = material->FindTechnique(drawable, materialQuality_);
-                if (!technique)
-                    continue;
-
-                // Update scene passes
-                for (ScenePass* pass : passes2_)
-                {
-                    const bool isLit = pass->AddSourceBatch(drawable, i, technique);
-                    if (isLit)
-                        transient_.traits_[drawableIndex] |= SceneDrawableData::ForwardLit;
-                }
-            }
-
-            // Reset light accumulator
-            // TODO(renderer): Don't do it if unlit
-            drawableLighting_[drawableIndex].ResetLights();
-
-            // TODO(renderer): Move
-            drawableLighting_[drawableIndex].sh_ = SphericalHarmonicsDot9(cachedZone.zone_->GetAmbientColor());
-            if (auto gi = frameInfo_.scene_->GetComponent<GlobalIllumination>())
-            {
-                unsigned& hint = drawable->GetMutableLightProbeTetrahedronHint();
-                const Vector3& samplePosition = drawable->GetWorldBoundingBox().Center();
-                drawableLighting_[drawableIndex].sh_ += gi->SampleAmbientSH(samplePosition, hint);
-            }
-        }
-        else if (drawable->GetDrawableFlags() & DRAWABLE_LIGHT)
-        {
-            auto light = static_cast<Light*>(drawable);
-            const Color lightColor = light->GetEffectiveColor();
-
-            // Skip lights with zero brightness or black color, skip baked lights too
-            if (!lightColor.Equals(Color::BLACK) && light->GetLightMaskEffective() != 0)
-                visibleLightsTemp_.PushBack(threadIndex, light);
-        }
-    }
-#endif
 }
 
 void SceneBatchCollector::ProcessVisibleLights()
 {
     // Process lights in main thread
     for (LightProcessor* sceneLight : visibleLights_)
-        sceneLight->BeginFrame(shadowPass_ && callback_->HasShadow(sceneLight->GetLight()));
+        sceneLight->BeginFrame(callback_->HasShadow(sceneLight->GetLight()));
 
     // Update lit geometries and shadow casters
     SceneLightProcessContext sceneLightProcessContext;
     sceneLightProcessContext.frameInfo_ = frameInfo_;
     sceneLightProcessContext.dp_ = dp_;
-    //sceneLightProcessContext.sceneZRange_ = dp_->GetSceneZRange();
-    //sceneLightProcessContext.visibleGeometries_ = &dp_->GetVisibleGeometries();
-    //sceneLightProcessContext.drawableData_ = &transient_;
-    //sceneLightProcessContext.geometriesToBeUpdates_ = &shadowCastersToBeUpdated_;
     for (unsigned i = 0; i < visibleLights_.size(); ++i)
     {
         workQueue_->AddWorkItem([this, i, &sceneLightProcessContext](unsigned threadIndex)
@@ -335,33 +156,6 @@ void SceneBatchCollector::ProcessVisibleLights()
 
     // Update batches for shadow casters
     dp_->ProcessShadowCasters();
-#if 0
-    ForEachParallel(workQueue_, 1u, shadowCastersToBeUpdated_,
-        [&](unsigned /*index*/, Drawable* drawable)
-    {
-        drawable->UpdateBatches(frameInfo_);
-        drawable->MarkInView(frameInfo_);
-
-        // Update zone
-        // TODO(renderer): Try to remove copypaste
-        const BoundingBox& boundingBox = drawable->GetWorldBoundingBox();
-        const Vector3 drawableCenter = boundingBox.Center();
-        CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
-        const float drawableCacheDistanceSquared = (cachedZone.cachePosition_ - drawableCenter).LengthSquared();
-        if (drawableCacheDistanceSquared >= cachedZone.cacheInvalidationDistanceSquared_)
-        {
-            cachedZone = octree_->QueryZone(drawableCenter, drawable->GetZoneMask());
-            drawable->MarkPipelineStateHashDirty();
-        }
-
-        // Queue geometry update
-        const UpdateGeometryType updateGeometryType = drawable->GetUpdateGeometryType();
-        if (updateGeometryType == UPDATE_MAIN_THREAD)
-            dp_->GET_NTGU().Insert(drawable);
-        else
-            dp_->GET_TGU().Insert(drawable);
-    });
-#endif
 
     // Collect shadow caster batches
     for (LightProcessor* sceneLight : visibleLights_)
@@ -371,19 +165,14 @@ void SceneBatchCollector::ProcessVisibleLights()
         {
             workQueue_->AddWorkItem([=](unsigned threadIndex)
             {
-                shadowPass_->BeginShadowBatchesComposition(visibleLights_.index_of(sceneLight), splitIndex);
-                shadowPass_->CollectShadowBatches(materialQuality_, sceneLight, splitIndex);
+                bc_->BeginShadowBatchesComposition(visibleLights_.index_of(sceneLight), splitIndex);
             }, M_MAX_UNSIGNED);
         }
     }
     workQueue_->Complete(M_MAX_UNSIGNED);
 
     // Finalize shadow batches
-    if (shadowPass_)
-    {
-        shadowPass_->FinalizeShadowBatches(camera_, *callback_);
-        shadowPass_->FinalizeShadowBatchesComposition();
-    }
+    bc_->FinalizeShadowBatchesComposition();
 
     // Find main light
     mainLightIndex_ = FindMainLight();
@@ -417,27 +206,6 @@ void SceneBatchCollector::AccumulateForwardLighting(unsigned lightIndex)
 {
     LightProcessor& sceneLight = *visibleLights_[lightIndex];
     dp_->ProcessForwardLighting(lightIndex, sceneLight.GetLitGeometries());
-    #if 0
-    Light* light = sceneLight.GetLight();
-
-    ForEachParallel(workQueue_, litGeometriesWorkThreshold_, sceneLight.GetLitGeometries(),
-        [&](unsigned /*index*/, Drawable* geometry)
-    {
-        DrawableLightDataAccumulationContext accumContext;
-        accumContext.maxPixelLights_ = maxPixelLights_;
-        accumContext.lightImportance_ = light->GetLightImportance();
-        accumContext.lightIndex_ = lightIndex;
-        // TODO(renderer): fixme
-        //accumContext.lights_ = &visibleLights_;
-
-        const float lightIntensityPenalty = 1.0f / light->GetIntensityDivisor();
-
-        const unsigned drawableIndex = geometry->GetDrawableIndex();
-        const float distance = ea::max(light->GetDistanceTo(geometry), M_LARGE_EPSILON);
-        const float penalty = lightIndex == mainLightIndex_ ? -M_LARGE_VALUE : distance * lightIntensityPenalty;
-        dp_->GET_LIGHT()[drawableIndex].AccumulateLight(accumContext, penalty);
-    });
-    #endif
 }
 
 void SceneBatchCollector::CollectSceneBatches()
@@ -452,15 +220,6 @@ void SceneBatchCollector::CollectSceneBatches()
 void SceneBatchCollector::UpdateGeometries()
 {
     dp_->UpdateGeometries();
-    // TODO(renderer): Add multithreading
-    /*for (Drawable* drawable : threadedGeometryUpdates_)
-    {
-        drawable->UpdateGeometry(frameInfo_);
-    };
-    for (Drawable* drawable : nonThreadedGeometryUpdates_)
-    {
-        drawable->UpdateGeometry(frameInfo_);
-    };*/
 }
 
 void SceneBatchCollector::CollectLightVolumeBatches()

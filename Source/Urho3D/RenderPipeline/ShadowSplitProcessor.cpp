@@ -26,9 +26,12 @@
 #include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
 #include "../RenderPipeline/ShadowSplitProcessor.h"
+#include "../RenderPipeline/PipelineBatchSortKey.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/Light.h"
 #include "../Scene/Node.h"
+
+#include <EASTL/sort.h>
 
 #include "../DebugNew.h"
 
@@ -299,6 +302,15 @@ Matrix4 ShadowSplitProcessor::CalculateShadowMatrix(float subPixelOffset) const
     texAdjust.SetScale(scale);
 
     return texAdjust * shadowProj * shadowView;
+}
+
+void ShadowSplitProcessor::SortShadowBatches(ea::vector<PipelineBatchByState>& sortedBatches) const
+{
+    const unsigned numBatches = shadowCasterBatches_.size();
+    sortedBatches.resize(numBatches);
+    for (unsigned i = 0; i < numBatches; ++i)
+        sortedBatches[i] = PipelineBatchByState{ &shadowCasterBatches_[i] };
+    ea::sort(sortedBatches.begin(), sortedBatches.end());
 }
 
 }

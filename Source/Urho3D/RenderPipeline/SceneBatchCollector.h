@@ -70,8 +70,6 @@ public:
     void SetMaxPixelLights(unsigned count) { maxPixelLights_ = count; }
     /// Reset scene passes.
     void ResetPasses();
-    /// Set shadow pass.
-    void SetShadowPass(const SharedPtr<ShadowScenePass>& shadowPass);
     /// Add scene pass.
     void AddScenePass(const SharedPtr<ScenePass>& pass);
 
@@ -151,8 +149,6 @@ private:
     /// Number of drawables.
     unsigned numDrawables_{};
 
-    /// Shadow pass.
-    SharedPtr<ShadowScenePass> shadowPass_;
     /// Scene passes.
     /// TODO(renderer): Rename
     ea::vector<SharedPtr<ScenePass>> passes2_;

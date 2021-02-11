@@ -144,7 +144,6 @@ private:
     SharedPtr<OpaqueForwardLightingScenePass> basePass_;
     SharedPtr<AlphaForwardLightingScenePass> alphaPass_;
     SharedPtr<UnlitScenePass> deferredPass_;
-    SharedPtr<ShadowScenePass> shadowPass_;
 
     SharedPtr<RenderPipelineTexture> deferredFinal_;
     SharedPtr<RenderPipelineTexture> deferredAlbedo_;
