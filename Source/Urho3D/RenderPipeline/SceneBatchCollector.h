@@ -32,7 +32,7 @@
 #include "../RenderPipeline/LightAccumulator.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/BatchCompositor.h"
-#include "../RenderPipeline/SceneBatch.h"
+#include "../RenderPipeline/PipelineBatchSortKey.h"
 #include "../RenderPipeline/SceneBatchCollectorCallback.h"
 #include "../RenderPipeline/SceneDrawableData.h"
 #include "../RenderPipeline/LightProcessor.h"

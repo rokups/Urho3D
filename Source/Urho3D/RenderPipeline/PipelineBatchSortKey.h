@@ -32,7 +32,7 @@ namespace Urho3D
 {
 
 /// Intermediate batch that may map onto one or many actual batches.
-using IntermediateSceneBatch = GeometryBatch;
+//using IntermediateSceneBatch = GeometryBatch;
 /*struct IntermediateSceneBatch
 {
     /// Geometry.

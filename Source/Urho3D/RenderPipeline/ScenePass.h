@@ -24,7 +24,7 @@
 
 #include "../Core/Object.h"
 #include "../RenderPipeline/LightAccumulator.h"
-#include "../RenderPipeline/SceneBatch.h"
+#include "../RenderPipeline/PipelineBatchSortKey.h"
 #include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/BatchStateCache.h"
 #include "../RenderPipeline/BatchCompositor.h"

@@ -25,7 +25,7 @@
 #include "../Core/NonCopyable.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/PipelineState.h"
-//#include "../RenderPipeline/SceneBatch.h"
+//#include "../RenderPipeline/PipelineBatchSortKey.h"
 
 namespace Urho3D
 {

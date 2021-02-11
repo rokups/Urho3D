@@ -25,7 +25,7 @@
 #include "../Core/Object.h"
 #include "../Graphics/DrawCommandQueue.h"
 // TODO(renderer): We don't need this include
-#include "../RenderPipeline/SceneBatch.h"
+#include "../RenderPipeline/PipelineBatchSortKey.h"
 
 #include <EASTL/span.h>
 

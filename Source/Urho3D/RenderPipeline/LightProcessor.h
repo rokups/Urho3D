@@ -26,7 +26,7 @@
 #include "../Graphics/Light.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/PipelineStateTracker.h"
-#include "../RenderPipeline/SceneBatch.h"
+#include "../RenderPipeline/PipelineBatchSortKey.h"
 #include "../RenderPipeline/SceneDrawableData.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
 #include "../RenderPipeline/ShadowSplitProcessor.h"
