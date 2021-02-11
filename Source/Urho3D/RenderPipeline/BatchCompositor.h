@@ -49,7 +49,7 @@ class Geometry;
 class Material;
 class Pass;
 class PipelineState;
-struct SceneLightShadowSplit;
+struct ShadowSplitProcessor;
 
 /// Self-sufficient batch that can be rendered by RenderPipeline.
 // TODO(renderer): Sort by vertex lights?
@@ -76,7 +76,7 @@ struct PipelineBatch
     const SourceBatch& GetSourceBatch() const { return drawable_->GetBatches()[sourceBatchIndex_]; }
 };
 
-/// Batch composition utility of scene pass.
+/// Batch compositor for single scene pass.
 class URHO3D_API BatchCompositorPass : public DrawableProcessorPass
 {
     URHO3D_OBJECT(BatchCompositorPass, DrawableProcessorPass);
@@ -143,7 +143,7 @@ private:
     WorkQueueVector<BatchStateCreateKey> delayedLightBatches_;
 };
 
-/// Batch composition utility for shadow batches.
+/// Batch composition manager.
 class URHO3D_API BatchCompositor : public Object
 {
     URHO3D_OBJECT(BatchCompositor, Object);
@@ -189,7 +189,7 @@ private:
     /// Cache for shadow batches.
     BatchStateCache shadowCache_;
     /// Delayed shadow batches.
-    WorkQueueVector<ea::pair<SceneLightShadowSplit*, BatchStateCreateKey>> delayedShadowBatches_;
+    WorkQueueVector<ea::pair<ShadowSplitProcessor*, BatchStateCreateKey>> delayedShadowBatches_;
 };
 
 }

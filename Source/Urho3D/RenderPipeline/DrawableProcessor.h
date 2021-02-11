@@ -38,6 +38,7 @@ class GlobalIllumination;
 class Pass;
 class Technique;
 class LightProcessor;
+class DrawableProcessor;
 struct FrameInfo;
 
 /// Flags related to geometry rendering.
@@ -138,7 +139,7 @@ public:
     /// Destruct.
     ~LightProcessorCache();
     /// Get existing or create new light processor. Lightweight. Not thread safe.
-    LightProcessor* GetLightProcessor(Light* light);
+    LightProcessor* GetLightProcessor(Light* light, DrawableProcessor* drawableProcessor);
 
 private:
     /// Weak cache.

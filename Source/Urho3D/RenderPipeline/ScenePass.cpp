@@ -365,7 +365,7 @@ void ShadowScenePass::CollectShadowBatches(MaterialQuality materialQuality, Ligh
             batch.pipelineState_ = pipelineStateCache_.GetPipelineState(key);
             if (!batch.pipelineState_)
             {
-                SceneLightShadowSplit& split = sceneLight->GetMutableSplit(splitIndex);
+                ShadowSplitProcessor& split = sceneLight->GetMutableSplit(splitIndex);
                 batchesDirty_.PushBack(threadIndex, { &split, shadowBatches.size() });
             }
 
@@ -382,9 +382,9 @@ void ShadowScenePass::FinalizeShadowBatches(Camera* camera, ScenePipelineStateCa
     subPassContext.shadowPass_ = true;
     subPassContext.camera_ = camera;
 
-    for (const ea::pair<SceneLightShadowSplit*, unsigned>& splitAndBatch : batchesDirty_)
+    for (const ea::pair<ShadowSplitProcessor*, unsigned>& splitAndBatch : batchesDirty_)
     {
-        SceneLightShadowSplit& split = *splitAndBatch.first;
+        ShadowSplitProcessor& split = *splitAndBatch.first;
         PipelineBatch& shadowBatch = split.shadowCasterBatches_[splitAndBatch.second];
         subPassContext.drawable_ = shadowBatch.drawable_;
         subPassContext.light_ = split.sceneLight_;
@@ -394,7 +394,7 @@ void ShadowScenePass::FinalizeShadowBatches(Camera* camera, ScenePipelineStateCa
     }*/
 }
 
-ea::span<const PipelineBatchByState> ShadowScenePass::GetSortedShadowBatches(const SceneLightShadowSplit& split) const
+ea::span<const PipelineBatchByState> ShadowScenePass::GetSortedShadowBatches(const ShadowSplitProcessor& split) const
 {
     static thread_local ea::vector<PipelineBatchByState> sortedBatchesStorage;
     auto& sortedBatches = sortedBatchesStorage;

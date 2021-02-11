@@ -127,7 +127,7 @@ protected:
     bool HasShadow(Light* light) override;
     ShadowMap GetTemporaryShadowMap(const IntVector2& size) override;
 
-    SharedPtr<PipelineState> CreatePipelineState(
+    SharedPtr<PipelineState> CreateBatchPipelineState(
         const BatchStateCreateKey& key, const BatchStateCreateContext& ctx) override;
     /// Return new or existing pipeline state for deferred light volume.
     SharedPtr<PipelineState> CreateLightVolumePipelineState(LightProcessor* sceneLight, Geometry* lightGeometry) override;

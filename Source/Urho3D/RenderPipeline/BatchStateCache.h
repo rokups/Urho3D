@@ -160,8 +160,7 @@ class BatchStateCacheCallback
 public:
     /// Create pipeline state given context and key.
     /// Only attributes that constribute to pipeline state hashes are safe to use.
-    // TODO(renderer): Rename into something less generic
-    virtual SharedPtr<PipelineState> CreatePipelineState(
+    virtual SharedPtr<PipelineState> CreateBatchPipelineState(
         const BatchStateCreateKey& key, const BatchStateCreateContext& ctx) = 0;
 };
 

@@ -149,12 +149,12 @@ LightProcessorCache::~LightProcessorCache()
 {
 }
 
-LightProcessor* LightProcessorCache::GetLightProcessor(Light* light)
+LightProcessor* LightProcessorCache::GetLightProcessor(Light* light, DrawableProcessor* drawableProcessor)
 {
     WeakPtr<Light> weakLight(light);
     auto& lightProcessor = cache_[weakLight];
     if (!lightProcessor)
-        lightProcessor = ea::make_unique<LightProcessor>(light);
+        lightProcessor = ea::make_unique<LightProcessor>(light, drawableProcessor);
     return lightProcessor.get();
 }
 
@@ -227,7 +227,7 @@ void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& dra
 
     lightProcessors_.clear();
     for (Light* light : visibleLights_)
-        lightProcessors_.push_back(lightProcessorCache_.GetLightProcessor(light));
+        lightProcessors_.push_back(lightProcessorCache_.GetLightProcessor(light, this));
 
     // Compute scene Z range
     for (const FloatRange& range : sceneZRangeTemp_)

@@ -22,15 +22,18 @@
 
 #pragma once
 
+#include "../Core/NonCopyable.h"
 #include "../Graphics/Light.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/PipelineStateTracker.h"
 #include "../RenderPipeline/SceneBatch.h"
 #include "../RenderPipeline/SceneDrawableData.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
+#include "../RenderPipeline/ShadowSplitProcessor.h"
 #include "../Scene/Node.h"
 
 #include <EASTL/vector.h>
+#include <EASTL/fixed_vector.h>
 
 namespace Urho3D
 {
@@ -102,7 +105,7 @@ struct SceneLightProcessContext
 };
 
 /// Scene light shadow split.
-struct SceneLightShadowSplit
+/*struct ShadowSplitProcessor
 {
     /// Owner light.
     LightProcessor* sceneLight_{};
@@ -130,14 +133,14 @@ struct SceneLightShadowSplit
     void FinalizeShadowCamera(Light* light);
     /// Calculate shadow matrix.
     Matrix4 CalculateShadowMatrix(float subPixelOffset) const;
-};
+};*/
 
-/// Per-viewport light data.
-class URHO3D_API LightProcessor : public PipelineStateTracker
+/// Light and shadow processing utility.
+class URHO3D_API LightProcessor : public PipelineStateTracker, public NonCopyable
 {
 public:
     /// Construct.
-    explicit LightProcessor(Light* light);
+    LightProcessor(Light* light, DrawableProcessor* drawableProcessor);
 
     /// Clear in the beginning of the frame.
     void BeginFrame(bool hasShadow);
@@ -150,6 +153,8 @@ public:
     /// Finalize light and shadow shader parameters.
     void FinalizeShaderParameters(Camera* cullCamera, float subPixelOffset);
 
+    /// Return owner drawable processor.
+    DrawableProcessor* GetDrawableProcessor() const { return drawableProcessor_; }
     /// Return light.
     Light* GetLight() const { return light_; }
     /// Return whether has shadow.
@@ -161,9 +166,9 @@ public:
     /// Return number of splits.
     unsigned GetNumSplits() const { return numSplits_; }
     /// Return shadow split.
-    const SceneLightShadowSplit& GetSplit(unsigned splitIndex) const { return splits_[splitIndex]; }
+    const ShadowSplitProcessor& GetSplit(unsigned splitIndex) const { return splits_[splitIndex]; }
     /// Return mutable shadow split.
-    SceneLightShadowSplit& GetMutableSplit(unsigned splitIndex) { return splits_[splitIndex]; }
+    ShadowSplitProcessor& GetMutableSplit(unsigned splitIndex) { return splits_[splitIndex]; }
     /// Return shader parameters.
     const SceneLightShaderParameters& GetShaderParams() const { return shaderParams_; }
 
@@ -179,10 +184,12 @@ public:
 private:
     /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
     unsigned RecalculatePipelineStateHash() const override;
+    /// Set number of splits.
+    void SetNumSplits(unsigned numSplits);
     /// Collect lit geometries (for all light types) and shadow casters (for shadowed spot and point lights).
     void CollectLitGeometriesAndMaybeShadowCasters(SceneLightProcessContext& ctx);
     /// Return or create shadow camera for split.
-    Camera* GetOrCreateShadowCamera(unsigned split);
+    //Camera* GetOrCreateShadowCamera(unsigned split);
     /// Setup shadow cameras.
     void SetupShadowCameras(SceneLightProcessContext& ctx);
     /// Process shadow casters' visibilities and build their combined view- or projection-space bounding box.
@@ -193,6 +200,9 @@ private:
 
     /// Light.
     Light* light_{};
+    /// Drawable processor.
+    DrawableProcessor* drawableProcessor_{};
+
     /// Whether the light has shadow.
     bool hasShadow_{};
     /// Shadow map split size.
@@ -209,7 +219,8 @@ private:
     ea::vector<Drawable*> tempShadowCasters_;
 
     /// Splits.
-    SceneLightShadowSplit splits_[MAX_LIGHT_SPLITS];
+    ea::fixed_vector<ShadowSplitProcessor, MAX_LIGHT_SPLITS> splits_;
+    //ShadowSplitProcessor splits_[MAX_LIGHT_SPLITS];
     /// Shadow map split count.
     unsigned numSplits_{};
 

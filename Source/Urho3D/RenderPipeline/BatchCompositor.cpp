@@ -264,7 +264,7 @@ void BatchCompositor::OnPipelineStatesInvalidated()
 void BatchCompositor::BeginShadowBatchesComposition(unsigned lightIndex, unsigned splitIndex)
 {
     LightProcessor* lightProcessor = drawableProcessor_->GetLightProcessor(lightIndex);
-    SceneLightShadowSplit& split = lightProcessor->GetMutableSplit(splitIndex);
+    ShadowSplitProcessor& split = lightProcessor->GetMutableSplit(splitIndex);
     const unsigned threadIndex = WorkQueue::GetWorkerThreadIndex();
     const auto& shadowCasters = lightProcessor->GetShadowCasters(splitIndex);
     auto& shadowBatches = lightProcessor->GetMutableShadowBatches(splitIndex);
@@ -326,7 +326,7 @@ void BatchCompositor::FinalizeShadowBatchesComposition()
     for (const auto& splitAndKey : delayedShadowBatches_)
     {
         const BatchStateCreateKey& key = splitAndKey.second;
-        SceneLightShadowSplit& split = *splitAndKey.first;
+        ShadowSplitProcessor& split = *splitAndKey.first;
         PipelineState* pipelineState = shadowCache_.GetOrCreatePipelineState(key, ctx, *batchStateCacheCallback_);
         if (pipelineState)
             split.shadowCasterBatches_.push_back(CreatePipelineBatch(key, pipelineState, CreateBatchTag::Unlit));

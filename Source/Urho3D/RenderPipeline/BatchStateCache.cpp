@@ -64,7 +64,7 @@ PipelineState* BatchStateCache::GetOrCreatePipelineState(const BatchStateCreateK
         || key.material_->GetPipelineStateHash() != entry.materialHash_
         || key.pass_->GetPipelineStateHash() != entry.passHash_)
     {
-        entry.pipelineState_ = callback.CreatePipelineState(key, ctx);
+        entry.pipelineState_ = callback.CreateBatchPipelineState(key, ctx);
         entry.geometryHash_ = key.geometry_->GetPipelineStateHash();
         entry.materialHash_ = key.material_->GetPipelineStateHash();
         entry.passHash_ = key.pass_->GetPipelineStateHash();

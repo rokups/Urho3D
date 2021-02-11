@@ -245,7 +245,7 @@ void RenderPipeline::ApplyAttributes()
 {
 }
 
-SharedPtr<PipelineState> RenderPipeline::CreatePipelineState(
+SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     const BatchStateCreateKey& key, const BatchStateCreateContext& ctx)
 {
     Geometry* geometry = key.geometry_;
@@ -820,7 +820,7 @@ void RenderPipeline::Render()
         const unsigned numSplits = sceneLight->GetNumSplits();
         for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
         {
-            const SceneLightShadowSplit& split = sceneLight->GetSplit(splitIndex);
+            const ShadowSplitProcessor& split = sceneLight->GetSplit(splitIndex);
             const auto& shadowBatches = shadowPass_->GetSortedShadowBatches(split);
 
             drawQueue_->Reset();

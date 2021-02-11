@@ -259,7 +259,7 @@ public:
     /// Finalize shadow batches. Called from main thread.
     virtual void FinalizeShadowBatches(Camera* camera, ScenePipelineStateCacheCallback& callback);
     /// Sort and return shadow batches. Safe to call from worker thread.
-    ea::span<const PipelineBatchByState> GetSortedShadowBatches(const SceneLightShadowSplit& split) const;
+    ea::span<const PipelineBatchByState> GetSortedShadowBatches(const ShadowSplitProcessor& split) const;
 
 protected:
     /// Sort batches (from vector).
@@ -286,7 +286,7 @@ protected:
     const unsigned shadowPassIndex_{};
 
     /// Temporary vector to store batches without pipeline states.
-    //WorkQueueVector<ea::pair<SceneLightShadowSplit*, unsigned>> batchesDirty_;
+    //WorkQueueVector<ea::pair<ShadowSplitProcessor*, unsigned>> batchesDirty_;
 
     /// Pipeline state cache.
     //ScenePipelineStateCache pipelineStateCache_;
