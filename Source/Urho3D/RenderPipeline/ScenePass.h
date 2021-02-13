@@ -77,7 +77,7 @@ public:
     virtual void CollectSceneBatches(unsigned mainLightIndex, ea::span<LightProcessor*> sceneLights,
         const DrawableProcessor* drawableProcessor, Camera* camera, ScenePipelineStateCacheCallback& callback);
     /// Sort scene batches.
-    virtual void SortSceneBatches() = 0;
+    //virtual void OnBatchesReady() = 0;
 
 protected:
     /// Collect unlit base batches.
@@ -183,7 +183,7 @@ public:
     using ForwardLightingScenePass::ForwardLightingScenePass;
 
     /// Sort scene batches.
-    virtual void SortSceneBatches() override;
+    virtual void OnBatchesReady() override;
 
     /// Return sorted unlit base batches.
     ea::span<const PipelineBatchByState> GetSortedUnlitBaseBatches() const { return sortedUnlitBaseBatches_; }
@@ -211,7 +211,7 @@ public:
     using ForwardLightingScenePass::ForwardLightingScenePass;
 
     /// Sort scene batches.
-    virtual void SortSceneBatches() override;
+    virtual void OnBatchesReady() override;
 
     /// Return sorted unlit base batches.
     ea::span<const PipelineBatchBackToFront> GetSortedBatches() const { return sortedBatches_; }
@@ -231,7 +231,7 @@ public:
     UnlitScenePass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& tag, const ea::string& pass);
 
     /// Sort scene batches.
-    virtual void SortSceneBatches() override;
+    virtual void OnBatchesReady() override;
 
     /// Return sorted batches.
     ea::span<const PipelineBatchByState> GetBatches() const { return sortedBatches_; }

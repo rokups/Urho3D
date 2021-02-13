@@ -25,6 +25,7 @@
 #include "../Core/Object.h"
 #include "../Core/Signal.h"
 #include "../Graphics/Drawable.h"
+#include "../RenderPipeline/SceneProcessor.h"
 #include "../RenderPipeline/RenderPipelineCamera.h"
 #include "../RenderPipeline/RenderPipelineTexture.h"
 #include "../RenderPipeline/RenderPipelineInterface.h"
@@ -131,10 +132,12 @@ private:
     /// Current pipeline settings.
     RenderPipelineSettings settings_;
     /// Current frame info.
-    FrameInfo frameInfo_{};
+    //FrameInfo frameInfo_{};
     /// Previous pipeline state hash.
     unsigned oldPipelineStateHash_{};
 
+    /// Scene processor.
+    SharedPtr<SceneProcessor> sceneProcessor_;
     /// Default draw queue.
     SharedPtr<DrawCommandQueue> drawQueue_;
     /// Main camera of render pipeline.
@@ -153,12 +156,12 @@ private:
     SharedPtr<RenderPipelineTexture> deferredNormal_;
     SharedPtr<RenderPipelineTexture> deferredDepth_;
 
-    ea::vector<Drawable*> occluders_;
-    ea::vector<Drawable*> drawables_;
+    //ea::vector<Drawable*> occluders_;
+    //ea::vector<Drawable*> drawables_;
     SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
-    SharedPtr<DrawableProcessor> drawableProcessor_;
-    SharedPtr<BatchCompositor> batchCompositor_;
-    SharedPtr<SceneBatchCollector> sceneBatchCollector_;
+    //SharedPtr<DrawableProcessor> drawableProcessor_;
+    //SharedPtr<BatchCompositor> batchCompositor_;
+    //SharedPtr<SceneBatchCollector> sceneBatchCollector_;
     SharedPtr<SceneBatchRenderer> sceneBatchRenderer_;
     SharedPtr<OcclusionBuffer> occlusionBuffer_;
 

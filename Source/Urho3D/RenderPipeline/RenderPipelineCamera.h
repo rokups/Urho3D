@@ -47,8 +47,8 @@ public:
     void Initialize(Camera* camera);
 
 protected:
-    /// Called when render begins.
-    void OnRenderBegin(const FrameInfo& frameInfo);
+    /// Called when update begins.
+    void OnUpdateBegin(const FrameInfo& frameInfo);
     /// Called when render ends.
     void OnRenderEnd(const FrameInfo& frameInfo);
     /// Mark pipeline state hash as dirty.

@@ -373,6 +373,8 @@ void DrawableProcessor::ProcessLights(LightProcessorCallback* callback)
     SortLightProcessorsByShadowMap();
     for (LightProcessor* lightProcessor : lightProcessorsByShadowMapSize_)
         lightProcessor->EndUpdate(this, callback);
+
+    ProcessShadowCasters();
 }
 
 void DrawableProcessor::ProcessForwardLighting(unsigned lightIndex, const ea::vector<Drawable*>& litGeometries)

@@ -100,6 +100,8 @@ void BatchCompositorPass::ComposeBatches()
     ResolveDelayedBatches(UnlitBaseSubpass, delayedUnlitBaseBatches_, unlitBaseCache_, baseBatches_);
     ResolveDelayedBatches(LitBaseSubpass, delayedLitBaseBatches_, litBaseCache_, baseBatches_);
     ResolveDelayedBatches(LightSubpass, delayedLightBatches_, lightCache_, lightBatches_);
+
+    OnBatchesReady();
 }
 
 void BatchCompositorPass::OnUpdateBegin(const FrameInfo& frameInfo)

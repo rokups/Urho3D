@@ -181,10 +181,10 @@ public:
     /// Return light processor by index.
     LightProcessor* GetLightProcessor(unsigned lightIndex) const { return lightProcessors_[lightIndex]; }
 
-    /// Pre-process shadow caster candidates. Safe to call from worker thread.
+    /// Internal. Pre-process shadow caster candidates. Safe to call from worker thread.
     void PreprocessShadowCasters(ea::vector<Drawable*>& shadowCasters,
         const ea::vector<Drawable*>& candidates, const FloatRange& frustumSubRange, Light* light, Camera* shadowCamera);
-    /// Finalize shadow casters processing.
+    /// Internal. Finalize shadow casters processing.
     void ProcessShadowCasters();
 
     /// Process lights: collect lit geometries, query shadow casters, update shadow maps.

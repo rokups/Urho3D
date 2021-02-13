@@ -264,14 +264,14 @@ ForwardLightingScenePass::ForwardLightingScenePass(RenderPipelineInterface* rend
     assert(!lightPass.empty());
 }
 
-void OpaqueForwardLightingScenePass::SortSceneBatches()
+void OpaqueForwardLightingScenePass::OnBatchesReady()
 {
     //SortBatches(unlitBaseBatches_, sortedUnlitBaseBatches_);
     SortBatches(baseBatches_, sortedLitBaseBatches_);
     SortBatches(lightBatches_, sortedLightBatches_);
 }
 
-void AlphaForwardLightingScenePass::SortSceneBatches()
+void AlphaForwardLightingScenePass::OnBatchesReady()
 {
     //const unsigned numUnlitBaseBatches = unlitBaseBatches_.Size();
     const unsigned numLitBaseBatches = baseBatches_.Size();
@@ -294,7 +294,7 @@ UnlitScenePass::UnlitScenePass(RenderPipelineInterface* renderPipeline, const Dr
 {
 }
 
-void UnlitScenePass::SortSceneBatches()
+void UnlitScenePass::OnBatchesReady()
 {
     SortBatches(baseBatches_, sortedBatches_);
 }

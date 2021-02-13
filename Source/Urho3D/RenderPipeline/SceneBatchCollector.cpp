@@ -165,7 +165,7 @@ void SceneBatchCollector::ProcessVisibleLights()
     }*/
 
     // Update batches for shadow casters
-    dp_->ProcessShadowCasters();
+    //dp_->ProcessShadowCasters();
     bc_->ComposeShadowBatches(dp_->GetLightProcessors());
 
     // Collect shadow caster batches
@@ -224,7 +224,7 @@ void SceneBatchCollector::CollectSceneBatches()
     for (ScenePass* pass : passes2_)
     {
         pass->CollectSceneBatches(0, visibleLights_, dp_, camera_, *callback_);
-        pass->SortSceneBatches();
+        //pass->OnBatchesReady();
     }
 }
 

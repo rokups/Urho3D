@@ -89,6 +89,8 @@ protected:
     void OnUpdateBegin(const FrameInfo& frameInfo) override;
     /// Called when pipeline states are invalidated.
     virtual void OnPipelineStatesInvalidated();
+    /// Called when batches are ready.
+    virtual void OnBatchesReady() {}
 
     /// Work queue.
     WorkQueue* workQueue_{};

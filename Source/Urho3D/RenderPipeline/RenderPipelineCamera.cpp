@@ -36,7 +36,7 @@ namespace Urho3D
 RenderPipelineCamera::RenderPipelineCamera(RenderPipelineInterface* renderPipeline)
     : Object(renderPipeline->GetContext())
 {
-    renderPipeline->OnRenderBegin.Subscribe(this, &RenderPipelineCamera::OnRenderBegin);
+    renderPipeline->OnUpdateBegin.Subscribe(this, &RenderPipelineCamera::OnUpdateBegin);
     renderPipeline->OnRenderEnd.Subscribe(this, &RenderPipelineCamera::OnRenderEnd);
 }
 
@@ -45,7 +45,7 @@ void RenderPipelineCamera::Initialize(Camera* camera)
     camera_ = camera;
 }
 
-void RenderPipelineCamera::OnRenderBegin(const FrameInfo& frameInfo)
+void RenderPipelineCamera::OnUpdateBegin(const FrameInfo& frameInfo)
 {
     flipCamera_ = false;
 
