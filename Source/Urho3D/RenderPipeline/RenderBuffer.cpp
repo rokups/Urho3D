@@ -34,7 +34,7 @@
 #include "../Graphics/TextureCube.h"
 #include "../Graphics/Viewport.h"
 #include "../RenderPipeline/RenderPipelineInterface.h"
-#include "../RenderPipeline/RenderPipelineTexture.h"
+#include "../RenderPipeline/RenderBuffer.h"
 #include "../IO/Log.h"
 
 #include <EASTL/unordered_set.h>
@@ -158,20 +158,20 @@ static ThreadSafeIndex persistentScreenBuffers;
 
 }
 
-RenderPipelineTexture::RenderPipelineTexture(RenderPipelineInterface* renderPipeline)
+RenderBuffer::RenderBuffer(RenderPipelineInterface* renderPipeline)
     : Object(renderPipeline->GetContext())
     , renderer_(GetSubsystem<Renderer>())
     , graphics_(GetSubsystem<Graphics>())
     , drawQueue_(renderPipeline->GetDefaultDrawQueue())
 {
-    renderPipeline->OnRenderBegin.Subscribe(this, &RenderPipelineTexture::OnRenderBegin);
+    renderPipeline->OnRenderBegin.Subscribe(this, &RenderBuffer::OnRenderBegin);
 }
 
-RenderPipelineTexture::~RenderPipelineTexture()
+RenderBuffer::~RenderBuffer()
 {
 }
 
-bool RenderPipelineTexture::IsCompatibleWith(RenderPipelineTexture* otherTexture) const
+bool RenderBuffer::IsCompatibleWith(RenderBuffer* otherTexture) const
 {
     RenderSurface* thisSurface = GetRenderSurface();
     RenderSurface* otherSurface = otherTexture->GetRenderSurface();
@@ -194,7 +194,7 @@ bool RenderPipelineTexture::IsCompatibleWith(RenderPipelineTexture* otherTexture
     return true;
 }
 
-void RenderPipelineTexture::ClearColor(const Color& color, CubeMapFace face)
+void RenderBuffer::ClearColor(const Color& color, CubeMapFace face)
 {
     RenderSurface* renderSurface = GetRenderSurface(face);
     if (renderSurface && renderSurface->GetUsage() == TEXTURE_DEPTHSTENCIL)
@@ -208,7 +208,7 @@ void RenderPipelineTexture::ClearColor(const Color& color, CubeMapFace face)
     graphics_->Clear(CLEAR_COLOR, color);
 }
 
-void RenderPipelineTexture::ClearDepthStencil(float depth, unsigned stencil, CubeMapFace face)
+void RenderBuffer::ClearDepthStencil(float depth, unsigned stencil, CubeMapFace face)
 {
     RenderSurface* renderSurface = GetRenderSurface(face);
     if (renderSurface && renderSurface->GetUsage() == TEXTURE_RENDERTARGET)
@@ -224,8 +224,8 @@ void RenderPipelineTexture::ClearDepthStencil(float depth, unsigned stencil, Cub
     graphics_->Clear(CLEAR_DEPTH | CLEAR_STENCIL, Color::TRANSPARENT_BLACK, depth, stencil);
 }
 
-void RenderPipelineTexture::SetRenderTargetsRegion(const IntRect& viewportRect,
-    ea::span<RenderPipelineTexture* const> colorTextures, CubeMapFace face)
+void RenderBuffer::SetRenderTargetsRegion(const IntRect& viewportRect,
+    ea::span<RenderBuffer* const> colorTextures, CubeMapFace face)
 {
     if (colorTextures.size() > MAX_RENDERTARGETS)
     {
@@ -272,25 +272,25 @@ void RenderPipelineTexture::SetRenderTargetsRegion(const IntRect& viewportRect,
 
 }
 
-void RenderPipelineTexture::SetRenderTargets(
-    ea::span<RenderPipelineTexture* const> colorTextures, CubeMapFace face)
+void RenderBuffer::SetRenderTargets(
+    ea::span<RenderBuffer* const> colorTextures, CubeMapFace face)
 {
     SetRenderTargetsRegion(IntRect::ZERO, colorTextures, face);
 }
 
-void RenderPipelineTexture::SetRenderTargetsRegion(const IntRect& viewportRect,
-    std::initializer_list<RenderPipelineTexture*> colorTextures, CubeMapFace face)
+void RenderBuffer::SetRenderTargetsRegion(const IntRect& viewportRect,
+    std::initializer_list<RenderBuffer*> colorTextures, CubeMapFace face)
 {
     SetRenderTargetsRegion(viewportRect, { colorTextures.begin(), static_cast<unsigned>(colorTextures.size()) }, face);
 }
 
-void RenderPipelineTexture::SetRenderTargets(
-    std::initializer_list<RenderPipelineTexture*> colorTextures, CubeMapFace face)
+void RenderBuffer::SetRenderTargets(
+    std::initializer_list<RenderBuffer*> colorTextures, CubeMapFace face)
 {
     SetRenderTargets({ colorTextures.begin(), static_cast<unsigned>(colorTextures.size()) }, face);
 }
 
-void RenderPipelineTexture::CopyRegionFrom(Texture* sourceTexture, const IntRect& sourceViewportRect,
+void RenderBuffer::CopyRegionFrom(Texture* sourceTexture, const IntRect& sourceViewportRect,
     CubeMapFace destinationFace, const IntRect& destinationViewportRect, bool flipVertical)
 {
     Geometry* quadGeometry = renderer_->GetQuadGeometry();
@@ -331,7 +331,7 @@ void RenderPipelineTexture::CopyRegionFrom(Texture* sourceTexture, const IntRect
     drawQueue_->Execute();
 }
 
-void RenderPipelineTexture::CopyFrom(RenderPipelineTexture* texture,
+void RenderBuffer::CopyFrom(RenderBuffer* texture,
     CubeMapFace destinationFace, const IntRect& destinationViewportRect, bool flipVertical)
 {
     Texture* sourceTexture = texture->GetTexture();
@@ -339,29 +339,29 @@ void RenderPipelineTexture::CopyFrom(RenderPipelineTexture* texture,
     CopyRegionFrom(sourceTexture, sourceRect, destinationFace, destinationViewportRect, flipVertical);
 }
 
-void RenderPipelineTexture::CopyFrom(RenderPipelineTexture* texture, bool flipVertical)
+void RenderBuffer::CopyFrom(RenderBuffer* texture, bool flipVertical)
 {
     CopyFrom(texture, FACE_POSITIVE_X, GetViewportRect(), flipVertical);
 }
 
-IntVector2 RenderPipelineTexture::GetSize() const
+IntVector2 RenderBuffer::GetSize() const
 {
     return RenderSurface::GetSize(graphics_, GetRenderSurface());
 }
 
-Vector4 RenderPipelineTexture::GetViewportOffsetAndScale(const IntRect& viewportRect) const
+Vector4 RenderBuffer::GetViewportOffsetAndScale(const IntRect& viewportRect) const
 {
     const IntVector2 size = GetSize();
     return CalculateViewportOffsetAndScale(size,
         viewportRect != IntRect::ZERO ? viewportRect : IntRect{ IntVector2::ZERO, size });
 }
 
-Vector2 RenderPipelineTexture::GetInvSize() const
+Vector2 RenderBuffer::GetInvSize() const
 {
     return Vector2::ONE / static_cast<Vector2>(GetSize());
 }
 
-void RenderPipelineTexture::OnRenderBegin(const FrameInfo& frameInfo)
+void RenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
 {
     active_ = true;
     const bool constantBuffersEnabled = graphics_->GetConstantBuffersEnabled();
@@ -373,12 +373,12 @@ void RenderPipelineTexture::OnRenderBegin(const FrameInfo& frameInfo)
     }
 }
 
-void RenderPipelineTexture::OnRenderEnd(const FrameInfo& frameInfo)
+void RenderBuffer::OnRenderEnd(const FrameInfo& frameInfo)
 {
     active_ = false;
 }
 
-void RenderPipelineTexture::SetRenderTarget(RenderSurface* renderSurface)
+void RenderBuffer::SetRenderTarget(RenderSurface* renderSurface)
 {
     graphics_->SetRenderTarget(0, renderSurface);
     for (unsigned i = 1; i < MAX_RENDERTARGETS; ++i)
@@ -386,20 +386,20 @@ void RenderPipelineTexture::SetRenderTarget(RenderSurface* renderSurface)
     graphics_->SetDepthStencil(GetDepthStencil(renderer_, renderSurface));
 }
 
-bool RenderPipelineTexture::CheckRendering() const
+bool RenderBuffer::CheckRendering() const
 {
     if (!active_)
     {
-        URHO3D_LOGERROR("Cannot access RenderPipelineTexture outside of RenderPipeline::Render");
+        URHO3D_LOGERROR("Cannot access RenderBuffer outside of RenderPipeline::Render");
         return false;
     }
     return true;
 }
 
-ScreenBufferTexture::ScreenBufferTexture(
-    RenderPipelineInterface* renderPipeline, const ScreenBufferParams& params,
+TextureRenderBuffer::TextureRenderBuffer(
+    RenderPipelineInterface* renderPipeline, const TextureRenderBufferParams& params,
     const Vector2& sizeMultiplier, const IntVector2& fixedSize, bool persistent)
-    : RenderPipelineTexture(renderPipeline)
+    : RenderBuffer(renderPipeline)
     , params_(params)
     , sizeMultiplier_(sizeMultiplier)
     , fixedSize_(fixedSize)
@@ -408,13 +408,13 @@ ScreenBufferTexture::ScreenBufferTexture(
         persistenceKey_ = persistentScreenBuffers.Allocate();
 }
 
-ScreenBufferTexture::~ScreenBufferTexture()
+TextureRenderBuffer::~TextureRenderBuffer()
 {
     if (persistenceKey_)
         persistentScreenBuffers.Release(persistenceKey_);
 }
 
-void ScreenBufferTexture::OnRenderBegin(const FrameInfo& frameInfo)
+void TextureRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
 {
     BaseClassName::OnRenderBegin(frameInfo);
 
@@ -425,69 +425,69 @@ void ScreenBufferTexture::OnRenderBegin(const FrameInfo& frameInfo)
         persistenceKey_);
 }
 
-Texture* ScreenBufferTexture::GetTexture() const
+Texture* TextureRenderBuffer::GetTexture() const
 {
     return CheckRendering() ? currentTexture_ : nullptr;
 }
 
-RenderSurface* ScreenBufferTexture::GetRenderSurface(CubeMapFace face) const
+RenderSurface* TextureRenderBuffer::GetRenderSurface(CubeMapFace face) const
 {
     return CheckRendering() ? GetRenderSurfaceFromTexture(currentTexture_, face) : nullptr;
 }
 
-IntRect ScreenBufferTexture::GetViewportRect() const
+IntRect TextureRenderBuffer::GetViewportRect() const
 {
     return CheckRendering() ? IntRect{ IntVector2::ZERO, currentSize_ } : IntRect::ZERO;
 }
 
-ViewportColorTexture::ViewportColorTexture(RenderPipelineInterface* renderPipeline)
-    : RenderPipelineTexture(renderPipeline)
+ViewportColorRenderBuffer::ViewportColorRenderBuffer(RenderPipelineInterface* renderPipeline)
+    : RenderBuffer(renderPipeline)
 {
 }
 
-void ViewportColorTexture::ClearDepthStencil(float depth, unsigned stencil, CubeMapFace face)
+void ViewportColorRenderBuffer::ClearDepthStencil(float depth, unsigned stencil, CubeMapFace face)
 {
     URHO3D_LOGERROR("Cannot clear depth-stencil for color texture");
 }
 
-Texture* ViewportColorTexture::GetTexture() const
+Texture* ViewportColorRenderBuffer::GetTexture() const
 {
     return CheckRendering() ? renderTarget_->GetParentTexture() : nullptr;
 }
 
-RenderSurface* ViewportColorTexture::GetRenderSurface(CubeMapFace face) const
+RenderSurface* ViewportColorRenderBuffer::GetRenderSurface(CubeMapFace face) const
 {
     return CheckRendering() ? renderTarget_ : nullptr;
 }
 
-void ViewportColorTexture::OnRenderBegin(const FrameInfo& frameInfo)
+void ViewportColorRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
 {
     BaseClassName::OnRenderBegin(frameInfo);
     renderTarget_ = frameInfo.renderTarget_;
     viewportRect_ = frameInfo.viewRect_;
 }
 
-ViewportDepthStencilTexture::ViewportDepthStencilTexture(RenderPipelineInterface* renderPipeline)
-    : RenderPipelineTexture(renderPipeline)
+ViewportDepthStencilRenderBuffer::ViewportDepthStencilRenderBuffer(RenderPipelineInterface* renderPipeline)
+    : RenderBuffer(renderPipeline)
 {
 }
 
-void ViewportDepthStencilTexture::ClearColor(const Color& color, CubeMapFace face)
+void ViewportDepthStencilRenderBuffer::ClearColor(const Color& color, CubeMapFace face)
 {
     URHO3D_LOGERROR("Cannot clear color for depth-stencil texture");
 }
 
-Texture* ViewportDepthStencilTexture::GetTexture() const
+Texture* ViewportDepthStencilRenderBuffer::GetTexture() const
 {
     return CheckRendering() ? renderTarget_->GetParentTexture() : nullptr;
 }
 
-RenderSurface* ViewportDepthStencilTexture::GetRenderSurface(CubeMapFace face) const
+RenderSurface* ViewportDepthStencilRenderBuffer::GetRenderSurface(CubeMapFace face) const
 {
     return CheckRendering() ? renderTarget_ : nullptr;
 }
 
-void ViewportDepthStencilTexture::OnRenderBegin(const FrameInfo& frameInfo)
+void ViewportDepthStencilRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
 {
     BaseClassName::OnRenderBegin(frameInfo);
     renderTarget_ = GetDepthStencil(renderer_, frameInfo.renderTarget_);

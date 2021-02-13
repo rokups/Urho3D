@@ -27,7 +27,7 @@
 #include "../Graphics/Drawable.h"
 #include "../RenderPipeline/SceneProcessor.h"
 #include "../RenderPipeline/CameraProcessor.h"
-#include "../RenderPipeline/RenderPipelineTexture.h"
+#include "../RenderPipeline/RenderBuffer.h"
 #include "../RenderPipeline/RenderPipelineInterface.h"
 #include "../RenderPipeline/ScenePass.h"
 #include "../Scene/Serializable.h"
@@ -97,17 +97,17 @@ public:
     DrawCommandQueue* GetDefaultDrawQueue() override { return drawQueue_; }
 
     /// Create transient viewport-scaled screen buffer owned by pipeline state.
-    SharedPtr<RenderPipelineTexture> CreateScreenBuffer(
-        const ScreenBufferParams& params, const Vector2& sizeMultiplier = Vector2::ONE);
+    SharedPtr<RenderBuffer> CreateScreenBuffer(
+        const TextureRenderBufferParams& params, const Vector2& sizeMultiplier = Vector2::ONE);
     /// Create transient fixed-sized screen buffer owned by pipeline state.
-    SharedPtr<RenderPipelineTexture> CreateFixedScreenBuffer(
-        const ScreenBufferParams& params, const IntVector2& fixedSize);
+    SharedPtr<RenderBuffer> CreateFixedScreenBuffer(
+        const TextureRenderBufferParams& params, const IntVector2& fixedSize);
     /// Create persistent viewport-sized screen buffer owned by pipeline state.
-    SharedPtr<RenderPipelineTexture> CreatePersistentScreenBuffer(
-        const ScreenBufferParams& params, const Vector2& sizeMultiplier = Vector2::ONE);
+    SharedPtr<RenderBuffer> CreatePersistentScreenBuffer(
+        const TextureRenderBufferParams& params, const Vector2& sizeMultiplier = Vector2::ONE);
     /// Create persistent fixed-sized screen buffer owned by pipeline state.
-    SharedPtr<RenderPipelineTexture> CreatePersistentFixedScreenBuffer(
-        const ScreenBufferParams& params, const IntVector2& fixedSize);
+    SharedPtr<RenderBuffer> CreatePersistentFixedScreenBuffer(
+        const TextureRenderBufferParams& params, const IntVector2& fixedSize);
 
 protected:
     /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
@@ -143,18 +143,18 @@ private:
     /// Main camera of render pipeline.
     SharedPtr<CameraProcessor> cameraProcessor_;
     /// Viewport color texture handler.
-    SharedPtr<RenderPipelineTexture> viewportColor_;
+    SharedPtr<RenderBuffer> viewportColor_;
     /// Viewport depth stencil texture handler.
-    SharedPtr<RenderPipelineTexture> viewportDepth_;
+    SharedPtr<RenderBuffer> viewportDepth_;
 
     SharedPtr<OpaqueForwardLightingScenePass> basePass_;
     SharedPtr<AlphaForwardLightingScenePass> alphaPass_;
     SharedPtr<UnlitScenePass> deferredPass_;
 
-    SharedPtr<RenderPipelineTexture> deferredFinal_;
-    SharedPtr<RenderPipelineTexture> deferredAlbedo_;
-    SharedPtr<RenderPipelineTexture> deferredNormal_;
-    SharedPtr<RenderPipelineTexture> deferredDepth_;
+    SharedPtr<RenderBuffer> deferredFinal_;
+    SharedPtr<RenderBuffer> deferredAlbedo_;
+    SharedPtr<RenderBuffer> deferredNormal_;
+    SharedPtr<RenderBuffer> deferredDepth_;
 
     //ea::vector<Drawable*> occluders_;
     //ea::vector<Drawable*> drawables_;

@@ -648,8 +648,8 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         //sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow");
 
         cameraProcessor_ = MakeShared<CameraProcessor>(this);
-        viewportColor_ = MakeShared<ViewportColorTexture>(this);
-        viewportDepth_ = MakeShared<ViewportDepthStencilTexture>(this);
+        viewportColor_ = MakeShared<ViewportColorRenderBuffer>(this);
+        viewportDepth_ = MakeShared<ViewportDepthStencilRenderBuffer>(this);
 
         //drawableProcessor_ = MakeShared<DrawableProcessor>(this);
         //batchCompositor_ = MakeShared<BatchCompositor>(this, drawableProcessor_, Technique::GetPassIndex("shadow"));
@@ -926,28 +926,28 @@ void RenderPipeline::Render()
     OnRenderEnd(this, sceneProcessor_->GetFrameInfo());
 }
 
-SharedPtr<RenderPipelineTexture> RenderPipeline::CreateScreenBuffer(
-    const ScreenBufferParams& params, const Vector2& sizeMultiplier)
+SharedPtr<RenderBuffer> RenderPipeline::CreateScreenBuffer(
+    const TextureRenderBufferParams& params, const Vector2& sizeMultiplier)
 {
-    return MakeShared<ScreenBufferTexture>(this, params, sizeMultiplier, IntVector2::ZERO, false);
+    return MakeShared<TextureRenderBuffer>(this, params, sizeMultiplier, IntVector2::ZERO, false);
 }
 
-SharedPtr<RenderPipelineTexture> RenderPipeline::CreateFixedScreenBuffer(
-    const ScreenBufferParams& params, const IntVector2& fixedSize)
+SharedPtr<RenderBuffer> RenderPipeline::CreateFixedScreenBuffer(
+    const TextureRenderBufferParams& params, const IntVector2& fixedSize)
 {
-    return MakeShared<ScreenBufferTexture>(this, params, Vector2::ONE, fixedSize, false);
+    return MakeShared<TextureRenderBuffer>(this, params, Vector2::ONE, fixedSize, false);
 }
 
-SharedPtr<RenderPipelineTexture> RenderPipeline::CreatePersistentScreenBuffer(
-    const ScreenBufferParams& params, const Vector2& sizeMultiplier)
+SharedPtr<RenderBuffer> RenderPipeline::CreatePersistentScreenBuffer(
+    const TextureRenderBufferParams& params, const Vector2& sizeMultiplier)
 {
-    return MakeShared<ScreenBufferTexture>(this, params, sizeMultiplier, IntVector2::ZERO, true);
+    return MakeShared<TextureRenderBuffer>(this, params, sizeMultiplier, IntVector2::ZERO, true);
 }
 
-SharedPtr<RenderPipelineTexture> RenderPipeline::CreatePersistentFixedScreenBuffer(
-    const ScreenBufferParams& params, const IntVector2& fixedSize)
+SharedPtr<RenderBuffer> RenderPipeline::CreatePersistentFixedScreenBuffer(
+    const TextureRenderBufferParams& params, const IntVector2& fixedSize)
 {
-    return MakeShared<ScreenBufferTexture>(this, params, Vector2::ONE, fixedSize, true);
+    return MakeShared<TextureRenderBuffer>(this, params, Vector2::ONE, fixedSize, true);
 }
 
 unsigned RenderPipeline::RecalculatePipelineStateHash() const

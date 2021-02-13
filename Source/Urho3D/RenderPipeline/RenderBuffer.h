@@ -38,14 +38,14 @@ class Texture;
 class Viewport;
 struct FrameInfo;
 
-/// Writable texture or texture region used during RenderPipeline execution. Readability is not guaranteed.
-class URHO3D_API RenderPipelineTexture : public Object
+/// Base class fro writable texture or texture region. Readability is not guaranteed.
+class URHO3D_API RenderBuffer : public Object
 {
-    URHO3D_OBJECT(RenderPipelineTexture, Object);
+    URHO3D_OBJECT(RenderBuffer, Object);
 
 public:
     /// Return whether this texture is compatible with another, i.e. can be set together.
-    bool IsCompatibleWith(RenderPipelineTexture* otherTexture) const;
+    bool IsCompatibleWith(RenderBuffer* otherTexture) const;
 
     /// Clear as color texture. No-op for depth-stencil texture.
     virtual void ClearColor(const Color& color = Color::TRANSPARENT_BLACK, CubeMapFace face = FACE_POSITIVE_X);
@@ -55,28 +55,28 @@ public:
 
     /// Set subregion of multiple render targets treating this texture as depth-stencil.
     void SetRenderTargetsRegion(const IntRect& viewportRect,
-        ea::span<RenderPipelineTexture* const> colorTextures, CubeMapFace face = FACE_POSITIVE_X);
+        ea::span<RenderBuffer* const> colorTextures, CubeMapFace face = FACE_POSITIVE_X);
 
     /// Set multiple render targets treating this texture as depth-stencil.
-    void SetRenderTargets(ea::span<RenderPipelineTexture* const> colorTextures, CubeMapFace face = FACE_POSITIVE_X);
+    void SetRenderTargets(ea::span<RenderBuffer* const> colorTextures, CubeMapFace face = FACE_POSITIVE_X);
 
     /// Set subregion of multiple render targets treating this texture as depth-stencil.
     void SetRenderTargetsRegion(const IntRect& viewportRect,
-        std::initializer_list<RenderPipelineTexture*> colorTextures, CubeMapFace face = FACE_POSITIVE_X);
+        std::initializer_list<RenderBuffer*> colorTextures, CubeMapFace face = FACE_POSITIVE_X);
 
     /// Set multiple render targets treating this texture as depth-stencil.
-    void SetRenderTargets(std::initializer_list<RenderPipelineTexture*> colorTextures, CubeMapFace face = FACE_POSITIVE_X);
+    void SetRenderTargets(std::initializer_list<RenderBuffer*> colorTextures, CubeMapFace face = FACE_POSITIVE_X);
 
     /// Copy contents from another texture subregion with optional vertical flip.
     void CopyRegionFrom(Texture* sourceTexture, const IntRect& sourceViewportRect,
         CubeMapFace destinationFace, const IntRect& destinationViewportRect, bool flipVertical);
 
     /// Copy contents from another texture into region.
-    void CopyFrom(RenderPipelineTexture* texture,
+    void CopyFrom(RenderBuffer* texture,
         CubeMapFace destinationFace, const IntRect& destinationViewportRect, bool flipVertical);
 
     /// Copy contents from another texture into this texture.
-    void CopyFrom(RenderPipelineTexture* texture, bool flipVertical = false);
+    void CopyFrom(RenderBuffer* texture, bool flipVertical = false);
 
     /// Return size of the texture.
     IntVector2 GetSize() const;
@@ -99,9 +99,9 @@ public:
 
 protected:
     /// Construct.
-    RenderPipelineTexture(RenderPipelineInterface* renderPipeline);
+    RenderBuffer(RenderPipelineInterface* renderPipeline);
     /// Destruct.
-    ~RenderPipelineTexture() override;
+    ~RenderBuffer() override;
     /// Called when render begins.
     virtual void OnRenderBegin(const FrameInfo& frameInfo);
     /// Called when render ends.
@@ -129,7 +129,7 @@ private:
 };
 
 /// Screen buffer creation parameters.
-struct ScreenBufferParams
+struct TextureRenderBufferParams
 {
     /// Texture format.
     unsigned format_{};
@@ -146,16 +146,16 @@ struct ScreenBufferParams
 };
 
 /// Writable and readable screen buffer texture (2D or cubemap).
-class URHO3D_API ScreenBufferTexture : public RenderPipelineTexture
+class URHO3D_API TextureRenderBuffer : public RenderBuffer
 {
-    URHO3D_OBJECT(ScreenBufferTexture, RenderPipelineTexture);
+    URHO3D_OBJECT(TextureRenderBuffer, RenderBuffer);
 
 public:
     /// Construct.
-    ScreenBufferTexture(RenderPipelineInterface* renderPipeline, const ScreenBufferParams& params,
+    TextureRenderBuffer(RenderPipelineInterface* renderPipeline, const TextureRenderBufferParams& params,
         const Vector2& sizeMultiplier, const IntVector2& fixedSize, bool persistent);
     /// Destruct.
-    ~ScreenBufferTexture() override;
+    ~TextureRenderBuffer() override;
 
     /// Return readable texture.
     Texture* GetTexture() const override;
@@ -171,7 +171,7 @@ protected:
     void OnRenderBegin(const FrameInfo& frameInfo) override;
 
     /// Texture parameters.
-    ScreenBufferParams params_;
+    TextureRenderBufferParams params_;
     /// Size multiplier.
     Vector2 sizeMultiplier_ = Vector2::ONE;
     /// Fixed size. If zero, ignored.
@@ -186,13 +186,13 @@ protected:
 };
 
 /// Optionally write-only viewport color texture.
-class URHO3D_API ViewportColorTexture : public RenderPipelineTexture
+class URHO3D_API ViewportColorRenderBuffer : public RenderBuffer
 {
-    URHO3D_OBJECT(ViewportColorTexture, RenderPipelineTexture);
+    URHO3D_OBJECT(ViewportColorRenderBuffer, RenderBuffer);
 
 public:
     /// Construct.
-    ViewportColorTexture(RenderPipelineInterface* renderPipeline);
+    ViewportColorRenderBuffer(RenderPipelineInterface* renderPipeline);
 
     /// Not supported.
     void ClearDepthStencil(float depth, unsigned stencil, CubeMapFace face) override;
@@ -218,13 +218,13 @@ private:
 };
 
 /// Optionally write-only viewport depth-stenil texture.
-class URHO3D_API ViewportDepthStencilTexture : public RenderPipelineTexture
+class URHO3D_API ViewportDepthStencilRenderBuffer : public RenderBuffer
 {
-    URHO3D_OBJECT(ViewportDepthStencilTexture, RenderPipelineTexture);
+    URHO3D_OBJECT(ViewportDepthStencilRenderBuffer, RenderBuffer);
 
 public:
     /// Construct.
-    ViewportDepthStencilTexture(RenderPipelineInterface* renderPipeline);
+    ViewportDepthStencilRenderBuffer(RenderPipelineInterface* renderPipeline);
 
     /// Clear as color texture. No-op for depth-stencil texture.
     void ClearColor(const Color& color, CubeMapFace face) override;
