@@ -647,7 +647,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         drawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
         //sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow");
 
-        pipelineCamera_ = MakeShared<RenderPipelineCamera>(this);
+        cameraProcessor_ = MakeShared<CameraProcessor>(this);
         viewportColor_ = MakeShared<ViewportColorTexture>(this);
         viewportDepth_ = MakeShared<ViewportDepthStencilTexture>(this);
 
@@ -660,7 +660,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
     }
 
     // Pre-frame initialize objects
-    pipelineCamera_->Initialize(camera);
+    cameraProcessor_->Initialize(camera);
 
     // Initialize or reset deferred rendering
     // TODO(renderer): Make it more clean
@@ -953,7 +953,7 @@ SharedPtr<RenderPipelineTexture> RenderPipeline::CreatePersistentFixedScreenBuff
 unsigned RenderPipeline::RecalculatePipelineStateHash() const
 {
     unsigned hash = 0;
-    CombineHash(hash, pipelineCamera_->GetPipelineStateHash());
+    CombineHash(hash, cameraProcessor_->GetPipelineStateHash());
     CombineHash(hash, static_cast<unsigned>(settings_.ambientMode_));
     CombineHash(hash, settings_.deferred_);
     CombineHash(hash, settings_.gammaCorrection_);

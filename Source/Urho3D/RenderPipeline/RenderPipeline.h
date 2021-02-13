@@ -26,7 +26,7 @@
 #include "../Core/Signal.h"
 #include "../Graphics/Drawable.h"
 #include "../RenderPipeline/SceneProcessor.h"
-#include "../RenderPipeline/RenderPipelineCamera.h"
+#include "../RenderPipeline/CameraProcessor.h"
 #include "../RenderPipeline/RenderPipelineTexture.h"
 #include "../RenderPipeline/RenderPipelineInterface.h"
 #include "../RenderPipeline/ScenePass.h"
@@ -141,7 +141,7 @@ private:
     /// Default draw queue.
     SharedPtr<DrawCommandQueue> drawQueue_;
     /// Main camera of render pipeline.
-    SharedPtr<RenderPipelineCamera> pipelineCamera_;
+    SharedPtr<CameraProcessor> cameraProcessor_;
     /// Viewport color texture handler.
     SharedPtr<RenderPipelineTexture> viewportColor_;
     /// Viewport depth stencil texture handler.

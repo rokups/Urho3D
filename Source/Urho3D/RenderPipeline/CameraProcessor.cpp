@@ -25,7 +25,7 @@
 #include "../Graphics/Drawable.h"
 #include "../Graphics/Octree.h"
 #include "../RenderPipeline/RenderPipelineInterface.h"
-#include "../RenderPipeline/RenderPipelineCamera.h"
+#include "../RenderPipeline/CameraProcessor.h"
 #include "../Scene/Node.h"
 
 #include "../DebugNew.h"
@@ -33,19 +33,19 @@
 namespace Urho3D
 {
 
-RenderPipelineCamera::RenderPipelineCamera(RenderPipelineInterface* renderPipeline)
+CameraProcessor::CameraProcessor(RenderPipelineInterface* renderPipeline)
     : Object(renderPipeline->GetContext())
 {
-    renderPipeline->OnUpdateBegin.Subscribe(this, &RenderPipelineCamera::OnUpdateBegin);
-    renderPipeline->OnRenderEnd.Subscribe(this, &RenderPipelineCamera::OnRenderEnd);
+    renderPipeline->OnUpdateBegin.Subscribe(this, &CameraProcessor::OnUpdateBegin);
+    renderPipeline->OnRenderEnd.Subscribe(this, &CameraProcessor::OnRenderEnd);
 }
 
-void RenderPipelineCamera::Initialize(Camera* camera)
+void CameraProcessor::Initialize(Camera* camera)
 {
     camera_ = camera;
 }
 
-void RenderPipelineCamera::OnUpdateBegin(const FrameInfo& frameInfo)
+void CameraProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
 {
     flipCamera_ = false;
 
@@ -73,13 +73,13 @@ void RenderPipelineCamera::OnUpdateBegin(const FrameInfo& frameInfo)
     }
 }
 
-void RenderPipelineCamera::OnRenderEnd(const FrameInfo& frameInfo)
+void CameraProcessor::OnRenderEnd(const FrameInfo& frameInfo)
 {
     if (flipCamera_ && camera_)
         camera_->SetFlipVertical(!camera_->GetFlipVertical());
 }
 
-unsigned RenderPipelineCamera::RecalculatePipelineStateHash() const
+unsigned CameraProcessor::RecalculatePipelineStateHash() const
 {
     unsigned hash = 0;
     if (camera_)

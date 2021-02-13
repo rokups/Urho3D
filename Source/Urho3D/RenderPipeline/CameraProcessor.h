@@ -35,14 +35,14 @@ class RenderSurface;
 class Viewport;
 struct FrameInfo;
 
-/// Main camera of render pipeline. May be flipped if necessary.
-class URHO3D_API RenderPipelineCamera : public Object, public PipelineStateTracker
+/// Utility to process camera(s) rendering to viewport (not cull camera!).
+class URHO3D_API CameraProcessor : public Object, public PipelineStateTracker
 {
-    URHO3D_OBJECT(RenderPipelineCamera, Object);
+    URHO3D_OBJECT(CameraProcessor, Object);
 
 public:
     /// Construct.
-    explicit RenderPipelineCamera(RenderPipelineInterface* renderPipeline);
+    explicit CameraProcessor(RenderPipelineInterface* renderPipeline);
     /// Initialize camera.
     void Initialize(Camera* camera);
 
