@@ -25,6 +25,7 @@
 #include "../Core/Context.h"
 #include "../Core/IteratorRange.h"
 #include "../Core/WorkQueue.h"
+#include "../Math/NumericRange.h"
 #include "../Math/Polyhedron.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/Octree.h"
@@ -33,6 +34,8 @@
 #include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/LightProcessorQuery.h"
 #include "../Scene/Node.h"
+
+#include <EASTL/fixed_vector.h>
 
 #include "../DebugNew.h"
 
@@ -82,79 +85,158 @@ Matrix4 CalculateSpotMatrix(Light* light)
     return texAdjust * spotProj * spotView;
 }
 
-}
-
-LightProcessor::LightProcessor(Light* light, DrawableProcessor* drawableProcessor)
-    : light_(light)
-    , drawableProcessor_(drawableProcessor)
+/// Return expected number of splits.
+unsigned CalculateNumSplits(Light* light)
 {
-    //for (ShadowSplitProcessor& split : splits_)
-    //    split.sceneLight_ = this;
-}
-
-void LightProcessor::BeginFrame(bool hasShadow)
-{
-    litGeometries_.clear();
-    tempShadowCasters_.clear();
-    shadowMap_ = {};
-    hasShadow_ = hasShadow;
-    MarkPipelineStateHashDirty();
-}
-
-void LightProcessor::UpdateLitGeometriesAndShadowCasters(SceneLightProcessContext& ctx)
-{
-    CollectLitGeometriesAndMaybeShadowCasters(ctx);
-
-    const LightType lightType = light_->GetLightType();
-    Camera* cullCamera = ctx.frameInfo_.camera_;
-    Octree* octree = ctx.frameInfo_.octree_;
-    const Frustum& frustum = cullCamera->GetFrustum();
-    const FloatRange& sceneZRange = ctx.dp_->GetSceneZRange();
-
-    if (hasShadow_)
+    switch (light->GetLightType())
     {
-        SetupShadowCameras(ctx);
+    case LIGHT_SPOT:
+        return 1;
+    case LIGHT_POINT:
+        return MAX_CUBEMAP_FACES;
+    case LIGHT_DIRECTIONAL:
+        return static_cast<unsigned>(light->GetNumShadowSplits());
+    default:
+        return 0;
+    }
+}
 
-        // Process each split for shadow casters
-        for (unsigned i = 0; i < numSplits_; ++i)
+/// Return effective splits of directional light.
+ea::fixed_vector<FloatRange, MAX_CASCADE_SPLITS> GetActiveSplits(Light* light, float nearClip, float farClip)
+{
+    const CascadeParameters& cascade = light->GetShadowCascade();
+    const int numSplits = light->GetNumShadowSplits();
+
+    ea::fixed_vector<FloatRange, MAX_CASCADE_SPLITS> result;
+
+    float nearSplit = nearClip;
+    for (unsigned i = 0; i < numSplits; ++i)
+    {
+        // Stop if split is completely beyond camera far clip
+        if (nearSplit > farClip)
+            break;
+
+        const float farSplit = ea::min(farClip, cascade.splits_[i]);
+        if (farSplit <= nearSplit)
+            break;
+
+        result.emplace_back(nearSplit, farSplit);
+        nearSplit = farSplit;
+    }
+
+    return result;
+}
+
+}
+
+LightProcessor::LightProcessor(Light* light)
+    : light_(light)
+{
+}
+
+LightProcessor::~LightProcessor()
+{
+}
+
+void LightProcessor::BeginUpdate(DrawableProcessor* drawableProcessor, LightProcessorCallback* callback)
+{
+    // Always clear pipeline state
+    MarkPipelineStateHashDirty();
+
+    // Clear temporary containers
+    litGeometries_.clear();
+    shadowCasterCandidates_.clear();
+    shadowMap_ = {};
+
+    // Initialize shadow
+    isShadowRequested_ = callback->IsLightShadowed(light_);
+    numSplitsRequested_ = isShadowRequested_ ? CalculateNumSplits(light_) : 0;
+
+    // Update splits
+    if (splits_.size() <= numSplitsRequested_)
+    {
+        // Allocate splits and reset timer immediately
+        splitTimeToLive_ = NumSplitFramesToLive;
+        while (splits_.size() < numSplitsRequested_)
+            splits_.emplace_back(this);
+    }
+    else
+    {
+        // Deallocate splits by timeout
+        --splitTimeToLive_;
+        if (splitTimeToLive_ == 0)
         {
-            Camera* shadowCamera = splits_[i].shadowCamera_;
-            const Frustum& shadowCameraFrustum = shadowCamera->GetFrustum();
-            splits_[i].shadowCasters_.clear();
-            splits_[i].shadowCasterBatches_.clear();
-
-            // For point light check that the face is visible: if not, can skip the split
-            if (lightType == LIGHT_POINT && frustum.IsInsideFast(BoundingBox(shadowCameraFrustum)) == OUTSIDE)
-                continue;
-
-            // For directional light check that the split is inside the visible scene: if not, can skip the split
-            if (lightType == LIGHT_DIRECTIONAL)
-            {
-                if (!sceneZRange.Interset(splits_[i].splitRange_))
-                    continue;
-
-                // Reuse lit geometry query for all except directional lights
-                DirectionalLightShadowCasterQuery query(
-                    tempShadowCasters_, shadowCameraFrustum, DRAWABLE_GEOMETRY, light_, cullCamera->GetViewMask());
-                octree->GetDrawables(query);
-            }
-
-            // Check which shadow casters actually contribute to the shadowing
-            ProcessShadowCasters(ctx, tempShadowCasters_, i);
+            while (splits_.size() > numSplitsRequested_)
+                splits_.pop_back();
         }
     }
 }
 
-void LightProcessor::FinalizeShadowMap()
+void LightProcessor::Update(DrawableProcessor* drawableProcessor)
 {
-    // Skip if doesn't have shadow or shadow casters
-    if (!hasShadow_)
+    const FrameInfo& frameInfo = drawableProcessor->GetFrameInfo();
+    Octree* octree = frameInfo.octree_;
+    Camera* cullCamera = frameInfo.cullCamera_;
+    const LightType lightType = light_->GetLightType();
+
+    // Query lit geometries (and shadow casters for spot and point lights)
+    switch (lightType)
+    {
+    case LIGHT_SPOT:
+    {
+        SpotLightGeometryQuery query(litGeometries_, isShadowRequested_ ? &shadowCasterCandidates_ : nullptr,
+            drawableProcessor, light_, cullCamera->GetViewMask());
+        octree->GetDrawables(query);
+        break;
+    }
+    case LIGHT_POINT:
+    {
+        PointLightGeometryQuery query(litGeometries_, isShadowRequested_ ? &shadowCasterCandidates_ : nullptr,
+            drawableProcessor, light_, cullCamera->GetViewMask());
+        octree->GetDrawables(query);
+        break;
+    }
+    case LIGHT_DIRECTIONAL:
+    {
+        // TODO(renderer): Skip if unlit
+        const unsigned lightMask = light_->GetLightMask();
+        for (Drawable* drawable : drawableProcessor->GetVisibleGeometries())
+        {
+            if (drawable->GetLightMaskInZone() & lightMask)
+                litGeometries_.push_back(drawable);
+        };
+        break;
+    }
+    }
+
+    // Update shadows
+    if (!isShadowRequested_)
         return;
 
-    const auto hasShadowCaster = [](const ShadowSplitProcessor& split) { return !split.shadowCasters_.empty(); };
-    if (!ea::any_of(ea::begin(splits_), ea::begin(splits_) + numSplits_, hasShadowCaster))
+    InitializeShadowSplits(drawableProcessor);
+
+    for (unsigned i = 0; i < numActiveSplits_; ++i)
     {
-        hasShadow_ = false;
+        switch (lightType)
+        {
+        case LIGHT_SPOT:
+            splits_[i].ProcessSpotShadowCasters(drawableProcessor, shadowCasterCandidates_);
+            break;
+        case LIGHT_POINT:
+            splits_[i].ProcessPointShadowCasters(drawableProcessor, shadowCasterCandidates_);
+            break;
+        case LIGHT_DIRECTIONAL:
+            splits_[i].ProcessDirectionalShadowCasters(drawableProcessor, shadowCasterCandidates_);
+            break;
+        default:
+            break;
+        }
+    }
+
+    const auto hasShadowCaster = [](const ShadowSplitProcessor& split) { return split.HasShadowCasters(); };
+    if (!ea::any_of(splits_.begin(), splits_.begin() + numActiveSplits_, hasShadowCaster))
+    {
+        numActiveSplits_ = 0;
         return;
     }
 
@@ -164,25 +246,60 @@ void LightProcessor::FinalizeShadowMap()
     shadowMapSize_ = IntVector2{ shadowMapSplitSize_, shadowMapSplitSize_ } * GetSplitsGridSize();
 }
 
-void LightProcessor::SetShadowMap(const ShadowMap& shadowMap)
+void LightProcessor::EndUpdate(DrawableProcessor* drawableProcessor, LightProcessorCallback* callback)
 {
-    // If failed to allocate, reset shadows
-    if (!shadowMap.texture_)
+    // Allocate shadow map
+    if (numActiveSplits_ > 0)
     {
-        numSplits_ = 0;
-        return;
+        shadowMap_ = callback->AllocateTransientShadowMap(shadowMapSize_);
+        if (!shadowMap_)
+            numActiveSplits_ = 0;
+        else
+        {
+            for (unsigned i = 0; i < numActiveSplits_; ++i)
+                splits_[i].Finalize(shadowMap_.GetSplit(i, GetSplitsGridSize()));
+        }
     }
 
-    // Initialize shadow map for all splits
-    shadowMap_ = shadowMap;
-    for (unsigned splitIndex = 0; splitIndex < numSplits_; ++splitIndex)
-    {
-        ShadowSplitProcessor& split = splits_[splitIndex];
-        split.Finalize(shadowMap.GetSplit(splitIndex, GetSplitsGridSize()));
-    }
+    // TODO(renderer): Fill second parameter
+    Camera* cullCamera = drawableProcessor->GetFrameInfo().cullCamera_;
+    CookShaderParameters(cullCamera, 0.0f);
 }
 
-void LightProcessor::FinalizeShaderParameters(Camera* cullCamera, float subPixelOffset)
+void LightProcessor::InitializeShadowSplits(DrawableProcessor* drawableProcessor)
+{
+    /// Setup splits
+    switch (light_->GetLightType())
+    {
+    case LIGHT_DIRECTIONAL:
+    {
+        const FrameInfo& frameInfo = drawableProcessor->GetFrameInfo();
+        Camera* cullCamera = frameInfo.cullCamera_;
+        const auto activeSplits = GetActiveSplits(light_, cullCamera->GetNearClip(), cullCamera->GetFarClip());
+
+        numActiveSplits_ = activeSplits.size();
+        for (unsigned i = 0; i < numActiveSplits_; ++i)
+            splits_[i].InitializeDirectional(drawableProcessor, activeSplits[i], litGeometries_);
+        break;
+    }
+    case LIGHT_SPOT:
+    {
+        numActiveSplits_ = 1;
+        splits_[0].InitializeSpot();
+        break;
+    }
+    case LIGHT_POINT:
+    {
+        numActiveSplits_ = MAX_CUBEMAP_FACES;
+        for (unsigned i = 0; i < MAX_CUBEMAP_FACES; ++i)
+            splits_[i].InitializePoint(static_cast<CubeMapFace>(i));
+        break;
+    }
+    }
+
+}
+
+void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffset)
 {
     Node* lightNode = light_->GetNode();
     const LightType lightType = light_->GetLightType();
@@ -244,7 +361,7 @@ void LightProcessor::FinalizeShaderParameters(Camera* cullCamera, float subPixel
     {
     case LIGHT_DIRECTIONAL:
         shaderParams_.numLightMatrices_ = MAX_CASCADE_SPLITS;
-        for (unsigned splitIndex = 0; splitIndex < numSplits_; ++splitIndex)
+        for (unsigned splitIndex = 0; splitIndex < numActiveSplits_; ++splitIndex)
             shaderParams_.lightMatrices_[splitIndex] = splits_[splitIndex].CalculateShadowMatrix(subPixelOffset);
         break;
 
@@ -255,7 +372,7 @@ void LightProcessor::FinalizeShaderParameters(Camera* cullCamera, float subPixel
 
     case LIGHT_POINT:
     {
-        const auto& splitViewport = splits_[0].shadowMap_.region_;
+        const auto& splitViewport = splits_[0].GetShadowMap().region_;
         const float viewportSizeX = static_cast<float>(splitViewport.Width());
         const float viewportSizeY = static_cast<float>(splitViewport.Height());
         const float viewportOffsetX = static_cast<float>(splitViewport.Left());
@@ -281,7 +398,7 @@ void LightProcessor::FinalizeShaderParameters(Camera* cullCamera, float subPixel
     {
         // Calculate shadow camera depth parameters for point light shadows and shadow fade parameters for
         //  directional light shadows, stored in the same uniform
-        Camera* shadowCamera = splits_[0].shadowCamera_;
+        Camera* shadowCamera = splits_[0].GetShadowCamera();
         const float nearClip = shadowCamera->GetNearClip();
         const float farClip = shadowCamera->GetFarClip();
         const float q = farClip / (farClip - nearClip);
@@ -313,12 +430,12 @@ void LightProcessor::FinalizeShaderParameters(Camera* cullCamera, float subPixel
     }
 
     shaderParams_.shadowSplits_ = { M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE };
-    if (numSplits_ > 1)
-        shaderParams_.shadowSplits_.x_ = splits_[0].splitRange_.second / cullCamera->GetFarClip();
-    if (numSplits_ > 2)
-        shaderParams_.shadowSplits_.y_ = splits_[1].splitRange_.second / cullCamera->GetFarClip();
-    if (numSplits_ > 3)
-        shaderParams_.shadowSplits_.z_ = splits_[2].splitRange_.second / cullCamera->GetFarClip();
+    if (numActiveSplits_ > 1)
+        shaderParams_.shadowSplits_.x_ = splits_[0].GetSplitZRange().second / cullCamera->GetFarClip();
+    if (numActiveSplits_ > 2)
+        shaderParams_.shadowSplits_.y_ = splits_[1].GetSplitZRange().second / cullCamera->GetFarClip();
+    if (numActiveSplits_ > 3)
+        shaderParams_.shadowSplits_.z_ = splits_[2].GetSplitZRange().second / cullCamera->GetFarClip();
 
     // TODO(renderer): Implement me
     shaderParams_.normalOffsetScale_ = Vector4::ZERO;
@@ -357,7 +474,7 @@ unsigned LightProcessor::RecalculatePipelineStateHash() const
     // TODO(renderer): Extract into pipeline state factory
     unsigned hash = 0;
     hash |= light_->GetLightType() & 0x3;
-    hash |= static_cast<unsigned>(hasShadow_) << 2;
+    hash |= static_cast<unsigned>(numActiveSplits_ != 0) << 2;
     hash |= static_cast<unsigned>(!!light_->GetShapeTexture()) << 3;
     hash |= static_cast<unsigned>(light_->GetSpecularIntensity() > 0.0f) << 4;
     hash |= static_cast<unsigned>(biasParameters.normalOffset_ > 0.0f) << 5;
@@ -366,123 +483,33 @@ unsigned LightProcessor::RecalculatePipelineStateHash() const
     return hash;
 }
 
-void LightProcessor::SetNumSplits(unsigned numSplits)
-{
-    while (splits_.size() > numSplits)
-        splits_.pop_back();
-    while (splits_.size() < numSplits)
-        splits_.emplace_back(this);
-}
-
-void LightProcessor::CollectLitGeometriesAndMaybeShadowCasters(SceneLightProcessContext& ctx)
-{
-    Octree* octree = ctx.frameInfo_.octree_;
-    switch (light_->GetLightType())
-    {
-    case LIGHT_SPOT:
-    {
-        SpotLightGeometryQuery query(litGeometries_, hasShadow_ ? &tempShadowCasters_ : nullptr,
-            ctx.dp_, light_, ctx.frameInfo_.camera_->GetViewMask());
-        octree->GetDrawables(query);
-        break;
-    }
-    case LIGHT_POINT:
-    {
-        PointLightGeometryQuery query(litGeometries_, hasShadow_ ? &tempShadowCasters_ : nullptr,
-            ctx.dp_, light_, ctx.frameInfo_.camera_->GetViewMask());
-        octree->GetDrawables(query);
-        break;
-    }
-    case LIGHT_DIRECTIONAL:
-    {
-        const unsigned lightMask = light_->GetLightMask();
-        for (Drawable* drawable : ctx.dp_->GetVisibleGeometries())
-        {
-            if (drawable->GetLightMaskInZone() & lightMask)
-                litGeometries_.push_back(drawable);
-        };
-        break;
-    }
-    }
-}
-
-void LightProcessor::SetupShadowCameras(SceneLightProcessContext& ctx)
-{
-    Camera* cullCamera = ctx.frameInfo_.camera_;
-
-    switch (light_->GetLightType())
-    {
-    case LIGHT_DIRECTIONAL:
-    {
-        const CascadeParameters& cascade = light_->GetShadowCascade();
-
-        float nearSplit = cullCamera->GetNearClip();
-        const int numSplits = light_->GetNumShadowSplits();
-
-        SetNumSplits(numSplits);
-
-        numSplits_ = 0;
-        for (unsigned i = 0; i < numSplits; ++i)
-        {
-            // If split is completely beyond camera far clip, we are done
-            if (nearSplit > cullCamera->GetFarClip())
-                break;
-
-            const float farSplit = Min(cullCamera->GetFarClip(), cascade.splits_[i]);
-            if (farSplit <= nearSplit)
-                break;
-
-            // Setup the shadow camera for the split
-            //Camera* shadowCamera = GetOrCreateShadowCamera(i);
-            splits_[i].InitializeDirectional(ctx.frameInfo_.camera_, { nearSplit, farSplit }, litGeometries_);
-            //splits_[i].zRange_ = { nearSplit, farSplit };
-            //splits_[i].SetupDirLightShadowCamera(light_, ctx.frameInfo_.camera_, litGeometries_, ctx.dp_);
-
-            nearSplit = farSplit;
-            ++numSplits_;
-        }
-        break;
-    }
-    case LIGHT_SPOT:
-    {
-
-        SetNumSplits(1);
-        splits_[0].InitializeSpot();
-
-        numSplits_ = 1;
-        break;
-    }
-    case LIGHT_POINT:
-    {
-        SetNumSplits(MAX_CUBEMAP_FACES);
-
-        for (unsigned i = 0; i < MAX_CUBEMAP_FACES; ++i)
-            splits_[i].InitializePoint(static_cast<CubeMapFace>(i));
-
-        numSplits_ = MAX_CUBEMAP_FACES;
-        break;
-    }
-    }
-}
-
-void LightProcessor::ProcessShadowCasters(SceneLightProcessContext& ctx,
-    const ea::vector<Drawable*>& drawables, unsigned splitIndex)
-{
-    auto& split = splits_[splitIndex];
-    ctx.dp_->PreprocessShadowCasters(split.shadowCasters_,
-        drawables, split.splitRange_, light_, split.shadowCamera_);
-}
-
 IntVector2 LightProcessor::GetSplitsGridSize() const
 {
-    if (numSplits_ == 1)
+    if (numActiveSplits_ == 1)
         return { 1, 1 };
-    else if (numSplits_ == 2)
+    else if (numActiveSplits_ == 2)
         return { 2, 1 };
-    else if (numSplits_ < 6)
+    else if (numActiveSplits_ < 6)
         return { 2, 2 };
     else
         return { 3, 2 };
+}
+
+LightProcessorCache::LightProcessorCache()
+{
+}
+
+LightProcessorCache::~LightProcessorCache()
+{
+}
+
+LightProcessor* LightProcessorCache::GetLightProcessor(Light* light)
+{
+    WeakPtr<Light> weakLight(light);
+    auto& lightProcessor = cache_[weakLight];
+    if (!lightProcessor)
+        lightProcessor = ea::make_unique<LightProcessor>(light);
+    return lightProcessor.get();
 }
 
 }

@@ -141,30 +141,18 @@ void DrawableProcessorPass::OnUpdateBegin(const FrameInfo& frameInfo)
     geometryBatches_.Clear(frameInfo.numThreads_);
 }
 
-LightProcessorCache::LightProcessorCache()
-{
-}
-
-LightProcessorCache::~LightProcessorCache()
-{
-}
-
-LightProcessor* LightProcessorCache::GetLightProcessor(Light* light, DrawableProcessor* drawableProcessor)
-{
-    WeakPtr<Light> weakLight(light);
-    auto& lightProcessor = cache_[weakLight];
-    if (!lightProcessor)
-        lightProcessor = ea::make_unique<LightProcessor>(light, drawableProcessor);
-    return lightProcessor.get();
-}
-
 DrawableProcessor::DrawableProcessor(RenderPipelineInterface* renderPipeline)
     : Object(renderPipeline->GetContext())
     , workQueue_(GetSubsystem<WorkQueue>())
     , renderer_(GetSubsystem<Renderer>())
     , defaultMaterial_(renderer_->GetDefaultMaterial())
+    , lightProcessorCache_(ea::make_unique<LightProcessorCache>())
 {
     renderPipeline->OnUpdateBegin.Subscribe(this, &DrawableProcessor::OnUpdateBegin);
+}
+
+DrawableProcessor::~DrawableProcessor()
+{
 }
 
 void DrawableProcessor::SetPasses(ea::vector<SharedPtr<DrawableProcessorPass>> passes)
@@ -227,7 +215,7 @@ void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& dra
 
     lightProcessors_.clear();
     for (Light* light : visibleLights_)
-        lightProcessors_.push_back(lightProcessorCache_.GetLightProcessor(light, this));
+        lightProcessors_.push_back(lightProcessorCache_->GetLightProcessor(light));
 
     // Compute scene Z range
     for (const FloatRange& range : sceneZRangeTemp_)
@@ -463,6 +451,23 @@ void DrawableProcessor::ProcessQueuedDrawable(Drawable* drawable)
     const BoundingBox& boundingBox = drawable->GetWorldBoundingBox();
     UpdateDrawableZone(boundingBox, drawable);
     QueueDrawableGeometryUpdate(WorkQueue::GetWorkerThreadIndex(), drawable);
+}
+
+const ea::vector<LightProcessor*>& DrawableProcessor::GetLightProcessorsSortedByShadowMap()
+{
+    lightProcessorsByShadowMapSize_ = lightProcessors_;
+
+    const auto compareShadowMapSize = [](const LightProcessor* lhs, const LightProcessor* rhs)
+    {
+        const IntVector2 lhsSize = lhs->GetShadowMapSize();
+        const IntVector2 rhsSize = rhs->GetShadowMapSize();
+        if (lhsSize != rhsSize)
+            return lhsSize.Length() > rhsSize.Length();
+        return lhs->GetLight()->GetID() < rhs->GetLight()->GetID();
+    };
+    ea::sort(lightProcessorsByShadowMapSize_.begin(), lightProcessorsByShadowMapSize_.end(), compareShadowMapSize);
+
+    return lightProcessorsByShadowMapSize_;
 }
 
 void DrawableProcessor::UpdateGeometries()

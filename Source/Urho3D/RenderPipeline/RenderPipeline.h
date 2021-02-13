@@ -112,6 +112,9 @@ protected:
     /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
     unsigned RecalculatePipelineStateHash() const override;
 
+    bool IsLightShadowed(Light* light) override;
+    ShadowMap AllocateTransientShadowMap(const IntVector2& size) override;
+
     bool HasShadow(Light* light) override;
     ShadowMap GetTemporaryShadowMap(const IntVector2& size) override;
 

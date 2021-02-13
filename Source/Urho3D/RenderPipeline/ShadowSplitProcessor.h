@@ -23,7 +23,8 @@
 #pragma once
 
 #include "../Graphics/Camera.h"
-#include "../RenderPipeline/BatchCompositor.h"
+#include "../Math/NumericRange.h"
+#include "../RenderPipeline/PipelineBatchSortKey.h"
 
 #include <EASTL/vector.h>
 
@@ -32,9 +33,11 @@ namespace Urho3D
 
 class Camera;
 class Drawable;
+class DrawableProcessor;
 class Light;
 class LightProcessor;
 class Node;
+struct PipelineBatch;
 struct PipelineBatchByState;
 struct ShadowMap;
 
@@ -48,17 +51,41 @@ public:
     ~ShadowSplitProcessor();
 
     /// Initialize split for direction light.
-    void InitializeDirectional(
-        Camera* cullCamera, const FloatRange& splitRange, const ea::vector<Drawable*>& litGeometries);
+    void InitializeDirectional(DrawableProcessor* drawableProcessor,
+        const FloatRange& splitRange, const ea::vector<Drawable*>& litGeometries);
     /// Initialize split for spot light.
     void InitializeSpot();
     /// Initialize split for point light.
     void InitializePoint(CubeMapFace face);
+    /// Process shadow casters for directional light split.
+    void ProcessDirectionalShadowCasters(DrawableProcessor* drawableProcessor, ea::vector<Drawable*>& shadowCastersBuffer);
+    /// Process shadow casters for spot light split.
+    void ProcessSpotShadowCasters(DrawableProcessor* drawableProcessor, const ea::vector<Drawable*>& shadowCasterCandidates);
+    /// Process shadow casters for point light split.
+    void ProcessPointShadowCasters(DrawableProcessor* drawableProcessor, const ea::vector<Drawable*>& shadowCasterCandidates);
     /// Finalize shadow.
     void Finalize(const ShadowMap& shadowMap);
 
     /// Calculate shadow matrix.
     Matrix4 CalculateShadowMatrix(float subPixelOffset) const;
+
+    /// Return light processor.
+    LightProcessor* GetLightProcessor() const { return owner_; }
+    /// Return light.
+    Light* GetLight() const { return light_; }
+    /// Return shadow map.
+    const ShadowMap& GetShadowMap() const { return shadowMap_; }
+    /// Return shadow camera.
+    Camera* GetShadowCamera() const { return shadowCamera_; }
+    /// Return split Z range.
+    const FloatRange& GetSplitZRange() const { return splitRange_; }
+    /// Return shadow casters.
+    const auto& GetShadowCasters() const { return shadowCasters_; }
+    /// Return mutable shadow batches.
+    auto& GetMutableShadowBatches() { return shadowCasterBatches_; }
+    /// Return whether the split has shadow casters.
+    bool HasShadowCasters() const { return !shadowCasters_.empty(); }
+
     /// Sort and return shadow batches. Array is cleared automatically.
     void SortShadowBatches(ea::vector<PipelineBatchByState>& sortedBatches) const;
 
@@ -66,9 +93,9 @@ private:
     /// Initialize base directional camera w/o any focusing and adjusting.
     void InitializeBaseDirectionalCamera(Camera* cullCamera);
     /// Return bounding box of lit geometries in split.
-    BoundingBox GetLitBoundingBox(const ea::vector<Drawable*>& litGeometries) const;
+    BoundingBox GetLitBoundingBox(DrawableProcessor* drawableProcessor, const ea::vector<Drawable*>& litGeometries) const;
     /// Return split bounding box in light space.
-    BoundingBox GetSplitBoundingBox(Camera* cullCamera, const ea::vector<Drawable*>& litGeometries) const;
+    BoundingBox GetSplitBoundingBox(DrawableProcessor* drawableProcessor, const ea::vector<Drawable*>& litGeometries) const;
     /// Adjust directional camera to keep texels stable.
     void AdjustDirectionalCamera(const BoundingBox& lightSpaceBoundingBox, float shadowMapSize);
 
@@ -77,7 +104,6 @@ private:
     /// Light.
     Light* light_{};
 
-public:
     /// Shadow camera node.
     SharedPtr<Node> shadowCameraNode_;
     /// Shadow camera.
@@ -95,11 +121,6 @@ public:
 
     /// Shadow map for split.
     ShadowMap shadowMap_;
-
-private:
-    /// Finalize shadow camera view after shadow casters and the shadow map are known.
-    void FinalizeShadowCamera(Light* light);
-
 };
 
 }

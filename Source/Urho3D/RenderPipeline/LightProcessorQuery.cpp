@@ -73,6 +73,7 @@ LightGeometryQueryResult PointLightGeometryQuery::IsLitOrShadowCaster(Drawable* 
     const unsigned drawableIndex = drawable->GetDrawableIndex();
     const unsigned geometryFlags = drawableProcessor_->GetGeometryRenderFlags(drawableIndex);
 
+    // TODO(renderer): Use ForwardLit?
     const bool isInside = (drawable->GetDrawableFlags() & drawableFlags_)
         && (drawable->GetViewMask() & viewMask_)
         && (inside || sphere_.IsInsideFast(drawable->GetWorldBoundingBox()));

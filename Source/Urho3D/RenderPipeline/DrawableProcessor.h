@@ -39,6 +39,7 @@ class Pass;
 class Technique;
 class LightProcessor;
 class DrawableProcessor;
+class LightProcessorCache;
 struct FrameInfo;
 
 /// Flags related to geometry rendering.
@@ -129,23 +130,6 @@ protected:
     WorkQueueVector<GeometryBatch> geometryBatches_;
 };
 
-/// Cache of light processors.
-// TODO(renderer): Add automatic expiration by time
-class LightProcessorCache
-{
-public:
-    /// Construct.
-    LightProcessorCache();
-    /// Destruct.
-    ~LightProcessorCache();
-    /// Get existing or create new light processor. Lightweight. Not thread safe.
-    LightProcessor* GetLightProcessor(Light* light, DrawableProcessor* drawableProcessor);
-
-private:
-    /// Weak cache.
-    ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<LightProcessor>> cache_;
-};
-
 /// Drawable processor settings.
 struct DrawableProcessorSettings
 {
@@ -163,6 +147,9 @@ class URHO3D_API DrawableProcessor : public Object
 public:
     /// Construct.
     explicit DrawableProcessor(RenderPipelineInterface* renderPipeline);
+    /// Destruct.
+    ~DrawableProcessor() override;
+
     /// Set passes.
     void SetPasses(ea::vector<SharedPtr<DrawableProcessorPass>> passes);
     /// Set settings.
@@ -201,6 +188,9 @@ public:
         const ea::vector<Drawable*>& candidates, const FloatRange& frustumSubRange, Light* light, Camera* shadowCamera);
     /// Finalize shadow casters processing.
     void ProcessShadowCasters();
+
+    /// Return light processors sorted by shadow map sizes.
+    const ea::vector<LightProcessor*>& GetLightProcessorsSortedByShadowMap();
 
     /// Update drawable geometries if needed.
     void UpdateGeometries();
@@ -286,10 +276,13 @@ private:
     /// Light processors for visible lights.
     ea::vector<LightProcessor*> lightProcessors_;
     /// Light processor cache.
-    LightProcessorCache lightProcessorCache_;
+    ea::unique_ptr<LightProcessorCache> lightProcessorCache_;
 
     /// Delayed drawable updates.
     WorkQueueVector<Drawable*> queuedDrawableUpdates_{};
+
+    /// Light processors for visible lights sorted by shadow map sizes.
+    ea::vector<LightProcessor*> lightProcessorsByShadowMapSize_;
 };
 
 }

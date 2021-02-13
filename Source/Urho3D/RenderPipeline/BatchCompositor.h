@@ -159,7 +159,7 @@ public:
     void ComposeBatches();
 
     /// Begin shadow batches composition. Safe to call from worker thread.
-    void BeginShadowBatchesComposition(unsigned lightIndex, unsigned splitIndex);
+    void BeginShadowBatchesComposition(unsigned lightIndex, ShadowSplitProcessor* splitProcessor);
     /// Finalize shadow batches composition. Should be called from main thread.
     void FinalizeShadowBatchesComposition();
 

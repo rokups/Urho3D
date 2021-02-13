@@ -216,7 +216,7 @@ void BatchCompositorPass::ResolveDelayedBatches(unsigned index, const WorkQueueV
 
     for (const BatchStateCreateKey& key : delayedBatches)
     {
-        PipelineState* pipelineState = cache.GetOrCreatePipelineState(key, ctx, *batchStateCacheCallback_);
+        PipelineState* pipelineState = cache.GetOrCreatePipelineState(key, ctx, batchStateCacheCallback_);
         if (pipelineState)
             batches.Insert(CreatePipelineBatch(key, pipelineState));
     }
@@ -255,15 +255,16 @@ void BatchCompositor::OnPipelineStatesInvalidated()
     shadowCache_.Invalidate();
 }
 
-void BatchCompositor::BeginShadowBatchesComposition(unsigned lightIndex, unsigned splitIndex)
+void BatchCompositor::BeginShadowBatchesComposition(unsigned lightIndex, ShadowSplitProcessor* splitProcessor)
 {
-    LightProcessor* lightProcessor = drawableProcessor_->GetLightProcessor(lightIndex);
-    ShadowSplitProcessor& split = lightProcessor->GetMutableSplit(splitIndex);
-    const unsigned threadIndex = WorkQueue::GetWorkerThreadIndex();
-    const auto& shadowCasters = lightProcessor->GetShadowCasters(splitIndex);
-    auto& shadowBatches = lightProcessor->GetMutableShadowBatches(splitIndex);
-    const unsigned lightMask = lightProcessor->GetLight()->GetLightMask();
+    LightProcessor* lightProcessor = splitProcessor->GetLightProcessor();
     const unsigned lightHash = lightProcessor->GetPipelineStateHash();
+
+    const unsigned threadIndex = WorkQueue::GetWorkerThreadIndex();
+    const auto& shadowCasters = splitProcessor->GetShadowCasters();
+    auto& shadowBatches = splitProcessor->GetMutableShadowBatches();
+    const unsigned lightMask = splitProcessor->GetLight()->GetLightMask();
+
     for (Drawable* drawable : shadowCasters)
     {
         // Check shadow mask now when zone is ready
@@ -306,7 +307,7 @@ void BatchCompositor::BeginShadowBatchesComposition(unsigned lightIndex, unsigne
             if (pipelineState)
                 shadowBatches.push_back(CreatePipelineBatch(key, pipelineState, CreateBatchTag::Unlit));
             else
-                delayedShadowBatches_.Insert({ &split, key });
+                delayedShadowBatches_.PushBack(threadIndex, { splitProcessor, key });
         }
     }
 }
@@ -321,9 +322,9 @@ void BatchCompositor::FinalizeShadowBatchesComposition()
     {
         const BatchStateCreateKey& key = splitAndKey.second;
         ShadowSplitProcessor& split = *splitAndKey.first;
-        PipelineState* pipelineState = shadowCache_.GetOrCreatePipelineState(key, ctx, *batchStateCacheCallback_);
+        PipelineState* pipelineState = shadowCache_.GetOrCreatePipelineState(key, ctx, batchStateCacheCallback_);
         if (pipelineState)
-            split.shadowCasterBatches_.push_back(CreatePipelineBatch(key, pipelineState, CreateBatchTag::Unlit));
+            split.GetMutableShadowBatches().push_back(CreatePipelineBatch(key, pipelineState, CreateBatchTag::Unlit));
     }
 }
 

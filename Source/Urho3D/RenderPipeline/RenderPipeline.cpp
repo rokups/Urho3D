@@ -580,7 +580,9 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
     return renderer_->GetOrCreatePipelineState(desc);
 }
 
-bool RenderPipeline::HasShadow(Light* light)
+bool RenderPipeline::HasShadow(Light* light) { return IsLightShadowed(light); }
+
+bool RenderPipeline::IsLightShadowed(Light* light)
 {
     const bool shadowsEnabled = renderer_->GetDrawShadows()
         && light->GetCastShadows()
@@ -593,13 +595,12 @@ bool RenderPipeline::HasShadow(Light* light)
     if (light->GetShadowDistance() > 0.0f && light->GetDistance() > light->GetShadowDistance())
         return false;
 
-    // OpenGL ES can not support point light shadows
-#ifdef GL_ES_VERSION_2_0
-    if (light->GetLightType() == LIGHT_POINT)
-        return false;
-#endif
-
     return true;
+}
+
+ShadowMap RenderPipeline::AllocateTransientShadowMap(const IntVector2& size)
+{
+    return shadowMapAllocator_->AllocateShadowMap(size);
 }
 
 ShadowMap RenderPipeline::GetTemporaryShadowMap(const IntVector2& size)
@@ -641,7 +642,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
         drawableProcessor_ = MakeShared<DrawableProcessor>(this);
         batchCompositor_ = MakeShared<BatchCompositor>(this, drawableProcessor_, Technique::GetPassIndex("shadow"));
-        sceneBatchCollector_ = MakeShared<SceneBatchCollector>(context_, drawableProcessor_, batchCompositor_);
+        sceneBatchCollector_ = MakeShared<SceneBatchCollector>(context_, drawableProcessor_, batchCompositor_, this);
 
         shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
         sceneBatchRenderer_ = MakeShared<SceneBatchRenderer>(context_);
@@ -721,6 +722,9 @@ void RenderPipeline::Update(const FrameInfo& frameInfo)
 void RenderPipeline::Render()
 {
     OnRenderBegin(this, frameInfo_);
+
+    // TODO(renderer): Do something about this hack
+    graphics_->SetVertexBuffer(nullptr);
 
     // Invalidate pipeline states if necessary
     MarkPipelineStateHashDirty();
@@ -819,12 +823,12 @@ void RenderPipeline::Render()
         const unsigned numSplits = sceneLight->GetNumSplits();
         for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
         {
-            const ShadowSplitProcessor& split = sceneLight->GetSplit(splitIndex);
-            split.SortShadowBatches(shadowBatches);
+            const ShadowSplitProcessor* split = sceneLight->GetSplit(splitIndex);
+            split->SortShadowBatches(shadowBatches);
 
             drawQueue_->Reset();
-            sceneBatchRenderer_->RenderShadowBatches(*drawQueue_, *drawableProcessor_, split.shadowCamera_, zone, shadowBatches);
-            shadowMapAllocator_->BeginShadowMap(split.shadowMap_);
+            sceneBatchRenderer_->RenderShadowBatches(*drawQueue_, *drawableProcessor_, split->GetShadowCamera(), zone, shadowBatches);
+            shadowMapAllocator_->BeginShadowMap(split->GetShadowMap());
             drawQueue_->Execute();
         }
     }

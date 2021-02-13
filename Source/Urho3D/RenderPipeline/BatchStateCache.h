@@ -147,7 +147,7 @@ public:
     PipelineState* GetPipelineState(const BatchStateLookupKey& key) const;
     /// Return existing or create new pipeline state. Not thread safe.
     PipelineState* GetOrCreatePipelineState(const BatchStateCreateKey& key,
-        BatchStateCreateContext& ctx, BatchStateCacheCallback& callback);
+        BatchStateCreateContext& ctx, BatchStateCacheCallback* callback);
 
 private:
     /// Cached states, possibly invalid.

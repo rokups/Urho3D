@@ -62,7 +62,8 @@ public:
     using VertexLightCollection = ea::array<unsigned, MaxVertexLights>;
 
     /// Construct.
-    SceneBatchCollector(Context* context, DrawableProcessor* dp, BatchCompositor* bc);
+    SceneBatchCollector(Context* context, DrawableProcessor* dp, BatchCompositor* bc, LightProcessorCallback* lpc);
+    LightProcessorCallback* lpc_{};
     /// Destruct.
     ~SceneBatchCollector();
 

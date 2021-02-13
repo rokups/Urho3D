@@ -40,12 +40,13 @@
 namespace Urho3D
 {
 
-SceneBatchCollector::SceneBatchCollector(Context* context, DrawableProcessor* dp, BatchCompositor* bc)
+SceneBatchCollector::SceneBatchCollector(Context* context, DrawableProcessor* dp, BatchCompositor* bc, LightProcessorCallback* lpc)
     : Object(context)
     , workQueue_(context->GetSubsystem<WorkQueue>())
     , renderer_(context->GetSubsystem<Renderer>())
     , dp_(dp)
     , bc_(bc)
+    , lpc_(lpc)
 {}
 
 SceneBatchCollector::~SceneBatchCollector()
@@ -109,12 +110,20 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
 
 void SceneBatchCollector::ProcessVisibleLights()
 {
-    // Process lights in main thread
     for (LightProcessor* sceneLight : visibleLights_)
-        sceneLight->BeginFrame(callback_->HasShadow(sceneLight->GetLight()));
+        sceneLight->BeginUpdate(dp_, lpc_);
+
+    ForEachParallel(workQueue_, visibleLights_,
+        [&](unsigned /*index*/, LightProcessor* lightProcessor)
+    {
+        lightProcessor->Update(dp_);
+    });
+
+    for (LightProcessor* sceneLight : dp_->GetLightProcessorsSortedByShadowMap())
+        sceneLight->EndUpdate(dp_, lpc_);
 
     // Update lit geometries and shadow casters
-    SceneLightProcessContext sceneLightProcessContext;
+    /*SceneLightProcessContext sceneLightProcessContext;
     sceneLightProcessContext.frameInfo_ = frameInfo_;
     sceneLightProcessContext.dp_ = dp_;
     for (unsigned i = 0; i < visibleLights_.size(); ++i)
@@ -143,7 +152,7 @@ void SceneBatchCollector::ProcessVisibleLights()
     ea::sort(visibleLightsSortedBySM.begin(), visibleLightsSortedBySM.end(), compareShadowMapSize);
 
     // Assign shadow maps and finalize shadow parameters
-    for (LightProcessor* sceneLight : visibleLightsSortedBySM)
+    for (LightProcessor* sceneLight : dp_->GetLightProcessorsSortedByShadowMap())
     {
         const IntVector2 shadowMapSize = sceneLight->GetShadowMapSize();
         if (shadowMapSize != IntVector2::ZERO)
@@ -152,7 +161,7 @@ void SceneBatchCollector::ProcessVisibleLights()
             sceneLight->SetShadowMap(shadowMap);
         }
         sceneLight->FinalizeShaderParameters(camera_, 0.0f);
-    }
+    }*/
 
     // Update batches for shadow casters
     dp_->ProcessShadowCasters();
@@ -165,7 +174,7 @@ void SceneBatchCollector::ProcessVisibleLights()
         {
             workQueue_->AddWorkItem([=](unsigned threadIndex)
             {
-                bc_->BeginShadowBatchesComposition(visibleLights_.index_of(sceneLight), splitIndex);
+                bc_->BeginShadowBatchesComposition(visibleLights_.index_of(sceneLight), sceneLight->GetMutableSplit(splitIndex));
             }, M_MAX_UNSIGNED);
         }
     }

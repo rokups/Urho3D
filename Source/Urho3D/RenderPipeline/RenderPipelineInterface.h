@@ -24,6 +24,7 @@
 
 #include "../Core/Signal.h"
 #include "../RenderPipeline/SceneBatchCollectorCallback.h"
+#include "../RenderPipeline/LightProcessor.h"
 #include "../Scene/Serializable.h"
 
 namespace Urho3D
@@ -36,6 +37,7 @@ struct FrameInfo;
 class URHO3D_API RenderPipelineInterface
     : public Serializable
     , public SceneBatchCollectorCallback
+    , public LightProcessorCallback
 {
     URHO3D_OBJECT(RenderPipelineInterface, Serializable);
 
