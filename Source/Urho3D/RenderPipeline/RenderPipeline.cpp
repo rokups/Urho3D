@@ -274,8 +274,9 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         return nullptr;
 
     // Update shadow parameters
+    // TODO(renderer): Don't use ShadowMapAllocator for this
     if (isShadowPass)
-        shadowMapAllocator_->ExportPipelineState(desc, light->GetShadowBias());
+        sceneProcessor_->GetShadowMapAllocator()->ExportPipelineState(desc, light->GetShadowBias());
 
     // Add lightmap
     // TODO(renderer): Get batch index as input?
@@ -598,7 +599,7 @@ bool RenderPipeline::IsLightShadowed(Light* light)
     return true;
 }
 
-ShadowMap RenderPipeline::AllocateTransientShadowMap(const IntVector2& size)
+/*ShadowMap RenderPipeline::AllocateTransientShadowMap(const IntVector2& size)
 {
     return shadowMapAllocator_->AllocateShadowMap(size);
 }
@@ -606,7 +607,7 @@ ShadowMap RenderPipeline::AllocateTransientShadowMap(const IntVector2& size)
 ShadowMap RenderPipeline::GetTemporaryShadowMap(const IntVector2& size)
 {
     return shadowMapAllocator_->AllocateShadowMap(size);
-}
+}*/
 
 bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 {
@@ -654,7 +655,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         //batchCompositor_ = MakeShared<BatchCompositor>(this, drawableProcessor_, Technique::GetPassIndex("shadow"));
         //sceneBatchCollector_ = MakeShared<SceneBatchCollector>(context_, drawableProcessor_, batchCompositor_, this);
 
-        shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
+        //shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
         sceneBatchRenderer_ = MakeShared<SceneBatchRenderer>(context_);
     }
 
@@ -717,7 +718,7 @@ void RenderPipeline::Update(const FrameInfo& frameInfo)
     // Update scene and batches
     sceneProcessor_->UpdateFrameInfo(frameInfo);
     // TODO(renderer): Move to event
-    shadowMapAllocator_->Reset();
+    //shadowMapAllocator_->Reset();
 
     // Setup frame info
     /*frameInfo_.timeStep_ = frameInfo.timeStep_;
@@ -842,7 +843,7 @@ void RenderPipeline::Render()
 
             drawQueue_->Reset();
             sceneBatchRenderer_->RenderShadowBatches(*drawQueue_, *sceneProcessor_->GetDrawableProcessor(), split->GetShadowCamera(), zone, shadowBatches);
-            shadowMapAllocator_->BeginShadowMap(split->GetShadowMap());
+            sceneProcessor_->GetShadowMapAllocator()->BeginShadowMap(split->GetShadowMap());
             drawQueue_->Execute();
         }
     }

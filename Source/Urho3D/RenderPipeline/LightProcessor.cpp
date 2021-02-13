@@ -30,7 +30,6 @@
 #include "../Graphics/Camera.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/OctreeQuery.h"
-#include "../Graphics/Renderer.h"
 #include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/LightProcessorQuery.h"
 #include "../Scene/Node.h"

@@ -147,7 +147,7 @@ public:
     /// Compose shadow batches.
     void ComposeShadowBatches(const ea::vector<LightProcessor*>& lightProcessors);
     /// Compose scene batches.
-    void ComposeBatches();
+    void ComposeSceneBatches();
 
 protected:
     /// Called when update begins.

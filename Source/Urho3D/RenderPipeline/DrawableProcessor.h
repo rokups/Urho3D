@@ -38,6 +38,7 @@ class GlobalIllumination;
 class LightProcessor;
 class LightProcessorCache;
 class LightProcessorCallback;
+class OcclusionBuffer;
 class Pass;
 class RenderPipelineInterface;
 class Technique;
@@ -56,6 +57,17 @@ struct GeometryRenderFlag
         /// Whether the geometry is lit using forward rendering.
         ForwardLit = 1 << 2,
     };
+};
+
+/// Sorted occluder type.
+struct SortedOccluder
+{
+    /// Sorting penalty.
+    float penalty_{};
+    /// Occluder drawable.
+    Drawable* drawable_{};
+    /// Compare.
+    bool operator<(const SortedOccluder& rhs) const { return penalty_ < rhs.penalty_; }
 };
 
 /// Reference to SourceBatch of Drawable geometry, with resolved material passes.
@@ -134,6 +146,8 @@ protected:
 /// Drawable processor settings.
 struct DrawableProcessorSettings
 {
+    /// Material quality.
+    MaterialQuality materialQuality_{ QUALITY_HIGH };
     /// Max number of vertex lights.
     unsigned maxVertexLights_{ 4 };
     /// Max number of pixel lights.
@@ -159,9 +173,17 @@ public:
     /// Return current frame info.
     const FrameInfo& GetFrameInfo() const { return frameInfo_; }
 
-    /// Process visible geometries and lights.
-    void ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables);
+    /// Process and filter occluders.
+    void ProcessOccluders(const ea::vector<Drawable*>& occluders, float sizeThreshold);
+    /// Return whether there are active occluders.
+    bool HasOccluders() const { return !sortedOccluders_.empty(); }
+    /// Return active occluders.
+    const auto& GetOccluders() const { return sortedOccluders_; }
 
+    /// Process visible geometries and lights.
+    void ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables, OcclusionBuffer* occlusionBuffer);
+
+    // TODO(renderer): Get rid of redundant "visible"
     /// Return visible geometries.
     const auto& GetVisibleGeometries() const { return visibleGeometries_; }
     /// Return visible lights.
@@ -225,8 +247,6 @@ private:
 
     /// Work queue.
     WorkQueue* workQueue_{};
-    /// Renderer.
-    Renderer* renderer_{};
     /// Default material.
     Material* defaultMaterial_{};
 
@@ -263,6 +283,9 @@ private:
     ea::vector<FloatRange> geometryZRanges_;
     /// Accumulated drawable lighting. Unspecified for invisible or unlit drawables.
     ea::vector<LightAccumulator> geometryLighting_;
+
+    /// Sorted occluders.
+    ea::vector<SortedOccluder> sortedOccluders_;
 
     /// Visible geometries.
     WorkQueueVector<Drawable*> visibleGeometries_;

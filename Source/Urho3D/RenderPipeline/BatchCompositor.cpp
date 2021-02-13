@@ -262,7 +262,7 @@ void BatchCompositor::ComposeShadowBatches(const ea::vector<LightProcessor*>& li
     FinalizeShadowBatchesComposition();
 }
 
-void BatchCompositor::ComposeBatches()
+void BatchCompositor::ComposeSceneBatches()
 {
     for (BatchCompositorPass* pass : passes_)
         pass->ComposeBatches();

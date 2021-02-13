@@ -33,6 +33,7 @@
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/RenderPipelineInterface.h"
 #include "../RenderPipeline/SceneProcessor.h"
+#include "../RenderPipeline/ShadowMapAllocator.h"
 #include "../Scene/Scene.h"
 
 #include "../DebugNew.h"
@@ -111,15 +112,23 @@ public:
     OcclusionBuffer* buffer_;
 };
 
+/// Calculate occlusion buffer size.
+IntVector2 CalculateOcclusionBufferSize(unsigned size, Camera* cullCamera)
+{
+    const auto width = static_cast<int>(size);
+    const int height = RoundToInt(size / cullCamera->GetAspectRatio());
+    return { width, height };
+}
+
 }
 
 SceneProcessor::SceneProcessor(RenderPipelineInterface* renderPipeline, const ea::string& shadowTechnique)
     : Object(renderPipeline->GetContext())
-    , renderPipeline_(renderPipeline)
-    , drawableProcessor_(MakeShared<DrawableProcessor>(renderPipeline_))
-    , batchCompositor_(MakeShared<BatchCompositor>(renderPipeline_, drawableProcessor_, Technique::GetPassIndex("shadow")))
+    , drawableProcessor_(MakeShared<DrawableProcessor>(renderPipeline))
+    , batchCompositor_(MakeShared<BatchCompositor>(renderPipeline, drawableProcessor_, Technique::GetPassIndex("shadow")))
+    , shadowMapAllocator_(MakeShared<ShadowMapAllocator>(context_))
 {
-    renderPipeline_->OnUpdateBegin.Subscribe(this, &SceneProcessor::OnUpdateBegin);
+    renderPipeline->OnUpdateBegin.Subscribe(this, &SceneProcessor::OnUpdateBegin);
 }
 
 SceneProcessor::~SceneProcessor()
@@ -155,6 +164,12 @@ void SceneProcessor::SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes
     batchCompositor_->SetPasses(ea::move(passes));
 }
 
+void SceneProcessor::SetSettings(const SceneProcessorSettings& settings)
+{
+    settings_ = settings;
+    drawableProcessor_->SetSettings(settings);
+}
+
 void SceneProcessor::UpdateFrameInfo(const FrameInfo& frameInfo)
 {
     frameInfo_.frameNumber_ = frameInfo.frameNumber_;
@@ -165,19 +180,45 @@ void SceneProcessor::Update()
 {
     // Collect occluders
     // TODO(renderer): Make optional
-    OccluderOctreeQuery occluderQuery(occluders_,
-        frameInfo_.cullCamera_->GetFrustum(), frameInfo_.cullCamera_->GetViewMask());
-    frameInfo_.octree_->GetDrawables(occluderQuery);
+    activeOcclusionBuffer_ = nullptr;
+    if (settings_.maxOccluderTriangles_ > 0)
+    {
+        OccluderOctreeQuery occluderQuery(occluders_,
+            frameInfo_.cullCamera_->GetFrustum(), frameInfo_.cullCamera_->GetViewMask());
+        frameInfo_.octree_->GetDrawables(occluderQuery);
+        drawableProcessor_->ProcessOccluders(occluders_, settings_.occluderSizeThreshold_);
+
+        if (drawableProcessor_->HasOccluders())
+        {
+            if (!occlusionBuffer_)
+                occlusionBuffer_ = MakeShared<OcclusionBuffer>(context_);
+            const IntVector2 bufferSize = CalculateOcclusionBufferSize(settings_.occlusionBufferSize_, frameInfo_.cullCamera_);
+            occlusionBuffer_->SetSize(bufferSize.x_, bufferSize.y_, settings_.threadedOcclusion_);
+            occlusionBuffer_->SetView(frameInfo_.cullCamera_);
+
+            DrawOccluders();
+            if (occlusionBuffer_->GetNumTriangles() > 0)
+                activeOcclusionBuffer_ = occlusionBuffer_;
+        }
+    }
 
     // Collect visible drawables
-    // TODO(renderer): Add occlusion culling
-    FrustumOctreeQuery drawableQuery(drawables_, frameInfo_.cullCamera_->GetFrustum(),
-        DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, frameInfo_.cullCamera_->GetViewMask());
-    frameInfo_.octree_->GetDrawables(drawableQuery);
+    if (activeOcclusionBuffer_)
+    {
+        OccludedFrustumOctreeQuery query(drawables_, frameInfo_.cullCamera_->GetFrustum(),
+            activeOcclusionBuffer_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, frameInfo_.cullCamera_->GetViewMask());
+        frameInfo_.octree_->GetDrawables(query);
+    }
+    else
+    {
+        FrustumOctreeQuery drawableQuery(drawables_, frameInfo_.cullCamera_->GetFrustum(),
+            DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, frameInfo_.cullCamera_->GetViewMask());
+        frameInfo_.octree_->GetDrawables(drawableQuery);
+    }
 
     // Process drawables
-    drawableProcessor_->ProcessVisibleDrawables(drawables_);
-    drawableProcessor_->ProcessLights(renderPipeline_);
+    drawableProcessor_->ProcessVisibleDrawables(drawables_, activeOcclusionBuffer_);
+    drawableProcessor_->ProcessLights(this);
 
     const auto& lightProcessors = drawableProcessor_->GetLightProcessors();
     for (unsigned i = 0; i < lightProcessors.size(); ++i)
@@ -185,14 +226,82 @@ void SceneProcessor::Update()
 
     drawableProcessor_->UpdateGeometries();
 
-    batchCompositor_->ComposeBatches();
-    batchCompositor_->ComposeShadowBatches(lightProcessors);
+    batchCompositor_->ComposeSceneBatches();
+    if (settings_.enableShadows_)
+        batchCompositor_->ComposeShadowBatches(lightProcessors);
 }
 
 void SceneProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
 {
+    shadowMapAllocator_->Reset();
     occluders_.clear();
     drawables_.clear();
+}
+
+bool SceneProcessor::IsLightShadowed(Light* light)
+{
+    const bool shadowsEnabled = settings_.enableShadows_
+        && light->GetCastShadows()
+        && light->GetLightImportance() != LI_NOT_IMPORTANT
+        && light->GetShadowIntensity() < 1.0f;
+
+    if (!shadowsEnabled)
+        return false;
+
+    if (light->GetShadowDistance() > 0.0f && light->GetDistance() > light->GetShadowDistance())
+        return false;
+
+    return true;
+}
+
+ShadowMap SceneProcessor::AllocateTransientShadowMap(const IntVector2& size)
+{
+    return shadowMapAllocator_->AllocateShadowMap(size);
+}
+
+void SceneProcessor::DrawOccluders()
+{
+    const auto& activeOccluders = drawableProcessor_->GetOccluders();
+
+    occlusionBuffer_->SetMaxTriangles(settings_.maxOccluderTriangles_);
+    occlusionBuffer_->Clear();
+
+    if (!occlusionBuffer_->IsThreaded())
+    {
+        // If not threaded, draw occluders one by one and test the next occluder against already rasterized depth
+        for (unsigned i = 0; i < activeOccluders.size(); ++i)
+        {
+            Drawable* occluder = activeOccluders[i].drawable_;
+            if (i > 0)
+            {
+                // For subsequent occluders, do a test against the pixel-level occlusion buffer to see if rendering is necessary
+                if (!occlusionBuffer_->IsVisible(occluder->GetWorldBoundingBox()))
+                    continue;
+            }
+
+            // Check for running out of triangles
+            bool success = occluder->DrawOcclusion(occlusionBuffer_);
+            // Draw triangles submitted by this occluder
+            occlusionBuffer_->DrawTriangles();
+            if (!success)
+                break;
+        }
+    }
+    else
+    {
+        // In threaded mode submit all triangles first, then render (cannot test in this case)
+        for (unsigned i = 0; i < activeOccluders.size(); ++i)
+        {
+            // Check for running out of triangles
+            if (!activeOccluders[i].drawable_->DrawOcclusion(occlusionBuffer_))
+                break;
+        }
+
+        occlusionBuffer_->DrawTriangles();
+    }
+
+    // Finally build the depth mip levels
+    occlusionBuffer_->BuildDepthHierarchy();
 }
 
 }

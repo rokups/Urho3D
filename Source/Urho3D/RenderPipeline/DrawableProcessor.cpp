@@ -25,6 +25,7 @@
 #include "../Core/WorkQueue.h"
 #include "../Graphics/Drawable.h"
 #include "../Graphics/GlobalIllumination.h"
+#include "../Graphics/OcclusionBuffer.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/Renderer.h"
 #include "../Graphics/Zone.h"
@@ -144,8 +145,7 @@ void DrawableProcessorPass::OnUpdateBegin(const FrameInfo& frameInfo)
 DrawableProcessor::DrawableProcessor(RenderPipelineInterface* renderPipeline)
     : Object(renderPipeline->GetContext())
     , workQueue_(GetSubsystem<WorkQueue>())
-    , renderer_(GetSubsystem<Renderer>())
-    , defaultMaterial_(renderer_->GetDefaultMaterial())
+    , defaultMaterial_(GetSubsystem<Renderer>()->GetDefaultMaterial())
     , lightProcessorCache_(ea::make_unique<LightProcessorCache>())
 {
     renderPipeline->OnUpdateBegin.Subscribe(this, &DrawableProcessor::OnUpdateBegin);
@@ -169,7 +169,7 @@ void DrawableProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
     viewZ_ = { viewMatrix_.m20_, viewMatrix_.m21_, viewMatrix_.m22_ };
     absViewZ_ = viewZ_.Abs();
 
-    materialQuality_ = renderer_->GetMaterialQuality();
+    materialQuality_ = settings_.materialQuality_;
     if (frameInfo_.cullCamera_->GetViewOverrideFlags() & VO_LOW_MATERIAL_QUALITY)
         materialQuality_ = QUALITY_LOW;
 
@@ -190,6 +190,7 @@ void DrawableProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
     geometryZRanges_.resize(numDrawables_);
     geometryLighting_.resize(numDrawables_);
 
+    sortedOccluders_.clear();
     visibleGeometries_.Clear(frameInfo_.numThreads_);
     threadedGeometryUpdates_.Clear(frameInfo_.numThreads_);
     nonThreadedGeometryUpdates_.Clear(frameInfo_.numThreads_);
@@ -199,11 +200,59 @@ void DrawableProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
     queuedDrawableUpdates_.Clear(frameInfo_.numThreads_);
 }
 
-void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables)
+void DrawableProcessor::ProcessOccluders(const ea::vector<Drawable*>& occluders, float sizeThreshold)
+{
+    Camera* cullCamera = frameInfo_.cullCamera_;
+    const float halfViewSize = cullCamera->GetHalfViewSize();
+    const float invOrthoSize = 1.0f / cullCamera->GetOrthoSize();
+
+    for (Drawable* drawable : occluders)
+    {
+        drawable->UpdateBatches(frameInfo_);
+
+        // Skip if too far
+        const float maxDistance = drawable->GetDrawDistance();
+        if (maxDistance > 0.0f && drawable->GetDistance() > maxDistance)
+            return;
+
+        // Check that occluder is big enough on the screen
+        const BoundingBox& boundingBox = drawable->GetWorldBoundingBox();
+        const float drawableSize = boundingBox.Size().Length();
+        float relativeSize = 0.0f;
+        if (cullCamera->IsOrthographic())
+            relativeSize = drawableSize * invOrthoSize;
+        else
+        {
+            // Occluders which are near the camera are more useful then occluders at the end of the camera's draw distance
+            const float relativeDistance = drawable->GetDistance() / cullCamera->GetFarClip();
+            relativeSize = drawableSize * halfViewSize / ea::max(M_EPSILON, drawable->GetDistance() * relativeDistance);
+
+            // Give higher priority to occluders which the camera is inside their AABB
+            const Vector3& cameraPos = cullCamera->GetNode()->GetWorldPosition();
+            if (boundingBox.IsInside(cameraPos))
+                relativeSize *= drawableSize;
+        }
+
+        // Keep occluders larger than threshold with lowest triangle count to size ratio.
+        if (relativeSize >= sizeThreshold)
+        {
+            const float density = drawable->GetNumOccluderTriangles() / drawableSize;
+            const float penalty = density / ea::max(M_EPSILON, relativeSize);
+            sortedOccluders_.push_back({ penalty, drawable });
+        }
+    }
+
+    ea::sort(sortedOccluders_.begin(), sortedOccluders_.end());
+}
+
+void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables, OcclusionBuffer* occlusionBuffer)
 {
     ForEachParallel(workQueue_, drawables,
         [&](unsigned /*index*/, Drawable* drawable)
     {
+        if (occlusionBuffer && drawable->IsOccludee() && !occlusionBuffer->IsVisible(drawable->GetWorldBoundingBox()))
+            return;
+
         ProcessVisibleDrawable(drawable);
     });
 
@@ -259,11 +308,8 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
 
     // Skip if too far
     const float maxDistance = drawable->GetDrawDistance();
-    if (maxDistance > 0.0f)
-    {
-        if (drawable->GetDistance() > maxDistance)
-            return;
-    }
+    if (maxDistance > 0.0f && drawable->GetDistance() > maxDistance)
+        return;
 
     // For geometries, find zone, clear lights and calculate view space Z range
     if (drawable->GetDrawableFlags() & DRAWABLE_GEOMETRY)

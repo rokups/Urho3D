@@ -100,7 +100,7 @@ void SceneBatchCollector::BeginFrame(const FrameInfo& frameInfo, SceneBatchColle
 
 void SceneBatchCollector::ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables)
 {
-    dp_->ProcessVisibleDrawables(drawables);
+    //dp_->ProcessVisibleDrawables(drawables);
     visibleLights_ = dp_->GetLightProcessors();
 }
 

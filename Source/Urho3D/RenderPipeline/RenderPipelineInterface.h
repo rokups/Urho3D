@@ -36,8 +36,7 @@ struct FrameInfo;
 /// Base interface of render pipeline required by Render Pipeline classes.
 class URHO3D_API RenderPipelineInterface
     : public Serializable
-    , public SceneBatchCollectorCallback
-    , public LightProcessorCallback
+    , public BatchStateCacheCallback
 {
     URHO3D_OBJECT(RenderPipelineInterface, Serializable);
 

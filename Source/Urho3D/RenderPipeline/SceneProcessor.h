@@ -24,17 +24,34 @@
 
 #include "../Graphics/Drawable.h"
 #include "../RenderPipeline/BatchCompositor.h"
+#include "../RenderPipeline/DrawableProcessor.h"
+#include "../RenderPipeline/LightProcessor.h"
 
 namespace Urho3D
 {
 
-class DrawableProcessor;
 class RenderPipelineInterface;
 class RenderSurface;
+class ShadowMapAllocator;
 class Viewport;
 
+/// Scene processor settings.
+struct SceneProcessorSettings : public DrawableProcessorSettings
+{
+    /// Whether to render shadows.
+    bool enableShadows_{ true };
+    /// Whether to render occlusion triangles in multiple threads.
+    bool threadedOcclusion_{};
+    /// Max number of occluder triangles.
+    unsigned maxOccluderTriangles_{ 5000 };
+    /// Occlusion buffer width.
+    unsigned occlusionBufferSize_{ 256 };
+    /// Occluder screen size threshold.
+    float occluderSizeThreshold_{ 0.025f };
+};
+
 /// Scene processor for RenderPipeline
-class URHO3D_API SceneProcessor : public Object
+class URHO3D_API SceneProcessor : public Object, public LightProcessorCallback
 {
     URHO3D_OBJECT(SceneProcessor, Object);
 
@@ -44,11 +61,13 @@ public:
     /// Destruct.
     ~SceneProcessor() override;
 
-    /// Define before RenderPipeline update.
-    void Define(RenderSurface* renderTarget, Viewport* viewport);
     /// Set passes.
     void SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes);
+    /// Set settings.
+    void SetSettings(const SceneProcessorSettings& settings);
 
+    /// Define before RenderPipeline update.
+    void Define(RenderSurface* renderTarget, Viewport* viewport);
     /// Update frame info.
     void UpdateFrameInfo(const FrameInfo& frameInfo);
     /// Update drawables and batches.
@@ -62,22 +81,35 @@ public:
     bool IsShadowPass(Object* pass) const { return batchCompositor_ == pass; }
     /// Return drawable processor.
     DrawableProcessor* GetDrawableProcessor() const { return drawableProcessor_; }
+    /// Return transient shadow map allocator.
+    ShadowMapAllocator* GetShadowMapAllocator() const { return shadowMapAllocator_; }
 
 private:
     /// Called when update begins.
     void OnUpdateBegin(const FrameInfo& frameInfo);
-
-    /// Render pipeline interface.
-    RenderPipelineInterface* renderPipeline_{};
+    /// Return whether light needs shadow.
+    bool IsLightShadowed(Light* light) override;
+    /// Allocate shadow map for one frame.
+    ShadowMap AllocateTransientShadowMap(const IntVector2& size) override;
+    /// Draw occluders.
+    void DrawOccluders();
 
     /// Drawable processor.
     SharedPtr<DrawableProcessor> drawableProcessor_;
     /// Batch compositor.
     SharedPtr<BatchCompositor> batchCompositor_;
+    /// Transient shadow map allocator.
+    SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
 
+    /// Settings.
+    SceneProcessorSettings settings_;
     /// Frame info.
     FrameInfo frameInfo_;
 
+    /// Occlusion buffer.
+    SharedPtr<OcclusionBuffer> occlusionBuffer_;
+    /// Currently active and filled occlusion buffer.
+    OcclusionBuffer* activeOcclusionBuffer_{};
     /// Occluders in current frame.
     ea::vector<Drawable*> occluders_;
     /// Drawables in current frame.

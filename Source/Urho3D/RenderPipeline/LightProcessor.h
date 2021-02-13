@@ -39,7 +39,7 @@ class DrawableProcessor;
 class LightProcessor;
 
 /// Light processor callback.
-class URHO3D_API LightProcessorCallback
+class LightProcessorCallback
 {
 public:
     /// Return whether light needs shadow.

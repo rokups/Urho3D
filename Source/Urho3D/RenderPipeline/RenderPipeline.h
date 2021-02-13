@@ -113,16 +113,16 @@ protected:
     /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
     unsigned RecalculatePipelineStateHash() const override;
 
-    bool IsLightShadowed(Light* light) override;
-    ShadowMap AllocateTransientShadowMap(const IntVector2& size) override;
+    bool IsLightShadowed(Light* light);
+    ShadowMap AllocateTransientShadowMap(const IntVector2& size);
 
-    bool HasShadow(Light* light) override;
-    ShadowMap GetTemporaryShadowMap(const IntVector2& size) override;
+    bool HasShadow(Light* light);
+    ShadowMap GetTemporaryShadowMap(const IntVector2& size);
 
     SharedPtr<PipelineState> CreateBatchPipelineState(
         const BatchStateCreateKey& key, const BatchStateCreateContext& ctx) override;
     /// Return new or existing pipeline state for deferred light volume.
-    SharedPtr<PipelineState> CreateLightVolumePipelineState(LightProcessor* sceneLight, Geometry* lightGeometry) override;
+    SharedPtr<PipelineState> CreateLightVolumePipelineState(LightProcessor* sceneLight, Geometry* lightGeometry);
 
 private:
     Graphics* graphics_{};
@@ -158,7 +158,7 @@ private:
 
     //ea::vector<Drawable*> occluders_;
     //ea::vector<Drawable*> drawables_;
-    SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
+    //SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
     //SharedPtr<DrawableProcessor> drawableProcessor_;
     //SharedPtr<BatchCompositor> batchCompositor_;
     //SharedPtr<SceneBatchCollector> sceneBatchCollector_;
