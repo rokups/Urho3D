@@ -226,6 +226,7 @@ BatchCompositor::BatchCompositor(RenderPipelineInterface* renderPipeline, const 
     unsigned shadowPassIndex)
     : Object(renderPipeline->GetContext())
     , shadowPassIndex_(shadowPassIndex)
+    , workQueue_(GetSubsystem<WorkQueue>())
     , drawableProcessor_(drawableProcessor)
     , defaultMaterial_(GetSubsystem<Renderer>()->GetDefaultMaterial())
     , batchStateCacheCallback_(renderPipeline)
@@ -236,6 +237,27 @@ BatchCompositor::BatchCompositor(RenderPipelineInterface* renderPipeline, const 
 void BatchCompositor::SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes)
 {
     passes_ = passes;
+}
+
+void BatchCompositor::ComposeShadowBatches(const ea::vector<LightProcessor*>& lightProcessors)
+{
+    // Collect shadow caster batches in worker threads
+    for (unsigned lightIndex = 0; lightIndex < lightProcessors.size(); ++lightIndex)
+    {
+        LightProcessor* lightProcessor = lightProcessors[lightIndex];
+        const unsigned numSplits = lightProcessor->GetNumSplits();
+        for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
+        {
+            workQueue_->AddWorkItem([=](unsigned threadIndex)
+            {
+                BeginShadowBatchesComposition(lightIndex, lightProcessor->GetMutableSplit(splitIndex));
+            }, M_MAX_UNSIGNED);
+        }
+    }
+    workQueue_->Complete(M_MAX_UNSIGNED);
+
+    // Finalize shadow batches in main thread
+    FinalizeShadowBatchesComposition();
 }
 
 void BatchCompositor::ComposeBatches()

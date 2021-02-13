@@ -90,7 +90,7 @@ public:
     void CollectLightVolumeBatches();
 
     /// Return frame info.
-    const FrameInfo& GetFrameInfo() const { return frameInfo_; }
+    /*const FrameInfo& GetFrameInfo() const { return frameInfo_; }
     /// Return main light index.
     unsigned GetMainLightIndex() const { return mainLightIndex_; }
     /// Return main light.
@@ -98,23 +98,23 @@ public:
     /// Return visible light by index.
     const LightProcessor* GetVisibleLight(unsigned i) const { return visibleLights_[i]; }
     /// Return all visible lights.
-    const ea::vector<LightProcessor*>& GetVisibleLights() const { return visibleLights_; }
+    const ea::vector<LightProcessor*>& GetVisibleLights() const { return visibleLights_; }*/
     /// Return light volume batches.
     ea::span<const LightVolumeBatch> GetLightVolumeBatches() const { return lightVolumeBatches_; }
 
     /// Return vertex lights for drawable (as indices in the array of visible lights).
-    VertexLightCollection GetVertexLightIndices(unsigned drawableIndex) const { return dp_->GetGeometryLighting(drawableIndex).GetVertexLights(); }
+    /*VertexLightCollection GetVertexLightIndices(unsigned drawableIndex) const { return dp_->GetGeometryLighting(drawableIndex).GetVertexLights(); }
     /// Return vertex lights for drawable (as pointers).
     ea::array<LightProcessor*, MaxVertexLights> GetVertexLights(unsigned drawableIndex) const;
     /// Return ambient light.
-    const SphericalHarmonicsDot9& GetAmbientLight(unsigned drawableIndex) const { return dp_->GetGeometryLighting(drawableIndex).sh_; }
+    const SphericalHarmonicsDot9& GetAmbientLight(unsigned drawableIndex) const { return dp_->GetGeometryLighting(drawableIndex).sh_; }*/
 
 private:
     /// Update source batches and collect pass batches for single thread.
     void ProcessVisibleDrawablesForThread(unsigned threadIndex, ea::span<Drawable* const> drawables);
 
     /// Find main light.
-    unsigned FindMainLight() const;
+    //unsigned FindMainLight() const;
     /// Accumulate forward lighting for given light.
     void AccumulateForwardLighting(unsigned lightIndex);
 
@@ -161,7 +161,7 @@ private:
     /// Visible lights.
     ea::vector<LightProcessor*> visibleLights_;
     /// Index of main directional light in visible lights collection.
-    unsigned mainLightIndex_{ M_MAX_UNSIGNED };
+    //unsigned mainLightIndex_{ M_MAX_UNSIGNED };
     /// Scene Z range.
     //SceneZRange sceneZRange_;
 

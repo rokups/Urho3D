@@ -817,7 +817,7 @@ void RenderPipeline::Render()
     const auto zone = frameInfo_.octree_->GetBackgroundZone();
 
     static thread_local ea::vector<PipelineBatchByState> shadowBatches;
-    const auto& visibleLights = sceneBatchCollector_->GetVisibleLights();
+    const auto& visibleLights = drawableProcessor_->GetLightProcessors();
     for (LightProcessor* sceneLight : visibleLights)
     {
         const unsigned numSplits = sceneLight->GetNumSplits();

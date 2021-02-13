@@ -24,8 +24,8 @@
 
 #include "../Core/Object.h"
 #include "../Core/WorkQueue.h"
-#include "../Math/NumericRange.h"
 #include "../Graphics/GraphicsDefs.h"
+#include "../Math/NumericRange.h"
 #include "../RenderPipeline/LightAccumulator.h"
 
 #include <atomic>
@@ -33,13 +33,14 @@
 namespace Urho3D
 {
 
-class RenderPipelineInterface;
-class GlobalIllumination;
-class Pass;
-class Technique;
-class LightProcessor;
 class DrawableProcessor;
+class GlobalIllumination;
+class LightProcessor;
 class LightProcessorCache;
+class LightProcessorCallback;
+class Pass;
+class RenderPipelineInterface;
+class Technique;
 struct FrameInfo;
 
 /// Flags related to geometry rendering.
@@ -180,17 +181,16 @@ public:
     /// Return light processor by index.
     LightProcessor* GetLightProcessor(unsigned lightIndex) const { return lightProcessors_[lightIndex]; }
 
-    /// Accumulate forward lighting for specified light source and geometries.
-    void ProcessForwardLighting(unsigned lightIndex, const ea::vector<Drawable*>& litGeometries);
-
     /// Pre-process shadow caster candidates. Safe to call from worker thread.
     void PreprocessShadowCasters(ea::vector<Drawable*>& shadowCasters,
         const ea::vector<Drawable*>& candidates, const FloatRange& frustumSubRange, Light* light, Camera* shadowCamera);
     /// Finalize shadow casters processing.
     void ProcessShadowCasters();
 
-    /// Return light processors sorted by shadow map sizes.
-    const ea::vector<LightProcessor*>& GetLightProcessorsSortedByShadowMap();
+    /// Process lights: collect lit geometries, query shadow casters, update shadow maps.
+    void ProcessLights(LightProcessorCallback* callback);
+    /// Accumulate forward lighting for specified light source and geometries.
+    void ProcessForwardLighting(unsigned lightIndex, const ea::vector<Drawable*>& litGeometries);
 
     /// Update drawable geometries if needed.
     void UpdateGeometries();
@@ -210,6 +210,8 @@ protected:
     void QueueDrawableGeometryUpdate(unsigned threadIndex, Drawable* drawable);
     /// Calculate Z range of bounding box.
     FloatRange CalculateBoundingBoxZRange(const BoundingBox& boundingBox) const;
+    /// Return light processors sorted by shadow map sizes.
+    void SortLightProcessorsByShadowMap();
 
 private:
     /// Whether the drawable is already updated for this pipeline and frame.

@@ -53,14 +53,14 @@ SceneBatchCollector::~SceneBatchCollector()
 {
 }
 
-ea::array<LightProcessor*, SceneBatchCollector::MaxVertexLights> SceneBatchCollector::GetVertexLights(unsigned drawableIndex) const
+/*ea::array<LightProcessor*, SceneBatchCollector::MaxVertexLights> SceneBatchCollector::GetVertexLights(unsigned drawableIndex) const
 {
     const auto indices = GetVertexLightIndices(drawableIndex);
     ea::array<LightProcessor*, MaxVertexLights> lights;
     for (unsigned i = 0; i < MaxVertexLights; ++i)
         lights[i] = indices[i] != M_MAX_UNSIGNED ? visibleLights_[indices[i]] : nullptr;
     return lights;
-}
+}*/
 
 void SceneBatchCollector::ResetPasses()
 {
@@ -110,11 +110,12 @@ void SceneBatchCollector::ProcessVisibleDrawablesForThread(unsigned threadIndex,
 
 void SceneBatchCollector::ProcessVisibleLights()
 {
-    for (LightProcessor* sceneLight : visibleLights_)
+    dp_->ProcessLights(lpc_);
+    /*for (LightProcessor* sceneLight : visibleLights_)
         sceneLight->BeginUpdate(dp_, lpc_);
 
     ForEachParallel(workQueue_, visibleLights_,
-        [&](unsigned /*index*/, LightProcessor* lightProcessor)
+        [&](unsigned /index/, LightProcessor* lightProcessor)
     {
         lightProcessor->Update(dp_);
     });
@@ -123,7 +124,7 @@ void SceneBatchCollector::ProcessVisibleLights()
         sceneLight->EndUpdate(dp_, lpc_);
 
     // Update lit geometries and shadow casters
-    /*SceneLightProcessContext sceneLightProcessContext;
+    SceneLightProcessContext sceneLightProcessContext;
     sceneLightProcessContext.frameInfo_ = frameInfo_;
     sceneLightProcessContext.dp_ = dp_;
     for (unsigned i = 0; i < visibleLights_.size(); ++i)
@@ -165,9 +166,10 @@ void SceneBatchCollector::ProcessVisibleLights()
 
     // Update batches for shadow casters
     dp_->ProcessShadowCasters();
+    bc_->ComposeShadowBatches(dp_->GetLightProcessors());
 
     // Collect shadow caster batches
-    for (LightProcessor* sceneLight : visibleLights_)
+    /*for (LightProcessor* sceneLight : visibleLights_)
     {
         const unsigned numSplits = sceneLight->GetNumSplits();
         for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
@@ -181,17 +183,17 @@ void SceneBatchCollector::ProcessVisibleLights()
     workQueue_->Complete(M_MAX_UNSIGNED);
 
     // Finalize shadow batches
-    bc_->FinalizeShadowBatchesComposition();
+    bc_->FinalizeShadowBatchesComposition();*/
 
     // Find main light
-    mainLightIndex_ = FindMainLight();
+    //mainLightIndex_ = FindMainLight();
 
     // Accumulate lighting
     for (unsigned i = 0; i < visibleLights_.size(); ++i)
         AccumulateForwardLighting(i);
 }
 
-unsigned SceneBatchCollector::FindMainLight() const
+/*unsigned SceneBatchCollector::FindMainLight() const
 {
     float mainLightScore = 0.0f;
     unsigned mainLightIndex = M_MAX_UNSIGNED;
@@ -209,7 +211,7 @@ unsigned SceneBatchCollector::FindMainLight() const
         }
     }
     return mainLightIndex;
-}
+}*/
 
 void SceneBatchCollector::AccumulateForwardLighting(unsigned lightIndex)
 {
@@ -221,7 +223,7 @@ void SceneBatchCollector::CollectSceneBatches()
 {
     for (ScenePass* pass : passes2_)
     {
-        pass->CollectSceneBatches(mainLightIndex_, visibleLights_, dp_, camera_, *callback_);
+        pass->CollectSceneBatches(0, visibleLights_, dp_, camera_, *callback_);
         pass->SortSceneBatches();
     }
 }

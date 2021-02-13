@@ -22,33 +22,20 @@
 
 #pragma once
 
-/*#include "../Core/Object.h"
-#include "../RenderPipeline/LightAccumulator.h"
-#include "../RenderPipeline/PipelineBatchSortKey.h"
-#include "../RenderPipeline/LightProcessor.h"*/
 #include "../Graphics/GraphicsDefs.h"
 #include "../RenderPipeline/BatchStateCache.h"
 #include "../RenderPipeline/DrawableProcessor.h"
-/*
-#include "../Graphics/Light.h"
-#include "../Graphics/SceneDrawableData.h"
-#include "../Graphics/ShadowMapAllocator.h"
-#include "../Graphics/PipelineStateTracker.h"
-#include "../Graphics/Camera.h"
-#include "../Scene/Node.h"*/
-
-/*#include <EASTL/string.h>
-#include <EASTL/vector.h>
-#include <EASTL/sort.h>*/
 
 namespace Urho3D
 {
 
 class Drawable;
 class Geometry;
+class LightProcessor;
 class Material;
 class Pass;
 class PipelineState;
+class WorkQueue;
 struct ShadowSplitProcessor;
 
 /// Self-sufficient batch that can be rendered by RenderPipeline.
@@ -150,18 +137,15 @@ class URHO3D_API BatchCompositor : public Object
 
 public:
     /// Construct.
-    explicit BatchCompositor(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
+    BatchCompositor(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
         unsigned shadowPassIndex);
     /// Set passes.
     void SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes);
 
-    /// Compose batches.
+    /// Compose shadow batches.
+    void ComposeShadowBatches(const ea::vector<LightProcessor*>& lightProcessors);
+    /// Compose scene batches.
     void ComposeBatches();
-
-    /// Begin shadow batches composition. Safe to call from worker thread.
-    void BeginShadowBatchesComposition(unsigned lightIndex, ShadowSplitProcessor* splitProcessor);
-    /// Finalize shadow batches composition. Should be called from main thread.
-    void FinalizeShadowBatchesComposition();
 
 protected:
     /// Called when update begins.
@@ -169,10 +153,17 @@ protected:
     /// Called when pipeline states are invalidated.
     virtual void OnPipelineStatesInvalidated();
 
+    /// Begin shadow batches composition. Safe to call from worker thread.
+    void BeginShadowBatchesComposition(unsigned lightIndex, ShadowSplitProcessor* splitProcessor);
+    /// Finalize shadow batches composition. Should be called from main thread.
+    void FinalizeShadowBatchesComposition();
+
 private:
     /// Index of shadow technique pass.
     const unsigned shadowPassIndex_;
 
+    /// Work queue.
+    WorkQueue* workQueue_{};
     /// Drawable processor.
     const DrawableProcessor* drawableProcessor_{};
     /// Default material.

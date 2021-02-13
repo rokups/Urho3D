@@ -29,9 +29,9 @@
 #include "../Graphics/Renderer.h"
 #include "../Graphics/Zone.h"
 #include "../IO/Log.h"
-#include "../RenderPipeline/RenderPipelineInterface.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/LightProcessor.h"
+#include "../RenderPipeline/RenderPipelineInterface.h"
 #include "../Scene/Scene.h"
 
 #include <EASTL/sort.h>
@@ -359,6 +359,22 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
     }
 }
 
+void DrawableProcessor::ProcessLights(LightProcessorCallback* callback)
+{
+    for (LightProcessor* lightProcessor : lightProcessors_)
+        lightProcessor->BeginUpdate(this, callback);
+
+    ForEachParallel(workQueue_, lightProcessors_,
+        [&](unsigned /*index*/, LightProcessor* lightProcessor)
+    {
+        lightProcessor->Update(this);
+    });
+
+    SortLightProcessorsByShadowMap();
+    for (LightProcessor* lightProcessor : lightProcessorsByShadowMapSize_)
+        lightProcessor->EndUpdate(this, callback);
+}
+
 void DrawableProcessor::ProcessForwardLighting(unsigned lightIndex, const ea::vector<Drawable*>& litGeometries)
 {
     if (lightIndex >= visibleLights_.size())
@@ -453,7 +469,7 @@ void DrawableProcessor::ProcessQueuedDrawable(Drawable* drawable)
     QueueDrawableGeometryUpdate(WorkQueue::GetWorkerThreadIndex(), drawable);
 }
 
-const ea::vector<LightProcessor*>& DrawableProcessor::GetLightProcessorsSortedByShadowMap()
+void DrawableProcessor::SortLightProcessorsByShadowMap()
 {
     lightProcessorsByShadowMapSize_ = lightProcessors_;
 
@@ -466,8 +482,6 @@ const ea::vector<LightProcessor*>& DrawableProcessor::GetLightProcessorsSortedBy
         return lhs->GetLight()->GetID() < rhs->GetLight()->GetID();
     };
     ea::sort(lightProcessorsByShadowMapSize_.begin(), lightProcessorsByShadowMapSize_.end(), compareShadowMapSize);
-
-    return lightProcessorsByShadowMapSize_;
 }
 
 void DrawableProcessor::UpdateGeometries()
