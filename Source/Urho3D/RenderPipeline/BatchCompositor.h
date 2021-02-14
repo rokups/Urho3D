@@ -145,9 +145,14 @@ public:
     void SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes);
 
     /// Compose shadow batches.
-    void ComposeShadowBatches(const ea::vector<LightProcessor*>& lightProcessors);
+    void ComposeShadowBatches();
     /// Compose scene batches.
     void ComposeSceneBatches();
+    /// Compose light volume batches.
+    void ComposeLightVolumeBatches();
+
+    /// Return light volume batches.
+    const auto& GetLightVolumeBatches() const { return lightVolumeBatches_; }
 
 protected:
     /// Called when update begins.
@@ -166,10 +171,15 @@ private:
 
     /// Work queue.
     WorkQueue* workQueue_{};
+    /// Renderer.
+    Renderer* renderer_{};
+
     /// Drawable processor.
     const DrawableProcessor* drawableProcessor_{};
     /// Default material.
     Material* defaultMaterial_{};
+    /// Null pass (for light volumes).
+    SharedPtr<Pass> nullPass_{};
     /// Batch state creation callback.
     BatchStateCacheCallback* batchStateCacheCallback_{};
 
@@ -183,6 +193,11 @@ private:
     BatchStateCache shadowCache_;
     /// Delayed shadow batches.
     WorkQueueVector<ea::pair<ShadowSplitProcessor*, BatchStateCreateKey>> delayedShadowBatches_;
+
+    /// Cache for light volume batches.
+    BatchStateCache lightVolumeCache_;
+    /// Light volume batches.
+    ea::vector<PipelineBatch> lightVolumeBatches_;
 };
 
 }

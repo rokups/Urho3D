@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "../Container/FlagSet.h"
 #include "../Core/Object.h"
 #include "../Graphics/GraphicsDefs.h"
 
@@ -38,12 +39,45 @@ class Texture;
 class Viewport;
 struct FrameInfo;
 
+/// Render buffer easy creation flags.
+enum class RenderBufferFlag
+{
+    /// Default flag: color buffer.
+    RGBA = 0,
+    /// Render buffer contains depth data.
+    Depth = 1 << 1,
+    /// Render buffer contains stencil data. Depth data is assumed.
+    Stencil = 1 << 2,
+    /// Texture content is preserved between frames.
+    Persistent = 1 << 3,
+    /// Texture cannot be read in shader.
+    WriteOnly = 1 << 4,
+    /// Use fixed texture size in pixels instead of relative size to viewport.
+    FixedSize = 1 << 5,
+    /// sRGB texture format is used.
+    sRGB = 1 << 6,
+    /// Bilinear filtering is used.
+    Filter = 1 << 7,
+    /// Render buffer is cubemap.
+    CubeMap = 1 << 8,
+};
+
+URHO3D_FLAGSET(RenderBufferFlag, RenderBufferFlags);
+
 /// Base class fro writable texture or texture region. Readability is not guaranteed.
 class URHO3D_API RenderBuffer : public Object
 {
     URHO3D_OBJECT(RenderBuffer, Object);
 
 public:
+    /// Create texture render buffer.
+    static SharedPtr<RenderBuffer> Create(RenderPipelineInterface* renderPipeline,
+        RenderBufferFlags flags, const Vector2& size = Vector2::ONE, int multiSample = 1);
+    /// Create render buffer that connects to viewport color.
+    static SharedPtr<RenderBuffer> ConnectToViewportColor(RenderPipelineInterface* renderPipeline);
+    /// Create render buffer that connects to viewport depth-stencil.
+    static SharedPtr<RenderBuffer> ConnectToViewportDepthStencil(RenderPipelineInterface* renderPipeline);
+
     /// Return whether this texture is compatible with another, i.e. can be set together.
     bool IsCompatibleWith(RenderBuffer* otherTexture) const;
 
@@ -128,7 +162,7 @@ private:
     bool active_{};
 };
 
-/// Screen buffer creation parameters.
+/// Render buffer texture creation parameters.
 struct TextureRenderBufferParams
 {
     /// Texture format.
@@ -145,7 +179,7 @@ struct TextureRenderBufferParams
     bool autoResolve_{ true };
 };
 
-/// Writable and readable screen buffer texture (2D or cubemap).
+/// Writable and readable render buffer texture (2D or cubemap).
 class URHO3D_API TextureRenderBuffer : public RenderBuffer
 {
     URHO3D_OBJECT(TextureRenderBuffer, RenderBuffer);
@@ -185,7 +219,7 @@ protected:
     Texture* currentTexture_{};
 };
 
-/// Optionally write-only viewport color texture.
+/// Write-only viewport color render buffer.
 class URHO3D_API ViewportColorRenderBuffer : public RenderBuffer
 {
     URHO3D_OBJECT(ViewportColorRenderBuffer, RenderBuffer);
@@ -217,7 +251,7 @@ private:
     RenderSurface* renderTarget_{};
 };
 
-/// Optionally write-only viewport depth-stenil texture.
+/// Write-only viewport depth-stenil texture.
 class URHO3D_API ViewportDepthStencilRenderBuffer : public RenderBuffer
 {
     URHO3D_OBJECT(ViewportDepthStencilRenderBuffer, RenderBuffer);

@@ -228,7 +228,9 @@ void SceneProcessor::Update()
 
     batchCompositor_->ComposeSceneBatches();
     if (settings_.enableShadows_)
-        batchCompositor_->ComposeShadowBatches(lightProcessors);
+        batchCompositor_->ComposeShadowBatches();
+    if (settings_.deferred_)
+        batchCompositor_->ComposeLightVolumeBatches();
 }
 
 void SceneProcessor::OnUpdateBegin(const FrameInfo& frameInfo)

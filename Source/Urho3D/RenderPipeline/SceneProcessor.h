@@ -40,6 +40,9 @@ struct SceneProcessorSettings : public DrawableProcessorSettings
 {
     /// Whether to render shadows.
     bool enableShadows_{ true };
+    /// Whether to enable deferred rendering.
+    bool deferred_{ false };
+
     /// Whether to render occlusion triangles in multiple threads.
     bool threadedOcclusion_{};
     /// Max number of occluder triangles.
@@ -77,12 +80,14 @@ public:
     bool IsValid() const { return frameInfo_.camera_ && frameInfo_.octree_; }
     /// Return frame info.
     const FrameInfo& GetFrameInfo() const { return frameInfo_; }
-    /// Return whether the object corresponds to shadow pass.
-    bool IsShadowPass(Object* pass) const { return batchCompositor_ == pass; }
+    /// Return whether the pass object in callback corresponds to internal pass.
+    bool IsInternalPass(Object* pass) const { return batchCompositor_ == pass; }
     /// Return drawable processor.
     DrawableProcessor* GetDrawableProcessor() const { return drawableProcessor_; }
     /// Return transient shadow map allocator.
     ShadowMapAllocator* GetShadowMapAllocator() const { return shadowMapAllocator_; }
+    /// Return light volume batches.
+    const auto& GetLightVolumeBatches() const { return batchCompositor_->GetLightVolumeBatches(); }
 
 private:
     /// Called when update begins.

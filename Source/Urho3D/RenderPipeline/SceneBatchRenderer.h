@@ -70,7 +70,7 @@ public:
 
     /// Render light volume batches for deferred rendering.
     void RenderLightVolumeBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
-        Camera* camera, Zone* zone, ea::span<const LightVolumeBatch> batches,
+        Camera* camera, Zone* zone, ea::span<const PipelineBatch> batches,
         ea::span<const GeometryBufferResource> geometryBuffer, const Vector4& geometryBufferOffset, const Vector2& geometryBufferInvSize);
 
 private:

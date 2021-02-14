@@ -96,7 +96,7 @@ struct SceneLightShaderParameters
 };
 
 /// Light and shadow processing utility.
-class URHO3D_API LightProcessor : public PipelineStateTracker, public NonCopyable
+class URHO3D_API LightProcessor : public NonCopyable
 {
 public:
     /// Number of frames for shadow splits expiration.
@@ -114,8 +114,17 @@ public:
     /// End update from main thread.
     void EndUpdate(DrawableProcessor* drawableProcessor, LightProcessorCallback* callback);
 
+    /// Return hash for forward light.
+    unsigned GetForwardLitHash() const { return forwardHash_; }
+    /// Return hash for shadow batches.
+    unsigned GetShadowHash() const { return forwardHash_; }
+    /// Return hash for light volumes batches.
+    unsigned GetLightVolumeHash() const { return lightVolumeHash_; }
+
     /// Return light.
     Light* GetLight() const { return light_; }
+    /// Return whether overlaps camera.
+    bool DoesOverlapCamera() const { return overlapsCamera_; }
     /// Return whether the light actually has shadow.
     bool HasShadow() const { return numActiveSplits_ != 0; }
     /// Return shadow map size.
@@ -132,11 +141,12 @@ public:
     const SceneLightShaderParameters& GetShaderParams() const { return shaderParams_; }
     /// Return lit geometries.
     const ea::vector<Drawable*>& GetLitGeometries() const { return litGeometries_; }
+
 private:
-    /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
-    unsigned RecalculatePipelineStateHash() const override;
     /// Initialize shadow splits.
     void InitializeShadowSplits(DrawableProcessor* drawableProcessor);
+    /// Update hashes.
+    void UpdateHashes();
     /// Cook shader parameters for light.
     void CookShaderParameters(Camera* cullCamera, float subPixelOffset);
     /// Return dimensions of splits grid in shadow map.
@@ -144,6 +154,12 @@ private:
 
     /// Light.
     Light* light_{};
+    /// Whether the camera is inside light volume.
+    bool overlapsCamera_{};
+    /// Light hash for forward rendering.
+    unsigned forwardHash_{};
+    /// Light hash for deferred light volume rendering.
+    unsigned lightVolumeHash_{};
 
     /// Splits.
     ea::vector<ShadowSplitProcessor> splits_;

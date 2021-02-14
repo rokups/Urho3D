@@ -191,7 +191,7 @@ void SceneBatchRenderer::RenderShadowBatches(DrawCommandQueue& drawQueue, const 
 }
 
 void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
-    Camera* camera, Zone* zone, ea::span<const LightVolumeBatch> batches,
+    Camera* camera, Zone* zone, ea::span<const PipelineBatch> batches,
     ea::span<const GeometryBufferResource> geometryBuffer, const Vector4& geometryBufferOffset, const Vector2& geometryBufferInvSize)
 {
     // TODO(renderer): Remove copypaste
@@ -209,7 +209,7 @@ void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, c
     float previousConstantDepthBias = 0.0f;
     const LightProcessor* previousLight = nullptr;
 
-    for (const LightVolumeBatch& batch : batches)
+    for (const PipelineBatch& batch : batches)
     {
         PipelineState* pipelineState = batch.pipelineState_;
         if (!pipelineState)

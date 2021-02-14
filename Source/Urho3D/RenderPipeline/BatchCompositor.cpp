@@ -153,7 +153,7 @@ bool BatchCompositorPass::InitializeKey(BatchStateCreateKey& key, const Geometry
 void BatchCompositorPass::InitializeKeyLight(BatchStateCreateKey& key, unsigned lightIndex) const
 {
     key.light_ = drawableProcessor_->GetLightProcessor(lightIndex);
-    key.lightHash_ = key.light_->GetPipelineStateHash();
+    key.lightHash_ = key.light_->GetForwardLitHash();
     key.lightIndex_ = lightIndex;
 }
 
@@ -229,8 +229,10 @@ BatchCompositor::BatchCompositor(RenderPipelineInterface* renderPipeline, const 
     : Object(renderPipeline->GetContext())
     , shadowPassIndex_(shadowPassIndex)
     , workQueue_(GetSubsystem<WorkQueue>())
+    , renderer_(GetSubsystem<Renderer>())
     , drawableProcessor_(drawableProcessor)
-    , defaultMaterial_(GetSubsystem<Renderer>()->GetDefaultMaterial())
+    , defaultMaterial_(renderer_->GetDefaultMaterial())
+    , nullPass_(MakeShared<Pass>(""))
     , batchStateCacheCallback_(renderPipeline)
 {
     renderPipeline->OnUpdateBegin.Subscribe(this, &BatchCompositor::OnUpdateBegin);
@@ -241,9 +243,10 @@ void BatchCompositor::SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passe
     passes_ = passes;
 }
 
-void BatchCompositor::ComposeShadowBatches(const ea::vector<LightProcessor*>& lightProcessors)
+void BatchCompositor::ComposeShadowBatches()
 {
     // Collect shadow caster batches in worker threads
+    const auto& lightProcessors = drawableProcessor_->GetLightProcessors();
     for (unsigned lightIndex = 0; lightIndex < lightProcessors.size(); ++lightIndex)
     {
         LightProcessor* lightProcessor = lightProcessors[lightIndex];
@@ -268,21 +271,53 @@ void BatchCompositor::ComposeSceneBatches()
         pass->ComposeBatches();
 }
 
+void BatchCompositor::ComposeLightVolumeBatches()
+{
+    BatchStateCreateContext ctx;
+    ctx.pass_ = this;
+    ctx.subpassIndex_ = 1;
+
+    lightVolumeBatches_.clear();
+
+    const auto& lightProcessors = drawableProcessor_->GetLightProcessors();
+    for (unsigned lightIndex = 0; lightIndex < lightProcessors.size(); ++lightIndex)
+    {
+        LightProcessor* lightProcessor = lightProcessors[lightIndex];
+
+        BatchStateCreateKey key;
+        key.drawableHash_ = 0;
+        key.sourceBatchIndex_ = M_MAX_UNSIGNED;
+        key.lightHash_ = lightProcessor->GetLightVolumeHash();
+        key.geometryType_ = GEOM_STATIC;
+        key.geometry_ = renderer_->GetLightGeometry(lightProcessor->GetLight());
+        key.material_ = defaultMaterial_;
+        key.pass_ = nullPass_;
+        key.drawable_ = lightProcessor->GetLight();
+        key.light_ = lightProcessor;
+        key.lightIndex_ = lightIndex;
+
+        PipelineState* pipelineState = lightVolumeCache_.GetOrCreatePipelineState(key, ctx, batchStateCacheCallback_);
+        lightVolumeBatches_.push_back(CreatePipelineBatch(key, pipelineState));
+    }
+}
+
 void BatchCompositor::OnUpdateBegin(const FrameInfo& frameInfo)
 {
     materialQuality_ = GetSubsystem<Renderer>()->GetMaterialQuality();
     delayedShadowBatches_.Clear(frameInfo.numThreads_);
+    lightVolumeBatches_.clear();
 }
 
 void BatchCompositor::OnPipelineStatesInvalidated()
 {
     shadowCache_.Invalidate();
+    lightVolumeCache_.Invalidate();
 }
 
 void BatchCompositor::BeginShadowBatchesComposition(unsigned lightIndex, ShadowSplitProcessor* splitProcessor)
 {
     LightProcessor* lightProcessor = splitProcessor->GetLightProcessor();
-    const unsigned lightHash = lightProcessor->GetPipelineStateHash();
+    const unsigned lightHash = lightProcessor->GetShadowHash();
 
     const unsigned threadIndex = WorkQueue::GetWorkerThreadIndex();
     const auto& shadowCasters = splitProcessor->GetShadowCasters();

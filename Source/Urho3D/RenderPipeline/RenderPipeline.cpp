@@ -248,12 +248,18 @@ void RenderPipeline::ApplyAttributes()
 SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     const BatchStateCreateKey& key, const BatchStateCreateContext& ctx)
 {
+    const bool isInternalPass = sceneProcessor_->IsInternalPass(ctx.pass_);
+    if (isInternalPass && ctx.subpassIndex_ == 1)
+    {
+        return CreateLightVolumePipelineState(key.light_, key.geometry_);
+    }
+
     Geometry* geometry = key.geometry_;
     Material* material = key.material_;
     Pass* pass = key.pass_;
     Light* light = key.light_ ? key.light_->GetLight() : nullptr;
     const bool isLitBasePass = ctx.subpassIndex_ == 1;
-    const bool isShadowPass = sceneProcessor_->IsShadowPass(ctx.pass_);
+    const bool isShadowPass = isInternalPass;
 
     // TODO(renderer): Remove this hack
     if (!pass)
@@ -542,18 +548,9 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
 
     desc.fillMode_ = FILL_SOLID;
 
-    // TODO(renderer): Extract this code to collector
-    Vector3 cameraPos = sceneProcessor_->GetFrameInfo().camera_->GetNode()->GetWorldPosition();
     if (type != LIGHT_DIRECTIONAL)
     {
-        float lightDist{};
-        if (type == LIGHT_POINT)
-            lightDist = Sphere(light->GetNode()->GetWorldPosition(), light->GetRange() * 1.25f).Distance(cameraPos);
-        else
-            lightDist = light->GetFrustum().Distance(cameraPos);
-
-        // Draw front faces if not inside light volume
-        if (lightDist < sceneProcessor_->GetFrameInfo().camera_->GetNearClip() * 2.0f)
+        if (sceneLight->DoesOverlapCamera())
         {
             desc.cullMode_ = GetEffectiveCullMode(CULL_CW, sceneProcessor_->GetFrameInfo().camera_);
             desc.depthMode_ = CMP_GREATER;
@@ -636,6 +633,10 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
     if (!frameInfo_.camera_ || !frameInfo_.octree_)
         return false;*/
 
+    // TODO(renderer): Optimize this
+    previousSettings_ = settings_;
+    sceneProcessor_->SetSettings(settings_);
+
     // Validate settings
     if (settings_.deferred_ && !graphics_->GetDeferredSupport()
         && !Graphics::GetReadableDepthStencilFormat())
@@ -648,8 +649,8 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         //sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow");
 
         cameraProcessor_ = MakeShared<CameraProcessor>(this);
-        viewportColor_ = MakeShared<ViewportColorRenderBuffer>(this);
-        viewportDepth_ = MakeShared<ViewportDepthStencilRenderBuffer>(this);
+        viewportColor_ = RenderBuffer::ConnectToViewportColor(this);// MakeShared<ViewportColorRenderBuffer>(this);
+        viewportDepth_ = RenderBuffer::ConnectToViewportDepthStencil(this);// MakeShared<ViewportDepthStencilRenderBuffer>(this);
 
         //drawableProcessor_ = MakeShared<DrawableProcessor>(this);
         //batchCompositor_ = MakeShared<BatchCompositor>(this, drawableProcessor_, Technique::GetPassIndex("shadow"));
@@ -670,10 +671,10 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         alphaPass_ = nullptr;
         deferredPass_ = MakeShared<UnlitScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "PASS_DEFERRED", "deferred");
 
-        deferredFinal_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
-        deferredAlbedo_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
-        deferredNormal_ = CreateScreenBuffer({ Graphics::GetRGBAFormat() });
-        deferredDepth_ = CreateScreenBuffer({ Graphics::GetReadableDepthStencilFormat() });
+        deferredFinal_ = RenderBuffer::Create(this, RenderBufferFlag::RGBA);
+        deferredAlbedo_ = RenderBuffer::Create(this, RenderBufferFlag::RGBA);
+        deferredNormal_ = RenderBuffer::Create(this, RenderBufferFlag::RGBA);
+        deferredDepth_ = RenderBuffer::Create(this, RenderBufferFlag::Depth | RenderBufferFlag::Stencil);
 
         sceneProcessor_->SetPasses({ deferredPass_ });
         //batchCompositor_->SetPasses({ deferredPass_ });
@@ -858,7 +859,7 @@ void RenderPipeline::Render()
         deferredDepth_->ClearDepthStencil();
         deferredDepth_->SetRenderTargets({ deferredFinal_, deferredAlbedo_, deferredNormal_ });
         drawQueue_->Reset();
-        //sceneBatchRenderer_->RenderUnlitBaseBatches(*drawQueue_, *drawableProcessor_, frameInfo_.camera_, zone, deferredPass_->GetBatches());
+        sceneBatchRenderer_->RenderUnlitBaseBatches(*drawQueue_, *sceneProcessor_->GetDrawableProcessor(), sceneProcessor_->GetFrameInfo().camera_, zone, deferredPass_->GetBatches());
         drawQueue_->Execute();
 
         // Draw deferred lights
@@ -869,9 +870,9 @@ void RenderPipeline::Render()
         };
 
         drawQueue_->Reset();
-        //sceneBatchRenderer_->RenderLightVolumeBatches(*drawQueue_, *drawableProcessor_, frameInfo_.camera_, zone,
-        //    sceneBatchCollector_->GetLightVolumeBatches(), geometryBuffer,
-        //    deferredDepth_->GetViewportOffsetAndScale(), deferredDepth_->GetInvSize());
+        sceneBatchRenderer_->RenderLightVolumeBatches(*drawQueue_, *sceneProcessor_->GetDrawableProcessor(), sceneProcessor_->GetFrameInfo().camera_, zone,
+            sceneProcessor_->GetLightVolumeBatches(), geometryBuffer,
+            deferredDepth_->GetViewportOffsetAndScale(), deferredDepth_->GetInvSize());
 
         deferredDepth_->SetRenderTargets({ deferredFinal_ });
         drawQueue_->Execute();
@@ -926,7 +927,7 @@ void RenderPipeline::Render()
     OnRenderEnd(this, sceneProcessor_->GetFrameInfo());
 }
 
-SharedPtr<RenderBuffer> RenderPipeline::CreateScreenBuffer(
+/*SharedPtr<RenderBuffer> RenderPipeline::CreateScreenBuffer(
     const TextureRenderBufferParams& params, const Vector2& sizeMultiplier)
 {
     return MakeShared<TextureRenderBuffer>(this, params, sizeMultiplier, IntVector2::ZERO, false);
@@ -948,7 +949,7 @@ SharedPtr<RenderBuffer> RenderPipeline::CreatePersistentFixedScreenBuffer(
     const TextureRenderBufferParams& params, const IntVector2& fixedSize)
 {
     return MakeShared<TextureRenderBuffer>(this, params, Vector2::ONE, fixedSize, true);
-}
+}*/
 
 unsigned RenderPipeline::RecalculatePipelineStateHash() const
 {

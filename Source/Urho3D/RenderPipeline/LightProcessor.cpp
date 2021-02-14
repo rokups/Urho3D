@@ -126,6 +126,23 @@ ea::fixed_vector<FloatRange, MAX_CASCADE_SPLITS> GetActiveSplits(Light* light, f
     return result;
 }
 
+/// Return lower bound of distance from light to camera.
+float EstimateDistanceToCamera(Camera* cullCamera, Light* light)
+{
+    const Vector3 cameraPos = cullCamera->GetNode()->GetWorldPosition();
+    switch (light->GetLightType())
+    {
+    case LIGHT_DIRECTIONAL:
+        return 0.0f;
+    case LIGHT_POINT:
+        return Sphere(light->GetNode()->GetWorldPosition(), light->GetRange() * 1.25f).Distance(cameraPos);
+    case LIGHT_SPOT:
+        return light->GetFrustum().Distance(cameraPos);
+    default:
+        return 0.0f;
+    }
+}
+
 }
 
 LightProcessor::LightProcessor(Light* light)
@@ -139,9 +156,6 @@ LightProcessor::~LightProcessor()
 
 void LightProcessor::BeginUpdate(DrawableProcessor* drawableProcessor, LightProcessorCallback* callback)
 {
-    // Always clear pipeline state
-    MarkPipelineStateHashDirty();
-
     // Clear temporary containers
     litGeometries_.clear();
     shadowCasterCandidates_.clear();
@@ -178,6 +192,9 @@ void LightProcessor::Update(DrawableProcessor* drawableProcessor)
     Camera* cullCamera = frameInfo.cullCamera_;
     const LightType lightType = light_->GetLightType();
 
+    // Check if light volume contains camera
+    overlapsCamera_ = EstimateDistanceToCamera(cullCamera, light_) < cullCamera->GetNearClip() * 2.0f;
+
     // Query lit geometries (and shadow casters for spot and point lights)
     switch (lightType)
     {
@@ -197,6 +214,7 @@ void LightProcessor::Update(DrawableProcessor* drawableProcessor)
     }
     case LIGHT_DIRECTIONAL:
     {
+        overlapsCamera_ = true;
         // TODO(renderer): Skip if unlit
         const unsigned lightMask = light_->GetLightMask();
         for (Drawable* drawable : drawableProcessor->GetVisibleGeometries())
@@ -262,6 +280,7 @@ void LightProcessor::EndUpdate(DrawableProcessor* drawableProcessor, LightProces
 
     // TODO(renderer): Fill second parameter
     Camera* cullCamera = drawableProcessor->GetFrameInfo().cullCamera_;
+    UpdateHashes();
     CookShaderParameters(cullCamera, 0.0f);
 }
 
@@ -466,20 +485,24 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
     }*/
 }
 
-unsigned LightProcessor::RecalculatePipelineStateHash() const
+void LightProcessor::UpdateHashes()
 {
     const BiasParameters& biasParameters = light_->GetShadowBias();
 
-    // TODO(renderer): Extract into pipeline state factory
-    unsigned hash = 0;
-    hash |= light_->GetLightType() & 0x3;
-    hash |= static_cast<unsigned>(numActiveSplits_ != 0) << 2;
-    hash |= static_cast<unsigned>(!!light_->GetShapeTexture()) << 3;
-    hash |= static_cast<unsigned>(light_->GetSpecularIntensity() > 0.0f) << 4;
-    hash |= static_cast<unsigned>(biasParameters.normalOffset_ > 0.0f) << 5;
-    CombineHash(hash, biasParameters.constantBias_);
-    CombineHash(hash, biasParameters.slopeScaledBias_);
-    return hash;
+    unsigned commonHash = 0;
+    CombineHash(commonHash, light_->GetLightType());
+    CombineHash(commonHash, HasShadow());
+    CombineHash(commonHash, !!light_->GetShapeTexture());
+    CombineHash(commonHash, light_->GetSpecularIntensity() > 0.0f);
+    CombineHash(commonHash, biasParameters.normalOffset_ > 0.0f);
+    CombineHash(commonHash, biasParameters.constantBias_);
+    CombineHash(commonHash, biasParameters.slopeScaledBias_);
+    CombineHash(commonHash, light_->GetLightMaskEffective() & PORTABLE_LIGHTMASK);
+
+    forwardHash_ = commonHash;
+
+    lightVolumeHash_ = commonHash;
+    CombineHash(lightVolumeHash_, overlapsCamera_);
 }
 
 IntVector2 LightProcessor::GetSplitsGridSize() const

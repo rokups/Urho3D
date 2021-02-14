@@ -158,6 +158,60 @@ static ThreadSafeIndex persistentScreenBuffers;
 
 }
 
+SharedPtr<RenderBuffer> RenderBuffer::Create(RenderPipelineInterface* renderPipeline,
+    RenderBufferFlags flags, const Vector2& size, int multiSample)
+{
+    // Read flags
+    TextureRenderBufferParams params;
+    params.multiSample_ = multiSample;
+    params.sRGB_ = flags.Test(RenderBufferFlag::sRGB);
+    params.filtered_ = flags.Test(RenderBufferFlag::Filter);
+    params.cubemap_ = flags.Test(RenderBufferFlag::CubeMap);
+
+    const bool isDepth = flags.Test(RenderBufferFlag::Depth);
+    const bool isStencil = flags.Test(RenderBufferFlag::Stencil);
+    const bool isPersistent = flags.Test(RenderBufferFlag::Persistent);
+    const bool isWriteOnly = flags.Test(RenderBufferFlag::WriteOnly);
+    const bool isFixedSize = flags.Test(RenderBufferFlag::FixedSize);
+
+    const IntVector2 fixedSize = isFixedSize ? VectorRoundToInt(size) : IntVector2::ZERO;
+    const Vector2 sizeMultiplier = isFixedSize ? Vector2::ONE : size;
+
+    // Deduce texture format
+    if (isDepth || isStencil)
+    {
+        if (!isWriteOnly)
+        {
+            params.format_ = isStencil
+                ? Graphics::GetReadableDepthStencilFormat()
+                : Graphics::GetReadableDepthFormat();
+        }
+        else
+        {
+            params.format_ = Graphics::GetDepthStencilFormat();
+        }
+    }
+    else
+    {
+        params.format_ = Graphics::GetRGBAFormat();
+    }
+
+    if (!params.format_)
+        return nullptr;
+
+    return MakeShared<TextureRenderBuffer>(renderPipeline, params, sizeMultiplier, fixedSize, isPersistent);
+}
+
+SharedPtr<RenderBuffer> RenderBuffer::ConnectToViewportColor(RenderPipelineInterface* renderPipeline)
+{
+    return MakeShared<ViewportColorRenderBuffer>(renderPipeline);
+}
+
+SharedPtr<RenderBuffer> RenderBuffer::ConnectToViewportDepthStencil(RenderPipelineInterface* renderPipeline)
+{
+    return MakeShared<ViewportDepthStencilRenderBuffer>(renderPipeline);
+}
+
 RenderBuffer::RenderBuffer(RenderPipelineInterface* renderPipeline)
     : Object(renderPipeline->GetContext())
     , renderer_(GetSubsystem<Renderer>())

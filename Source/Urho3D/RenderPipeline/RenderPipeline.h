@@ -56,12 +56,12 @@ enum class AmbientMode
 };
 
 ///
-struct RenderPipelineSettings
+struct RenderPipelineSettings : public SceneProcessorSettings
 {
     ///
     AmbientMode ambientMode_{ AmbientMode::Flat };
     /// Whether to use deferred rendering.
-    bool deferred_{};
+    //bool deferred_{};
     /// Whether to apply gamma correction.
     bool gammaCorrection_{};
 };
@@ -97,7 +97,7 @@ public:
     DrawCommandQueue* GetDefaultDrawQueue() override { return drawQueue_; }
 
     /// Create transient viewport-scaled screen buffer owned by pipeline state.
-    SharedPtr<RenderBuffer> CreateScreenBuffer(
+    /*SharedPtr<RenderBuffer> CreateScreenBuffer(
         const TextureRenderBufferParams& params, const Vector2& sizeMultiplier = Vector2::ONE);
     /// Create transient fixed-sized screen buffer owned by pipeline state.
     SharedPtr<RenderBuffer> CreateFixedScreenBuffer(
@@ -107,7 +107,7 @@ public:
         const TextureRenderBufferParams& params, const Vector2& sizeMultiplier = Vector2::ONE);
     /// Create persistent fixed-sized screen buffer owned by pipeline state.
     SharedPtr<RenderBuffer> CreatePersistentFixedScreenBuffer(
-        const TextureRenderBufferParams& params, const IntVector2& fixedSize);
+        const TextureRenderBufferParams& params, const IntVector2& fixedSize);*/
 
 protected:
     /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
@@ -129,6 +129,8 @@ private:
     Renderer* renderer_{};
     WorkQueue* workQueue_{};
 
+    /// Pipeline settings from previous frame.
+    RenderPipelineSettings previousSettings_;
     /// Current pipeline settings.
     RenderPipelineSettings settings_;
     /// Current frame info.
