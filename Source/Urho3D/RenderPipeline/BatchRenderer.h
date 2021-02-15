@@ -23,16 +23,19 @@
 #pragma once
 
 #include "../Core/Object.h"
-// TODO(renderer): We don't need this include
-#include "../RenderPipeline/PipelineBatchSortKey.h"
+#include "../Graphics/GraphicsDefs.h"
 
 #include <EASTL/span.h>
 
 namespace Urho3D
 {
 
+class Camera;
 class DrawCommandQueue;
 class DrawableProcessor;
+class Texture;
+struct PipelineBatchBackToFront;
+struct PipelineBatchByState;
 
 /// Batch rendering flags.
 enum class BatchRenderFlag
@@ -87,30 +90,7 @@ public:
     void RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera* camera,
         const LightVolumeRenderContext& ctx, ea::span<const PipelineBatchByState> batches);
 
-    /// Render unlit base batches. Safe to call from worker thread.
-    void RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
-        Camera* camera, Zone* zone, ea::span<const PipelineBatchByState> batches);
-    /// Render lit base batches. Safe to call from worker thread.
-    void RenderLitBaseBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
-        Camera* camera, Zone* zone, ea::span<const PipelineBatchByState> batches);
-    /// Render light batches. Safe to call from worker thread.
-    //void RenderLightBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
-    //    Camera* camera, Zone* zone, ea::span<const LightBatchSortedByState> batches);
-    /// Render unlit and lit alpha batches. Safe to call from worker thread.
-    void RenderAlphaBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
-        Camera* camera, Zone* zone, ea::span<const PipelineBatchBackToFront> batches);
-    /// Render shadow batches. Safe to call from worker thread.
-    void RenderShadowBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
-        Camera* camera, Zone* zone, ea::span<const PipelineBatchByState> batches);
-
 private:
-    /// Render generic batches.
-    template <bool HasLight, class BatchType>
-    void RenderBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
-        Camera* camera, Zone* zone, ea::span<const BatchType> batches);
-
-    /// Graphics subsystem.
-    Graphics* graphics_{};
     /// Renderer subsystem.
     Renderer* renderer_{};
 

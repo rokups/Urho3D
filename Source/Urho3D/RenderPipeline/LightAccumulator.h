@@ -47,11 +47,12 @@ struct LightAccumulatorContext
 };
 
 /// Accumulated light for forward rendering.
-/// MaxPixelLights: Max number of per-pixel lights supported. Important lights may override this limit.
-/// MaxVertexLights: Max number of per-vertex lights supported. Actual limit may be lower.
-template <unsigned MaxPixelLights, unsigned MaxVertexLights>
-struct LightAccumulatorBase
+struct LightAccumulator
 {
+    /// Hint: Max number of per-pixel lights.
+    static const unsigned MaxPixelLights = 4;
+    /// Hint: Max number of per-vertex lights.
+    static const unsigned MaxVertexLights = 4;
     /// Max number of lights that don't require allocations.
     static const unsigned NumElements = ea::max(MaxPixelLights + 1, 4u) + MaxVertexLights;
     /// Container for lights.
@@ -123,13 +124,5 @@ struct LightAccumulatorBase
     /// First vertex light.
     unsigned firstVertexLight_{};
 };
-
-/// Default light accumulator.
-using LightAccumulator = LightAccumulatorBase<4, 4>;
-
-// TODO(renderer): Remove me
-using DrawableLightDataAccumulationContext = LightAccumulatorContext;
-template <unsigned MaxPixelLights, unsigned MaxVertexLights>
-using DrawableLightAccumulator = LightAccumulatorBase<MaxPixelLights, MaxVertexLights>;
 
 }

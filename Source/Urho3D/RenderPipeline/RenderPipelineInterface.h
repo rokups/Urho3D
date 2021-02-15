@@ -23,7 +23,7 @@
 #pragma once
 
 #include "../Core/Signal.h"
-#include "../RenderPipeline/SceneBatchCollectorCallback.h"
+#include "../RenderPipeline/BatchStateCache.h"
 #include "../RenderPipeline/LightProcessor.h"
 #include "../Scene/Serializable.h"
 

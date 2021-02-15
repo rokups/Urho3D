@@ -31,63 +31,6 @@
 namespace Urho3D
 {
 
-/// Intermediate batch that may map onto one or many actual batches.
-//using IntermediateSceneBatch = GeometryBatch;
-/*struct IntermediateSceneBatch
-{
-    /// Geometry.
-    Drawable* geometry_{};
-    /// Index of source batch within geometry.
-    unsigned sourceBatchIndex_{};
-    /// Base material pass.
-    Pass* basePass_{};
-    /// Additional material pass for forward rendering.
-    Pass* additionalPass_{};
-};*/
-
-/// Base or lit base scene batch for specific sub-pass.
-// TODO(renderer): Sort by vertex lights
-//using PipelineBatch = PipelineBatch;
-/*struct PipelineBatch
-{
-    /// Light index (if applicable).
-    unsigned lightIndex_{ M_MAX_UNSIGNED };
-    /// Drawable index.
-    unsigned drawableIndex_{};
-    /// Source batch index.
-    unsigned sourceBatchIndex_{};
-    /// Geometry type used.
-    GeometryType geometryType_{};
-    /// Drawable to be rendered.
-    Drawable* drawable_{};
-    /// Geometry to be rendered.
-    Geometry* geometry_{};
-    /// Material to be rendered.
-    Material* material_{};
-    /// Material pass to be rendered.
-    Pass* pass_{};
-    /// Pipeline state.
-    PipelineState* pipelineState_{};
-
-    /// Construct default.
-    PipelineBatch() = default;
-    /// Construct from intermediate batch.
-    PipelineBatch(unsigned lightIndex, const IntermediateSceneBatch& intermediateBatch, Material* defaultMaterial)
-        : lightIndex_(lightIndex)
-        , drawableIndex_(intermediateBatch.geometry_->GetDrawableIndex())
-        , sourceBatchIndex_(intermediateBatch.sourceBatchIndex_)
-        , drawable_(intermediateBatch.geometry_)
-        , pass_(intermediateBatch.basePass_)
-    {
-        const SourceBatch& sourceBatch = GetSourceBatch();
-        geometryType_ = sourceBatch.geometryType_;
-        geometry_ = sourceBatch.geometry_;
-        material_ = sourceBatch.material_ ? sourceBatch.material_ : defaultMaterial;
-    }
-    /// Return source batch.
-    const SourceBatch& GetSourceBatch() const { return drawable_->GetBatches()[sourceBatchIndex_]; }
-};*/
-
 /// Scene batch sorted by pipeline state, material and geometry. Also sorted front to back.
 // TODO(renderer): Maybe sort by light as well?
 struct PipelineBatchByState
@@ -173,44 +116,6 @@ struct PipelineBatchBackToFront
             return renderOrder_ < rhs.renderOrder_;
         return distance_ > rhs.distance_;
     }
-};
-
-/// Light batch sorted by light, pipeline state, material and geometry.
-/*struct LightBatchSortedByState : public PipelineBatchByState
-{
-    /// Index of light in the array of visible lights.
-    unsigned lightIndex_{ M_MAX_UNSIGNED };
-
-    /// Construct default.
-    LightBatchSortedByState() = default;
-
-    /// Construct from batch.
-    explicit LightBatchSortedByState(const PipelineBatch* lightBatch)
-        : PipelineBatchByState(lightBatch)
-        , lightIndex_(lightBatch->lightIndex_)
-    {
-    }
-
-    /// Compare sorted batches.
-    bool operator < (const LightBatchSortedByState& rhs) const
-    {
-        if (lightIndex_ != rhs.lightIndex_)
-            return lightIndex_ < rhs.lightIndex_;
-        if (pipelineStateKey_ != rhs.pipelineStateKey_)
-            return pipelineStateKey_ < rhs.pipelineStateKey_;
-        return materialGeometryKey_ < rhs.materialGeometryKey_;
-    }
-};*/
-
-/// Light volume batch.
-struct LightVolumeBatch
-{
-    /// Light index.
-    unsigned lightIndex_{ M_MAX_UNSIGNED };
-    /// Light geometry.
-    Geometry* geometry_{};
-    /// Pipeline state.
-    PipelineState* pipelineState_{};
 };
 
 }

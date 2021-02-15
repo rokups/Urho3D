@@ -96,28 +96,9 @@ public:
     /// Return default draw queue. Is not automatically executed.
     DrawCommandQueue* GetDefaultDrawQueue() override { return drawQueue_; }
 
-    /// Create transient viewport-scaled screen buffer owned by pipeline state.
-    /*SharedPtr<RenderBuffer> CreateScreenBuffer(
-        const TextureRenderBufferParams& params, const Vector2& sizeMultiplier = Vector2::ONE);
-    /// Create transient fixed-sized screen buffer owned by pipeline state.
-    SharedPtr<RenderBuffer> CreateFixedScreenBuffer(
-        const TextureRenderBufferParams& params, const IntVector2& fixedSize);
-    /// Create persistent viewport-sized screen buffer owned by pipeline state.
-    SharedPtr<RenderBuffer> CreatePersistentScreenBuffer(
-        const TextureRenderBufferParams& params, const Vector2& sizeMultiplier = Vector2::ONE);
-    /// Create persistent fixed-sized screen buffer owned by pipeline state.
-    SharedPtr<RenderBuffer> CreatePersistentFixedScreenBuffer(
-        const TextureRenderBufferParams& params, const IntVector2& fixedSize);*/
-
 protected:
     /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
     unsigned RecalculatePipelineStateHash() const override;
-
-    bool IsLightShadowed(Light* light);
-    ShadowMap AllocateTransientShadowMap(const IntVector2& size);
-
-    bool HasShadow(Light* light);
-    ShadowMap GetTemporaryShadowMap(const IntVector2& size);
 
     SharedPtr<PipelineState> CreateBatchPipelineState(
         const BatchStateCreateKey& key, const BatchStateCreateContext& ctx) override;
@@ -158,12 +139,6 @@ private:
     SharedPtr<RenderBuffer> deferredNormal_;
     SharedPtr<RenderBuffer> deferredDepth_;
 
-    //ea::vector<Drawable*> occluders_;
-    //ea::vector<Drawable*> drawables_;
-    //SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
-    //SharedPtr<DrawableProcessor> drawableProcessor_;
-    //SharedPtr<BatchCompositor> batchCompositor_;
-    //SharedPtr<SceneBatchCollector> sceneBatchCollector_;
     SharedPtr<BatchRenderer> sceneBatchRenderer_;
     SharedPtr<OcclusionBuffer> occlusionBuffer_;
 

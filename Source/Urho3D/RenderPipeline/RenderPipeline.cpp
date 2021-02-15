@@ -36,7 +36,6 @@
 #include "../Graphics/Viewport.h"
 #include "../RenderPipeline/RenderPipeline.h"
 #include "../RenderPipeline/DrawableProcessor.h"
-#include "../RenderPipeline/SceneBatchCollector.h"
 #include "../RenderPipeline/BatchRenderer.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
 #include "../Scene/Scene.h"
@@ -61,74 +60,6 @@ namespace Urho3D
 
 namespace
 {
-
-/// %Frustum octree query for occluders.
-class OccluderOctreeQuery : public FrustumOctreeQuery
-{
-public:
-    /// Construct with frustum and query parameters.
-    OccluderOctreeQuery(ea::vector<Drawable*>& result, const Frustum& frustum, unsigned viewMask = DEFAULT_VIEWMASK) :
-        FrustumOctreeQuery(result, frustum, DRAWABLE_GEOMETRY, viewMask)
-    {
-    }
-
-    /// Intersection test for drawables.
-    void TestDrawables(Drawable** start, Drawable** end, bool inside) override
-    {
-        for (Drawable* drawable : MakeIteratorRange(start, end))
-        {
-            const DrawableFlags flags = drawable->GetDrawableFlags();
-            if (flags == DRAWABLE_GEOMETRY && drawable->IsOccluder() && (drawable->GetViewMask() & viewMask_))
-            {
-                if (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()))
-                    result_.push_back(drawable);
-            }
-        }
-    }
-};
-
-/// %Frustum octree query with occlusion.
-class OccludedFrustumOctreeQuery : public FrustumOctreeQuery
-{
-public:
-    /// Construct with frustum, occlusion buffer and query parameters.
-    OccludedFrustumOctreeQuery(ea::vector<Drawable*>& result, const Frustum& frustum, OcclusionBuffer* buffer,
-                               DrawableFlags drawableFlags = DRAWABLE_ANY, unsigned viewMask = DEFAULT_VIEWMASK) :
-        FrustumOctreeQuery(result, frustum, drawableFlags, viewMask),
-        buffer_(buffer)
-    {
-    }
-
-    /// Intersection test for an octant.
-    Intersection TestOctant(const BoundingBox& box, bool inside) override
-    {
-        if (inside)
-            return buffer_->IsVisible(box) ? INSIDE : OUTSIDE;
-        else
-        {
-            Intersection result = frustum_.IsInside(box);
-            if (result != OUTSIDE && !buffer_->IsVisible(box))
-                result = OUTSIDE;
-            return result;
-        }
-    }
-
-    /// Intersection test for drawables. Note: drawable occlusion is performed later in worker threads.
-    void TestDrawables(Drawable** start, Drawable** end, bool inside) override
-    {
-        for (Drawable* drawable : MakeIteratorRange(start, end))
-        {
-            if ((drawable->GetDrawableFlags() & drawableFlags_) && (drawable->GetViewMask() & viewMask_))
-            {
-                if (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()))
-                    result_.push_back(drawable);
-            }
-        }
-    }
-
-    /// Occlusion buffer.
-    OcclusionBuffer* buffer_;
-};
 
 enum class SampleConversionType
 {
@@ -578,34 +509,6 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
     return renderer_->GetOrCreatePipelineState(desc);
 }
 
-bool RenderPipeline::HasShadow(Light* light) { return IsLightShadowed(light); }
-
-bool RenderPipeline::IsLightShadowed(Light* light)
-{
-    const bool shadowsEnabled = renderer_->GetDrawShadows()
-        && light->GetCastShadows()
-        && light->GetLightImportance() != LI_NOT_IMPORTANT
-        && light->GetShadowIntensity() < 1.0f;
-
-    if (!shadowsEnabled)
-        return false;
-
-    if (light->GetShadowDistance() > 0.0f && light->GetDistance() > light->GetShadowDistance())
-        return false;
-
-    return true;
-}
-
-/*ShadowMap RenderPipeline::AllocateTransientShadowMap(const IntVector2& size)
-{
-    return shadowMapAllocator_->AllocateShadowMap(size);
-}
-
-ShadowMap RenderPipeline::GetTemporaryShadowMap(const IntVector2& size)
-{
-    return shadowMapAllocator_->AllocateShadowMap(size);
-}*/
-
 bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 {
     if (!sceneProcessor_)
@@ -618,20 +521,6 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         return false;
 
     Camera* camera = viewport->GetCamera();
-
-    /*frameInfo_.viewport_ = viewport;
-    frameInfo_.renderTarget_ = renderTarget;
-
-    frameInfo_.scene_ = viewport->GetScene();
-    frameInfo_.camera_ = viewport->GetCamera();
-    frameInfo_.cullCamera_ = viewport->GetCullCamera() ? viewport->GetCullCamera() : frameInfo_.camera_;
-    frameInfo_.octree_ = frameInfo_.scene_ ? frameInfo_.scene_->GetComponent<Octree>() : nullptr;
-
-    frameInfo_.viewRect_ = viewport->GetEffectiveRect(renderTarget);
-    frameInfo_.viewSize_ = frameInfo_.viewRect_.Size();
-
-    if (!frameInfo_.camera_ || !frameInfo_.octree_)
-        return false;*/
 
     // TODO(renderer): Optimize this
     previousSettings_ = settings_;
@@ -646,17 +535,11 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
     if (!drawQueue_)
     {
         drawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
-        //sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow");
 
         cameraProcessor_ = MakeShared<CameraProcessor>(this);
-        viewportColor_ = RenderBuffer::ConnectToViewportColor(this);// MakeShared<ViewportColorRenderBuffer>(this);
-        viewportDepth_ = RenderBuffer::ConnectToViewportDepthStencil(this);// MakeShared<ViewportDepthStencilRenderBuffer>(this);
+        viewportColor_ = RenderBuffer::ConnectToViewportColor(this);
+        viewportDepth_ = RenderBuffer::ConnectToViewportDepthStencil(this);
 
-        //drawableProcessor_ = MakeShared<DrawableProcessor>(this);
-        //batchCompositor_ = MakeShared<BatchCompositor>(this, drawableProcessor_, Technique::GetPassIndex("shadow"));
-        //sceneBatchCollector_ = MakeShared<SceneBatchCollector>(context_, drawableProcessor_, batchCompositor_, this);
-
-        //shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
         sceneBatchRenderer_ = MakeShared<BatchRenderer>(context_, sceneProcessor_->GetDrawableProcessor());
     }
 
@@ -669,7 +552,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
     {
         basePass_ = nullptr;
         alphaPass_ = nullptr;
-        deferredPass_ = MakeShared<UnlitScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "PASS_DEFERRED", "deferred");
+        deferredPass_ = MakeShared<UnlitScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "deferred");
 
         deferredFinal_ = RenderBuffer::Create(this, RenderBufferFlag::RGBA);
         deferredAlbedo_ = RenderBuffer::Create(this, RenderBufferFlag::RGBA);
@@ -677,16 +560,12 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         deferredDepth_ = RenderBuffer::Create(this, RenderBufferFlag::Depth | RenderBufferFlag::Stencil);
 
         sceneProcessor_->SetPasses({ deferredPass_ });
-        //batchCompositor_->SetPasses({ deferredPass_ });
-
-        //sceneBatchCollector_->ResetPasses();
-        //sceneBatchCollector_->AddScenePass(deferredPass_);
     }
 
     if (!settings_.deferred_ && !basePass_)
     {
-        basePass_ = MakeShared<OpaqueForwardLightingScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "PASS_BASE", "base", "litbase", "light");
-        alphaPass_ = MakeShared<AlphaForwardLightingScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "PASS_ALPHA", "alpha", "alpha", "litalpha");
+        basePass_ = MakeShared<OpaqueForwardLightingScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "base", "litbase", "light");
+        alphaPass_ = MakeShared<AlphaForwardLightingScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "alpha", "alpha", "litalpha");
         deferredPass_ = nullptr;
 
         deferredFinal_ = nullptr;
@@ -695,11 +574,6 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         deferredDepth_ = nullptr;
 
         sceneProcessor_->SetPasses({ basePass_, alphaPass_ });
-        //batchCompositor_->SetPasses({ basePass_, alphaPass_ });
-
-        //sceneBatchCollector_->ResetPasses();
-        //sceneBatchCollector_->AddScenePass(basePass_);
-        //sceneBatchCollector_->AddScenePass(alphaPass_);
     }
 
     return true;
@@ -718,31 +592,10 @@ void RenderPipeline::Update(const FrameInfo& frameInfo)
 
     // Update scene and batches
     sceneProcessor_->UpdateFrameInfo(frameInfo);
-    // TODO(renderer): Move to event
-    //shadowMapAllocator_->Reset();
-
-    // Setup frame info
-    /*frameInfo_.timeStep_ = frameInfo.timeStep_;
-    frameInfo_.frameNumber_ = frameInfo.frameNumber_;
-    frameInfo_.numThreads_ = workQueue_->GetNumThreads() + 1;*/
-
-    // Begin update event
     OnUpdateBegin(this, sceneProcessor_->GetFrameInfo());
+
     sceneProcessor_->Update();
 
-    // Collect occluders
-    // TODO(renderer): Make optional
-    /*OccluderOctreeQuery occluderQuery(occluders_,
-        frameInfo_.cullCamera_->GetFrustum(), frameInfo_.cullCamera_->GetViewMask());
-    frameInfo_.octree_->GetDrawables(occluderQuery);
-
-    // Collect visible drawables
-    // TODO(renderer): Add occlusion culling
-    FrustumOctreeQuery drawableQuery(drawables_, frameInfo_.cullCamera_->GetFrustum(),
-        DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, frameInfo_.cullCamera_->GetViewMask());
-    frameInfo_.octree_->GetDrawables(drawableQuery);*/
-
-    // End update event
     OnUpdateEnd(this, sceneProcessor_->GetFrameInfo());
 }
 
@@ -752,82 +605,6 @@ void RenderPipeline::Render()
 
     // TODO(renderer): Do something about this hack
     graphics_->SetVertexBuffer(nullptr);
-
-    //viewport_->BeginFrame();
-    //shadowMapAllocator_->Reset();
-
-    // Collect and process occluders
-    // TODO(renderer): Fix me
-#if 0
-    const unsigned maxOccluderTriangles_ = renderer_->GetMaxOccluderTriangles();
-    unsigned activeOccluders_ = 0;
-    if (maxOccluderTriangles_ > 0 && occluders.size() > 0)
-    {
-        //UpdateOccluders(occluders_, cullCamera_);
-        occlusionBuffer_ = MakeShared<OcclusionBuffer>(context_);
-        occlusionBuffer_->SetSize(256, 256, true);
-        occlusionBuffer_->SetView(frameInfo_.cullCamera_);
-        occlusionBuffer_->SetMaxTriangles((unsigned)maxOccluderTriangles_);
-        occlusionBuffer_->Clear();
-
-        if (!occlusionBuffer_->IsThreaded())
-        {
-            // If not threaded, draw occluders one by one and test the next occluder against already rasterized depth
-            for (unsigned i = 0; i < occluders.size(); ++i)
-            {
-                Drawable* occluder = occluders[i];
-                if (i > 0)
-                {
-                    // For subsequent occluders, do a test against the pixel-level occlusion occlusionBuffer_ to see if rendering is necessary
-                    if (!occlusionBuffer_->IsVisible(occluder->GetWorldBoundingBox()))
-                        continue;
-                }
-
-                // Check for running out of triangles
-                ++activeOccluders_;
-                bool success = occluder->DrawOcclusion(occlusionBuffer_);
-                // Draw triangles submitted by this occluder
-                occlusionBuffer_->DrawTriangles();
-                if (!success)
-                    break;
-            }
-        }
-        else
-        {
-            // In threaded mode submit all triangles first, then render (cannot test in this case)
-            for (unsigned i = 0; i < occluders.size(); ++i)
-            {
-                // Check for running out of triangles
-                ++activeOccluders_;
-                if (!occluders[i]->DrawOcclusion(occlusionBuffer_))
-                    break;
-            }
-
-            occlusionBuffer_->DrawTriangles();
-        }
-
-        // Finally build the depth mip levels
-        occlusionBuffer_->BuildDepthHierarchy();
-    }
-#endif
-
-    // Process batches
-    /*static ScenePassDescription passes[] = {
-        { ScenePassType::ForwardLitBase,   "base",  "litbase",  "light" },
-        { ScenePassType::ForwardUnlitBase, "alpha", "",         "litalpha" },
-        { ScenePassType::Unlit, "postopaque" },
-        { ScenePassType::Unlit, "refract" },
-        { ScenePassType::Unlit, "postalpha" },
-    };*/
-    /*sceneBatchCollector_->SetMaxPixelLights(4);
-
-    sceneBatchCollector_->BeginFrame(frameInfo_, *this);
-    sceneBatchCollector_->ProcessVisibleDrawables(drawables_);
-    sceneBatchCollector_->ProcessVisibleLights();
-    sceneBatchCollector_->UpdateGeometries();
-    sceneBatchCollector_->CollectSceneBatches();
-    if (settings_.deferred_)
-        sceneBatchCollector_->CollectLightVolumeBatches();*/
 
     // Collect batches
     static thread_local ea::vector<PipelineBatchByState> shadowBatches;
@@ -892,7 +669,7 @@ void RenderPipeline::Render()
 
         drawQueue_->Reset();
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            BatchRenderFlag::AmbientAndVertexLights | BatchRenderFlag::PixelLight, basePass_->GetSortedLitBaseBatches());
+            BatchRenderFlag::AmbientAndVertexLights | BatchRenderFlag::PixelLight, basePass_->GetSortedBaseBatches());
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
             BatchRenderFlag::PixelLight, basePass_->GetSortedLightBatches());
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
@@ -932,30 +709,6 @@ void RenderPipeline::Render()
     }
     OnRenderEnd(this, sceneProcessor_->GetFrameInfo());
 }
-
-/*SharedPtr<RenderBuffer> RenderPipeline::CreateScreenBuffer(
-    const TextureRenderBufferParams& params, const Vector2& sizeMultiplier)
-{
-    return MakeShared<TextureRenderBuffer>(this, params, sizeMultiplier, IntVector2::ZERO, false);
-}
-
-SharedPtr<RenderBuffer> RenderPipeline::CreateFixedScreenBuffer(
-    const TextureRenderBufferParams& params, const IntVector2& fixedSize)
-{
-    return MakeShared<TextureRenderBuffer>(this, params, Vector2::ONE, fixedSize, false);
-}
-
-SharedPtr<RenderBuffer> RenderPipeline::CreatePersistentScreenBuffer(
-    const TextureRenderBufferParams& params, const Vector2& sizeMultiplier)
-{
-    return MakeShared<TextureRenderBuffer>(this, params, sizeMultiplier, IntVector2::ZERO, true);
-}
-
-SharedPtr<RenderBuffer> RenderPipeline::CreatePersistentFixedScreenBuffer(
-    const TextureRenderBufferParams& params, const IntVector2& fixedSize)
-{
-    return MakeShared<TextureRenderBuffer>(this, params, Vector2::ONE, fixedSize, true);
-}*/
 
 unsigned RenderPipeline::RecalculatePipelineStateHash() const
 {
