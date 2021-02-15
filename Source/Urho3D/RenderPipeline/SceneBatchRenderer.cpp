@@ -25,6 +25,7 @@
 #include "../Core/Context.h"
 #include "../IO/Log.h"
 #include "../Graphics/Camera.h"
+#include "../Graphics/DrawCommandQueue.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/Renderer.h"
@@ -134,19 +135,370 @@ void AddCameraShaderParameters(DrawCommandQueue& drawQueue, const Camera* camera
     drawQueue.AddShaderParameter(PSP_FOGPARAMS, GetFogParameter(camera));
 }
 
+/// Batch renderer to command queue.
+// TODO(renderer): Add template parameter to avoid branching?
+class DrawCommandCompositor : public NonCopyable
+{
+public:
+    /// Construct.
+    DrawCommandCompositor(DrawCommandQueue& drawQueue,
+        const DrawableProcessor& drawableProcessor, Camera* renderCamera, BatchRenderFlags flags)
+        : drawQueue_(drawQueue)
+        , enableAmbientAndVertexLights_(flags.Test(BatchRenderFlag::AmbientAndVertexLights))
+        , enablePixelLights_(flags.Test(BatchRenderFlag::PixelLight))
+        , enableLight_(enableAmbientAndVertexLights_ || enablePixelLights_)
+        , drawableProcessor_(drawableProcessor)
+        , frameInfo_(drawableProcessor_.GetFrameInfo())
+        , scene_(frameInfo_.scene_)
+        , lights_(drawableProcessor_.GetLightProcessors())
+        , camera_(renderCamera)
+        , cameraNode_(camera_->GetNode())
+    {
+    }
+
+    /// Convert scene batch to DrawCommandQueue commands.
+    void ProcessSceneBatch(const PipelineBatch& pipelineBatch)
+    {
+        ProcessBatch(pipelineBatch, pipelineBatch.GetSourceBatch());
+    }
+
+private:
+    /// Add Frame shader parameters.
+    void AddFrameShaderParameters()
+    {
+        drawQueue_.AddShaderParameter(VSP_DELTATIME, frameInfo_.timeStep_);
+        drawQueue_.AddShaderParameter(VSP_ELAPSEDTIME, scene_->GetElapsedTime());
+    }
+
+    /// Add Camera shader parameters.
+    void AddCameraShaderParameters(float constantDepthBias)
+    {
+        const Matrix3x4 cameraEffectiveTransform = camera_->GetEffectiveWorldTransform();
+        drawQueue_.AddShaderParameter(VSP_CAMERAPOS, cameraEffectiveTransform.Translation());
+        drawQueue_.AddShaderParameter(VSP_VIEWINV, cameraEffectiveTransform);
+        drawQueue_.AddShaderParameter(VSP_VIEW, camera_->GetView());
+        drawQueue_.AddShaderParameter(PSP_CAMERAPOS, cameraEffectiveTransform.Translation());
+
+        const float nearClip = camera_->GetNearClip();
+        const float farClip = camera_->GetFarClip();
+        drawQueue_.AddShaderParameter(VSP_NEARCLIP, nearClip);
+        drawQueue_.AddShaderParameter(VSP_FARCLIP, farClip);
+        drawQueue_.AddShaderParameter(PSP_NEARCLIP, nearClip);
+        drawQueue_.AddShaderParameter(PSP_FARCLIP, farClip);
+
+        drawQueue_.AddShaderParameter(VSP_DEPTHMODE, GetCameraDepthModeParameter(camera_));
+        drawQueue_.AddShaderParameter(PSP_DEPTHRECONSTRUCT, GetCameraDepthReconstructParameter(camera_));
+
+        Vector3 nearVector, farVector;
+        camera_->GetFrustumSize(nearVector, farVector);
+        drawQueue_.AddShaderParameter(VSP_FRUSTUMSIZE, farVector);
+
+        drawQueue_.AddShaderParameter(VSP_VIEWPROJ, camera_->GetEffectiveGPUViewProjection(constantDepthBias));
+
+        drawQueue_.AddShaderParameter(PSP_AMBIENTCOLOR, camera_->GetEffectiveAmbientColor());
+        drawQueue_.AddShaderParameter(PSP_FOGCOLOR, camera_->GetEffectiveFogColor());
+        drawQueue_.AddShaderParameter(PSP_FOGPARAMS, GetFogParameter(camera_));
+    }
+
+    /// Cache vertex lights data.
+    void CacheVertexLights(const LightAccumulator::VertexLightContainer& vertexLights)
+    {
+        for (unsigned i = 0; i < MAX_VERTEX_LIGHTS; ++i)
+        {
+            if (vertexLights[i] == M_MAX_UNSIGNED)
+            {
+                vertexLightsData_[i * 3] = {};
+                vertexLightsData_[i * 3 + 1] = {};
+                vertexLightsData_[i * 3 + 2] = {};
+            }
+            else
+            {
+                const LightShaderParameters& vertexLightParams = lights_[vertexLights[i]]->GetShaderParams();
+                vertexLightsData_[i * 3] = { vertexLightParams.color_, vertexLightParams.invRange_ };
+                vertexLightsData_[i * 3 + 1] = { vertexLightParams.direction_, vertexLightParams.cutoff_ };
+                vertexLightsData_[i * 3 + 2] = { vertexLightParams.position_, vertexLightParams.invCutoff_ };
+            }
+        }
+    }
+
+    /// Cache pixel light.
+    void CachePixelLight(unsigned lightIndex)
+    {
+        hasPixelLight_ = lightIndex != M_MAX_UNSIGNED;
+        lightParams_ = hasPixelLight_ ? &lights_[lightIndex]->GetShaderParams() : nullptr;
+    }
+
+    /// Add Light shader parameters.
+    void AddLightShaderParameters()
+    {
+        // Add vertex lights parameters
+        drawQueue_.AddShaderParameter(VSP_VERTEXLIGHTS, ea::span<const Vector4>{ vertexLightsData_ });
+
+        // Add pixel light parameters
+        if (!hasPixelLight_)
+            return;
+
+        drawQueue_.AddShaderParameter(VSP_LIGHTDIR, lightParams_->direction_);
+        drawQueue_.AddShaderParameter(VSP_LIGHTPOS,
+            Vector4{ lightParams_->position_, lightParams_->invRange_ });
+        drawQueue_.AddShaderParameter(PSP_LIGHTCOLOR,
+            Vector4{ lightParams_->color_, lightParams_->specularIntensity_ });
+
+        drawQueue_.AddShaderParameter(PSP_LIGHTRAD, lightParams_->radius_);
+        drawQueue_.AddShaderParameter(PSP_LIGHTLENGTH, lightParams_->length_);
+
+        if (lightParams_->numLightMatrices_ > 0)
+        {
+            ea::span<const Matrix4> shadowMatricesSpan{ lightParams_->lightMatrices_, lightParams_->numLightMatrices_ };
+            drawQueue_.AddShaderParameter(VSP_LIGHTMATRICES, shadowMatricesSpan);
+        }
+
+        if (lightParams_->shadowMap_)
+        {
+            drawQueue_.AddShaderParameter(PSP_SHADOWDEPTHFADE, lightParams_->shadowDepthFade_);
+            drawQueue_.AddShaderParameter(PSP_SHADOWINTENSITY, lightParams_->shadowIntensity_);
+            drawQueue_.AddShaderParameter(PSP_SHADOWMAPINVSIZE, lightParams_->shadowMapInvSize_);
+            drawQueue_.AddShaderParameter(PSP_SHADOWSPLITS, lightParams_->shadowSplits_);
+            drawQueue_.AddShaderParameter(PSP_SHADOWCUBEUVBIAS, lightParams_->shadowCubeUVBias_);
+            drawQueue_.AddShaderParameter(PSP_SHADOWCUBEADJUST, lightParams_->shadowCubeAdjust_);
+            drawQueue_.AddShaderParameter(VSP_NORMALOFFSETSCALE, lightParams_->normalOffsetScale_);
+            // TODO(renderer): Add VSM
+            //drawQueue_.AddShaderParameter(PSP_VSMSHADOWPARAMS, renderer_->GetVSMShadowParameters());
+        }
+    }
+
+    /// Convert PipelineBatch to DrawCommandQueue commands.
+    void ProcessBatch(const PipelineBatch& pipelineBatch, const SourceBatch& sourceBatch)
+    {
+        const LightAccumulator* lightAccumulator = enableAmbientAndVertexLights_
+            ? &drawableProcessor_.GetGeometryLighting(pipelineBatch.drawableIndex_)
+            : nullptr;
+
+        // Initialize pipeline state
+        drawQueue_.SetPipelineState(pipelineBatch.pipelineState_);
+
+        // Add frame shader parameters
+        if (drawQueue_.BeginShaderParameterGroup(SP_FRAME, frameDirty_))
+        {
+            AddFrameShaderParameters();
+            drawQueue_.CommitShaderParameterGroup(SP_FRAME);
+            frameDirty_ = false;
+        }
+
+        // Add camera shader parameters
+        const float constantDepthBias = pipelineBatch.pipelineState_->GetDesc().constantDepthBias_;
+        if (drawQueue_.BeginShaderParameterGroup(SP_CAMERA,
+            cameraDirty_ || lastConstantDepthBias_ != constantDepthBias))
+        {
+            AddCameraShaderParameters(constantDepthBias);
+            drawQueue_.CommitShaderParameterGroup(SP_CAMERA);
+            cameraDirty_ = false;
+            lastConstantDepthBias_ = constantDepthBias;
+        }
+
+        // Check if lights are dirty
+        bool pixelLightDirty = false;
+        if (enablePixelLights_)
+        {
+            pixelLightDirty = pipelineBatch.lightIndex_ != lastLightIndex_;
+
+            if (pixelLightDirty)
+            {
+                CachePixelLight(pipelineBatch.lightIndex_);
+                lastLightIndex_ = pipelineBatch.lightIndex_;
+            }
+        }
+
+        bool vertexLightsDirty = false;
+        if (enableAmbientAndVertexLights_)
+        {
+            vertexLights_ = lightAccumulator->GetVertexLights();
+            ea::sort(vertexLights_.begin(), vertexLights_.end());
+            vertexLightsDirty = lastVertexLights_ != vertexLights_;
+
+            if (vertexLightsDirty)
+            {
+                CacheVertexLights(vertexLights_);
+                lastVertexLights_ = vertexLights_;
+            }
+        }
+
+        // Add light shader parameters
+        if (enableLight_ && drawQueue_.BeginShaderParameterGroup(SP_LIGHT, pixelLightDirty || vertexLightsDirty))
+        {
+            AddLightShaderParameters();
+            drawQueue_.CommitShaderParameterGroup(SP_LIGHT);
+        }
+
+        // Check if material is dirty
+        bool materialDirty = false;
+        if (lastMaterial_ != pipelineBatch.material_)
+        {
+            materialDirty = true;
+            lastMaterial_ = pipelineBatch.material_;
+        }
+
+        // Add material shader parameters
+        if (drawQueue_.BeginShaderParameterGroup(SP_MATERIAL, materialDirty))
+        {
+            const auto& materialParameters = pipelineBatch.material_->GetShaderParameters();
+            for (const auto& parameter : materialParameters)
+                drawQueue_.AddShaderParameter(parameter.first, parameter.second.value_);
+            drawQueue_.CommitShaderParameterGroup(SP_MATERIAL);
+        }
+
+        // Add resources
+        // TODO(renderer): Don't check for pixelLightDirty, check for shadow map and ramp/shape only
+        if (materialDirty || pixelLightDirty)
+        {
+            // Add material resources
+            const auto& materialTextures = pipelineBatch.material_->GetTextures();
+            for (const auto& texture : materialTextures)
+                drawQueue_.AddShaderResource(texture.first, texture.second);
+
+            // Add light resources
+            if (hasPixelLight_)
+            {
+                drawQueue_.AddShaderResource(TU_LIGHTRAMP, lightParams_->lightRamp_);
+                drawQueue_.AddShaderResource(TU_LIGHTSHAPE, lightParams_->lightShape_);
+                if (lightParams_->shadowMap_)
+                    drawQueue_.AddShaderResource(TU_SHADOWMAP, lightParams_->shadowMap_);
+            }
+
+            drawQueue_.CommitShaderResources();
+        }
+
+        // Add object shader parameters
+        if (drawQueue_.BeginShaderParameterGroup(SP_OBJECT, true))
+        {
+            // Add ambient light parameters
+            if (enableAmbientAndVertexLights_)
+            {
+                const SphericalHarmonicsDot9& sh = lightAccumulator->sh_;
+                drawQueue_.AddShaderParameter(VSP_SHAR, sh.Ar_);
+                drawQueue_.AddShaderParameter(VSP_SHAG, sh.Ag_);
+                drawQueue_.AddShaderParameter(VSP_SHAB, sh.Ab_);
+                drawQueue_.AddShaderParameter(VSP_SHBR, sh.Br_);
+                drawQueue_.AddShaderParameter(VSP_SHBG, sh.Bg_);
+                drawQueue_.AddShaderParameter(VSP_SHBB, sh.Bb_);
+                drawQueue_.AddShaderParameter(VSP_SHC, sh.C_);
+                drawQueue_.AddShaderParameter(VSP_AMBIENT, Vector4(sh.EvaluateAverage(), 1.0f));
+            }
+
+            // Add transform parameters
+            const SourceBatch& sourceBatch = pipelineBatch.GetSourceBatch();
+            switch (pipelineBatch.geometryType_)
+            {
+            case GEOM_INSTANCED:
+                // TODO(renderer): Implement instancing
+                assert(0);
+                break;
+            case GEOM_SKINNED:
+                drawQueue_.AddShaderParameter(VSP_SKINMATRICES,
+                    ea::span<const Matrix3x4>(sourceBatch.worldTransform_, sourceBatch.numWorldTransforms_));
+                break;
+            case GEOM_BILLBOARD:
+                drawQueue_.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
+                if (sourceBatch.numWorldTransforms_ > 1)
+                    drawQueue_.AddShaderParameter(VSP_BILLBOARDROT, sourceBatch.worldTransform_[1].RotationMatrix());
+                else
+                    drawQueue_.AddShaderParameter(VSP_BILLBOARDROT, cameraNode_->GetWorldRotation().RotationMatrix());
+                break;
+            default:
+                drawQueue_.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
+                break;
+            }
+            drawQueue_.CommitShaderParameterGroup(SP_OBJECT);
+        }
+
+        // Set buffers and draw
+        drawQueue_.SetBuffers(pipelineBatch.geometry_->GetVertexBuffers(), pipelineBatch.geometry_->GetIndexBuffer());
+        drawQueue_.DrawIndexed(pipelineBatch.geometry_->GetIndexStart(), pipelineBatch.geometry_->GetIndexCount());
+    }
+
+    /// Destination draw queue.
+    DrawCommandQueue& drawQueue_;
+
+    /// Export ambient light and vertex lights
+    const bool enableAmbientAndVertexLights_;
+    /// Export pixel light
+    const bool enablePixelLights_;
+    /// Export light of any kind
+    const bool enableLight_;
+
+    /// Drawable processor.
+    const DrawableProcessor& drawableProcessor_;
+    /// Frame info.
+    const FrameInfo& frameInfo_;
+    /// Scene.
+    const Scene* scene_{};
+    /// Light array for indexing.
+    const ea::vector<LightProcessor*>& lights_;
+    /// Render camera.
+    const Camera* camera_{};
+    /// Render camera node.
+    const Node* cameraNode_{};
+
+    /// Whether frame shader parameters are dirty.
+    bool frameDirty_{ true };
+    /// Whether camera shader parameters are dirty.
+    bool cameraDirty_{ true };
+    /// Last used constant depth bias. Ignored on first frame.
+    float lastConstantDepthBias_{ 0.0f };
+
+    /// Last used pixel light.
+    unsigned lastLightIndex_{ M_MAX_UNSIGNED };
+    /// Whether pixel light is active.
+    bool hasPixelLight_{};
+    /// Pixel light paramters.
+    const LightShaderParameters* lightParams_{};
+
+    /// Last used vertex lights.
+    LightAccumulator::VertexLightContainer lastVertexLights_{};
+    /// Current vertex lights.
+    LightAccumulator::VertexLightContainer vertexLights_{};
+    /// Cached vertex lights data.
+    Vector4 vertexLightsData_[MAX_VERTEX_LIGHTS * 3]{};
+
+    /// Last used material.
+    Material* lastMaterial_{};
+};
+
 }
 
-SceneBatchRenderer::SceneBatchRenderer(Context* context)
+SceneBatchRenderer::SceneBatchRenderer(Context* context, const DrawableProcessor* drawableProcessor)
     : Object(context)
     , graphics_(context_->GetSubsystem<Graphics>())
     , renderer_(context_->GetSubsystem<Renderer>())
-{}
+    , drawableProcessor_(drawableProcessor)
+{
+}
+
+void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, Camera* camera, BatchRenderFlags flags,
+    ea::span<const PipelineBatchByState> batches)
+{
+    DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, flags };
+    for (const auto& sortedBatch : batches)
+        compositor.ProcessSceneBatch(*sortedBatch.sceneBatch_);
+}
+
+void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, Camera* camera, BatchRenderFlags flags,
+    ea::span<const PipelineBatchBackToFront> batches)
+{
+    DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, flags };
+    for (const auto& sortedBatch : batches)
+        compositor.ProcessSceneBatch(*sortedBatch.sceneBatch_);
+}
 
 void SceneBatchRenderer::RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
     Camera* camera, Zone* zone, ea::span<const PipelineBatchByState> batches)
 {
+    //DrawCommandCompositor compositor{ drawQueue, drawableProcessor, camera, BatchRenderFlag::AmbientAndVertexLights };
+    //for (const auto& sortedBatch : batches)
+    //    compositor.ProcessBatch(*sortedBatch.sceneBatch_);
+
     //const auto getBatchLight = [&](const PipelineBatchByState& batch) { return nullptr; };
-    RenderBatches<false>(drawQueue, drawableProcessor, camera, zone, batches);
+    //RenderBatches<false>(drawQueue, drawableProcessor, camera, zone, batches);
 }
 
 void SceneBatchRenderer::RenderLitBaseBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
@@ -157,7 +509,7 @@ void SceneBatchRenderer::RenderLitBaseBatches(DrawCommandQueue& drawQueue, const
     {
         return mainLight;
     };*/
-    RenderBatches<true>(drawQueue, drawableProcessor, camera, zone, batches);
+    //RenderBatches<true>(drawQueue, drawableProcessor, camera, zone, batches);
 }
 
 /*void SceneBatchRenderer::RenderLightBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
@@ -180,14 +532,14 @@ void SceneBatchRenderer::RenderAlphaBatches(DrawCommandQueue& drawQueue, const D
         const unsigned lightIndex = batch.sceneBatch_->lightIndex_;
         return lightIndex != M_MAX_UNSIGNED ? visibleLights[lightIndex] : nullptr;
     };*/
-    RenderBatches<true>(drawQueue, drawableProcessor, camera, zone, batches);
+    //RenderBatches<true>(drawQueue, drawableProcessor, camera, zone, batches);
 }
 
 void SceneBatchRenderer::RenderShadowBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
     Camera* camera, Zone* zone, ea::span<const PipelineBatchByState> batches)
 {
     //const auto getBatchLight = [&](const PipelineBatchByState& batch) { return nullptr; };
-    RenderBatches<false>(drawQueue, drawableProcessor, camera, zone, batches);
+    //RenderBatches<false>(drawQueue, drawableProcessor, camera, zone, batches);
 }
 
 void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
@@ -200,8 +552,8 @@ void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, c
     const ea::vector<LightProcessor*>& visibleLights = drawableProcessor.GetLightProcessors();
     Node* cameraNode = camera->GetNode();
 
-    static const SceneLightShaderParameters defaultLightParams;
-    const SceneLightShaderParameters* currentLightParams = &defaultLightParams;
+    static const LightShaderParameters defaultLightParams;
+    const LightShaderParameters* currentLightParams = &defaultLightParams;
     Texture2D* currentShadowMap = nullptr;
 
     bool frameDirty = true;
@@ -320,13 +672,24 @@ template <bool HasLight, class BatchType>
 void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
     Camera* camera, Zone* zone, ea::span<const BatchType> batches)
 {
+    ///*
+    const auto flags = HasLight
+        ? BatchRenderFlag::AmbientAndVertexLights | BatchRenderFlag::PixelLight
+        : BatchRenderFlag::None;
+    DrawCommandCompositor compositor{ drawQueue, drawableProcessor, camera, flags };
+    for (const auto& sortedBatch : batches)
+        compositor.ProcessBatch(*sortedBatch.sceneBatch_);
+    return;
+    //*/
+
+
     const FrameInfo& frameInfo = drawableProcessor.GetFrameInfo();
     const Scene* scene = frameInfo.octree_->GetScene();
     const ea::vector<LightProcessor*>& visibleLights = drawableProcessor.GetLightProcessors();
     Node* cameraNode = camera->GetNode();
 
-    static const SceneLightShaderParameters defaultLightParams;
-    const SceneLightShaderParameters* currentLightParams = &defaultLightParams;
+    static const LightShaderParameters defaultLightParams;
+    const LightShaderParameters* currentLightParams = &defaultLightParams;
     Texture2D* currentShadowMap = nullptr;
 
     bool frameDirty = true;
@@ -409,7 +772,7 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Drawab
                     if (vertexLights[i] == M_MAX_UNSIGNED)
                         continue;
 
-                    const SceneLightShaderParameters& vertexLightParams = visibleLights[vertexLights[i]]->GetShaderParams();
+                    const LightShaderParameters& vertexLightParams = visibleLights[vertexLights[i]]->GetShaderParams();
                     vertexLightsData[i * 3] = { vertexLightParams.color_, vertexLightParams.invRange_ };
                     vertexLightsData[i * 3 + 1] = { vertexLightParams.direction_, vertexLightParams.cutoff_ };
                     vertexLightsData[i * 3 + 2] = { vertexLightParams.position_, vertexLightParams.invCutoff_ };

@@ -84,6 +84,8 @@ public:
     bool IsInternalPass(Object* pass) const { return batchCompositor_ == pass; }
     /// Return drawable processor.
     DrawableProcessor* GetDrawableProcessor() const { return drawableProcessor_; }
+    /// Return batch compositor.
+    BatchCompositor* GetBatchCompositor() const { return batchCompositor_; }
     /// Return transient shadow map allocator.
     ShadowMapAllocator* GetShadowMapAllocator() const { return shadowMapAllocator_; }
     /// Return light volume batches.

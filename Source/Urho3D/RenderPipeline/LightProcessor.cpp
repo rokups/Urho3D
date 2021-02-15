@@ -28,6 +28,7 @@
 #include "../Math/NumericRange.h"
 #include "../Math/Polyhedron.h"
 #include "../Graphics/Camera.h"
+#include "../Graphics/Renderer.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/OctreeQuery.h"
 #include "../RenderPipeline/LightProcessor.h"
@@ -321,6 +322,12 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
 {
     Node* lightNode = light_->GetNode();
     const LightType lightType = light_->GetLightType();
+
+    // Setup resources
+    auto renderer = light_->GetSubsystem<Renderer>();
+    shaderParams_.shadowMap_ = shadowMap_.texture_;
+    shaderParams_.lightRamp_ = light_->GetRampTexture() ? light_->GetRampTexture() : renderer->GetDefaultLightRamp();
+    shaderParams_.lightShape_ = light_->GetShapeTexture() ? light_->GetShapeTexture() : renderer->GetDefaultLightSpot();
 
     // Setup common shader parameters
     shaderParams_.position_ = lightNode->GetWorldPosition();

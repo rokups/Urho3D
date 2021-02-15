@@ -48,8 +48,8 @@ public:
     virtual ShadowMap AllocateTransientShadowMap(const IntVector2& size) = 0;
 };
 
-/// Scene light shadow parameters.
-struct SceneLightShaderParameters
+/// Cooked shadow parameters of light.
+struct LightShaderParameters
 {
     /// Light direction.
     Vector3 direction_;
@@ -93,6 +93,13 @@ struct SceneLightShaderParameters
     float cutoff_{};
     /// Inverse cutoff for vertex lighting.
     float invCutoff_{};
+
+    /// Shadow map texture.
+    Texture2D* shadowMap_{};
+    /// Light ramp texture.
+    Texture* lightRamp_{};
+    /// Light shape texture.
+    Texture* lightShape_{};
 };
 
 /// Light and shadow processing utility.
@@ -138,7 +145,7 @@ public:
     /// Return mutable shadow split.
     ShadowSplitProcessor* GetMutableSplit(unsigned splitIndex) { return &splits_[splitIndex]; }
     /// Return shader parameters.
-    const SceneLightShaderParameters& GetShaderParams() const { return shaderParams_; }
+    const LightShaderParameters& GetShaderParams() const { return shaderParams_; }
     /// Return lit geometries.
     const ea::vector<Drawable*>& GetLitGeometries() const { return litGeometries_; }
 
@@ -190,7 +197,7 @@ private:
     /// Shadow map allocated to this light.
     ShadowMap shadowMap_;
     /// Shader parameters.
-    SceneLightShaderParameters shaderParams_;
+    LightShaderParameters shaderParams_;
 };
 
 /// Cache of light processors.

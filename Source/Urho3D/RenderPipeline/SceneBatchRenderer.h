@@ -23,7 +23,6 @@
 #pragma once
 
 #include "../Core/Object.h"
-#include "../Graphics/DrawCommandQueue.h"
 // TODO(renderer): We don't need this include
 #include "../RenderPipeline/PipelineBatchSortKey.h"
 
@@ -32,7 +31,21 @@
 namespace Urho3D
 {
 
+class DrawCommandQueue;
 class DrawableProcessor;
+
+/// Batch rendering flags.
+enum class BatchRenderFlag
+{
+    /// Default null flag.
+    None = 0,
+    /// Export ambient light and vertex lights.
+    AmbientAndVertexLights = 1 << 0,
+    /// Export pixel light.
+    PixelLight = 1 << 1,
+};
+
+URHO3D_FLAGSET(BatchRenderFlag, BatchRenderFlags);
 
 /// Geometry buffer texture for deferred renderer.
 struct GeometryBufferResource
@@ -50,7 +63,14 @@ class SceneBatchRenderer : public Object
 
 public:
     /// Construct.
-    explicit SceneBatchRenderer(Context* context);
+    SceneBatchRenderer(Context* context, const DrawableProcessor* drawableProcessor);
+
+    /// Render batches (sorted by state).
+    void RenderBatches(DrawCommandQueue& drawQueue, Camera* camera, BatchRenderFlags flags,
+        ea::span<const PipelineBatchByState> batches);
+    /// Render batches (sorted by distance).
+    void RenderBatches(DrawCommandQueue& drawQueue, Camera* camera, BatchRenderFlags flags,
+        ea::span<const PipelineBatchBackToFront> batches);
 
     /// Render unlit base batches. Safe to call from worker thread.
     void RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
@@ -84,6 +104,8 @@ private:
     /// Renderer subsystem.
     Renderer* renderer_{};
 
+    /// Drawable processor.
+    const DrawableProcessor* drawableProcessor_{};
 };
 
 }
