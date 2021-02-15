@@ -26,6 +26,8 @@
 #include "../RenderPipeline/BatchStateCache.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 
+#include <EASTL/sort.h>
+
 namespace Urho3D
 {
 
@@ -36,6 +38,7 @@ class Material;
 class Pass;
 class PipelineState;
 class WorkQueue;
+struct PipelineBatchByState;
 struct ShadowSplitProcessor;
 
 /// Self-sufficient batch that can be rendered by RenderPipeline.
@@ -151,8 +154,48 @@ public:
     /// Compose light volume batches.
     void ComposeLightVolumeBatches();
 
-    /// Return light volume batches.
-    const auto& GetLightVolumeBatches() const { return lightVolumeBatches_; }
+    /// Return sorted light volume batches.
+    const auto& GetLightVolumeBatches() const { return sortedLightVolumeBatches_; }
+
+    /// Sort batches (from vector).
+    template <class T, class ... U>
+    static void SortBatches(ea::vector<T>& sortedBatches, const U& ... pipelineBatches)
+    {
+        using namespace std;
+        const auto pipelineBatchesArray = { &pipelineBatches... };
+
+        // Evaluate total size
+        unsigned totalSize = 0;
+        for (const auto* batches : pipelineBatchesArray)
+            totalSize += size(*batches);
+
+        // Build sorted batches
+        sortedBatches.resize(totalSize);
+        unsigned i = 0;
+        for (const auto* batches : pipelineBatchesArray)
+        {
+            for (const auto& pipelineBatch : *batches)
+                sortedBatches[i++] = T{ &pipelineBatch };
+        }
+
+        // Sort
+        ea::sort(sortedBatches.begin(), sortedBatches.end());
+    }
+
+    /// Sort batches (from WorkQueueVector).
+    template <class T>
+    static void SortBatches(const WorkQueueVector<PipelineBatch>& sceneBatches, ea::vector<T>& sortedBatches)
+    {
+        const unsigned numBatches = sceneBatches.Size();
+        sortedBatches.resize(numBatches);
+        unsigned elementIndex = 0;
+        for (const PipelineBatch& lightBatch : sceneBatches)
+        {
+            sortedBatches[elementIndex] = T{ &lightBatch };
+            ++elementIndex;
+        }
+        ea::sort(sortedBatches.begin(), sortedBatches.end());
+    }
 
 protected:
     /// Called when update begins.
@@ -198,6 +241,8 @@ private:
     BatchStateCache lightVolumeCache_;
     /// Light volume batches.
     ea::vector<PipelineBatch> lightVolumeBatches_;
+    /// Sorted light volume batches.
+    ea::vector<PipelineBatchByState> sortedLightVolumeBatches_;
 };
 
 }

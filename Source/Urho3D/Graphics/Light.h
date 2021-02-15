@@ -417,7 +417,7 @@ public:
     /// Set light queue used for this light. Called by View.
     void SetLightQueue(LightBatchQueue* queue);
     /// Return light volume model transform.
-    const Matrix3x4& GetVolumeTransform(Camera* camera);
+    const Matrix3x4& GetVolumeTransform(const Camera* camera);
 
     /// Return light queue. Called by View.
     LightBatchQueue* GetLightQueue() const { return lightQueue_; }
@@ -438,7 +438,7 @@ public:
     ResourceRef GetShapeTextureAttr() const;
 
     /// Return a transform for deferred fullscreen quad (directional light) rendering.
-    static Matrix3x4 GetFullscreenQuadTransform(Camera* camera);
+    static Matrix3x4 GetFullscreenQuadTransform(const Camera* camera);
 
 protected:
     /// Recalculate the world-space bounding box.

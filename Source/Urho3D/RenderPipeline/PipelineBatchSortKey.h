@@ -111,7 +111,8 @@ struct PipelineBatchByState
         if (!batch->pipelineState_)
             return;
 
-        const SourceBatch& sourceBatch = batch->GetSourceBatch();
+        // TODO(renderer): Fix me
+        const SourceBatch* sourceBatch = batch->sourceBatchIndex_ != M_MAX_UNSIGNED ? &batch->GetSourceBatch() : nullptr;
 
         // 8: render order
         // 32: shader variation
@@ -126,10 +127,10 @@ struct PipelineBatchByState
         // 32: material
         // 32: geometry
         unsigned long long materialHash = MakeHash(batch->material_);
-        materialGeometryKey_ |= (materialHash ^ sourceBatch.lightmapIndex_) << 32;
+        materialGeometryKey_ |= (materialHash ^ (sourceBatch ? sourceBatch->lightmapIndex_ : 0)) << 32;
         materialGeometryKey_ |= MakeHash(batch->geometry_);
 
-        distance_ = sourceBatch.distance_;
+        distance_ = sourceBatch ? sourceBatch->distance_ : 0.0f;
     }
 
     /// Compare sorted batches.

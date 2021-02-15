@@ -142,7 +142,7 @@ class DrawCommandCompositor : public NonCopyable
 public:
     /// Construct.
     DrawCommandCompositor(DrawCommandQueue& drawQueue,
-        const DrawableProcessor& drawableProcessor, Camera* renderCamera, BatchRenderFlags flags)
+        const DrawableProcessor& drawableProcessor, const Camera* renderCamera, BatchRenderFlags flags)
         : drawQueue_(drawQueue)
         , enableAmbientAndVertexLights_(flags.Test(BatchRenderFlag::AmbientAndVertexLights))
         , enablePixelLights_(flags.Test(BatchRenderFlag::PixelLight))
@@ -154,12 +154,34 @@ public:
         , camera_(renderCamera)
         , cameraNode_(camera_->GetNode())
     {
+        lightVolumeSourceBatch_.worldTransform_ = &lightVolumeTransform_;
+    }
+
+    /// Set GBuffer parameters.
+    void SetGBufferParameters(const Vector4& offsetAndScale, const Vector2& invSize)
+    {
+        geometryBufferOffsetAndScale_ = offsetAndScale;
+        geometryBufferInvSize_ = invSize;
+    }
+
+    /// Set global resources.
+    void SetGlobalResources(ea::span<const ShaderResourceDesc> globalResources)
+    {
+        globalResources_ = globalResources;
     }
 
     /// Convert scene batch to DrawCommandQueue commands.
     void ProcessSceneBatch(const PipelineBatch& pipelineBatch)
     {
         ProcessBatch(pipelineBatch, pipelineBatch.GetSourceBatch());
+    }
+
+    /// Convert light batch to DrawCommandQueue commands.
+    void ProcessLightVolumeBatch(const PipelineBatch& pipelineBatch)
+    {
+        Light* light = lights_[pipelineBatch.lightIndex_]->GetLight();
+        lightVolumeTransform_ = light->GetVolumeTransform(camera_);
+        ProcessBatch(pipelineBatch, lightVolumeSourceBatch_);
     }
 
 private:
@@ -173,6 +195,9 @@ private:
     /// Add Camera shader parameters.
     void AddCameraShaderParameters(float constantDepthBias)
     {
+        drawQueue_.AddShaderParameter(VSP_GBUFFEROFFSETS, geometryBufferOffsetAndScale_);
+        drawQueue_.AddShaderParameter(PSP_GBUFFERINVSIZE, geometryBufferInvSize_);
+
         const Matrix3x4 cameraEffectiveTransform = camera_->GetEffectiveWorldTransform();
         drawQueue_.AddShaderParameter(VSP_CAMERAPOS, cameraEffectiveTransform.Translation());
         drawQueue_.AddShaderParameter(VSP_VIEWINV, cameraEffectiveTransform);
@@ -351,6 +376,10 @@ private:
         // TODO(renderer): Don't check for pixelLightDirty, check for shadow map and ramp/shape only
         if (materialDirty || pixelLightDirty)
         {
+            // Add global resources
+            for (const ShaderResourceDesc& desc : globalResources_)
+                drawQueue_.AddShaderResource(desc.unit_, desc.texture_);
+
             // Add material resources
             const auto& materialTextures = pipelineBatch.material_->GetTextures();
             for (const auto& texture : materialTextures)
@@ -386,7 +415,6 @@ private:
             }
 
             // Add transform parameters
-            const SourceBatch& sourceBatch = pipelineBatch.GetSourceBatch();
             switch (pipelineBatch.geometryType_)
             {
             case GEOM_INSTANCED:
@@ -419,11 +447,11 @@ private:
     /// Destination draw queue.
     DrawCommandQueue& drawQueue_;
 
-    /// Export ambient light and vertex lights
+    /// Export ambient light and vertex lights.
     const bool enableAmbientAndVertexLights_;
-    /// Export pixel light
+    /// Export pixel light.
     const bool enablePixelLights_;
-    /// Export light of any kind
+    /// Export light of any kind.
     const bool enableLight_;
 
     /// Drawable processor.
@@ -438,6 +466,14 @@ private:
     const Camera* camera_{};
     /// Render camera node.
     const Node* cameraNode_{};
+
+    /// Offset and scale of GBuffer.
+    Vector4 geometryBufferOffsetAndScale_;
+    /// Inverse size of GBuffer.
+    Vector2 geometryBufferInvSize_;
+
+    /// Global resources.
+    ea::span<const ShaderResourceDesc> globalResources_;
 
     /// Whether frame shader parameters are dirty.
     bool frameDirty_{ true };
@@ -462,6 +498,11 @@ private:
 
     /// Last used material.
     Material* lastMaterial_{};
+
+    /// Temporary world transform for light volumes.
+    Matrix3x4 lightVolumeTransform_;
+    /// Temporary source batch for light volumes.
+    SourceBatch lightVolumeSourceBatch_;
 };
 
 }
@@ -474,7 +515,7 @@ SceneBatchRenderer::SceneBatchRenderer(Context* context, const DrawableProcessor
 {
 }
 
-void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, Camera* camera, BatchRenderFlags flags,
+void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
     ea::span<const PipelineBatchByState> batches)
 {
     DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, flags };
@@ -482,7 +523,7 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, Camera* came
         compositor.ProcessSceneBatch(*sortedBatch.sceneBatch_);
 }
 
-void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, Camera* camera, BatchRenderFlags flags,
+void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
     ea::span<const PipelineBatchBackToFront> batches)
 {
     DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, flags };
@@ -542,10 +583,19 @@ void SceneBatchRenderer::RenderShadowBatches(DrawCommandQueue& drawQueue, const 
     //RenderBatches<false>(drawQueue, drawableProcessor, camera, zone, batches);
 }
 
-void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
-    Camera* camera, Zone* zone, ea::span<const PipelineBatch> batches,
-    ea::span<const GeometryBufferResource> geometryBuffer, const Vector4& geometryBufferOffset, const Vector2& geometryBufferInvSize)
+void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera* camera,
+        ea::span<const PipelineBatchByState> batches,
+        ea::span<const ShaderResourceDesc> geometryBuffer,
+        const Vector4& geometryBufferOffset, const Vector2& geometryBufferInvSize)
 {
+    DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, BatchRenderFlag::PixelLight };
+    compositor.SetGBufferParameters(geometryBufferOffset, geometryBufferInvSize);
+    compositor.SetGlobalResources(geometryBuffer);
+    for (const auto& sortedBatch : batches)
+        compositor.ProcessLightVolumeBatch(*sortedBatch.sceneBatch_);
+    return;
+
+#if 0
     // TODO(renderer): Remove copypaste
     const FrameInfo& frameInfo = drawableProcessor.GetFrameInfo();
     const Scene* scene = frameInfo.octree_->GetScene();
@@ -666,6 +716,7 @@ void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, c
         drawQueue.SetBuffers(batch.geometry_->GetVertexBuffers(), batch.geometry_->GetIndexBuffer());
         drawQueue.DrawIndexed(batch.geometry_->GetIndexStart(), batch.geometry_->GetIndexCount());
     }
+#endif
 }
 
 template <bool HasLight, class BatchType>

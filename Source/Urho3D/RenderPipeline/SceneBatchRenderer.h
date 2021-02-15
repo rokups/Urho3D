@@ -47,8 +47,8 @@ enum class BatchRenderFlag
 
 URHO3D_FLAGSET(BatchRenderFlag, BatchRenderFlags);
 
-/// Geometry buffer texture for deferred renderer.
-struct GeometryBufferResource
+/// Shader resource binding (for global resources).
+struct ShaderResourceDesc
 {
     /// Texture unit.
     TextureUnit unit_{};
@@ -66,11 +66,17 @@ public:
     SceneBatchRenderer(Context* context, const DrawableProcessor* drawableProcessor);
 
     /// Render batches (sorted by state).
-    void RenderBatches(DrawCommandQueue& drawQueue, Camera* camera, BatchRenderFlags flags,
+    void RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
         ea::span<const PipelineBatchByState> batches);
     /// Render batches (sorted by distance).
-    void RenderBatches(DrawCommandQueue& drawQueue, Camera* camera, BatchRenderFlags flags,
+    void RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
         ea::span<const PipelineBatchBackToFront> batches);
+
+    /// Render light volume batches for deferred rendering.
+    void RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera* camera,
+        ea::span<const PipelineBatchByState> batches,
+        ea::span<const ShaderResourceDesc> geometryBuffer,
+        const Vector4& geometryBufferOffset, const Vector2& geometryBufferInvSize);
 
     /// Render unlit base batches. Safe to call from worker thread.
     void RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
@@ -87,11 +93,6 @@ public:
     /// Render shadow batches. Safe to call from worker thread.
     void RenderShadowBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
         Camera* camera, Zone* zone, ea::span<const PipelineBatchByState> batches);
-
-    /// Render light volume batches for deferred rendering.
-    void RenderLightVolumeBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
-        Camera* camera, Zone* zone, ea::span<const PipelineBatch> batches,
-        ea::span<const GeometryBufferResource> geometryBuffer, const Vector4& geometryBufferOffset, const Vector2& geometryBufferInvSize);
 
 private:
     /// Render generic batches.

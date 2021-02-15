@@ -830,8 +830,6 @@ void RenderPipeline::Render()
         sceneBatchCollector_->CollectLightVolumeBatches();*/
 
     // Collect batches
-    const auto zone = nullptr;// sceneProcessor_->GetFrameInfo().octree_->GetBackgroundZone();
-
     static thread_local ea::vector<PipelineBatchByState> shadowBatches;
     const auto& visibleLights = sceneProcessor_->GetDrawableProcessor()->GetLightProcessors();
     for (LightProcessor* sceneLight : visibleLights)
@@ -865,14 +863,14 @@ void RenderPipeline::Render()
         drawQueue_->Execute();
 
         // Draw deferred lights
-        GeometryBufferResource geometryBuffer[] = {
+        ShaderResourceDesc geometryBuffer[] = {
             { TU_ALBEDOBUFFER, deferredAlbedo_->GetRenderSurface()->GetParentTexture() },
             { TU_NORMALBUFFER, deferredNormal_->GetRenderSurface()->GetParentTexture() },
             { TU_DEPTHBUFFER, deferredDepth_->GetRenderSurface()->GetParentTexture() }
         };
 
         drawQueue_->Reset();
-        sceneBatchRenderer_->RenderLightVolumeBatches(*drawQueue_, *sceneProcessor_->GetDrawableProcessor(), sceneProcessor_->GetFrameInfo().camera_, zone,
+        sceneBatchRenderer_->RenderLightVolumeBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
             sceneProcessor_->GetLightVolumeBatches(), geometryBuffer,
             deferredDepth_->GetViewportOffsetAndScale(), deferredDepth_->GetInvSize());
 

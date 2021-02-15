@@ -277,8 +277,6 @@ void BatchCompositor::ComposeLightVolumeBatches()
     ctx.pass_ = this;
     ctx.subpassIndex_ = 1;
 
-    lightVolumeBatches_.clear();
-
     const auto& lightProcessors = drawableProcessor_->GetLightProcessors();
     for (unsigned lightIndex = 0; lightIndex < lightProcessors.size(); ++lightIndex)
     {
@@ -299,6 +297,8 @@ void BatchCompositor::ComposeLightVolumeBatches()
         PipelineState* pipelineState = lightVolumeCache_.GetOrCreatePipelineState(key, ctx, batchStateCacheCallback_);
         lightVolumeBatches_.push_back(CreatePipelineBatch(key, pipelineState));
     }
+
+    SortBatches(sortedLightVolumeBatches_, lightVolumeBatches_);
 }
 
 void BatchCompositor::OnUpdateBegin(const FrameInfo& frameInfo)
@@ -306,6 +306,7 @@ void BatchCompositor::OnUpdateBegin(const FrameInfo& frameInfo)
     materialQuality_ = GetSubsystem<Renderer>()->GetMaterialQuality();
     delayedShadowBatches_.Clear(frameInfo.numThreads_);
     lightVolumeBatches_.clear();
+    sortedLightVolumeBatches_.clear();
 }
 
 void BatchCompositor::OnPipelineStatesInvalidated()

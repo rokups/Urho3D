@@ -515,7 +515,7 @@ int Light::GetNumShadowSplits() const
     return (int)Min(ret, MAX_CASCADE_SPLITS);
 }
 
-const Matrix3x4& Light::GetVolumeTransform(Camera* camera)
+const Matrix3x4& Light::GetVolumeTransform(const Camera* camera)
 {
     if (!node_)
         return Matrix3x4::IDENTITY;
@@ -672,7 +672,7 @@ void Light::SetLightQueue(LightBatchQueue* queue)
     lightQueue_ = queue;
 }
 
-Matrix3x4 Light::GetFullscreenQuadTransform(Camera* camera)
+Matrix3x4 Light::GetFullscreenQuadTransform(const Camera* camera)
 {
     Matrix3x4 quadTransform;
     Vector3 nearSize, farSize;
