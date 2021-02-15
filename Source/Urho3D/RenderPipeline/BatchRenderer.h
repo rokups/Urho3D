@@ -56,14 +56,25 @@ struct ShaderResourceDesc
     Texture* texture_{};
 };
 
-/// Utility class to convert batches into sequence of draw operations.
-class SceneBatchRenderer : public Object
+/// Light volume batch rendering context.
+struct LightVolumeRenderContext
 {
-    URHO3D_OBJECT(SceneBatchRenderer, Object);
+    /// Geometry buffer resources.
+    ea::span<const ShaderResourceDesc> geometryBuffer_;
+    /// Geometry buffer offset and scale.
+    Vector4 geometryBufferOffsetAndScale_;
+    /// Geometry buffer inverse scale.
+    Vector2 geometryBufferInvSize_;
+};
+
+/// Utility class to convert pipeline batches into sequence of draw commands.
+class URHO3D_API BatchRenderer : public Object
+{
+    URHO3D_OBJECT(BatchRenderer, Object);
 
 public:
     /// Construct.
-    SceneBatchRenderer(Context* context, const DrawableProcessor* drawableProcessor);
+    BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor);
 
     /// Render batches (sorted by state).
     void RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
@@ -74,9 +85,7 @@ public:
 
     /// Render light volume batches for deferred rendering.
     void RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera* camera,
-        ea::span<const PipelineBatchByState> batches,
-        ea::span<const ShaderResourceDesc> geometryBuffer,
-        const Vector4& geometryBufferOffset, const Vector2& geometryBufferInvSize);
+        const LightVolumeRenderContext& ctx, ea::span<const PipelineBatchByState> batches);
 
     /// Render unlit base batches. Safe to call from worker thread.
     void RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,

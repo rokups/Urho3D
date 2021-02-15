@@ -46,7 +46,7 @@ class ShadowMapAllocator;
 class DrawCommandQueue;
 class DrawableProcessor;
 class SceneBatchCollector;
-class SceneBatchRenderer;
+class BatchRenderer;
 
 enum class AmbientMode
 {
@@ -164,7 +164,7 @@ private:
     //SharedPtr<DrawableProcessor> drawableProcessor_;
     //SharedPtr<BatchCompositor> batchCompositor_;
     //SharedPtr<SceneBatchCollector> sceneBatchCollector_;
-    SharedPtr<SceneBatchRenderer> sceneBatchRenderer_;
+    SharedPtr<BatchRenderer> sceneBatchRenderer_;
     SharedPtr<OcclusionBuffer> occlusionBuffer_;
 
 };

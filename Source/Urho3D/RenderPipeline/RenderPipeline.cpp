@@ -37,7 +37,7 @@
 #include "../RenderPipeline/RenderPipeline.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/SceneBatchCollector.h"
-#include "../RenderPipeline/SceneBatchRenderer.h"
+#include "../RenderPipeline/BatchRenderer.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
 #include "../Scene/Scene.h"
 
@@ -657,7 +657,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         //sceneBatchCollector_ = MakeShared<SceneBatchCollector>(context_, drawableProcessor_, batchCompositor_, this);
 
         //shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
-        sceneBatchRenderer_ = MakeShared<SceneBatchRenderer>(context_, sceneProcessor_->GetDrawableProcessor());
+        sceneBatchRenderer_ = MakeShared<BatchRenderer>(context_, sceneProcessor_->GetDrawableProcessor());
     }
 
     // Pre-frame initialize objects
@@ -869,10 +869,14 @@ void RenderPipeline::Render()
             { TU_DEPTHBUFFER, deferredDepth_->GetRenderSurface()->GetParentTexture() }
         };
 
+        LightVolumeRenderContext lightVolumeRenderContext;
+        lightVolumeRenderContext.geometryBuffer_ = geometryBuffer;
+        lightVolumeRenderContext.geometryBufferOffsetAndScale_ = deferredDepth_->GetViewportOffsetAndScale();
+        lightVolumeRenderContext.geometryBufferInvSize_ = deferredDepth_->GetInvSize();
+
         drawQueue_->Reset();
         sceneBatchRenderer_->RenderLightVolumeBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            sceneProcessor_->GetLightVolumeBatches(), geometryBuffer,
-            deferredDepth_->GetViewportOffsetAndScale(), deferredDepth_->GetInvSize());
+            lightVolumeRenderContext, sceneProcessor_->GetLightVolumeBatches());
 
         deferredDepth_->SetRenderTargets({ deferredFinal_ });
         drawQueue_->Execute();

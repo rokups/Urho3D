@@ -32,7 +32,7 @@
 #include "../Graphics/Zone.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/LightProcessor.h"
-#include "../RenderPipeline/SceneBatchRenderer.h"
+#include "../RenderPipeline/BatchRenderer.h"
 #include "../Scene/Scene.h"
 
 #include <EASTL/sort.h>
@@ -507,7 +507,7 @@ private:
 
 }
 
-SceneBatchRenderer::SceneBatchRenderer(Context* context, const DrawableProcessor* drawableProcessor)
+BatchRenderer::BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor)
     : Object(context)
     , graphics_(context_->GetSubsystem<Graphics>())
     , renderer_(context_->GetSubsystem<Renderer>())
@@ -515,7 +515,7 @@ SceneBatchRenderer::SceneBatchRenderer(Context* context, const DrawableProcessor
 {
 }
 
-void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
+void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
     ea::span<const PipelineBatchByState> batches)
 {
     DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, flags };
@@ -523,7 +523,7 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera
         compositor.ProcessSceneBatch(*sortedBatch.sceneBatch_);
 }
 
-void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
+void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
     ea::span<const PipelineBatchBackToFront> batches)
 {
     DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, flags };
@@ -531,7 +531,7 @@ void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera
         compositor.ProcessSceneBatch(*sortedBatch.sceneBatch_);
 }
 
-void SceneBatchRenderer::RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
+void BatchRenderer::RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
     Camera* camera, Zone* zone, ea::span<const PipelineBatchByState> batches)
 {
     //DrawCommandCompositor compositor{ drawQueue, drawableProcessor, camera, BatchRenderFlag::AmbientAndVertexLights };
@@ -542,7 +542,7 @@ void SceneBatchRenderer::RenderUnlitBaseBatches(DrawCommandQueue& drawQueue, con
     //RenderBatches<false>(drawQueue, drawableProcessor, camera, zone, batches);
 }
 
-void SceneBatchRenderer::RenderLitBaseBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
+void BatchRenderer::RenderLitBaseBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
     Camera* camera, Zone* zone, ea::span<const PipelineBatchByState> batches)
 {
     /*LightProcessor* mainLight = drawableProcessor.GetMainLight();
@@ -553,7 +553,7 @@ void SceneBatchRenderer::RenderLitBaseBatches(DrawCommandQueue& drawQueue, const
     //RenderBatches<true>(drawQueue, drawableProcessor, camera, zone, batches);
 }
 
-/*void SceneBatchRenderer::RenderLightBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
+/*void BatchRenderer::RenderLightBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
     Camera* camera, Zone* zone, ea::span<const LightBatchSortedByState> batches)
 {
     const ea::vector<LightProcessor*>& visibleLights = drawableProcessor.GetVisibleLights();
@@ -564,7 +564,7 @@ void SceneBatchRenderer::RenderLitBaseBatches(DrawCommandQueue& drawQueue, const
     RenderBatches<true>(drawQueue, drawableProcessor, camera, zone, batches, getBatchLight);
 }*/
 
-void SceneBatchRenderer::RenderAlphaBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
+void BatchRenderer::RenderAlphaBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
     Camera* camera, Zone* zone, ea::span<const PipelineBatchBackToFront> batches)
 {
     /*const ea::vector<LightProcessor*>& visibleLights = drawableProcessor.GetVisibleLights();
@@ -576,21 +576,19 @@ void SceneBatchRenderer::RenderAlphaBatches(DrawCommandQueue& drawQueue, const D
     //RenderBatches<true>(drawQueue, drawableProcessor, camera, zone, batches);
 }
 
-void SceneBatchRenderer::RenderShadowBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
+void BatchRenderer::RenderShadowBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
     Camera* camera, Zone* zone, ea::span<const PipelineBatchByState> batches)
 {
     //const auto getBatchLight = [&](const PipelineBatchByState& batch) { return nullptr; };
     //RenderBatches<false>(drawQueue, drawableProcessor, camera, zone, batches);
 }
 
-void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera* camera,
-        ea::span<const PipelineBatchByState> batches,
-        ea::span<const ShaderResourceDesc> geometryBuffer,
-        const Vector4& geometryBufferOffset, const Vector2& geometryBufferInvSize)
+void BatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera* camera,
+    const LightVolumeRenderContext& ctx, ea::span<const PipelineBatchByState> batches)
 {
     DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, BatchRenderFlag::PixelLight };
-    compositor.SetGBufferParameters(geometryBufferOffset, geometryBufferInvSize);
-    compositor.SetGlobalResources(geometryBuffer);
+    compositor.SetGBufferParameters(ctx.geometryBufferOffsetAndScale_, ctx.geometryBufferInvSize_);
+    compositor.SetGlobalResources(ctx.geometryBuffer_);
     for (const auto& sortedBatch : batches)
         compositor.ProcessLightVolumeBatch(*sortedBatch.sceneBatch_);
     return;
@@ -720,7 +718,7 @@ void SceneBatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, C
 }
 
 template <bool HasLight, class BatchType>
-void SceneBatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
+void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const DrawableProcessor& drawableProcessor,
     Camera* camera, Zone* zone, ea::span<const BatchType> batches)
 {
     ///*
