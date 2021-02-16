@@ -58,6 +58,20 @@
 				<attribute name="Light Mask" value="-8" />
 			</component>
 		</node>
+		<node id="179">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Occluder" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="2.5 5 -10" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="10 10 10" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="171">
+				<attribute name="Model" value="Model;Models/Box.mdl" />
+				<attribute name="Material" value="Material;Materials/GreenTransparent.xml" />
+				<attribute name="Is Occluder" value="true" />
+			</component>
+		</node>
 	</node>
 	<node id="3">
 		<attribute name="Is Enabled" value="true" />

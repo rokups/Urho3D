@@ -50,59 +50,51 @@ ShadowMapAllocator::ShadowMapAllocator(Context* context)
     : Object(context)
     , graphics_(context_->GetSubsystem<Graphics>())
     , renderer_(context_->GetSubsystem<Renderer>())
-{}
+{
+    CacheSettings();
+}
+
+void ShadowMapAllocator::SetSettings(const ShadowMapAllocatorSettings& settings)
+{
+    if (settings_ != settings)
+    {
+        settings_ = settings;
+        CacheSettings();
+
+        dummyColorTexture_ = nullptr;
+        pool_.clear();
+    }
+}
+
+void ShadowMapAllocator::CacheSettings()
+{
+    if (settings_.varianceShadowMap_)
+        shadowMapFormat_ = graphics_->GetRGFloat32Format();
+    else
+    {
+        shadowMapFormat_ = settings_.lowPrecisionShadowMaps_
+            ? graphics_->GetShadowMapFormat()
+            : graphics_->GetHiresShadowMapFormat();
+    }
+
+    shadowMapPageSize_ = static_cast<int>(settings_.shadowMapPageSize_) * IntVector2::ONE;
+}
 
 void ShadowMapAllocator::Reset()
 {
-    // Invalidate whole pool if settings changed
-    const ShadowMapType shadowMapType = GetShadowMapType();
-    const int shadowMapSize = renderer_->GetShadowMapSize();
-    const int vsmMultiSample = renderer_->GetVSMMultiSample();
-    if (shadowMapType_ != shadowMapType || shadowMapSize_ != shadowMapSize || vsmMultiSample_ != vsmMultiSample)
-    {
-        // TODO(renderer): Check shadow map size
-        shadowMapType_ = shadowMapType;
-        shadowMapSize_ = shadowMapSize;
-        vsmMultiSample_ = vsmMultiSample;
-        dummyColorTexture_ = nullptr;
-        pool_.clear();
-
-        switch (shadowMapType_)
-        {
-        case ShadowMapType::Depth16:
-            shadowMapFormat_ = graphics_->GetShadowMapFormat();
-            shadowMapUsage_ = TEXTURE_DEPTHSTENCIL;
-            multiSample_ = 1;
-            break;
-
-        case ShadowMapType::Depth24:
-            shadowMapFormat_ = graphics_->GetHiresShadowMapFormat();
-            shadowMapUsage_ = TEXTURE_DEPTHSTENCIL;
-            multiSample_ = 1;
-            break;
-
-        case ShadowMapType::ColorRG32:
-            shadowMapFormat_ = graphics_->GetRGFloat32Format();
-            shadowMapUsage_ = TEXTURE_RENDERTARGET;
-            multiSample_ = vsmMultiSample_;
-            break;
-        }
-    }
-
-    // Reset individual allocators
     for (PoolElement& element : pool_)
     {
-        element.allocator_.Reset(shadowMapSize_, shadowMapSize_, shadowMapSize_, shadowMapSize_);
+        element.allocator_.Reset(shadowMapPageSize_.x_, shadowMapPageSize_.y_, shadowMapPageSize_.x_, shadowMapPageSize_.y_);
         element.needClear_ = false;
     }
 }
 
 ShadowMap ShadowMapAllocator::AllocateShadowMap(const IntVector2& size)
 {
-    if (!shadowMapSize_ || !shadowMapFormat_)
+    if (!settings_.shadowMapPageSize_ || !shadowMapFormat_)
         return {};
 
-    const IntVector2 clampedSize = VectorMin(size, IntVector2{ shadowMapSize_, shadowMapSize_ });
+    const IntVector2 clampedSize = VectorMin(size, shadowMapPageSize_);
 
     for (PoolElement& element : pool_)
     {
@@ -173,7 +165,7 @@ void ShadowMapAllocator::ExportPipelineState(PipelineStateDesc& desc, const Bias
 {
     desc.fillMode_ = FILL_SOLID;
     desc.stencilEnabled_ = false;
-    if (shadowMapUsage_ == TEXTURE_DEPTHSTENCIL)
+    if (!settings_.varianceShadowMap_)
     {
         desc.colorWrite_ = false;
         // TODO(renderer): For directional light there's bias auto adjust, do we need it?
@@ -183,7 +175,6 @@ void ShadowMapAllocator::ExportPipelineState(PipelineStateDesc& desc, const Bias
     else
     {
         desc.colorWrite_ = true;
-        // TODO(renderer): Why?
         desc.constantDepthBias_ = 0.0f;
         desc.slopeScaledDepthBias_ = 0.0f;
     }
@@ -215,41 +206,23 @@ ShadowMap ShadowMapAllocator::PoolElement::Allocate(const IntVector2& size)
     return {};
 }
 
-ShadowMapType ShadowMapAllocator::GetShadowMapType() const
-{
-    switch (renderer_->GetShadowQuality())
-    {
-    case SHADOWQUALITY_SIMPLE_16BIT:
-    case SHADOWQUALITY_PCF_16BIT:
-        return ShadowMapType::Depth16;
-
-    case SHADOWQUALITY_SIMPLE_24BIT:
-    case SHADOWQUALITY_PCF_24BIT:
-        return ShadowMapType::Depth24;
-
-    case SHADOWQUALITY_VSM:
-    case SHADOWQUALITY_BLUR_VSM:
-        return ShadowMapType::ColorRG32;
-
-    default:
-        assert(0);
-        return ShadowMapType::Depth24;
-    }
-}
-
 void ShadowMapAllocator::AllocateNewTexture()
 {
+    const bool isDepthTexture = !settings_.varianceShadowMap_;
+    const TextureUsage textureUsage = isDepthTexture ? TEXTURE_DEPTHSTENCIL : TEXTURE_RENDERTARGET;
+    const int multiSample = isDepthTexture ? 1 : settings_.varianceShadowMapMultiSample_;
+
     auto newShadowMap = MakeShared<Texture2D>(context_);
     const unsigned dummyColorFormat = graphics_->GetDummyColorFormat();
 
     // Disable mipmaps from the shadow map
     newShadowMap->SetNumLevels(1);
-    newShadowMap->SetSize(shadowMapSize_, shadowMapSize_, shadowMapFormat_, shadowMapUsage_, multiSample_);
+    newShadowMap->SetSize(shadowMapPageSize_.x_, shadowMapPageSize_.y_, shadowMapFormat_, textureUsage, multiSample);
 
 #ifndef GL_ES_VERSION_2_0
     // OpenGL (desktop) and D3D11: shadow compare mode needs to be specifically enabled for the shadow map
     newShadowMap->SetFilterMode(FILTER_BILINEAR);
-    newShadowMap->SetShadowCompare(shadowMapUsage_ == TEXTURE_DEPTHSTENCIL);
+    newShadowMap->SetShadowCompare(isDepthTexture);
 #endif
 #ifndef URHO3D_OPENGL
     // Direct3D9: when shadow compare must be done manually, use nearest filtering so that the filtering of point lights
@@ -258,14 +231,15 @@ void ShadowMapAllocator::AllocateNewTexture()
 #endif
     // Create dummy color texture for the shadow map if necessary: Direct3D9, or OpenGL when working around an OS X +
     // Intel driver bug
-    if (shadowMapUsage_ == TEXTURE_DEPTHSTENCIL && dummyColorFormat)
+    if (isDepthTexture && dummyColorFormat)
     {
         // If no dummy color rendertarget for this size exists yet, create one now
         if (!dummyColorTexture_)
         {
             dummyColorTexture_ = MakeShared<Texture2D>(context_);
             dummyColorTexture_->SetNumLevels(1);
-            dummyColorTexture_->SetSize(shadowMapSize_, shadowMapSize_, dummyColorFormat, TEXTURE_RENDERTARGET);
+            dummyColorTexture_->SetSize(shadowMapPageSize_.x_, shadowMapPageSize_.y_,
+                dummyColorFormat, TEXTURE_RENDERTARGET);
         }
         // Link the color rendertarget to the shadow map
         newShadowMap->GetRenderSurface()->SetLinkedRenderTarget(dummyColorTexture_->GetRenderSurface());
@@ -275,7 +249,7 @@ void ShadowMapAllocator::AllocateNewTexture()
     PoolElement& element = pool_.emplace_back();
     element.index_ = pool_.size() - 1;
     element.texture_ = newShadowMap;
-    element.allocator_.Reset(shadowMapSize_, shadowMapSize_, shadowMapSize_, shadowMapSize_);
+    element.allocator_.Reset(shadowMapPageSize_.x_, shadowMapPageSize_.y_, shadowMapPageSize_.x_, shadowMapPageSize_.y_);
 }
 
 }

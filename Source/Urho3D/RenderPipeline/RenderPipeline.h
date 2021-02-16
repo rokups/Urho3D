@@ -60,8 +60,6 @@ struct RenderPipelineSettings : public SceneProcessorSettings
 {
     ///
     AmbientMode ambientMode_{ AmbientMode::Flat };
-    /// Whether to use deferred rendering.
-    //bool deferred_{};
     /// Whether to apply gamma correction.
     bool gammaCorrection_{};
 };

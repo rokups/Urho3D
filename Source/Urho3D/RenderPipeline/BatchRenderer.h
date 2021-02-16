@@ -78,6 +78,8 @@ class URHO3D_API BatchRenderer : public Object
 public:
     /// Construct.
     BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor);
+    /// Set variance shadow map parameters.
+    void SetVSMShadowParams(const Vector2& vsmShadowParams);
 
     /// Render batches (sorted by state).
     void RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
@@ -93,9 +95,11 @@ public:
 private:
     /// Renderer subsystem.
     Renderer* renderer_{};
-
     /// Drawable processor.
     const DrawableProcessor* drawableProcessor_{};
+
+    /// Variance shadow map shader parameters.
+    Vector2 vsmShadowParams_;
 };
 
 }

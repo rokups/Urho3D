@@ -33,7 +33,6 @@
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/RenderPipelineInterface.h"
 #include "../RenderPipeline/SceneProcessor.h"
-#include "../RenderPipeline/ShadowMapAllocator.h"
 #include "../Scene/Scene.h"
 
 #include "../DebugNew.h"
@@ -122,6 +121,8 @@ IntVector2 CalculateOcclusionBufferSize(unsigned size, Camera* cullCamera)
 
 }
 
+const Vector2 SceneProcessorSettings::DefaultVSMShadowParams{ 0.0000001f, 0.9f };
+
 SceneProcessor::SceneProcessor(RenderPipelineInterface* renderPipeline, const ea::string& shadowTechnique)
     : Object(renderPipeline->GetContext())
     , drawableProcessor_(MakeShared<DrawableProcessor>(renderPipeline))
@@ -168,6 +169,7 @@ void SceneProcessor::SetSettings(const SceneProcessorSettings& settings)
 {
     settings_ = settings;
     drawableProcessor_->SetSettings(settings);
+    shadowMapAllocator_->SetSettings(settings_);
 }
 
 void SceneProcessor::UpdateFrameInfo(const FrameInfo& frameInfo)

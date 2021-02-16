@@ -61,8 +61,6 @@ void CameraProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
     Zone* cameraZone = frameInfo.octree_->QueryZone(cameraPosition, camera_->GetZoneMask()).zone_;
     camera_->SetZone(cameraZone);
 
-    MarkPipelineStateHashDirty();
-
     if (camera_)
     {
         if (flipCamera_)
@@ -79,7 +77,7 @@ void CameraProcessor::OnRenderEnd(const FrameInfo& frameInfo)
         camera_->SetFlipVertical(!camera_->GetFlipVertical());
 }
 
-unsigned CameraProcessor::RecalculatePipelineStateHash() const
+unsigned CameraProcessor::GetPipelineStateHash() const
 {
     unsigned hash = 0;
     if (camera_)

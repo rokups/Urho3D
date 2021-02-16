@@ -52,15 +52,29 @@ struct ShadowMap
     ShadowMap GetSplit(unsigned split, const IntVector2& numSplits) const;
 };
 
-/// Shadow map type.
-enum class ShadowMapType
+/// Shadow map allocator settings.
+struct ShadowMapAllocatorSettings
 {
-    /// 16-bit depth texture.
-    Depth16,
-    /// 24-bit depth texture.
-    Depth24,
-    /// Depth and variance in 32-bit RG float color texture.
-    ColorRG32
+    /// Whether to use Variance Shadow Maps
+    bool varianceShadowMap_{};
+    /// Multisampling level of Variance Shadow Maps.
+    int varianceShadowMapMultiSample_{ 1 };
+    /// Whether to use low precision 16-bit depth maps.
+    bool lowPrecisionShadowMaps_{};
+    /// Size of shadow map atlas page.
+    unsigned shadowMapPageSize_{ 2048 };
+
+    /// Compare settings.
+    bool operator==(const ShadowMapAllocatorSettings& rhs) const
+    {
+        return varianceShadowMap_ == rhs.varianceShadowMap_
+            && varianceShadowMapMultiSample_ == rhs.varianceShadowMapMultiSample_
+            && lowPrecisionShadowMaps_ == rhs.lowPrecisionShadowMaps_
+            && shadowMapPageSize_ == rhs.shadowMapPageSize_;
+    }
+
+    /// Compare settings.
+    bool operator!=(const ShadowMapAllocatorSettings& rhs) const { return !(*this == rhs); }
 };
 
 /// Utility to allocate shadow maps in texture pool.
@@ -72,6 +86,9 @@ class URHO3D_API ShadowMapAllocator : public Object
 public:
     /// Construct.
     explicit ShadowMapAllocator(Context* context);
+    /// Set settings.
+    void SetSettings(const ShadowMapAllocatorSettings& settings);
+
     /// Reset allocated shadow maps.
     void Reset();
     /// Allocate shadow map of given size. It is better to allocate from bigger to smaller sizes.
@@ -98,8 +115,8 @@ private:
         ShadowMap Allocate(const IntVector2& size);
     };
 
-    /// Return shadow map type from renderer.
-    ShadowMapType GetShadowMapType() const;
+    /// Process and cache settings.
+    void CacheSettings();
     /// Allocate one more texture.
     void AllocateNewTexture();
 
@@ -108,23 +125,17 @@ private:
     /// Renderer subsystem.
     Renderer* renderer_{};
 
+    /// Settings.
+    ShadowMapAllocatorSettings settings_;
+    /// Shadow map texture format.
+    unsigned shadowMapFormat_{};
+    /// Shadow map texture size.
+    IntVector2 shadowMapPageSize_;
+
     /// Dummy color map, if needed.
     SharedPtr<Texture2D> dummyColorTexture_;
     /// Texture pool.
     ea::vector<PoolElement> pool_;
-    /// Size of texture.
-    int shadowMapSize_{};
-    /// Internal texture type.
-    ShadowMapType shadowMapType_{};
-    /// VSM multisample level.
-    int vsmMultiSample_{};
-
-    /// Shadow map texture format.
-    unsigned shadowMapFormat_{};
-    /// Shadow map texture usage.
-    TextureUsage shadowMapUsage_{};
-    /// Shadow map multisample level.
-    int multiSample_{};
 };
 
 }

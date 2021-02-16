@@ -25,7 +25,6 @@
 #include "../Core/Object.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/GraphicsDefs.h"
-#include "../Graphics/PipelineStateTracker.h"
 
 namespace Urho3D
 {
@@ -36,7 +35,7 @@ class Viewport;
 struct FrameInfo;
 
 /// Utility to process camera(s) rendering to viewport (not cull camera!).
-class URHO3D_API CameraProcessor : public Object, public PipelineStateTracker
+class URHO3D_API CameraProcessor : public Object
 {
     URHO3D_OBJECT(CameraProcessor, Object);
 
@@ -45,14 +44,14 @@ public:
     explicit CameraProcessor(RenderPipelineInterface* renderPipeline);
     /// Initialize camera.
     void Initialize(Camera* camera);
+    /// Return pipeline state hash.
+    unsigned GetPipelineStateHash() const;
 
 protected:
     /// Called when update begins.
     void OnUpdateBegin(const FrameInfo& frameInfo);
     /// Called when render ends.
     void OnRenderEnd(const FrameInfo& frameInfo);
-    /// Mark pipeline state hash as dirty.
-    unsigned RecalculatePipelineStateHash() const override;
 
 private:
     /// Whether to flip camera.

@@ -26,22 +26,30 @@
 #include "../RenderPipeline/BatchCompositor.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/LightProcessor.h"
+#include "../RenderPipeline/ShadowMapAllocator.h"
 
 namespace Urho3D
 {
 
 class RenderPipelineInterface;
 class RenderSurface;
-class ShadowMapAllocator;
 class Viewport;
 
 /// Scene processor settings.
-struct SceneProcessorSettings : public DrawableProcessorSettings
+struct URHO3D_API SceneProcessorSettings
+    : public DrawableProcessorSettings
+    , public ShadowMapAllocatorSettings
 {
+    /// Default VSM shadow params.
+    static const Vector2 DefaultVSMShadowParams;
+
     /// Whether to render shadows.
     bool enableShadows_{ true };
     /// Whether to enable deferred rendering.
     bool deferred_{ false };
+
+    /// Variance shadow map parameters.
+    Vector2 vsmShadowParams_{ DefaultVSMShadowParams };
 
     /// Whether to render occlusion triangles in multiple threads.
     bool threadedOcclusion_{};

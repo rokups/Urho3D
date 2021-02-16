@@ -236,6 +236,7 @@ BatchCompositor::BatchCompositor(RenderPipelineInterface* renderPipeline, const 
     , batchStateCacheCallback_(renderPipeline)
 {
     renderPipeline->OnUpdateBegin.Subscribe(this, &BatchCompositor::OnUpdateBegin);
+    renderPipeline->OnPipelineStatesInvalidated.Subscribe(this, &BatchCompositor::OnPipelineStatesInvalidated);
 }
 
 void BatchCompositor::SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes)

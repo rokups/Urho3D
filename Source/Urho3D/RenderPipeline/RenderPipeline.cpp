@@ -170,6 +170,8 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ENUM_ATTRIBUTE("Ambient Mode", settings_.ambientMode_, ambientModeNames, AmbientMode::Flat, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Deferred Rendering", bool, settings_.deferred_, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Gamma Correction", bool, settings_.gammaCorrection_, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Use Variance Shadow Maps", bool, settings_.varianceShadowMap_, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("VSM Shadow Settings", Vector2, settings_.vsmShadowParams_, SceneProcessorSettings::DefaultVSMShadowParams, AM_DEFAULT);
 }
 
 void RenderPipeline::ApplyAttributes()
@@ -354,7 +356,10 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         commonDefines += "PERPIXEL ";
         if (key.light_->HasShadow())
         {
-            commonDefines += "SHADOW SIMPLE_SHADOW ";
+            if (settings_.varianceShadowMap_)
+                commonDefines += "SHADOW VSM_SHADOW ";
+            else
+                commonDefines += "SHADOW SIMPLE_SHADOW ";
         }
         switch (light->GetLightType())
         {
@@ -450,7 +455,10 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
 
     if (sceneLight->GetNumSplits() > 0)
     {
-        pixelDefiles += "SHADOW SIMPLE_SHADOW ";
+        if (settings_.varianceShadowMap_)
+            pixelDefiles += "SHADOW VSM_SHADOW ";
+        else
+            pixelDefiles += "SHADOW SIMPLE_SHADOW ";
         if (light->GetShadowBias().normalOffset_ > 0.0)
             pixelDefiles += "NORMALOFFSET ";
     }
@@ -531,6 +539,9 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         && !Graphics::GetReadableDepthStencilFormat())
         settings_.deferred_ = false;
 
+    if (!settings_.lowPrecisionShadowMaps_ && !graphics_->GetHiresShadowMapFormat())
+        settings_.lowPrecisionShadowMaps_ = true;
+
     // Lazy initialize heavy objects
     if (!drawQueue_)
     {
@@ -542,6 +553,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
         sceneBatchRenderer_ = MakeShared<BatchRenderer>(context_, sceneProcessor_->GetDrawableProcessor());
     }
+    sceneBatchRenderer_->SetVSMShadowParams(settings_.vsmShadowParams_);
 
     // Pre-frame initialize objects
     cameraProcessor_->Initialize(camera);
@@ -581,6 +593,10 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
 void RenderPipeline::Update(const FrameInfo& frameInfo)
 {
+    // Begin update. Should happen before pipeline state hash check.
+    sceneProcessor_->UpdateFrameInfo(frameInfo);
+    OnUpdateBegin(this, sceneProcessor_->GetFrameInfo());
+
     // Invalidate pipeline states if necessary
     MarkPipelineStateHashDirty();
     const unsigned pipelineStateHash = GetPipelineStateHash();
@@ -589,10 +605,6 @@ void RenderPipeline::Update(const FrameInfo& frameInfo)
         oldPipelineStateHash_ = pipelineStateHash;
         OnPipelineStatesInvalidated(this);
     }
-
-    // Update scene and batches
-    sceneProcessor_->UpdateFrameInfo(frameInfo);
-    OnUpdateBegin(this, sceneProcessor_->GetFrameInfo());
 
     sceneProcessor_->Update();
 
@@ -717,6 +729,7 @@ unsigned RenderPipeline::RecalculatePipelineStateHash() const
     CombineHash(hash, static_cast<unsigned>(settings_.ambientMode_));
     CombineHash(hash, settings_.deferred_);
     CombineHash(hash, settings_.gammaCorrection_);
+    CombineHash(hash, settings_.varianceShadowMap_);
     return hash;
 }
 

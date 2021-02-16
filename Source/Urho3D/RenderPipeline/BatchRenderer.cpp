@@ -117,6 +117,12 @@ public:
         lightVolumeSourceBatch_.worldTransform_ = &lightVolumeTransform_;
     }
 
+    /// Set variance shadow map parameters.
+    void SetVSMShadowParams(const Vector2& vsmShadowParams)
+    {
+        vsmShadowParams_ = vsmShadowParams;
+    }
+
     /// Set GBuffer parameters.
     void SetGBufferParameters(const Vector4& offsetAndScale, const Vector2& invSize)
     {
@@ -247,8 +253,7 @@ private:
             drawQueue_.AddShaderParameter(PSP_SHADOWCUBEUVBIAS, lightParams_->shadowCubeUVBias_);
             drawQueue_.AddShaderParameter(PSP_SHADOWCUBEADJUST, lightParams_->shadowCubeAdjust_);
             drawQueue_.AddShaderParameter(VSP_NORMALOFFSETSCALE, lightParams_->normalOffsetScale_);
-            // TODO(renderer): Add VSM
-            //drawQueue_.AddShaderParameter(PSP_VSMSHADOWPARAMS, renderer_->GetVSMShadowParameters());
+            drawQueue_.AddShaderParameter(PSP_VSMSHADOWPARAMS, vsmShadowParams_);
         }
     }
 
@@ -431,6 +436,8 @@ private:
     Vector4 geometryBufferOffsetAndScale_;
     /// Inverse size of GBuffer.
     Vector2 geometryBufferInvSize_;
+    /// Variance shadow map parameters.
+    Vector2 vsmShadowParams_;
 
     /// Global resources.
     ea::span<const ShaderResourceDesc> globalResources_;
@@ -474,10 +481,16 @@ BatchRenderer::BatchRenderer(Context* context, const DrawableProcessor* drawable
 {
 }
 
+void BatchRenderer::SetVSMShadowParams(const Vector2& vsmShadowParams)
+{
+    vsmShadowParams_ = vsmShadowParams;
+}
+
 void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
     ea::span<const PipelineBatchByState> batches)
 {
     DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, flags };
+    compositor.SetVSMShadowParams(vsmShadowParams_);
     for (const auto& sortedBatch : batches)
         compositor.ProcessSceneBatch(*sortedBatch.sceneBatch_);
 }
@@ -486,6 +499,7 @@ void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* cam
     ea::span<const PipelineBatchBackToFront> batches)
 {
     DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, flags };
+    compositor.SetVSMShadowParams(vsmShadowParams_);
     for (const auto& sortedBatch : batches)
         compositor.ProcessSceneBatch(*sortedBatch.sceneBatch_);
 }
@@ -494,6 +508,7 @@ void BatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera
     const LightVolumeRenderContext& ctx, ea::span<const PipelineBatchByState> batches)
 {
     DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, BatchRenderFlag::PixelLight };
+    compositor.SetVSMShadowParams(vsmShadowParams_);
     compositor.SetGBufferParameters(ctx.geometryBufferOffsetAndScale_, ctx.geometryBufferInvSize_);
     compositor.SetGlobalResources(ctx.geometryBuffer_);
     for (const auto& sortedBatch : batches)
