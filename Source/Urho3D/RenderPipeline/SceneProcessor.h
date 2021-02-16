@@ -24,6 +24,7 @@
 
 #include "../Graphics/Drawable.h"
 #include "../RenderPipeline/BatchCompositor.h"
+#include "../RenderPipeline/BatchRenderer.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
@@ -31,6 +32,7 @@
 namespace Urho3D
 {
 
+class DrawCommandQueue;
 class RenderPipelineInterface;
 class RenderSurface;
 class Viewport;
@@ -84,20 +86,26 @@ public:
     /// Update drawables and batches.
     void Update();
 
+    /// Render shadow maps.
+    void RenderShadowMaps();
+
     /// Return whether is valid.
     bool IsValid() const { return frameInfo_.camera_ && frameInfo_.octree_; }
     /// Return frame info.
     const FrameInfo& GetFrameInfo() const { return frameInfo_; }
     /// Return whether the pass object in callback corresponds to internal pass.
     bool IsInternalPass(Object* pass) const { return batchCompositor_ == pass; }
+    /// Return light volume batches.
+    const auto& GetLightVolumeBatches() const { return batchCompositor_->GetLightVolumeBatches(); }
+
     /// Return drawable processor.
     DrawableProcessor* GetDrawableProcessor() const { return drawableProcessor_; }
     /// Return batch compositor.
     BatchCompositor* GetBatchCompositor() const { return batchCompositor_; }
     /// Return transient shadow map allocator.
     ShadowMapAllocator* GetShadowMapAllocator() const { return shadowMapAllocator_; }
-    /// Return light volume batches.
-    const auto& GetLightVolumeBatches() const { return batchCompositor_->GetLightVolumeBatches(); }
+    /// Return batch renderer.
+    BatchRenderer* GetBatchRenderer() const { return batchRenderer_; }
 
 private:
     /// Called when update begins.
@@ -115,6 +123,10 @@ private:
     SharedPtr<BatchCompositor> batchCompositor_;
     /// Transient shadow map allocator.
     SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
+    /// Batch renderer.
+    SharedPtr<BatchRenderer> batchRenderer_;
+    /// Draw queue for main thread.
+    SharedPtr<DrawCommandQueue> drawQueue_;
 
     /// Settings.
     SceneProcessorSettings settings_;
@@ -129,6 +141,9 @@ private:
     ea::vector<Drawable*> occluders_;
     /// Drawables in current frame.
     ea::vector<Drawable*> drawables_;
+
+    /// Sorted shadow batches.
+    ea::vector<PipelineBatchByState> sortedShadowBatches_;
 };
 
 }

@@ -287,7 +287,7 @@ void BatchCompositor::ComposeLightVolumeBatches()
         key.drawableHash_ = 0;
         key.sourceBatchIndex_ = M_MAX_UNSIGNED;
         key.lightHash_ = lightProcessor->GetLightVolumeHash();
-        key.geometryType_ = GEOM_STATIC;
+        key.geometryType_ = GEOM_STATIC_NOINSTANCING;
         key.geometry_ = renderer_->GetLightGeometry(lightProcessor->GetLight());
         key.material_ = defaultMaterial_;
         key.pass_ = nullPass_;

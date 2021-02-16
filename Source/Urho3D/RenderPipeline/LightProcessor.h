@@ -144,6 +144,8 @@ public:
     const ShadowSplitProcessor* GetSplit(unsigned splitIndex) const { return &splits_[splitIndex]; }
     /// Return mutable shadow split.
     ShadowSplitProcessor* GetMutableSplit(unsigned splitIndex) { return &splits_[splitIndex]; }
+    /// Return active shadow splits.
+    ea::span<const ShadowSplitProcessor> GetSplits() const { return { splits_.data(), numActiveSplits_ }; }
     /// Return shader parameters.
     const LightShaderParameters& GetShaderParams() const { return shaderParams_; }
     /// Return lit geometries.

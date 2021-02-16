@@ -229,7 +229,10 @@ void LightProcessor::Update(DrawableProcessor* drawableProcessor)
 
     // Update shadows
     if (!isShadowRequested_)
+    {
+        numActiveSplits_ = 0;
         return;
+    }
 
     InitializeShadowSplits(drawableProcessor);
 

@@ -136,10 +136,6 @@ private:
     SharedPtr<RenderBuffer> deferredAlbedo_;
     SharedPtr<RenderBuffer> deferredNormal_;
     SharedPtr<RenderBuffer> deferredDepth_;
-
-    SharedPtr<BatchRenderer> sceneBatchRenderer_;
-    SharedPtr<OcclusionBuffer> occlusionBuffer_;
-
 };
 
 }

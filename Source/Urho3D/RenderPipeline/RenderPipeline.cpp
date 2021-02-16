@@ -168,10 +168,12 @@ void RenderPipeline::RegisterObject(Context* context)
     context->RegisterFactory<RenderPipeline>();
 
     URHO3D_ENUM_ATTRIBUTE("Ambient Mode", settings_.ambientMode_, ambientModeNames, AmbientMode::Flat, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Deferred Rendering", bool, settings_.deferred_, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Gamma Correction", bool, settings_.gammaCorrection_, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Enable Shadow", bool, settings_.enableShadows_, true, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Deferred Rendering", bool, settings_.deferred_, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Use Variance Shadow Maps", bool, settings_.varianceShadowMap_, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE("VSM Shadow Settings", Vector2, settings_.vsmShadowParams_, SceneProcessorSettings::DefaultVSMShadowParams, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("VSM Multi Sample", int, settings_.varianceShadowMapMultiSample_, 1, AM_DEFAULT);
 }
 
 void RenderPipeline::ApplyAttributes()
@@ -519,16 +521,22 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
 
 bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 {
-    if (!sceneProcessor_)
+    // Lazy initialize heavy objects
+    if (!drawQueue_)
     {
+        drawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
         sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow");
+        cameraProcessor_ = MakeShared<CameraProcessor>(this);
+
+        viewportColor_ = RenderBuffer::ConnectToViewportColor(this);
+        viewportDepth_ = RenderBuffer::ConnectToViewportDepthStencil(this);
     }
 
     sceneProcessor_->Define(renderTarget, viewport);
     if (!sceneProcessor_->IsValid())
         return false;
 
-    Camera* camera = viewport->GetCamera();
+    cameraProcessor_->Initialize(viewport->GetCamera());
 
     // TODO(renderer): Optimize this
     previousSettings_ = settings_;
@@ -541,22 +549,6 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
     if (!settings_.lowPrecisionShadowMaps_ && !graphics_->GetHiresShadowMapFormat())
         settings_.lowPrecisionShadowMaps_ = true;
-
-    // Lazy initialize heavy objects
-    if (!drawQueue_)
-    {
-        drawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
-
-        cameraProcessor_ = MakeShared<CameraProcessor>(this);
-        viewportColor_ = RenderBuffer::ConnectToViewportColor(this);
-        viewportDepth_ = RenderBuffer::ConnectToViewportDepthStencil(this);
-
-        sceneBatchRenderer_ = MakeShared<BatchRenderer>(context_, sceneProcessor_->GetDrawableProcessor());
-    }
-    sceneBatchRenderer_->SetVSMShadowParams(settings_.vsmShadowParams_);
-
-    // Pre-frame initialize objects
-    cameraProcessor_->Initialize(camera);
 
     // Initialize or reset deferred rendering
     // TODO(renderer): Make it more clean
@@ -618,24 +610,9 @@ void RenderPipeline::Render()
     // TODO(renderer): Do something about this hack
     graphics_->SetVertexBuffer(nullptr);
 
-    // Collect batches
-    static thread_local ea::vector<PipelineBatchByState> shadowBatches;
-    const auto& visibleLights = sceneProcessor_->GetDrawableProcessor()->GetLightProcessors();
-    for (LightProcessor* sceneLight : visibleLights)
-    {
-        const unsigned numSplits = sceneLight->GetNumSplits();
-        for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
-        {
-            const ShadowSplitProcessor* split = sceneLight->GetSplit(splitIndex);
-            split->SortShadowBatches(shadowBatches);
+    sceneProcessor_->RenderShadowMaps();
 
-            drawQueue_->Reset();
-            sceneBatchRenderer_->RenderBatches(*drawQueue_, split->GetShadowCamera(),
-                BatchRenderFlag::None, shadowBatches);
-            sceneProcessor_->GetShadowMapAllocator()->BeginShadowMap(split->GetShadowMap());
-            drawQueue_->Execute();
-        }
-    }
+    auto sceneBatchRenderer_ = sceneProcessor_->GetBatchRenderer();
 
     // TODO(renderer): Remove this guard
 #ifdef DESKTOP_GRAPHICS
@@ -727,8 +704,9 @@ unsigned RenderPipeline::RecalculatePipelineStateHash() const
     unsigned hash = 0;
     CombineHash(hash, cameraProcessor_->GetPipelineStateHash());
     CombineHash(hash, static_cast<unsigned>(settings_.ambientMode_));
-    CombineHash(hash, settings_.deferred_);
     CombineHash(hash, settings_.gammaCorrection_);
+    CombineHash(hash, settings_.enableShadows_);
+    CombineHash(hash, settings_.deferred_);
     CombineHash(hash, settings_.varianceShadowMap_);
     return hash;
 }

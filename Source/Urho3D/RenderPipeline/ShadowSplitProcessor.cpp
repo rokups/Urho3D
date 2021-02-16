@@ -362,11 +362,7 @@ Matrix4 ShadowSplitProcessor::CalculateShadowMatrix(float subPixelOffset) const
 
 void ShadowSplitProcessor::SortShadowBatches(ea::vector<PipelineBatchByState>& sortedBatches) const
 {
-    const unsigned numBatches = shadowCasterBatches_.size();
-    sortedBatches.resize(numBatches);
-    for (unsigned i = 0; i < numBatches; ++i)
-        sortedBatches[i] = PipelineBatchByState{ &shadowCasterBatches_[i] };
-    ea::sort(sortedBatches.begin(), sortedBatches.end());
+    BatchCompositor::SortBatches(sortedBatches, shadowCasterBatches_);
 }
 
 }

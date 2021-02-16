@@ -24,6 +24,7 @@
 
 #include "../Core/Context.h"
 #include "../Core/IteratorRange.h"
+#include "../Graphics/DrawCommandQueue.h"
 #include "../Graphics/OcclusionBuffer.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/OctreeQuery.h"
@@ -128,6 +129,8 @@ SceneProcessor::SceneProcessor(RenderPipelineInterface* renderPipeline, const ea
     , drawableProcessor_(MakeShared<DrawableProcessor>(renderPipeline))
     , batchCompositor_(MakeShared<BatchCompositor>(renderPipeline, drawableProcessor_, Technique::GetPassIndex("shadow")))
     , shadowMapAllocator_(MakeShared<ShadowMapAllocator>(context_))
+    , batchRenderer_(MakeShared<BatchRenderer>(context_, drawableProcessor_))
+    , drawQueue_(renderPipeline->GetDefaultDrawQueue())
 {
     renderPipeline->OnUpdateBegin.Subscribe(this, &SceneProcessor::OnUpdateBegin);
 }
@@ -170,6 +173,7 @@ void SceneProcessor::SetSettings(const SceneProcessorSettings& settings)
     settings_ = settings;
     drawableProcessor_->SetSettings(settings);
     shadowMapAllocator_->SetSettings(settings_);
+    batchRenderer_->SetVSMShadowParams(settings_.vsmShadowParams_);
 }
 
 void SceneProcessor::UpdateFrameInfo(const FrameInfo& frameInfo)
@@ -233,6 +237,27 @@ void SceneProcessor::Update()
         batchCompositor_->ComposeShadowBatches();
     if (settings_.deferred_)
         batchCompositor_->ComposeLightVolumeBatches();
+}
+
+void SceneProcessor::RenderShadowMaps()
+{
+    if (!settings_.enableShadows_)
+        return;
+
+    const auto& visibleLights = drawableProcessor_->GetLightProcessors();
+    for (LightProcessor* sceneLight : visibleLights)
+    {
+        for (const ShadowSplitProcessor& split : sceneLight->GetSplits())
+        {
+            split.SortShadowBatches(sortedShadowBatches_);
+
+            drawQueue_->Reset();
+            batchRenderer_->RenderBatches(*drawQueue_, split.GetShadowCamera(),
+                BatchRenderFlag::None, sortedShadowBatches_);
+            shadowMapAllocator_->BeginShadowMap(split.GetShadowMap());
+            drawQueue_->Execute();
+        }
+    }
 }
 
 void SceneProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
