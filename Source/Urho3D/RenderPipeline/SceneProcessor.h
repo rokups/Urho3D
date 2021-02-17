@@ -26,6 +26,7 @@
 #include "../RenderPipeline/BatchCompositor.h"
 #include "../RenderPipeline/BatchRenderer.h"
 #include "../RenderPipeline/DrawableProcessor.h"
+#include "../RenderPipeline/InstancingBufferCompositor.h"
 #include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
 
@@ -45,6 +46,9 @@ struct URHO3D_API SceneProcessorSettings
     /// Default VSM shadow params.
     static const Vector2 DefaultVSMShadowParams;
 
+    /// Whether to enable instanching.
+    // TODO(renderer): Make true when implemented
+    bool enableInstancing_{ false };
     /// Whether to render shadows.
     bool enableShadows_{ true };
     /// Whether to enable deferred rendering.
@@ -104,6 +108,8 @@ public:
     BatchCompositor* GetBatchCompositor() const { return batchCompositor_; }
     /// Return transient shadow map allocator.
     ShadowMapAllocator* GetShadowMapAllocator() const { return shadowMapAllocator_; }
+    /// Return instancing buffer.
+    InstancingBufferCompositor* GetInstancingBuffer() const { return instancingBufferCompositor_; }
     /// Return batch renderer.
     BatchRenderer* GetBatchRenderer() const { return batchRenderer_; }
 
@@ -121,8 +127,12 @@ private:
     SharedPtr<DrawableProcessor> drawableProcessor_;
     /// Batch compositor.
     SharedPtr<BatchCompositor> batchCompositor_;
+
+    // TODO(renderer): Consider sharing these with another SceneProcessor
     /// Transient shadow map allocator.
     SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
+    /// Instancing buffer compositor.
+    SharedPtr<InstancingBufferCompositor> instancingBufferCompositor_;
     /// Batch renderer.
     SharedPtr<BatchRenderer> batchRenderer_;
     /// Draw queue for main thread.

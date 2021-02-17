@@ -33,6 +33,7 @@ namespace Urho3D
 class Camera;
 class DrawCommandQueue;
 class DrawableProcessor;
+class InstancingBufferCompositor;
 class Texture;
 struct PipelineBatchBackToFront;
 struct PipelineBatchByState;
@@ -46,6 +47,8 @@ enum class BatchRenderFlag
     AmbientAndVertexLights = 1 << 0,
     /// Export pixel light.
     PixelLight = 1 << 1,
+    /// Use instancing for static geometry.
+    InstantiateStaticGeometry = 1 << 2,
 };
 
 URHO3D_FLAGSET(BatchRenderFlag, BatchRenderFlags);
@@ -78,8 +81,11 @@ class URHO3D_API BatchRenderer : public Object
 public:
     /// Construct.
     BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor);
+
     /// Set variance shadow map parameters.
     void SetVSMShadowParams(const Vector2& vsmShadowParams);
+    /// Set instancing buffer.
+    void SetInstancingBuffer(InstancingBufferCompositor* instancingBuffer);
 
     /// Render batches (sorted by state).
     void RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
@@ -98,6 +104,8 @@ private:
     /// Drawable processor.
     const DrawableProcessor* drawableProcessor_{};
 
+    /// Instancing buffer.
+    InstancingBufferCompositor* instancingBuffer_{};
     /// Variance shadow map shader parameters.
     Vector2 vsmShadowParams_;
 };

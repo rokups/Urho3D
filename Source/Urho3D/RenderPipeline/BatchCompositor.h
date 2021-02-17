@@ -141,6 +141,13 @@ class URHO3D_API BatchCompositor : public Object
     URHO3D_OBJECT(BatchCompositor, Object);
 
 public:
+    /// Subpass indices.
+    enum : unsigned
+    {
+        ShadowSubpass = 0,
+        LitVolumeSubpass
+    };
+
     /// Construct.
     BatchCompositor(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
         unsigned shadowPassIndex);

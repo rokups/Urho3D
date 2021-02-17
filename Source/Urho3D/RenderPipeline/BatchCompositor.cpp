@@ -276,7 +276,7 @@ void BatchCompositor::ComposeLightVolumeBatches()
 {
     BatchStateCreateContext ctx;
     ctx.pass_ = this;
-    ctx.subpassIndex_ = 1;
+    ctx.subpassIndex_ = LitVolumeSubpass;
 
     const auto& lightProcessors = drawableProcessor_->GetLightProcessors();
     for (unsigned lightIndex = 0; lightIndex < lightProcessors.size(); ++lightIndex)
@@ -377,7 +377,7 @@ void BatchCompositor::FinalizeShadowBatchesComposition()
 {
     BatchStateCreateContext ctx;
     ctx.pass_ = this;
-    ctx.subpassIndex_ = 0;
+    ctx.subpassIndex_ = ShadowSubpass;
 
     for (const auto& splitAndKey : delayedShadowBatches_)
     {

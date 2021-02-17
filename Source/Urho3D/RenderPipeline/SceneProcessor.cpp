@@ -129,6 +129,7 @@ SceneProcessor::SceneProcessor(RenderPipelineInterface* renderPipeline, const ea
     , drawableProcessor_(MakeShared<DrawableProcessor>(renderPipeline))
     , batchCompositor_(MakeShared<BatchCompositor>(renderPipeline, drawableProcessor_, Technique::GetPassIndex("shadow")))
     , shadowMapAllocator_(MakeShared<ShadowMapAllocator>(context_))
+    , instancingBufferCompositor_(MakeShared<InstancingBufferCompositor>(context_))
     , batchRenderer_(MakeShared<BatchRenderer>(context_, drawableProcessor_))
     , drawQueue_(renderPipeline->GetDefaultDrawQueue())
 {
@@ -244,6 +245,10 @@ void SceneProcessor::RenderShadowMaps()
     if (!settings_.enableShadows_)
         return;
 
+    BatchRenderFlags flags = BatchRenderFlag::None;
+    if (settings_.enableInstancing_)
+        flags |= BatchRenderFlag::InstantiateStaticGeometry;
+
     const auto& visibleLights = drawableProcessor_->GetLightProcessors();
     for (LightProcessor* sceneLight : visibleLights)
     {
@@ -251,9 +256,16 @@ void SceneProcessor::RenderShadowMaps()
         {
             split.SortShadowBatches(sortedShadowBatches_);
 
+            if (settings_.enableInstancing_)
+                instancingBufferCompositor_->Reset();
+
             drawQueue_->Reset();
-            batchRenderer_->RenderBatches(*drawQueue_, split.GetShadowCamera(),
-                BatchRenderFlag::None, sortedShadowBatches_);
+            batchRenderer_->SetInstancingBuffer(instancingBufferCompositor_);
+            batchRenderer_->RenderBatches(*drawQueue_, split.GetShadowCamera(), flags, sortedShadowBatches_);
+
+            if (settings_.enableInstancing_)
+                instancingBufferCompositor_->Commit();
+
             shadowMapAllocator_->BeginShadowMap(split.GetShadowMap());
             drawQueue_->Execute();
         }

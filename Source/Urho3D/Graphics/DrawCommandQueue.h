@@ -226,8 +226,21 @@ public:
     /// Set vertex and index buffers.
     void SetBuffers(const ea::vector<SharedPtr<VertexBuffer>>& vertexBuffers, IndexBuffer* indexBuffer)
     {
-        ea::copy(vertexBuffers.begin(), vertexBuffers.end(), currentDrawCommand_.vertexBuffers_.begin());
         currentDrawCommand_.indexBuffer_ = indexBuffer;
+
+        assert(vertexBuffers.size() < MAX_VERTEX_STREAMS);
+        ea::copy(vertexBuffers.begin(), vertexBuffers.end(), currentDrawCommand_.vertexBuffers_.begin());
+    }
+
+    /// Set vertex, index and instancing buffers.
+    void SetBuffers(const ea::vector<SharedPtr<VertexBuffer>>& vertexBuffers,
+        IndexBuffer* indexBuffer, VertexBuffer* instancingBuffer)
+    {
+        currentDrawCommand_.indexBuffer_ = indexBuffer;
+
+        assert(vertexBuffers.size() + 1 < MAX_VERTEX_STREAMS);
+        const auto iter = ea::copy(vertexBuffers.begin(), vertexBuffers.end(), currentDrawCommand_.vertexBuffers_.begin());
+        *iter = instancingBuffer;
     }
 
     /// Enqueue draw non-indexed geometry.

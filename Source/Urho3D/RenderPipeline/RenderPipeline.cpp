@@ -168,12 +168,13 @@ void RenderPipeline::RegisterObject(Context* context)
     context->RegisterFactory<RenderPipeline>();
 
     URHO3D_ENUM_ATTRIBUTE("Ambient Mode", settings_.ambientMode_, ambientModeNames, AmbientMode::Flat, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Gamma Correction", bool, settings_.gammaCorrection_, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Enable Instancing", bool, settings_.enableInstancing_, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Enable Shadow", bool, settings_.enableShadows_, true, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Deferred Rendering", bool, settings_.deferred_, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Use Variance Shadow Maps", bool, settings_.varianceShadowMap_, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE("VSM Shadow Settings", Vector2, settings_.vsmShadowParams_, SceneProcessorSettings::DefaultVSMShadowParams, AM_DEFAULT);
     URHO3D_ATTRIBUTE("VSM Multi Sample", int, settings_.varianceShadowMapMultiSample_, 1, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Gamma Correction", bool, settings_.gammaCorrection_, false, AM_DEFAULT);
 }
 
 void RenderPipeline::ApplyAttributes()
@@ -184,7 +185,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     const BatchStateCreateKey& key, const BatchStateCreateContext& ctx)
 {
     const bool isInternalPass = sceneProcessor_->IsInternalPass(ctx.pass_);
-    if (isInternalPass && ctx.subpassIndex_ == 1)
+    if (isInternalPass && ctx.subpassIndex_ == BatchCompositor::LitVolumeSubpass)
     {
         return CreateLightVolumePipelineState(key.light_, key.geometry_);
     }
@@ -300,6 +301,11 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     switch (key.geometryType_)
     {
     case GEOM_STATIC:
+        if (settings_.enableInstancing_)
+            vertexShaderDefines += "GEOM_INSTANCED ";
+        else
+            vertexShaderDefines += "GEOM_STATIC ";
+        break;
     case GEOM_STATIC_NOINSTANCING:
         vertexShaderDefines += "GEOM_STATIC ";
         break;
@@ -350,6 +356,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         }
     }
 
+    // TODO(renderer): This check is not correct, have to check for AMBIENT is pass defines
     if (isLitBasePass)
         commonDefines += "NUMVERTEXLIGHTS=4 ";
 
@@ -540,7 +547,6 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
     // TODO(renderer): Optimize this
     previousSettings_ = settings_;
-    sceneProcessor_->SetSettings(settings_);
 
     // Validate settings
     if (settings_.deferred_ && !graphics_->GetDeferredSupport()
@@ -549,6 +555,11 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
     if (!settings_.lowPrecisionShadowMaps_ && !graphics_->GetHiresShadowMapFormat())
         settings_.lowPrecisionShadowMaps_ = true;
+
+    if (settings_.enableInstancing_ && !graphics_->GetInstancingSupport())
+        settings_.enableInstancing_ = false;
+
+    sceneProcessor_->SetSettings(settings_);
 
     // Initialize or reset deferred rendering
     // TODO(renderer): Make it more clean
@@ -613,6 +624,8 @@ void RenderPipeline::Render()
     sceneProcessor_->RenderShadowMaps();
 
     auto sceneBatchRenderer_ = sceneProcessor_->GetBatchRenderer();
+    auto instancingBuffer = sceneProcessor_->GetInstancingBuffer();
+    auto flag = settings_.enableInstancing_ ? BatchRenderFlag::InstantiateStaticGeometry : BatchRenderFlag::None;
 
     // TODO(renderer): Remove this guard
 #ifdef DESKTOP_GRAPHICS
@@ -624,8 +637,13 @@ void RenderPipeline::Render()
         deferredDepth_->ClearDepthStencil();
         deferredDepth_->SetRenderTargets({ deferredFinal_, deferredAlbedo_, deferredNormal_ });
         drawQueue_->Reset();
+        if (settings_.enableInstancing_)
+            instancingBuffer->Reset();
+        sceneBatchRenderer_->SetInstancingBuffer(instancingBuffer);
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            BatchRenderFlag::AmbientAndVertexLights, deferredPass_->GetBatches());
+            BatchRenderFlag::AmbientAndVertexLights | flag, deferredPass_->GetBatches());
+        if (settings_.enableInstancing_)
+            instancingBuffer->Commit();
         drawQueue_->Execute();
 
         // Draw deferred lights
@@ -657,12 +675,17 @@ void RenderPipeline::Render()
         viewportDepth_->SetRenderTargets({ viewportColor_ });
 
         drawQueue_->Reset();
+        if (settings_.enableInstancing_)
+            instancingBuffer->Reset();
+        sceneBatchRenderer_->SetInstancingBuffer(instancingBuffer);
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            BatchRenderFlag::AmbientAndVertexLights | BatchRenderFlag::PixelLight, basePass_->GetSortedBaseBatches());
+            BatchRenderFlag::AmbientAndVertexLights | BatchRenderFlag::PixelLight | flag, basePass_->GetSortedBaseBatches());
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            BatchRenderFlag::PixelLight, basePass_->GetSortedLightBatches());
+            BatchRenderFlag::PixelLight | flag, basePass_->GetSortedLightBatches());
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            BatchRenderFlag::AmbientAndVertexLights | BatchRenderFlag::PixelLight, alphaPass_->GetSortedBatches());
+            BatchRenderFlag::AmbientAndVertexLights | BatchRenderFlag::PixelLight | flag, alphaPass_->GetSortedBatches());
+        if (settings_.enableInstancing_)
+            instancingBuffer->Commit();
         drawQueue_->Execute();
     }
 
@@ -705,6 +728,7 @@ unsigned RenderPipeline::RecalculatePipelineStateHash() const
     CombineHash(hash, cameraProcessor_->GetPipelineStateHash());
     CombineHash(hash, static_cast<unsigned>(settings_.ambientMode_));
     CombineHash(hash, settings_.gammaCorrection_);
+    CombineHash(hash, settings_.enableInstancing_);
     CombineHash(hash, settings_.enableShadows_);
     CombineHash(hash, settings_.deferred_);
     CombineHash(hash, settings_.varianceShadowMap_);

@@ -32,6 +32,7 @@
 #include "../IO/Log.h"
 #include "../RenderPipeline/BatchRenderer.h"
 #include "../RenderPipeline/DrawableProcessor.h"
+#include "../RenderPipeline/InstancingBufferCompositor.h"
 #include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/PipelineBatchSortKey.h"
 #include "../Scene/Scene.h"
@@ -107,6 +108,7 @@ public:
         , enableAmbientAndVertexLights_(flags.Test(BatchRenderFlag::AmbientAndVertexLights))
         , enablePixelLights_(flags.Test(BatchRenderFlag::PixelLight))
         , enableLight_(enableAmbientAndVertexLights_ || enablePixelLights_)
+        , enableStaticInstancing_(flags.Test(BatchRenderFlag::InstantiateStaticGeometry))
         , drawableProcessor_(drawableProcessor)
         , frameInfo_(drawableProcessor_.GetFrameInfo())
         , scene_(frameInfo_.scene_)
@@ -121,6 +123,12 @@ public:
     void SetVSMShadowParams(const Vector2& vsmShadowParams)
     {
         vsmShadowParams_ = vsmShadowParams;
+    }
+
+    /// Set instancing buffer.
+    void SetInstancingBuffer(InstancingBufferCompositor* instancingBuffer)
+    {
+        instancingBuffer_ = instancingBuffer;
     }
 
     /// Set GBuffer parameters.
@@ -148,6 +156,19 @@ public:
         Light* light = lights_[pipelineBatch.lightIndex_]->GetLight();
         lightVolumeTransform_ = light->GetVolumeTransform(camera_);
         ProcessBatch(pipelineBatch, lightVolumeSourceBatch_);
+    }
+
+    /// Flush pending draw queue commands.
+    void FlushDrawCommands()
+    {
+        if (instanceCount_ > 0)
+        {
+            drawQueue_.SetBuffers(lastGeometry_->GetVertexBuffers(), lastGeometry_->GetIndexBuffer(),
+                instancingBuffer_->GetVertexBuffer());
+            drawQueue_.DrawIndexedInstanced(lastGeometry_->GetIndexStart(), lastGeometry_->GetIndexCount(),
+                startInstance_, instanceCount_);
+            instanceCount_ = 0;
+        }
     }
 
 private:
@@ -264,29 +285,20 @@ private:
             ? &drawableProcessor_.GetGeometryLighting(pipelineBatch.drawableIndex_)
             : nullptr;
 
-        // Initialize pipeline state
-        drawQueue_.SetPipelineState(pipelineBatch.pipelineState_);
+        // Check if pipeline state changed
+        const bool pipelineStateDirty = pipelineBatch.pipelineState_ != lastPipelineState_;
+        if (pipelineStateDirty)
+            lastPipelineState_ = pipelineBatch.pipelineState_;
 
-        // Add frame shader parameters
-        if (drawQueue_.BeginShaderParameterGroup(SP_FRAME, frameDirty_))
-        {
-            AddFrameShaderParameters();
-            drawQueue_.CommitShaderParameterGroup(SP_FRAME);
-            frameDirty_ = false;
-        }
-
-        // Add camera shader parameters
+        // Check if camera parameters changed
         const float constantDepthBias = pipelineBatch.pipelineState_->GetDesc().constantDepthBias_;
-        if (drawQueue_.BeginShaderParameterGroup(SP_CAMERA,
-            cameraDirty_ || lastConstantDepthBias_ != constantDepthBias))
+        if (lastConstantDepthBias_ != constantDepthBias)
         {
-            AddCameraShaderParameters(constantDepthBias);
-            drawQueue_.CommitShaderParameterGroup(SP_CAMERA);
-            cameraDirty_ = false;
             lastConstantDepthBias_ = constantDepthBias;
+            cameraDirty_ = true;
         }
 
-        // Check if lights are dirty
+        // Check if pixel lights changed
         bool pixelLightDirty = false;
         if (enablePixelLights_)
         {
@@ -299,6 +311,7 @@ private:
             }
         }
 
+        // Check if vertex lights changed
         bool vertexLightsDirty = false;
         if (enableAmbientAndVertexLights_)
         {
@@ -313,100 +326,164 @@ private:
             }
         }
 
-        // Add light shader parameters
-        if (enableLight_ && drawQueue_.BeginShaderParameterGroup(SP_LIGHT, pixelLightDirty || vertexLightsDirty))
-        {
-            AddLightShaderParameters();
-            drawQueue_.CommitShaderParameterGroup(SP_LIGHT);
-        }
-
         // Check if material is dirty
-        bool materialDirty = false;
-        if (lastMaterial_ != pipelineBatch.material_)
-        {
-            materialDirty = true;
+        const bool materialDirty = lastMaterial_ != pipelineBatch.material_;
+        if (materialDirty)
             lastMaterial_ = pipelineBatch.material_;
-        }
 
-        // Add material shader parameters
-        if (drawQueue_.BeginShaderParameterGroup(SP_MATERIAL, materialDirty))
+        // Check if geometry is dirty
+        const bool geometryDirty = lastGeometry_ != pipelineBatch.geometry_;
+
+        // Check if batch should be appended to ongoing instanced draw operation
+        const bool appendInstancedBatch = instanceCount_ > 0
+            && !pipelineStateDirty && !pixelLightDirty && !vertexLightsDirty && !materialDirty && !geometryDirty;
+
+        // Update state if not instanced batch
+        if (!appendInstancedBatch)
         {
-            const auto& materialParameters = pipelineBatch.material_->GetShaderParameters();
-            for (const auto& parameter : materialParameters)
-                drawQueue_.AddShaderParameter(parameter.first, parameter.second.value_);
-            drawQueue_.CommitShaderParameterGroup(SP_MATERIAL);
-        }
+            // Flush draw commands if instancing draw was in progress
+            FlushDrawCommands();
 
-        // Add resources
-        // TODO(renderer): Don't check for pixelLightDirty, check for shadow map and ramp/shape only
-        if (materialDirty || pixelLightDirty)
-        {
-            // Add global resources
-            for (const ShaderResourceDesc& desc : globalResources_)
-                drawQueue_.AddShaderResource(desc.unit_, desc.texture_);
+            // TODO(renderer): Cleanup me
+            if (geometryDirty)
+                lastGeometry_ = pipelineBatch.geometry_;
 
-            // Add material resources
-            const auto& materialTextures = pipelineBatch.material_->GetTextures();
-            for (const auto& texture : materialTextures)
-                drawQueue_.AddShaderResource(texture.first, texture.second);
+            // Initialize pipeline state
+            if (pipelineStateDirty)
+                drawQueue_.SetPipelineState(pipelineBatch.pipelineState_);
 
-            // Add light resources
-            if (hasPixelLight_)
+            // Add frame shader parameters
+            if (drawQueue_.BeginShaderParameterGroup(SP_FRAME, frameDirty_))
             {
-                drawQueue_.AddShaderResource(TU_LIGHTRAMP, lightParams_->lightRamp_);
-                drawQueue_.AddShaderResource(TU_LIGHTSHAPE, lightParams_->lightShape_);
-                if (lightParams_->shadowMap_)
-                    drawQueue_.AddShaderResource(TU_SHADOWMAP, lightParams_->shadowMap_);
+                AddFrameShaderParameters();
+                drawQueue_.CommitShaderParameterGroup(SP_FRAME);
+                frameDirty_ = false;
             }
 
-            drawQueue_.CommitShaderResources();
-        }
+            // Add camera shader parameters
+            if (drawQueue_.BeginShaderParameterGroup(SP_CAMERA, cameraDirty_))
+            {
+                AddCameraShaderParameters(constantDepthBias);
+                drawQueue_.CommitShaderParameterGroup(SP_CAMERA);
+                cameraDirty_ = false;
+            }
 
-        // Add object shader parameters
-        if (drawQueue_.BeginShaderParameterGroup(SP_OBJECT, true))
+            // Add light shader parameters
+            if (enableLight_ && drawQueue_.BeginShaderParameterGroup(SP_LIGHT, pixelLightDirty || vertexLightsDirty))
+            {
+                AddLightShaderParameters();
+                drawQueue_.CommitShaderParameterGroup(SP_LIGHT);
+            }
+
+            // Add material shader parameters
+            if (drawQueue_.BeginShaderParameterGroup(SP_MATERIAL, materialDirty))
+            {
+                const auto& materialParameters = pipelineBatch.material_->GetShaderParameters();
+                for (const auto& parameter : materialParameters)
+                    drawQueue_.AddShaderParameter(parameter.first, parameter.second.value_);
+                drawQueue_.CommitShaderParameterGroup(SP_MATERIAL);
+            }
+
+            // Add resources
+            // TODO(renderer): Don't check for pixelLightDirty, check for shadow map and ramp/shape only
+            if (materialDirty || pixelLightDirty)
+            {
+                // Add global resources
+                for (const ShaderResourceDesc& desc : globalResources_)
+                    drawQueue_.AddShaderResource(desc.unit_, desc.texture_);
+
+                // Add material resources
+                const auto& materialTextures = pipelineBatch.material_->GetTextures();
+                for (const auto& texture : materialTextures)
+                    drawQueue_.AddShaderResource(texture.first, texture.second);
+
+                // Add light resources
+                if (hasPixelLight_)
+                {
+                    drawQueue_.AddShaderResource(TU_LIGHTRAMP, lightParams_->lightRamp_);
+                    drawQueue_.AddShaderResource(TU_LIGHTSHAPE, lightParams_->lightShape_);
+                    if (lightParams_->shadowMap_)
+                        drawQueue_.AddShaderResource(TU_SHADOWMAP, lightParams_->shadowMap_);
+                }
+
+                drawQueue_.CommitShaderResources();
+            }
+
+            // Add object shader parameters
+            const bool useInstancingBuffer = enableStaticInstancing_
+                && pipelineBatch.geometryType_ == GEOM_STATIC
+                && !!pipelineBatch.geometry_->GetIndexBuffer();
+            if (useInstancingBuffer)
+            {
+                // TODO(renderer): Refactor me
+                instanceCount_ = 1;
+                startInstance_ = instancingBuffer_->AddInstance();
+                instancingBuffer_->SetElements(sourceBatch.worldTransform_, 0, 3);
+                if (enableAmbientAndVertexLights_)
+                {
+                    const SphericalHarmonicsDot9& sh = lightAccumulator->sh_;
+                    const Vector4 ambient(sh.EvaluateAverage(), 1.0f);
+                    instancingBuffer_->SetElements(&ambient, 3, 1);
+                }
+            }
+            else if (drawQueue_.BeginShaderParameterGroup(SP_OBJECT, true))
+            {
+                // Add ambient light parameters
+                if (enableAmbientAndVertexLights_)
+                {
+                    const SphericalHarmonicsDot9& sh = lightAccumulator->sh_;
+                    drawQueue_.AddShaderParameter(VSP_SHAR, sh.Ar_);
+                    drawQueue_.AddShaderParameter(VSP_SHAG, sh.Ag_);
+                    drawQueue_.AddShaderParameter(VSP_SHAB, sh.Ab_);
+                    drawQueue_.AddShaderParameter(VSP_SHBR, sh.Br_);
+                    drawQueue_.AddShaderParameter(VSP_SHBG, sh.Bg_);
+                    drawQueue_.AddShaderParameter(VSP_SHBB, sh.Bb_);
+                    drawQueue_.AddShaderParameter(VSP_SHC, sh.C_);
+                    drawQueue_.AddShaderParameter(VSP_AMBIENT, Vector4(sh.EvaluateAverage(), 1.0f));
+                }
+
+                // Add transform parameters
+                switch (pipelineBatch.geometryType_)
+                {
+                case GEOM_INSTANCED:
+                    // TODO(renderer): Implement instancing
+                    assert(0);
+                    break;
+                case GEOM_SKINNED:
+                    drawQueue_.AddShaderParameter(VSP_SKINMATRICES,
+                        ea::span<const Matrix3x4>(sourceBatch.worldTransform_, sourceBatch.numWorldTransforms_));
+                    break;
+                case GEOM_BILLBOARD:
+                    drawQueue_.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
+                    if (sourceBatch.numWorldTransforms_ > 1)
+                        drawQueue_.AddShaderParameter(VSP_BILLBOARDROT, sourceBatch.worldTransform_[1].RotationMatrix());
+                    else
+                        drawQueue_.AddShaderParameter(VSP_BILLBOARDROT, cameraNode_->GetWorldRotation().RotationMatrix());
+                    break;
+                default:
+                    drawQueue_.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
+                    break;
+                }
+                drawQueue_.CommitShaderParameterGroup(SP_OBJECT);
+
+                // Set buffers and draw
+                drawQueue_.SetBuffers(pipelineBatch.geometry_->GetVertexBuffers(), pipelineBatch.geometry_->GetIndexBuffer());
+                drawQueue_.DrawIndexed(pipelineBatch.geometry_->GetIndexStart(), pipelineBatch.geometry_->GetIndexCount());
+            }
+        }
+        else
         {
-            // Add ambient light parameters
+            // TODO(renderer): Refactor me
+            instanceCount_ += 1;
+            instancingBuffer_->AddInstance();
+            instancingBuffer_->SetElements(sourceBatch.worldTransform_, 0, 3);
             if (enableAmbientAndVertexLights_)
             {
                 const SphericalHarmonicsDot9& sh = lightAccumulator->sh_;
-                drawQueue_.AddShaderParameter(VSP_SHAR, sh.Ar_);
-                drawQueue_.AddShaderParameter(VSP_SHAG, sh.Ag_);
-                drawQueue_.AddShaderParameter(VSP_SHAB, sh.Ab_);
-                drawQueue_.AddShaderParameter(VSP_SHBR, sh.Br_);
-                drawQueue_.AddShaderParameter(VSP_SHBG, sh.Bg_);
-                drawQueue_.AddShaderParameter(VSP_SHBB, sh.Bb_);
-                drawQueue_.AddShaderParameter(VSP_SHC, sh.C_);
-                drawQueue_.AddShaderParameter(VSP_AMBIENT, Vector4(sh.EvaluateAverage(), 1.0f));
+                const Vector4 ambient(sh.EvaluateAverage(), 1.0f);
+                instancingBuffer_->SetElements(&ambient, 3, 1);
             }
-
-            // Add transform parameters
-            switch (pipelineBatch.geometryType_)
-            {
-            case GEOM_INSTANCED:
-                // TODO(renderer): Implement instancing
-                assert(0);
-                break;
-            case GEOM_SKINNED:
-                drawQueue_.AddShaderParameter(VSP_SKINMATRICES,
-                    ea::span<const Matrix3x4>(sourceBatch.worldTransform_, sourceBatch.numWorldTransforms_));
-                break;
-            case GEOM_BILLBOARD:
-                drawQueue_.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
-                if (sourceBatch.numWorldTransforms_ > 1)
-                    drawQueue_.AddShaderParameter(VSP_BILLBOARDROT, sourceBatch.worldTransform_[1].RotationMatrix());
-                else
-                    drawQueue_.AddShaderParameter(VSP_BILLBOARDROT, cameraNode_->GetWorldRotation().RotationMatrix());
-                break;
-            default:
-                drawQueue_.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
-                break;
-            }
-            drawQueue_.CommitShaderParameterGroup(SP_OBJECT);
         }
-
-        // Set buffers and draw
-        drawQueue_.SetBuffers(pipelineBatch.geometry_->GetVertexBuffers(), pipelineBatch.geometry_->GetIndexBuffer());
-        drawQueue_.DrawIndexed(pipelineBatch.geometry_->GetIndexStart(), pipelineBatch.geometry_->GetIndexCount());
     }
 
     /// Destination draw queue.
@@ -418,6 +495,8 @@ private:
     const bool enablePixelLights_;
     /// Export light of any kind.
     const bool enableLight_;
+    /// Use instancing buffer for object parameters of static geometry.
+    const bool enableStaticInstancing_;
 
     /// Drawable processor.
     const DrawableProcessor& drawableProcessor_;
@@ -438,9 +517,14 @@ private:
     Vector2 geometryBufferInvSize_;
     /// Variance shadow map parameters.
     Vector2 vsmShadowParams_;
+    /// Set instancing buffer.
+    InstancingBufferCompositor* instancingBuffer_{};
 
     /// Global resources.
     ea::span<const ShaderResourceDesc> globalResources_;
+
+    /// Last used pipeline state.
+    PipelineState* lastPipelineState_{};
 
     /// Whether frame shader parameters are dirty.
     bool frameDirty_{ true };
@@ -465,11 +549,18 @@ private:
 
     /// Last used material.
     Material* lastMaterial_{};
+    /// Last used geometry.
+    Geometry* lastGeometry_{};
 
     /// Temporary world transform for light volumes.
     Matrix3x4 lightVolumeTransform_;
     /// Temporary source batch for light volumes.
     SourceBatch lightVolumeSourceBatch_;
+
+    /// Start instance for pending call.
+    unsigned startInstance_{};
+    /// Number of instances in call.
+    unsigned instanceCount_{};
 };
 
 }
@@ -486,13 +577,20 @@ void BatchRenderer::SetVSMShadowParams(const Vector2& vsmShadowParams)
     vsmShadowParams_ = vsmShadowParams;
 }
 
+void BatchRenderer::SetInstancingBuffer(InstancingBufferCompositor* instancingBuffer)
+{
+    instancingBuffer_ = instancingBuffer;
+}
+
 void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
     ea::span<const PipelineBatchByState> batches)
 {
     DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, flags };
     compositor.SetVSMShadowParams(vsmShadowParams_);
+    compositor.SetInstancingBuffer(instancingBuffer_);
     for (const auto& sortedBatch : batches)
         compositor.ProcessSceneBatch(*sortedBatch.sceneBatch_);
+    compositor.FlushDrawCommands();
 }
 
 void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
@@ -500,8 +598,10 @@ void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* cam
 {
     DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, flags };
     compositor.SetVSMShadowParams(vsmShadowParams_);
+    compositor.SetInstancingBuffer(instancingBuffer_);
     for (const auto& sortedBatch : batches)
         compositor.ProcessSceneBatch(*sortedBatch.sceneBatch_);
+    compositor.FlushDrawCommands();
 }
 
 void BatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera* camera,
@@ -513,6 +613,7 @@ void BatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera
     compositor.SetGlobalResources(ctx.geometryBuffer_);
     for (const auto& sortedBatch : batches)
         compositor.ProcessLightVolumeBatch(*sortedBatch.sceneBatch_);
+    compositor.FlushDrawCommands();
 }
 
 }
