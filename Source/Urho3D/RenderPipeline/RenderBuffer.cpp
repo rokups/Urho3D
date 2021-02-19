@@ -118,44 +118,6 @@ Vector4 CalculateViewportOffsetAndScale(const IntVector2& textureSize, const Int
 #endif
 }
 
-/// Thread safe provider of unique indexes.
-class ThreadSafeIndex
-{
-public:
-    /// Allocate index for object.
-    unsigned Allocate()
-    {
-        MutexLock<Mutex> lock(mutex_);
-
-        // Scroll next index until get a free one.
-        while (allocated_.contains(nextIndex_) || nextIndex_ == 0)
-            ++nextIndex_;
-
-        allocated_.insert(nextIndex_);
-        return nextIndex_++;
-    }
-
-    /// Release index.
-    void Release(unsigned index)
-    {
-        MutexLock<Mutex> lock(mutex_);
-
-        assert(allocated_.contains(index));
-        allocated_.erase(index);
-    }
-
-private:
-    /// Mutex that protects map and index.
-    Mutex mutex_;
-    /// Next index.
-    unsigned nextIndex_{};
-    /// Map from index to object.
-    ea::unordered_set<unsigned> allocated_;
-};
-
-/// Persistent screen buffers.
-static ThreadSafeIndex persistentScreenBuffers;
-
 }
 
 SharedPtr<RenderBuffer> RenderBuffer::Create(RenderPipelineInterface* renderPipeline,
@@ -457,15 +419,12 @@ TextureRenderBuffer::TextureRenderBuffer(
     , params_(params)
     , sizeMultiplier_(sizeMultiplier)
     , fixedSize_(fixedSize)
+    , persistenceKey_(persistent ? GetObjectID() : 0)
 {
-    if (persistent)
-        persistenceKey_ = persistentScreenBuffers.Allocate();
 }
 
 TextureRenderBuffer::~TextureRenderBuffer()
 {
-    if (persistenceKey_)
-        persistentScreenBuffers.Release(persistenceKey_);
 }
 
 void TextureRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)

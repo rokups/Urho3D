@@ -23,6 +23,7 @@
 #pragma once
 
 #include "../Container/FlagSet.h"
+#include "../Container/IndexAllocator.h"
 #include "../Core/Object.h"
 #include "../Graphics/GraphicsDefs.h"
 
@@ -65,7 +66,7 @@ enum class RenderBufferFlag
 URHO3D_FLAGSET(RenderBufferFlag, RenderBufferFlags);
 
 /// Base class fro writable texture or texture region. Readability is not guaranteed.
-class URHO3D_API RenderBuffer : public Object
+class URHO3D_API RenderBuffer : public Object, public IDFamily<RenderBuffer>
 {
     URHO3D_OBJECT(RenderBuffer, Object);
 

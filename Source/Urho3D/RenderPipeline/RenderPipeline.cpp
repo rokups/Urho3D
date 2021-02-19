@@ -26,7 +26,7 @@
 #include "../Core/IteratorRange.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/ConstantBuffer.h"
-#include "../Graphics/ConstantBufferLayout.h"
+#include "../Graphics/ShaderProgramLayout.h"
 #include "../Graphics/DebugRenderer.h"
 #include "../Graphics/DrawCommandQueue.h"
 #include "../Graphics/IndexBuffer.h"
@@ -544,6 +544,8 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         return false;
 
     cameraProcessor_->Initialize(viewport->GetCamera());
+
+    settings_.enableInstancing_ = GetSubsystem<Renderer>()->GetDynamicInstancing();
 
     // TODO(renderer): Optimize this
     previousSettings_ = settings_;

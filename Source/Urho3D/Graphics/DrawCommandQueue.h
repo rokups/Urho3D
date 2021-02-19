@@ -24,7 +24,7 @@
 
 #include "../Core/Object.h"
 #include "../Graphics/ConstantBuffer.h"
-#include "../Graphics/ConstantBufferLayout.h"
+#include "../Graphics/ShaderProgramLayout.h"
 #include "../Graphics/Geometry.h"
 #include "../Graphics/IndexBuffer.h"
 #include "../Graphics/PipelineState.h"
@@ -105,7 +105,7 @@ public:
 
         if (useConstantBuffers_)
         {
-            constantBuffers_.currentLayout_ = pipelineState->GetConstantBufferLayout();
+            constantBuffers_.currentLayout_ = pipelineState->GetShaderProgramLayout();
         }
     }
 
@@ -404,7 +404,7 @@ private:
         /// Current constant buffer group.
         ShaderParameterGroup currentGroup_{ MAX_SHADER_PARAMETER_GROUPS };
         /// Current constant buffer layout.
-        ConstantBufferLayout* currentLayout_{};
+        ShaderProgramLayout* currentLayout_{};
         /// Current pointer to constant buffer data.
         unsigned char* currentData_{};
         /// Current constant buffer layout hashes.

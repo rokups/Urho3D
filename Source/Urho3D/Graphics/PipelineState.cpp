@@ -45,13 +45,11 @@ bool PipelineState::Create(const PipelineStateDesc& desc)
 
     desc_ = desc;
     OnDeviceReset();
-#ifndef URHO3D_D3D9
-    if (!constantBufferLayout_)
+    if (!shaderProgramLayout_)
     {
-        URHO3D_LOGERROR("Constant buffer layout of pipeline state is invalid");
+        URHO3D_LOGERROR("Shader program layout of pipeline state is invalid");
         return false;
     }
-#endif
 
     return true;
 }
@@ -75,19 +73,17 @@ void PipelineState::Apply()
 
 void PipelineState::OnDeviceLost()
 {
-    constantBufferLayout_ = nullptr;
+    shaderProgramLayout_ = nullptr;
 }
 
 void PipelineState::OnDeviceReset()
 {
-#ifndef URHO3D_D3D9
-    constantBufferLayout_ = graphics_->GetConstantBufferLayout(desc_.vertexShader_, desc_.pixelShader_);
-#endif
+    shaderProgramLayout_ = graphics_->GetShaderProgramLayout(desc_.vertexShader_, desc_.pixelShader_);
 }
 
 void PipelineState::Release()
 {
-    constantBufferLayout_ = nullptr;
+    shaderProgramLayout_ = nullptr;
 }
 
 }

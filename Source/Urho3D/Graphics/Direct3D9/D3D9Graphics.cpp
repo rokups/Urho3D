@@ -1056,10 +1056,20 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
     }
 }
 
-ConstantBufferLayout* Graphics::GetConstantBufferLayout(ShaderVariation* vs, ShaderVariation* ps)
+ShaderProgramLayout* Graphics::GetShaderProgramLayout(ShaderVariation* vs, ShaderVariation* ps)
 {
-    URHO3D_LOGERROR("Graphics::GetConstantBufferLayout is not supported for D3D9 graphics");
-    return nullptr;
+    const auto combination = ea::make_pair(vs, ps);
+    auto iter = impl_->shaderPrograms_.find(combination);
+    if (iter != impl_->shaderPrograms_.end())
+        return iter->second;
+
+    // TODO(renderer): Some overhead due to redundant setting of shader program
+    ShaderVariation* prevVertexShader = vertexShader_;
+    ShaderVariation* prevPixelShader = pixelShader_;
+    SetShaders(vs, ps);
+    ShaderProgramLayout* layout = impl_->shaderProgram_;
+    SetShaders(prevVertexShader, prevPixelShader);
+    return layout;
 }
 
 void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)

@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "../Container/IndexAllocator.h"
 #include "../Container/RefCounted.h"
 #include "../Graphics/GraphicsDefs.h"
 
@@ -42,7 +43,7 @@ struct ConstantBufferElement
 };
 
 /// Description of constant buffer layout of shader program.
-class URHO3D_API ConstantBufferLayout : public RefCounted
+class URHO3D_API ShaderProgramLayout : public RefCounted, public IDFamily<ShaderProgramLayout>
 {
 public:
     /// Return constant buffer size for given group.
@@ -63,38 +64,11 @@ public:
 
 protected:
     /// Add constant buffer.
-    void AddConstantBuffer(ShaderParameterGroup group, unsigned size)
-    {
-        constantBufferSizes_[group] = size;
-    }
-
+    void AddConstantBuffer(ShaderParameterGroup group, unsigned size);
     /// Add parameter inside constant buffer.
-    void AddConstantBufferParameter(StringHash name, ShaderParameterGroup group, unsigned offset, unsigned size)
-    {
-        constantBufferParameters_.emplace(name, ConstantBufferElement{ group, offset, size });
-    }
-
+    void AddConstantBufferParameter(StringHash name, ShaderParameterGroup group, unsigned offset, unsigned size);
     /// Recalculate layout hash.
-    void RecalculateLayoutHash()
-    {
-        for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
-        {
-            constantBufferHashes_[i] = 0;
-            CombineHash(constantBufferHashes_[i], constantBufferSizes_[i]);
-        }
-
-        for (const auto& item : constantBufferParameters_)
-        {
-            const StringHash paramName = item.first;
-            const ConstantBufferElement& element = item.second;
-            CombineHash(constantBufferHashes_[element.group_], paramName.Value());
-            CombineHash(constantBufferHashes_[element.group_], element.offset_);
-            CombineHash(constantBufferHashes_[element.group_], element.size_);
-
-            if (constantBufferHashes_[element.group_] == 0)
-                constantBufferHashes_[element.group_] = 1;
-        }
-    }
+    void RecalculateLayoutHash();
 
 private:
     /// Constant buffer sizes.

@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "../Container/IndexAllocator.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/Light.h"
 #include "../Graphics/Technique.h"
@@ -153,7 +154,7 @@ private:
 };
 
 /// Describes how to render 3D geometries.
-class URHO3D_API Material : public Resource, public PipelineStateTracker
+class URHO3D_API Material : public Resource, public PipelineStateTracker, public IDFamily<Material>
 {
     URHO3D_OBJECT(Material, Resource);
 

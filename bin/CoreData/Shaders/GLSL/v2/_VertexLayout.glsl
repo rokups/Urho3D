@@ -29,7 +29,7 @@
     VERTEX_SHADER_IN(vec4 iTexCoord4)
     VERTEX_SHADER_IN(vec4 iTexCoord5)
     VERTEX_SHADER_IN(vec4 iTexCoord6)
-    #ifdef SPHERICALHARMONICS
+    #if defined(URHO3D_AMBIENT_DIRECTIONAL)
         VERTEX_SHADER_IN(vec4 iTexCoord7)
         VERTEX_SHADER_IN(vec4 iTexCoord8)
         VERTEX_SHADER_IN(vec4 iTexCoord9)
@@ -37,7 +37,7 @@
         VERTEX_SHADER_IN(vec4 iTexCoord11)
         VERTEX_SHADER_IN(vec4 iTexCoord12)
         VERTEX_SHADER_IN(vec4 iTexCoord13)
-    #else
+    #elif defined(URHO3D_AMBIENT_FLAT)
         VERTEX_SHADER_IN(vec4 iTexCoord7)
     #endif
 #endif

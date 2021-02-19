@@ -24,6 +24,7 @@
 
 #include <EASTL/shared_array.h>
 
+#include "../Container/IndexAllocator.h"
 #include "../Core/Object.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/PipelineStateTracker.h"
@@ -37,7 +38,7 @@ class Graphics;
 class VertexBuffer;
 
 /// Defines one or more vertex buffers, an index buffer and a draw range.
-class URHO3D_API Geometry : public Object, public PipelineStateTracker
+class URHO3D_API Geometry : public Object, public PipelineStateTracker, public IDFamily<Geometry>
 {
     URHO3D_OBJECT(Geometry, Object);
 

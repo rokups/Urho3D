@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "../Container/IndexAllocator.h"
 #include "../Container/Hash.h"
 #include "../Container/RefCounted.h"
 #include "../Graphics/GraphicsDefs.h"
@@ -36,7 +37,7 @@ namespace Urho3D
 {
 
 class ShaderVariation;
-class ConstantBufferLayout;
+class ShaderProgramLayout;
 
 /// Pipeline state description.
 struct PipelineStateDesc
@@ -174,7 +175,7 @@ struct PipelineStateDesc
 };
 
 /// Pipeline state.
-class PipelineState : public Object, public GPUObject
+class URHO3D_API PipelineState : public Object, public GPUObject, public IDFamily<PipelineState>
 {
     URHO3D_OBJECT(PipelineState, Object);
 
@@ -191,7 +192,7 @@ public:
     const PipelineStateDesc& GetDesc() const { return desc_; }
 
     /// Return constant buffer layout.
-    ConstantBufferLayout* GetConstantBufferLayout() const { return constantBufferLayout_; }
+    ShaderProgramLayout* GetShaderProgramLayout() const { return shaderProgramLayout_; }
 
     /// Return hash of used shaders.
     unsigned GetShaderHash() const
@@ -213,7 +214,7 @@ private:
     /// Description.
     PipelineStateDesc desc_;
     /// Layout of constant buffers.
-    ConstantBufferLayout* constantBufferLayout_{};
+    ShaderProgramLayout* shaderProgramLayout_{};
 };
 
 /// Generic pipeline state cache.

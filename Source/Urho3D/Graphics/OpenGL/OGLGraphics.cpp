@@ -1039,7 +1039,7 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
     indexBuffer_ = buffer;
 }
 
-ConstantBufferLayout* Graphics::GetConstantBufferLayout(ShaderVariation* vs, ShaderVariation* ps)
+ShaderProgramLayout* Graphics::GetShaderProgramLayout(ShaderVariation* vs, ShaderVariation* ps)
 {
     const auto combination = ea::make_pair(vs, ps);
     auto iter = impl_->shaderPrograms_.find(combination);
@@ -1050,7 +1050,7 @@ ConstantBufferLayout* Graphics::GetConstantBufferLayout(ShaderVariation* vs, Sha
     ShaderVariation* prevVertexShader = vertexShader_;
     ShaderVariation* prevPixelShader = pixelShader_;
     SetShaders(vs, ps);
-    ConstantBufferLayout* layout = impl_->shaderProgram_;
+    ShaderProgramLayout* layout = impl_->shaderProgram_;
     SetShaders(prevVertexShader, prevPixelShader);
     return layout;
 }

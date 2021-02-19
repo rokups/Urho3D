@@ -41,7 +41,7 @@ namespace Urho3D
 {
 
 class ConstantBuffer;
-class ConstantBufferLayout;
+class ShaderProgramLayout;
 class File;
 class Image;
 class IndexBuffer;
@@ -256,7 +256,7 @@ public:
     /// Set index buffer.
     void SetIndexBuffer(IndexBuffer* buffer);
     /// Return constant buffer layout for given shaders.
-    ConstantBufferLayout* GetConstantBufferLayout(ShaderVariation* vs, ShaderVariation* ps);
+    ShaderProgramLayout* GetShaderProgramLayout(ShaderVariation* vs, ShaderVariation* ps);
     /// Set shaders.
     void SetShaders(ShaderVariation* vs, ShaderVariation* ps);
     /// Set shader constant buffers.
