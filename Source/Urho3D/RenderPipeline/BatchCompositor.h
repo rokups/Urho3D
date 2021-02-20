@@ -42,17 +42,8 @@ struct PipelineBatchByState;
 struct ShadowSplitProcessor;
 
 /// Self-sufficient batch that can be rendered by RenderPipeline.
-// TODO(renderer): Sort by vertex lights?
 struct PipelineBatch
 {
-    /// Index of per-pixel forward light in DrawableProcessor.
-    unsigned lightIndex_{ M_MAX_UNSIGNED };
-    /// Drawable index.
-    unsigned drawableIndex_{};
-    /// Index of source batch within Drawable.
-    unsigned sourceBatchIndex_{};
-    /// Geometry type used.
-    GeometryType geometryType_{};
     /// Pointer to Drawable.
     Drawable* drawable_{};
     /// Pointer to Geometry.
@@ -61,6 +52,16 @@ struct PipelineBatch
     Material* material_{};
     /// Pipeline state used for rendering.
     PipelineState* pipelineState_{};
+    /// Drawable index.
+    unsigned drawableIndex_{};
+    /// Index of per-pixel forward light in DrawableProcessor.
+    unsigned lightIndex_{ M_MAX_UNSIGNED };
+    /// Order-independent hash of vertex lights.
+    unsigned vertexLightsHash_{};
+    /// Index of source batch within Drawable.
+    unsigned sourceBatchIndex_{};
+    /// Geometry type used.
+    GeometryType geometryType_{};
 
     /// Return source batch.
     const SourceBatch& GetSourceBatch() const { return drawable_->GetBatches()[sourceBatchIndex_]; }
@@ -81,7 +82,7 @@ public:
     };
 
     /// Construct.
-    BatchCompositorPass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
+    BatchCompositorPass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
         bool needAmbient, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
     /// Compose batches.
@@ -100,7 +101,7 @@ protected:
     /// Default material.
     Material* defaultMaterial_{};
     /// Drawable processor.
-    const DrawableProcessor* drawableProcessor_{};
+    DrawableProcessor* drawableProcessor_{};
     /// Batch state creation callback.
     BatchStateCacheCallback* batchStateCacheCallback_{};
 
@@ -113,7 +114,7 @@ private:
     /// Initialize common members of BatchStateCreateKey.
     bool InitializeKey(BatchStateCreateKey& key, const GeometryBatch& geometryBatch) const;
     /// Initialize light-related members of BatchStateCreateKey.
-    void InitializeKeyLight(BatchStateCreateKey& key, unsigned lightIndex) const;
+    void InitializeKeyLight(BatchStateCreateKey& key, unsigned lightIndex, unsigned vertexLightsHash) const;
     /// Process geometry batch (threaded).
     void ProcessGeometryBatch(const GeometryBatch& geometryBatch);
     /// Resolve delayed batches.

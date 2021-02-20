@@ -26,7 +26,7 @@
 #include "../Math/SphericalHarmonics.h"
 
 #include <EASTL/fixed_vector.h>
-#include <EASTL/vector_multimap.h>
+#include <EASTL/sort.h>
 
 namespace Urho3D
 {
@@ -55,9 +55,10 @@ struct LightAccumulator
     static const unsigned MaxVertexLights = 4;
     /// Max number of lights that don't require allocations.
     static const unsigned NumElements = ea::max(MaxPixelLights + 1, 4u) + MaxVertexLights;
+    /// Light data.
+    using LightData = ea::pair<float, unsigned>;
     /// Container for lights.
-    using Container = ea::vector_multimap<float, unsigned, ea::less<float>, ea::allocator,
-        ea::fixed_vector<ea::pair<float, unsigned>, NumElements>>;
+    using Container = ea::fixed_vector<LightData, NumElements>;
     /// Container for vertex lights.
     using VertexLightContainer = ea::array<unsigned, MaxVertexLights>;
 
@@ -65,20 +66,26 @@ struct LightAccumulator
     void ResetLights()
     {
         lights_.clear();
+        firstVertexLight_ = 0;
         numImportantLights_ = 0;
         numAutoLights_ = 0;
+        vertexLightsHash_ = 0;
     }
 
     /// Accumulate light.
     void AccumulateLight(const LightAccumulatorContext& ctx, float penalty)
     {
+        assert(vertexLightsHash_ == 0);
+
         if (ctx.lightImportance_ == LI_IMPORTANT)
             ++numImportantLights_;
         else if (ctx.lightImportance_ == LI_AUTO)
             ++numAutoLights_;
 
         // Add new light
-        lights_.emplace(penalty, ctx.lightIndex_);
+        const auto lessPenalty = [&](const LightData& pair) { return penalty <= pair.first; };
+        auto iter = ea::find_if(lights_.begin(), lights_.end(), lessPenalty);
+        lights_.emplace(iter, penalty, ctx.lightIndex_);
 
         // First N important plus automatic lights are per-pixel
         firstVertexLight_ = ea::max(numImportantLights_,
@@ -91,6 +98,21 @@ struct LightAccumulator
             // TODO(renderer): Accumulate into SH
             lights_.pop_back();
         }
+    }
+
+    /// Cook light if necessary.
+    void Cook()
+    {
+        if (vertexLightsHash_)
+            return;
+
+        const auto compareIndex = [](const LightData& lhs, const LightData& rhs) { return lhs.second < rhs.second; };
+        ea::sort(lights_.begin() + firstVertexLight_, lights_.end(), compareIndex);
+
+        const unsigned numLights = lights_.size();
+        for (unsigned i = firstVertexLight_; i < numLights; ++i)
+            CombineHash(vertexLightsHash_, (lights_[i].second + 1) * 2654435761);
+        vertexLightsHash_ += !vertexLightsHash_;
     }
 
     /// Return per-vertex lights.
@@ -106,23 +128,28 @@ struct LightAccumulator
     }
 
     /// Return per-pixel lights.
-    ea::span<const ea::pair<float, unsigned>> GetPixelLights() const
+    ea::span<const LightData> GetPixelLights() const
     {
         return { lights_.data(), ea::min(static_cast<unsigned>(lights_.size()), firstVertexLight_) };
     }
 
-    /// TODO(renderer): Make private
+    /// Return order-independent hash of vertex lights.
+    unsigned GetVertexLightsHash() const { return vertexLightsHash_; }
 
+    /// Accumulated SH lights.
+    SphericalHarmonicsDot9 sphericalHarmonics_;
+
+private:
     /// Container of per-pixel and per-pixel lights.
     Container lights_;
-    /// Accumulated SH lights.
-    SphericalHarmonicsDot9 sh_;
     /// Number of important lights.
     unsigned numImportantLights_{};
     /// Number of automatic lights.
     unsigned numAutoLights_{};
     /// First vertex light.
     unsigned firstVertexLight_{};
+    /// Hash of vertex lights. Non-zero.
+    unsigned vertexLightsHash_{};
 };
 
 }

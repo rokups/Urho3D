@@ -99,6 +99,8 @@ struct BatchStateCreateKey : public BatchStateLookupKey
     LightProcessor* light_{};
     /// Index of per-pixel forward light.
     unsigned lightIndex_{};
+    /// Order-independed hash of vertex lights.
+    unsigned vertexLightsHash_{};
 };
 
 
@@ -153,10 +155,5 @@ private:
     /// Cached states, possibly invalid.
     ea::unordered_map<BatchStateLookupKey, CachedBatchState> cache_;
 };
-
-// TODO(renderer): Remove me
-using ScenePipelineStateKey = BatchStateLookupKey;
-using ScenePipelineStateCache = BatchStateCache;
-using ScenePipelineStateCacheCallback = BatchStateCacheCallback;
 
 }

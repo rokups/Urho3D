@@ -297,7 +297,6 @@ void DrawableProcessor::QueueDrawableGeometryUpdate(unsigned threadIndex, Drawab
 
 void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
 {
-    // TODO(renderer): Add occlusion culling
     const unsigned drawableIndex = drawable->GetDrawableIndex();
     const unsigned threadIndex = WorkQueue::GetWorkerThreadIndex();
 
@@ -370,14 +369,14 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
             {
                 unsigned& hint = drawable->GetMutableLightProbeTetrahedronHint();
                 const Vector3& samplePosition = boundingBox.Center();
-                lightAccumulator.sh_ = gi_->SampleAmbientSH(samplePosition, hint);
+                lightAccumulator.sphericalHarmonics_ = gi_->SampleAmbientSH(samplePosition, hint);
             }
             else
-                lightAccumulator.sh_ = {};
+                lightAccumulator.sphericalHarmonics_ = {};
 
             // Apply ambient from Zone
             const CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
-            lightAccumulator.sh_ += cachedZone.zone_->GetLinearAmbient().ToVector3();
+            lightAccumulator.sphericalHarmonics_ += cachedZone.zone_->GetLinearAmbient().ToVector3();
         }
 
         // Store geometry
@@ -445,9 +444,18 @@ void DrawableProcessor::ProcessForwardLighting(unsigned lightIndex, const ea::ve
     ForEachParallel(workQueue_, litGeometries,
         [&](unsigned /*index*/, Drawable* geometry)
     {
+        const unsigned drawableIndex = geometry->GetDrawableIndex();
+
+        // Directional light doesn't filter out e.g. deferred lit geometries for shadow focusing
+        if (lightType == LIGHT_DIRECTIONAL)
+        {
+            const bool isForwardLit = !!(geometryFlags_[drawableIndex] & GeometryRenderFlag::ForwardLit);
+            if (!isForwardLit)
+                return;
+        }
+
         const float distance = ea::max(light->GetDistanceTo(geometry), M_LARGE_EPSILON);
         const float penalty = GetDrawableLightPenalty(distance * lightIntensityPenalty, ctx.lightImportance_, lightType);
-        const unsigned drawableIndex = geometry->GetDrawableIndex();
         geometryLighting_[drawableIndex].AccumulateLight(ctx, penalty);
     });
 }

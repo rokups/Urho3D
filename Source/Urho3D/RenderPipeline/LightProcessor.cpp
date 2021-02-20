@@ -201,26 +201,39 @@ void LightProcessor::Update(DrawableProcessor* drawableProcessor)
     {
     case LIGHT_SPOT:
     {
-        SpotLightGeometryQuery query(litGeometries_, isShadowRequested_ ? &shadowCasterCandidates_ : nullptr,
+        SpotLightGeometryQuery query(litGeometries_, hasLitGeometries_,
+            isShadowRequested_ ? &shadowCasterCandidates_ : nullptr,
             drawableProcessor, light_, cullCamera->GetViewMask());
         octree->GetDrawables(query);
+        hasForwardLitGeometries_ = !litGeometries_.empty();
         break;
     }
     case LIGHT_POINT:
     {
-        PointLightGeometryQuery query(litGeometries_, isShadowRequested_ ? &shadowCasterCandidates_ : nullptr,
+        PointLightGeometryQuery query(litGeometries_, hasLitGeometries_,
+            isShadowRequested_ ? &shadowCasterCandidates_ : nullptr,
             drawableProcessor, light_, cullCamera->GetViewMask());
         octree->GetDrawables(query);
+        hasForwardLitGeometries_ = !litGeometries_.empty();
         break;
     }
     case LIGHT_DIRECTIONAL:
     {
         overlapsCamera_ = true;
-        // TODO(renderer): Skip if unlit
+        hasLitGeometries_ = false;
+        hasForwardLitGeometries_ = false;
         const unsigned lightMask = light_->GetLightMask();
         for (Drawable* drawable : drawableProcessor->GetVisibleGeometries())
         {
-            if (drawable->GetLightMaskInZone() & lightMask)
+            const unsigned drawableIndex = drawable->GetDrawableIndex();
+            const unsigned char flags = drawableProcessor->GetGeometryRenderFlags(drawableIndex);
+            const bool isLit = !!(flags & GeometryRenderFlag::Lit);
+            const bool isForwardLit = !!(flags & GeometryRenderFlag::ForwardLit);
+
+            hasLitGeometries_ = hasLitGeometries_ || isLit;
+            hasForwardLitGeometries_ = hasForwardLitGeometries_ || isForwardLit;
+
+            if (isLit && (drawable->GetLightMaskInZone() & lightMask))
                 litGeometries_.push_back(drawable);
         };
         break;

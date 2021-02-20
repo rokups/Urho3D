@@ -28,6 +28,7 @@
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/GPUObject.h"
 #include "../Graphics/IndexBuffer.h"
+#include "../Graphics/ShaderProgramLayout.h"
 #include "../Graphics/VertexBuffer.h"
 
 #include <EASTL/algorithm.h>
@@ -37,7 +38,6 @@ namespace Urho3D
 {
 
 class ShaderVariation;
-class ShaderProgramLayout;
 
 /// Pipeline state description.
 struct PipelineStateDesc
@@ -194,14 +194,8 @@ public:
     /// Return constant buffer layout.
     ShaderProgramLayout* GetShaderProgramLayout() const { return shaderProgramLayout_; }
 
-    /// Return hash of used shaders.
-    unsigned GetShaderHash() const
-    {
-        unsigned hash = 0;
-        CombineHash(hash, MakeHash(desc_.vertexShader_));
-        CombineHash(hash, MakeHash(desc_.pixelShader_));
-        return hash;
-    }
+    /// Return ID of used shader program.
+    unsigned GetShaderID() const { return shaderProgramLayout_->GetObjectID(); }
 
     /// Mark the GPU resource destroyed on graphics context destruction.
     virtual void OnDeviceLost();

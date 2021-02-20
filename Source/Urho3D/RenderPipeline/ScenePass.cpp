@@ -36,7 +36,7 @@
 namespace Urho3D
 {
 
-ForwardLightingScenePass::ForwardLightingScenePass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
+ForwardLightingScenePass::ForwardLightingScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
     const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass)
     : BatchCompositorPass(renderPipeline, drawableProcessor,
         true,
@@ -60,7 +60,7 @@ void AlphaForwardLightingScenePass::OnBatchesReady()
     BatchCompositor::SortBatches(sortedBatches_, baseBatches_, lightBatches_);
 }
 
-UnlitScenePass::UnlitScenePass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& pass)
+UnlitScenePass::UnlitScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor, const ea::string& pass)
     : BatchCompositorPass(renderPipeline, drawableProcessor, true, Technique::GetPassIndex(pass), M_MAX_UNSIGNED, M_MAX_UNSIGNED)
 {
 }

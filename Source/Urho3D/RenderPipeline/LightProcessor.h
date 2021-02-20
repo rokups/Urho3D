@@ -130,6 +130,13 @@ public:
 
     /// Return light.
     Light* GetLight() const { return light_; }
+    /// Return lit geometries.
+    const ea::vector<Drawable*>& GetLitGeometries() const { return litGeometries_; }
+    /// Return whether light has lit geometries (regardless of exact mode).
+    bool HasLitGeometries() const { return hasLitGeometries_; }
+    /// Return whether light has geometries lit with forward rendering.
+    bool HasForwardLitGeometries() const { return hasForwardLitGeometries_; }
+
     /// Return whether overlaps camera.
     bool DoesOverlapCamera() const { return overlapsCamera_; }
     /// Return whether the light actually has shadow.
@@ -138,6 +145,7 @@ public:
     IntVector2 GetShadowMapSize() const { return numActiveSplits_ != 0 ? shadowMapSize_ : IntVector2::ZERO; }
     /// Return shadow map.
     ShadowMap GetShadowMap() const { return shadowMap_; }
+
     /// Return number of active splits.
     unsigned GetNumSplits() const { return numActiveSplits_; }
     /// Return shadow split.
@@ -146,10 +154,9 @@ public:
     ShadowSplitProcessor* GetMutableSplit(unsigned splitIndex) { return &splits_[splitIndex]; }
     /// Return active shadow splits.
     ea::span<const ShadowSplitProcessor> GetSplits() const { return { splits_.data(), numActiveSplits_ }; }
+
     /// Return shader parameters.
     const LightShaderParameters& GetShaderParams() const { return shaderParams_; }
-    /// Return lit geometries.
-    const ea::vector<Drawable*>& GetLitGeometries() const { return litGeometries_; }
 
 private:
     /// Initialize shadow splits.
@@ -188,8 +195,13 @@ private:
     /// Shadow map size.
     IntVector2 shadowMapSize_{};
 
+    /// Whether light has lit geometries.
+    bool hasLitGeometries_{};
+    /// Whether light has forward lit geometries.
+    bool hasForwardLitGeometries_{};
     /// Lit geometries.
-    // TODO(renderer): Skip unlit geometries?
+    /// Point and spot lights: only forward lit geometries.
+    /// Directional lights: all lit geometries, for shadow focusing.
     ea::vector<Drawable*> litGeometries_;
     /// Shadow caster candidates.
     /// Point and spot lights: all possible shadow casters.

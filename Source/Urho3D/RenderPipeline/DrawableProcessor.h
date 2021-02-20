@@ -198,6 +198,8 @@ public:
     const FloatRange& GetGeometryZRange(unsigned drawableIndex) const { return geometryZRanges_[drawableIndex]; }
     /// Return geometry forward lighting.
     const LightAccumulator& GetGeometryLighting(unsigned drawableIndex) const { return geometryLighting_[drawableIndex]; }
+    /// Return geometry forward lighting (mutable).
+    LightAccumulator& GetMutableGeometryLighting(unsigned drawableIndex) { return geometryLighting_[drawableIndex]; }
     /// Return visible light by index.
     Light* GetLight(unsigned lightIndex) const { return visibleLights_[lightIndex]; }
     /// Return light processor by index.

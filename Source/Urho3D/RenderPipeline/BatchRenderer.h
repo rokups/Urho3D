@@ -43,12 +43,14 @@ enum class BatchRenderFlag
 {
     /// Default null flag.
     None = 0,
-    /// Export ambient light and vertex lights.
-    AmbientAndVertexLights = 1 << 0,
+    /// Export ambient light.
+    AmbientLight = 1 << 0,
+    /// Export vertex lights.
+    VertexLights = 1 << 1,
     /// Export pixel light.
-    PixelLight = 1 << 1,
+    PixelLight = 1 << 2,
     /// Use instancing for static geometry.
-    InstantiateStaticGeometry = 1 << 2,
+    InstantiateStaticGeometry = 1 << 3,
 };
 
 URHO3D_FLAGSET(BatchRenderFlag, BatchRenderFlags);

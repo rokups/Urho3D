@@ -45,13 +45,15 @@ Sphere GetLightSphere(Light* light)
 }
 
 PointLightGeometryQuery::PointLightGeometryQuery(
-    ea::vector<Drawable*>& result, ea::vector<Drawable*>* shadowCasters,
+    ea::vector<Drawable*>& result, bool& hasLitGeometries, ea::vector<Drawable*>* shadowCasters,
     const DrawableProcessor* drawableProcessor, Light* light, unsigned viewMask)
     : SphereOctreeQuery(result, GetLightSphere(light), DRAWABLE_GEOMETRY, viewMask)
+    , hasLitGeometries_(hasLitGeometries)
     , shadowCasters_(shadowCasters)
     , drawableProcessor_(drawableProcessor)
     , lightMask_(light->GetLightMaskEffective())
 {
+    hasLitGeometries_ = false;
     if (shadowCasters_)
         shadowCasters_->clear();
 }
@@ -62,6 +64,8 @@ void PointLightGeometryQuery::TestDrawables(Drawable** start, Drawable** end, bo
     {
         const auto result = IsLitOrShadowCaster(drawable, inside);
         if (result.isLit_)
+            hasLitGeometries_ = true;
+        if (result.isForwardLit_)
             result_.push_back(drawable);
         if (result.isShadowCaster_)
             shadowCasters_->push_back(drawable);
@@ -73,26 +77,29 @@ LightGeometryQueryResult PointLightGeometryQuery::IsLitOrShadowCaster(Drawable* 
     const unsigned drawableIndex = drawable->GetDrawableIndex();
     const unsigned geometryFlags = drawableProcessor_->GetGeometryRenderFlags(drawableIndex);
 
-    // TODO(renderer): Use ForwardLit?
     const bool isInside = (drawable->GetDrawableFlags() & drawableFlags_)
         && (drawable->GetViewMask() & viewMask_)
         && (inside || sphere_.IsInsideFast(drawable->GetWorldBoundingBox()));
     const bool isLit = isInside
-        && (geometryFlags & GeometryRenderFlag::Visible)
+        && (geometryFlags & GeometryRenderFlag::Lit)
         && (drawable->GetLightMaskInZone() & lightMask_);
+    const bool isForwardLit = isLit && (geometryFlags & GeometryRenderFlag::ForwardLit);
     const bool isShadowCaster = shadowCasters_ && isInside
         && drawable->GetCastShadows()
         && (drawable->GetShadowMask() & lightMask_);
-    return { isLit, isShadowCaster };
+    return { isLit, isForwardLit, isShadowCaster };
 }
 
-SpotLightGeometryQuery::SpotLightGeometryQuery(ea::vector<Drawable*>& result, ea::vector<Drawable*>* shadowCasters,
+SpotLightGeometryQuery::SpotLightGeometryQuery(
+    ea::vector<Drawable*>& result, bool& hasLitGeometries, ea::vector<Drawable*>* shadowCasters,
     const DrawableProcessor* drawableProcessor, Light* light, unsigned viewMask)
     : FrustumOctreeQuery(result, light->GetFrustum(), DRAWABLE_GEOMETRY, viewMask)
+    , hasLitGeometries_(hasLitGeometries)
     , shadowCasters_(shadowCasters)
     , drawableProcessor_(drawableProcessor)
     , lightMask_(light->GetLightMaskEffective())
 {
+    hasLitGeometries_ = false;
     if (shadowCasters_)
         shadowCasters_->clear();
 }
@@ -101,10 +108,12 @@ void SpotLightGeometryQuery::TestDrawables(Drawable** start, Drawable** end, boo
 {
     for (Drawable* drawable : MakeIteratorRange(start, end))
     {
-        const auto isLitOrShadowCaster = IsLitOrShadowCaster(drawable, inside);
-        if (isLitOrShadowCaster.isLit_)
+        const auto result = IsLitOrShadowCaster(drawable, inside);
+        if (result.isLit_)
+            hasLitGeometries_ = true;
+        if (result.isForwardLit_)
             result_.push_back(drawable);
-        if (isLitOrShadowCaster.isShadowCaster_)
+        if (result.isShadowCaster_)
             shadowCasters_->push_back(drawable);
     }
 }
@@ -118,12 +127,13 @@ LightGeometryQueryResult SpotLightGeometryQuery::IsLitOrShadowCaster(Drawable* d
         && (drawable->GetViewMask() & viewMask_)
         && (inside || frustum_.IsInsideFast(drawable->GetWorldBoundingBox()));
     const bool isLit = isInside
-        && (geometryFlags & GeometryRenderFlag::Visible)
+        && (geometryFlags & GeometryRenderFlag::Lit)
         && (drawable->GetLightMaskInZone() & lightMask_);
+    const bool isForwardLit = isLit && (geometryFlags & GeometryRenderFlag::ForwardLit);
     const bool isShadowCaster = shadowCasters_ && isInside
         && drawable->GetCastShadows()
         && (drawable->GetShadowMask() & lightMask_);
-    return { isLit, isShadowCaster };
+    return { isLit, isForwardLit, isShadowCaster };
 }
 
 DirectionalLightShadowCasterQuery::DirectionalLightShadowCasterQuery(ea::vector<Drawable*>& result,

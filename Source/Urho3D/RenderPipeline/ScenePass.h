@@ -44,7 +44,7 @@ class URHO3D_API ForwardLightingScenePass : public BatchCompositorPass
 
 public:
     /// Construct.
-    ForwardLightingScenePass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
+    ForwardLightingScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
         const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass);
 
 private:
@@ -101,7 +101,7 @@ class URHO3D_API UnlitScenePass : public BatchCompositorPass
 
 public:
     /// Construct.
-    UnlitScenePass(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor, const ea::string& pass);
+    UnlitScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor, const ea::string& pass);
 
     /// Sort scene batches.
     virtual void OnBatchesReady() override;

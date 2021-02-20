@@ -229,7 +229,11 @@ void SceneProcessor::Update()
 
     const auto& lightProcessors = drawableProcessor_->GetLightProcessors();
     for (unsigned i = 0; i < lightProcessors.size(); ++i)
-        drawableProcessor_->ProcessForwardLighting(i, lightProcessors[i]->GetLitGeometries());
+    {
+        const LightProcessor* lightProcessor = lightProcessors[i];
+        if (lightProcessor->HasForwardLitGeometries())
+            drawableProcessor_->ProcessForwardLighting(i, lightProcessor->GetLitGeometries());
+    }
 
     drawableProcessor_->UpdateGeometries();
 

@@ -105,9 +105,10 @@ public:
     DrawCommandCompositor(DrawCommandQueue& drawQueue,
         const DrawableProcessor& drawableProcessor, const Camera* renderCamera, BatchRenderFlags flags)
         : drawQueue_(drawQueue)
-        , enableAmbientAndVertexLights_(flags.Test(BatchRenderFlag::AmbientAndVertexLights))
+        , enableAmbientLight_(flags.Test(BatchRenderFlag::AmbientLight))
+        , enableVertexLights_(flags.Test(BatchRenderFlag::VertexLights))
         , enablePixelLights_(flags.Test(BatchRenderFlag::PixelLight))
-        , enableLight_(enableAmbientAndVertexLights_ || enablePixelLights_)
+        , enableLight_(enableAmbientLight_ || enableVertexLights_ || enablePixelLights_)
         , enableStaticInstancing_(flags.Test(BatchRenderFlag::InstantiateStaticGeometry))
         , drawableProcessor_(drawableProcessor)
         , frameInfo_(drawableProcessor_.GetFrameInfo())
@@ -281,7 +282,7 @@ private:
     /// Convert PipelineBatch to DrawCommandQueue commands.
     void ProcessBatch(const PipelineBatch& pipelineBatch, const SourceBatch& sourceBatch)
     {
-        const LightAccumulator* lightAccumulator = enableAmbientAndVertexLights_
+        const LightAccumulator* lightAccumulator = enableAmbientLight_ || enableVertexLights_
             ? &drawableProcessor_.GetGeometryLighting(pipelineBatch.drawableIndex_)
             : nullptr;
 
@@ -313,10 +314,9 @@ private:
 
         // Check if vertex lights changed
         bool vertexLightsDirty = false;
-        if (enableAmbientAndVertexLights_)
+        if (enableVertexLights_)
         {
             vertexLights_ = lightAccumulator->GetVertexLights();
-            ea::sort(vertexLights_.begin(), vertexLights_.end());
             vertexLightsDirty = lastVertexLights_ != vertexLights_;
 
             if (vertexLightsDirty)
@@ -419,9 +419,9 @@ private:
                 instanceCount_ = 1;
                 startInstance_ = instancingBuffer_->AddInstance();
                 instancingBuffer_->SetElements(sourceBatch.worldTransform_, 0, 3);
-                if (enableAmbientAndVertexLights_)
+                if (enableAmbientLight_)
                 {
-                    const SphericalHarmonicsDot9& sh = lightAccumulator->sh_;
+                    const SphericalHarmonicsDot9& sh = lightAccumulator->sphericalHarmonics_;
                     const Vector4 ambient(sh.EvaluateAverage(), 1.0f);
                     instancingBuffer_->SetElements(&ambient, 3, 1);
                 }
@@ -429,9 +429,9 @@ private:
             else if (drawQueue_.BeginShaderParameterGroup(SP_OBJECT, true))
             {
                 // Add ambient light parameters
-                if (enableAmbientAndVertexLights_)
+                if (enableAmbientLight_)
                 {
-                    const SphericalHarmonicsDot9& sh = lightAccumulator->sh_;
+                    const SphericalHarmonicsDot9& sh = lightAccumulator->sphericalHarmonics_;
                     drawQueue_.AddShaderParameter(VSP_SHAR, sh.Ar_);
                     drawQueue_.AddShaderParameter(VSP_SHAG, sh.Ag_);
                     drawQueue_.AddShaderParameter(VSP_SHAB, sh.Ab_);
@@ -446,7 +446,7 @@ private:
                 switch (pipelineBatch.geometryType_)
                 {
                 case GEOM_INSTANCED:
-                    // TODO(renderer): Implement instancing
+                    // TODO(renderer): Do something with this branch
                     assert(0);
                     break;
                 case GEOM_SKINNED:
@@ -477,9 +477,9 @@ private:
             instanceCount_ += 1;
             instancingBuffer_->AddInstance();
             instancingBuffer_->SetElements(sourceBatch.worldTransform_, 0, 3);
-            if (enableAmbientAndVertexLights_)
+            if (enableAmbientLight_)
             {
-                const SphericalHarmonicsDot9& sh = lightAccumulator->sh_;
+                const SphericalHarmonicsDot9& sh = lightAccumulator->sphericalHarmonics_;
                 const Vector4 ambient(sh.EvaluateAverage(), 1.0f);
                 instancingBuffer_->SetElements(&ambient, 3, 1);
             }
@@ -490,7 +490,9 @@ private:
     DrawCommandQueue& drawQueue_;
 
     /// Export ambient light and vertex lights.
-    const bool enableAmbientAndVertexLights_;
+    const bool enableAmbientLight_;
+    /// Export ambient light and vertex lights.
+    const bool enableVertexLights_;
     /// Export pixel light.
     const bool enablePixelLights_;
     /// Export light of any kind.
@@ -589,7 +591,7 @@ void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* cam
     compositor.SetVSMShadowParams(vsmShadowParams_);
     compositor.SetInstancingBuffer(instancingBuffer_);
     for (const auto& sortedBatch : batches)
-        compositor.ProcessSceneBatch(*sortedBatch.sceneBatch_);
+        compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
     compositor.FlushDrawCommands();
 }
 
@@ -600,7 +602,7 @@ void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* cam
     compositor.SetVSMShadowParams(vsmShadowParams_);
     compositor.SetInstancingBuffer(instancingBuffer_);
     for (const auto& sortedBatch : batches)
-        compositor.ProcessSceneBatch(*sortedBatch.sceneBatch_);
+        compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
     compositor.FlushDrawCommands();
 }
 
@@ -612,7 +614,7 @@ void BatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera
     compositor.SetGBufferParameters(ctx.geometryBufferOffsetAndScale_, ctx.geometryBufferInvSize_);
     compositor.SetGlobalResources(ctx.geometryBuffer_);
     for (const auto& sortedBatch : batches)
-        compositor.ProcessLightVolumeBatch(*sortedBatch.sceneBatch_);
+        compositor.ProcessLightVolumeBatch(*sortedBatch.pipelineBatch_);
     compositor.FlushDrawCommands();
 }
 

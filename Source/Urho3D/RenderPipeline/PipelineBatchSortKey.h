@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "../Graphics/Geometry.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Material.h"
 #include "../Graphics/Technique.h"
@@ -32,57 +33,101 @@ namespace Urho3D
 {
 
 /// Scene batch sorted by pipeline state, material and geometry. Also sorted front to back.
-// TODO(renderer): Maybe sort by light as well?
 struct PipelineBatchByState
 {
-    /// Sorting value for pipeline state.
-    unsigned long long pipelineStateKey_{};
-    /// Sorting value for material and geometry.
-    unsigned long long materialGeometryKey_{};
+    /// Primary key layout (from least to most important)
+    /// @{
+    static constexpr unsigned long long PixelLightBits      = 8;
+    static constexpr unsigned long long LightmapBits        = 8;
+    static constexpr unsigned long long MaterialBits        = 16;
+    static constexpr unsigned long long PipelineStateBits   = 8;
+    static constexpr unsigned long long ShaderProgramBits   = 16;
+    static constexpr unsigned long long RenderOrderBits     = 8;
+
+    static constexpr unsigned long long PixelLightMask      = (1ull << PixelLightBits) - 1;
+    static constexpr unsigned long long LightmapMask        = (1ull << LightmapBits) - 1;
+    static constexpr unsigned long long MaterialMask        = (1ull << MaterialBits) - 1;
+    static constexpr unsigned long long PipelineStateMask   = (1ull << PipelineStateBits) - 1;
+    static constexpr unsigned long long ShaderProgramMask   = (1ull << ShaderProgramBits) - 1;
+    static constexpr unsigned long long RenderOrderMask     = (1ull << RenderOrderBits) - 1;
+
+    static constexpr unsigned long long PixelLightOffset    = 0;
+    static constexpr unsigned long long LightmapOffset      = PixelLightOffset    + PixelLightBits;
+    static constexpr unsigned long long MaterialOffset      = LightmapOffset      + LightmapBits;
+    static constexpr unsigned long long PipelineStateOffset = MaterialOffset      + MaterialBits;
+    static constexpr unsigned long long ShaderProgramOffset = PipelineStateOffset + PipelineStateBits;
+    static constexpr unsigned long long RenderOrderOffset   = ShaderProgramOffset + ShaderProgramBits;
+
+    static_assert(RenderOrderOffset + RenderOrderBits == 64, "Unexpected mask layout");
+    static_assert(PixelLightMask | LightmapMask | MaterialMask
+        | PipelineStateMask | ShaderProgramMask | RenderOrderMask == 0xffffffffffffffffull, "Unexpected mask layout");
+    /// @}
+
+    /// Secondary key layout (from least to most important)
+    /// @{
+    static constexpr unsigned long long ReservedBits        = 16;
+    static constexpr unsigned long long VertexLightsBits    = 24;
+    static constexpr unsigned long long GeometryBits        = 24;
+
+    static constexpr unsigned long long ReservedMask        = (1ull << ReservedBits) - 1;
+    static constexpr unsigned long long VertexLightsMask    = (1ull << VertexLightsBits) - 1;
+    static constexpr unsigned long long GeometryMask        = (1ull << GeometryBits) - 1;
+
+    static constexpr unsigned long long ReservedOffset      = 0;
+    static constexpr unsigned long long VertexLightsOffset  = ReservedOffset + ReservedBits;
+    static constexpr unsigned long long GeometryOffset      = VertexLightsOffset + VertexLightsBits;
+
+    static_assert(GeometryOffset + GeometryBits == 64, "Unexpected mask layout");
+    static_assert(ReservedMask | VertexLightsMask | GeometryMask == 0xffffffffffffffffull, "Unexpected mask layout");
+    /// @}
+
+    /// Primary sorting value.
+    unsigned long long primaryKey_{};
+    /// Secondary sorting value.
+    unsigned long long secondaryKey_{};
     /// Sorting distance.
     float distance_{};
-    /// Base, litbase or light batch to be sorted.
-    const PipelineBatch* sceneBatch_{};
+    /// Batch to be sorted.
+    const PipelineBatch* pipelineBatch_{};
 
     /// Construct default.
     PipelineBatchByState() = default;
 
     /// Construct from batch.
     explicit PipelineBatchByState(const PipelineBatch* batch)
-        : sceneBatch_(batch)
+        : pipelineBatch_(batch)
     {
         if (!batch->pipelineState_)
             return;
 
-        // TODO(renderer): Fix me
-        const SourceBatch* sourceBatch = batch->sourceBatchIndex_ != M_MAX_UNSIGNED ? &batch->GetSourceBatch() : nullptr;
+        // TODO(renderer): Fix me?
+        static const SourceBatch defaultSourceBatch;
+        const SourceBatch& sourceBatch = batch->sourceBatchIndex_ != M_MAX_UNSIGNED
+            ? batch->GetSourceBatch()
+            : defaultSourceBatch;
 
-        // 8: render order
-        // 32: shader variation
-        // 24: pipeline state
-        const unsigned long long renderOrder = batch->material_->GetRenderOrder();
-        const unsigned long long shaderHash = batch->pipelineState_->GetShaderHash();
-        const unsigned pipelineStateHash = MakeHash(batch->pipelineState_);
-        pipelineStateKey_ |= renderOrder << 56;
-        pipelineStateKey_ |= shaderHash << 24;
-        pipelineStateKey_ |= (pipelineStateHash & 0xffffff) ^ (pipelineStateHash >> 24);
+        // Calculate primary key
+        primaryKey_ |= (batch->material_->GetRenderOrder() & RenderOrderMask) << RenderOrderOffset;
+        primaryKey_ |= (batch->pipelineState_->GetShaderID() & ShaderProgramMask) << ShaderProgramOffset;
+        primaryKey_ |= (batch->pipelineState_->GetObjectID() & PipelineStateMask) << PipelineStateOffset;
+        primaryKey_ |= (batch->material_->GetObjectID() & MaterialMask) << MaterialOffset;
+        primaryKey_ |= (sourceBatch.lightmapIndex_ & LightmapMask) << LightmapOffset;
+        primaryKey_ |= (batch->lightIndex_ & PixelLightMask) << PixelLightOffset;
 
-        // 32: material
-        // 32: geometry
-        unsigned long long materialHash = MakeHash(batch->material_);
-        materialGeometryKey_ |= (materialHash ^ (sourceBatch ? sourceBatch->lightmapIndex_ : 0)) << 32;
-        materialGeometryKey_ |= MakeHash(batch->geometry_);
+        // Calculate secondary key
+        secondaryKey_ |= (batch->geometry_->GetObjectID() & GeometryMask) << GeometryOffset;
+        secondaryKey_ |= (batch->vertexLightsHash_ & VertexLightsMask) << VertexLightsOffset;
 
-        distance_ = sourceBatch ? sourceBatch->distance_ : 0.0f;
+        distance_ = sourceBatch.distance_;
     }
 
     /// Compare sorted batches.
     bool operator < (const PipelineBatchByState& rhs) const
     {
-        if (pipelineStateKey_ != rhs.pipelineStateKey_)
-            return pipelineStateKey_ < rhs.pipelineStateKey_;
-        if (materialGeometryKey_ != rhs.materialGeometryKey_)
-            return materialGeometryKey_ < rhs.materialGeometryKey_;
+        if (primaryKey_ != rhs.primaryKey_)
+            return primaryKey_ < rhs.primaryKey_;
+        if (secondaryKey_ != rhs.secondaryKey_)
+            return secondaryKey_ < rhs.secondaryKey_;
         return distance_ > rhs.distance_;
     }
 };
@@ -95,7 +140,7 @@ struct PipelineBatchBackToFront
     /// Sorting distance.
     float distance_{};
     /// Batch to be sorted.
-    const PipelineBatch* sceneBatch_{};
+    const PipelineBatch* pipelineBatch_{};
 
     /// Construct default.
     PipelineBatchBackToFront() = default;
@@ -103,7 +148,7 @@ struct PipelineBatchBackToFront
     /// Construct from batch.
     explicit PipelineBatchBackToFront(const PipelineBatch* batch)
         : renderOrder_(batch->material_->GetRenderOrder())
-        , sceneBatch_(batch)
+        , pipelineBatch_(batch)
     {
         const SourceBatch& sourceBatch = batch->GetSourceBatch();
         distance_ = sourceBatch.distance_;

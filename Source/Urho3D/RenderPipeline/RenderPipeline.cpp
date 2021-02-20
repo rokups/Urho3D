@@ -197,10 +197,6 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     const bool isLitBasePass = ctx.subpassIndex_ == 1;
     const bool isShadowPass = isInternalPass;
 
-    // TODO(renderer): Remove this hack
-    if (!pass)
-        return nullptr;
-
     PipelineStateDesc desc;
     ea::string commonDefines;
     ea::string vertexShaderDefines;
@@ -221,8 +217,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         sceneProcessor_->GetShadowMapAllocator()->ExportPipelineState(desc, light->GetShadowBias());
 
     // Add lightmap
-    // TODO(renderer): Get batch index as input?
-    if (key.drawable_->GetBatches()[0].lightmapScaleOffset_)
+    if (key.drawable_->GetBatches()[key.sourceBatchIndex_].lightmapScaleOffset_)
         commonDefines += "LIGHTMAP ";
 
     // Add ambient vertex defines
@@ -545,7 +540,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
     cameraProcessor_->Initialize(viewport->GetCamera());
 
-    settings_.enableInstancing_ = GetSubsystem<Renderer>()->GetDynamicInstancing();
+    //settings_.enableInstancing_ = GetSubsystem<Renderer>()->GetDynamicInstancing();
 
     // TODO(renderer): Optimize this
     previousSettings_ = settings_;
@@ -643,7 +638,7 @@ void RenderPipeline::Render()
             instancingBuffer->Reset();
         sceneBatchRenderer_->SetInstancingBuffer(instancingBuffer);
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            BatchRenderFlag::AmbientAndVertexLights | flag, deferredPass_->GetBatches());
+            BatchRenderFlag::AmbientLight | flag, deferredPass_->GetBatches());
         if (settings_.enableInstancing_)
             instancingBuffer->Commit();
         drawQueue_->Execute();
@@ -681,11 +676,11 @@ void RenderPipeline::Render()
             instancingBuffer->Reset();
         sceneBatchRenderer_->SetInstancingBuffer(instancingBuffer);
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            BatchRenderFlag::AmbientAndVertexLights | BatchRenderFlag::PixelLight | flag, basePass_->GetSortedBaseBatches());
+            BatchRenderFlag::AmbientLight | BatchRenderFlag::VertexLights | BatchRenderFlag::PixelLight | flag, basePass_->GetSortedBaseBatches());
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
             BatchRenderFlag::PixelLight | flag, basePass_->GetSortedLightBatches());
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            BatchRenderFlag::AmbientAndVertexLights | BatchRenderFlag::PixelLight | flag, alphaPass_->GetSortedBatches());
+            BatchRenderFlag::AmbientLight | BatchRenderFlag::VertexLights | BatchRenderFlag::PixelLight | flag, alphaPass_->GetSortedBatches());
         if (settings_.enableInstancing_)
             instancingBuffer->Commit();
         drawQueue_->Execute();
