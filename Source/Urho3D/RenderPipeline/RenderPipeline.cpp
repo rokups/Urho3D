@@ -352,8 +352,8 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     }
 
     // TODO(renderer): This check is not correct, have to check for AMBIENT is pass defines
-    if (isLitBasePass)
-        commonDefines += "NUMVERTEXLIGHTS=4 ";
+    if (isLitBasePass || ctx.subpassIndex_ == 0)
+        commonDefines += "NUMVERTEXLIGHTS=4 AMBIENT ";
 
     if (light)
     {

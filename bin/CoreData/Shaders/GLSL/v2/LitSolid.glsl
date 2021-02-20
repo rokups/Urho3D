@@ -70,7 +70,17 @@ void main()
         vTangent = vec4(tangent.xyz, bitangent.z);
     #endif
 
-    #if defined(PASS_BASE_LITBASE) || defined(PASS_ALPHA_LITBASE)
+    // Ambient & per-vertex lighting
+    #if defined(LIGHTMAP) || defined(AO)
+        // If using lightmap, disregard zone ambient light
+        // If using AO, calculate ambient in the PS
+        //vVertexLight = vec3(0.0, 0.0, 0.0);
+        vTexCoord2 = GetLightMapTexCoord(iTexCoord1);
+    //#else
+        //vVertexLight = GetAmbientLight(vec4(vNormal, 1)) + GetAmbient(0.0);
+    #endif
+
+    #if defined(PASS_BASE_LITBASE) || defined(PASS_ALPHA_LITBASE) || defined(PASS_BASE_UNLIT) || defined(PASS_ALPHA_UNLIT)
         vVertexLight = GetAmbientLight(vec4(vNormal, 1));
 
         #ifdef NUMVERTEXLIGHTS
@@ -180,7 +190,7 @@ void main()
             gl_FragColor = vec4(GetLitFog(Color_LightToGamma3(finalColor), fogFactor), diffColor.a);
         #endif
 
-        gl_FragColor = vec4(GetFog(Color_LightToGamma3(finalColor), fogFactor), diffColor.a);
+        //gl_FragColor = vec4(GetFog(Color_LightToGamma3(finalColor), fogFactor), diffColor.a);
     #elif defined(PASS_DEFERRED)
         // Fill deferred G-buffer
         float specIntensity = specColor.g;

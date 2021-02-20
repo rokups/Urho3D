@@ -185,6 +185,8 @@ public:
     /// Create pipeline state.
     bool Create(const PipelineStateDesc& desc);
 
+    /// Validate on shader reload.
+    void ReloadShader();
     /// Apply pipeline state.
     void Apply();
 
@@ -208,36 +210,28 @@ private:
     /// Description.
     PipelineStateDesc desc_;
     /// Layout of constant buffers.
-    ShaderProgramLayout* shaderProgramLayout_{};
+    WeakPtr<ShaderProgramLayout> shaderProgramLayout_{};
 };
 
 /// Generic pipeline state cache.
-class PipelineStateCache : public Object
+class URHO3D_API PipelineStateCache : public Object
 {
     URHO3D_OBJECT(PipelineStateCache, Object);
 
 public:
     /// Construct.
-    explicit PipelineStateCache(Context* context) : Object(context) {}
+    explicit PipelineStateCache(Context* context);
 
     /// Create new or return existing pipeline state.
-    SharedPtr<PipelineState> GetPipelineState(PipelineStateDesc desc)
-    {
-        desc.RecalculateHash();
-        auto iterNew = states_.emplace(desc, nullptr);
-        if (iterNew.second)
-        {
-            if (desc.IsValid())
-            {
-                auto newState = MakeShared<PipelineState>(context_);
-                if (newState->Create(desc))
-                    iterNew.first->second = newState;
-            }
-        }
-        return iterNew.first->second;
-    }
+    /// Return nullptr in case of error. Errored states are not cached.
+    SharedPtr<PipelineState> GetPipelineState(PipelineStateDesc desc);
 
 private:
+    /// Handle reload finished.
+    void HandleResourceReload(StringHash eventType, VariantMap& eventData);
+    /// Reload shaders for all cached states.
+    void ReloadShaders();
+
     /// Cached states.
     ea::unordered_map<PipelineStateDesc, SharedPtr<PipelineState>> states_;
 };

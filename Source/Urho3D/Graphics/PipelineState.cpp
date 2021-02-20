@@ -25,6 +25,8 @@
 #include "../Core/Context.h"
 #include "../IO/Log.h"
 #include "../Graphics/Graphics.h"
+#include "../Graphics/Shader.h"
+#include "../Resource/ResourceEvents.h"
 
 namespace Urho3D
 {
@@ -44,7 +46,7 @@ bool PipelineState::Create(const PipelineStateDesc& desc)
     }
 
     desc_ = desc;
-    OnDeviceReset();
+    ReloadShader();
     if (!shaderProgramLayout_)
     {
         URHO3D_LOGERROR("Shader program layout of pipeline state is invalid");
@@ -52,6 +54,12 @@ bool PipelineState::Create(const PipelineStateDesc& desc)
     }
 
     return true;
+}
+
+void PipelineState::ReloadShader()
+{
+    if (!shaderProgramLayout_)
+        shaderProgramLayout_ = graphics_->GetShaderProgramLayout(desc_.vertexShader_, desc_.pixelShader_);
 }
 
 void PipelineState::Apply()
@@ -78,12 +86,56 @@ void PipelineState::OnDeviceLost()
 
 void PipelineState::OnDeviceReset()
 {
-    shaderProgramLayout_ = graphics_->GetShaderProgramLayout(desc_.vertexShader_, desc_.pixelShader_);
+    ReloadShader();
 }
 
 void PipelineState::Release()
 {
     shaderProgramLayout_ = nullptr;
+}
+
+PipelineStateCache::PipelineStateCache(Context* context)
+    : Object(context)
+{
+    SubscribeToEvent(E_RELOADFINISHED, &PipelineStateCache::HandleResourceReload);
+}
+
+SharedPtr<PipelineState> PipelineStateCache::GetPipelineState(PipelineStateDesc desc)
+{
+    desc.RecalculateHash();
+    auto iter = states_.find(desc);
+    if (iter != states_.end())
+    {
+        const SharedPtr<PipelineState>& existingState = iter->second;
+        if (!existingState->GetShaderProgramLayout())
+        {
+            existingState->ReloadShader();
+            if (!existingState->GetShaderProgramLayout())
+                return nullptr;
+        }
+        return existingState;
+    }
+
+    auto newState = MakeShared<PipelineState>(context_);
+    if (newState->Create(desc))
+    {
+        states_.emplace(desc, newState);
+        return newState;
+    }
+
+    return nullptr;
+}
+
+void PipelineStateCache::HandleResourceReload(StringHash /*eventType*/, VariantMap& /*eventData*/)
+{
+    if (context_->GetEventSender()->GetType() == Shader::GetTypeStatic())
+        ReloadShaders();
+}
+
+void PipelineStateCache::ReloadShaders()
+{
+    for (const auto& item : states_)
+        item.second->ReloadShader();
 }
 
 }

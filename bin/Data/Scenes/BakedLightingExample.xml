@@ -25,7 +25,7 @@
 	</component>
 	<component type="GlobalIllumination" id="4">
 		<attribute name="Emission Brightness" value="32.000000" />
-		<attribute name="Is Background Static" value="1" />
+		<attribute name="Is Background Static" value="true" />
 		<attribute name="Background Brightness" value="0.100000" />
 		<attribute name="Data File" value="BinaryFile;Scenes/BakedLightingExample/GI.bin" />
 	</component>
@@ -53,7 +53,7 @@
 	</component>
 	<component type="DebugRenderer" id="409" />
 	<node id="2">
-		<attribute name="Is Enabled" value="1" />
+		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Chunk 0" />
 		<attribute name="Tags" />
 		<attribute name="Position" value="0.000365645 0 0" />
@@ -61,7 +61,7 @@
 		<attribute name="Scale" value="1 1 1" />
 		<attribute name="Variables" />
 		<node id="99">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Boxes" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="0 0 0" />
@@ -69,7 +69,7 @@
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
 			<node id="56">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Torus" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="2.5 0.3 -2" />
@@ -79,14 +79,15 @@
 				<component type="StaticModel" id="58">
 					<attribute name="Model" value="Model;Models/Torus.mdl" />
 					<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Blend Light Probes" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Scale in Lightmap" value="0.000000" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0683594 0.0449219 0.216797 0.00195313" />
 				</component>
 			</node>
 			<node id="51">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="White Box" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="0.5 0.3 -2" />
@@ -96,13 +97,13 @@
 				<component type="StaticModel" id="53">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.833984 0.949219" />
 				</component>
 			</node>
 			<node id="41">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Green Box" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="1.5 0.3 -2" />
@@ -112,13 +113,13 @@
 				<component type="StaticModel" id="43">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapGreen.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.914063 0.949219" />
 				</component>
 			</node>
 			<node id="25">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Stone Box" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-1.5 0.3 -2" />
@@ -128,13 +129,13 @@
 				<component type="StaticModel" id="27">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapStone.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.00195313 0.941406" />
 				</component>
 			</node>
 			<node id="24">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="White Box" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-2.5 0.3 -2" />
@@ -144,13 +145,13 @@
 				<component type="StaticModel" id="26">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.0820313 0.941406" />
 				</component>
 			</node>
 			<node id="15">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Red Box" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-3.5 0.3 -2" />
@@ -160,13 +161,13 @@
 				<component type="StaticModel" id="16">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapRed.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.162109 0.941406" />
 				</component>
 			</node>
 			<node id="13">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="White Box" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-4.5 0.3 -2" />
@@ -176,13 +177,13 @@
 				<component type="StaticModel" id="14">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.242188 0.941406" />
 				</component>
 			</node>
 			<node id="34">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Glowing Box" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-0.5 0.3 -2" />
@@ -192,14 +193,14 @@
 				<component type="StaticModel" id="36">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapGlowingGreen.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.322266 0.941406" />
 				</component>
 			</node>
 		</node>
 		<node id="100">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Shadow Casters" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="0 0 0" />
@@ -207,7 +208,7 @@
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
 			<node id="8">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Transparent Shallow" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-2 2.5 -1" />
@@ -217,13 +218,13 @@
 				<component type="StaticModel" id="8">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapBlueTransparentShallow.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.152344 0.0976563 0.833984 0.847656" />
 				</component>
 			</node>
 			<node id="9">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Transparent Deep" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-5 2.5 -1" />
@@ -233,13 +234,13 @@
 				<component type="StaticModel" id="9">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapBlueTransparentDeep.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.152344 0.0976563 0.00195313 0.839844" />
 				</component>
 			</node>
 			<node id="50">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Transparent Stone" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="1 2.5 -1" />
@@ -249,14 +250,14 @@
 				<component type="StaticModel" id="52">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapStoneTransparent.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.152344 0.0976563 0.158203 0.839844" />
 				</component>
 			</node>
 		</node>
 		<node id="196">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Light Probes" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="0 0 0" />
@@ -264,7 +265,7 @@
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
 			<node id="197">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Boxes" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-1 0.55 -2" />
@@ -280,7 +281,7 @@
 				</component>
 			</node>
 			<node id="198">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Shadows" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-1 1 1" />
@@ -297,7 +298,7 @@
 			</node>
 		</node>
 		<node id="305">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="false" />
 			<attribute name="Name" value="Torus Text" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="1.89069 0.175145 -2.5968" />
@@ -316,7 +317,7 @@
 			</component>
 		</node>
 		<node id="321">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="false" />
 			<attribute name="Name" value="Common Text" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="-4.5784 0.221186 -2.7204" />
@@ -336,7 +337,7 @@
 		</node>
 	</node>
 	<node id="3">
-		<attribute name="Is Enabled" value="1" />
+		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Main Light" />
 		<attribute name="Tags" />
 		<attribute name="Position" value="0 5 0" />
@@ -350,12 +351,12 @@
 			<attribute name="Brightness Multiplier" value="0.800000" />
 			<attribute name="Indirect Brightness" value="4.000000" />
 			<attribute name="Radius" value="5.000000" />
-			<attribute name="Cast Shadows" value="1" />
+			<attribute name="Cast Shadows" value="true" />
 			<attribute name="CSM Splits" value="100 0 0 0" />
 		</component>
 	</node>
 	<node id="59">
-		<attribute name="Is Enabled" value="1" />
+		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Chunk 1" />
 		<attribute name="Tags" />
 		<attribute name="Position" value="-10 0 0" />
@@ -363,7 +364,7 @@
 		<attribute name="Scale" value="1 1 1" />
 		<attribute name="Variables" />
 		<node id="64">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Light Probes" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="0 0 0" />
@@ -371,7 +372,7 @@
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
 			<node id="204">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Mushrooms" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-1 0.9 0" />
@@ -386,7 +387,7 @@
 				</component>
 			</node>
 			<node id="205">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Sphere Shadow" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="2.5 2.2 -0.5" />
@@ -402,7 +403,7 @@
 			</node>
 		</node>
 		<node id="74">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Big Mushroom" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="-1 -0.02 0" />
@@ -412,14 +413,14 @@
 			<component type="StaticModel" id="75">
 				<attribute name="Model" value="Model;Models/LightmapMushroom.mdl" />
 				<attribute name="Material" value="Material;Materials/LightmapGreen.xml" />
-				<attribute name="Bake Lightmap" value="1" />
+				<attribute name="Bake Lightmap" value="true" />
 				<attribute name="Lightmap Index" value="1" />
 				<attribute name="Lightmap Scale &amp; Offset" value="0.5 0.503906 0.380859 0.00195313" />
 			</component>
 			<component type="Navigable" id="577" />
 		</node>
 		<node id="75">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Small Mushroom" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="1 -0.02 0" />
@@ -429,13 +430,13 @@
 			<component type="StaticModel" id="76">
 				<attribute name="Model" value="Model;Models/LightmapMushroom.mdl" />
 				<attribute name="Material" value="Material;Materials/LightmapGreen.xml" />
-				<attribute name="Bake Lightmap" value="1" />
+				<attribute name="Bake Lightmap" value="true" />
 				<attribute name="Lightmap Scale &amp; Offset" value="0.25 0.251953 0.695313 0.591797" />
 			</component>
 			<component type="Navigable" id="578" />
 		</node>
 		<node id="76">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Sphere" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="2 3 -2" />
@@ -445,12 +446,12 @@
 			<component type="StaticModel" id="77">
 				<attribute name="Model" value="Model;Models/Sphere.mdl" />
 				<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
-				<attribute name="Bake Lightmap" value="1" />
+				<attribute name="Bake Lightmap" value="true" />
 				<attribute name="Lightmap Scale &amp; Offset" value="0.210938 0.134766 0.619141 0.847656" />
 			</component>
 		</node>
 		<node id="306">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="false" />
 			<attribute name="Name" value="Mushroom Text" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="-1.36056 0.194063 -2.21141" />
@@ -469,7 +470,7 @@
 			</component>
 		</node>
 		<node id="307">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="false" />
 			<attribute name="Name" value="Sphere Text" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="2.86676 2.8714 -3.27084" />
@@ -489,7 +490,7 @@
 		</node>
 	</node>
 	<node id="107">
-		<attribute name="Is Enabled" value="1" />
+		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Chunk 2" />
 		<attribute name="Tags" />
 		<attribute name="Position" value="-5 0 15" />
@@ -497,7 +498,7 @@
 		<attribute name="Scale" value="1 1 1" />
 		<attribute name="Variables" />
 		<node id="109">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Light Probes" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="0 0 0" />
@@ -505,7 +506,7 @@
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
 			<node id="206">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Comb" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-5.6 1 0" />
@@ -521,7 +522,7 @@
 				</component>
 			</node>
 			<node id="207">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Glowing Floor" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="5 0.5 8.5" />
@@ -537,7 +538,7 @@
 				</component>
 			</node>
 			<node id="208">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Spot Light Room" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="0 1.2 -0.6" />
@@ -552,7 +553,7 @@
 				</component>
 			</node>
 			<node id="209">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Point Light Room" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="0 0.6 6.2" />
@@ -568,7 +569,7 @@
 			</node>
 		</node>
 		<node id="113">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Boxes" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="0 0 0" />
@@ -577,7 +578,7 @@
 			<attribute name="Variables" />
 			<component type="Navigable" id="580" />
 			<node id="114">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Box" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="4 2.5 7" />
@@ -587,13 +588,13 @@
 				<component type="StaticModel" id="110">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.380859 0.244141 0.00195313 0.591797" />
 				</component>
 			</node>
 			<node id="115">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Box" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="3.38241 0.5 -1.77921" />
@@ -603,13 +604,13 @@
 				<component type="StaticModel" id="111">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.228516 0.146484 0.386719 0.791016" />
 				</component>
 			</node>
 			<node id="116">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Box" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-3 6 -2" />
@@ -619,13 +620,13 @@
 				<component type="StaticModel" id="112">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.914063 0.585938 0.00195313 0.00195313" />
 				</component>
 			</node>
 			<node id="117">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Box" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="0 1 3" />
@@ -635,14 +636,14 @@
 				<component type="StaticModel" id="113">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Index" value="1" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.152344 0.0976563 0.00195313 0.755859" />
 				</component>
 			</node>
 			<node id="119">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Box" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="0 1 -4" />
@@ -652,15 +653,15 @@
 				<component type="StaticModel" id="115">
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
-					<attribute name="Cast Shadows" value="1" />
-					<attribute name="Bake Lightmap" value="1" />
+					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Scale in Lightmap" value="2.000000" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.304688 0.195313 0.386719 0.591797" />
 				</component>
 			</node>
 			<node id="316">
-				<attribute name="Is Enabled" value="1" />
-				<attribute name="Name" value="Sphere Text" />
+				<attribute name="Is Enabled" value="false" />
+				<attribute name="Name" value="Logo Text" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-1.10997 1.54636 -3.48662" />
 				<attribute name="Rotation" value="0.707107 0 0.707107 0" />
@@ -679,7 +680,7 @@
 			</node>
 		</node>
 		<node id="120">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Point Light" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="0 1.5 6" />
@@ -692,11 +693,11 @@
 				<attribute name="Indirect Brightness" value="4.000000" />
 				<attribute name="Radius" value="0.200000" />
 				<attribute name="Light Shape Texture" value="TextureCube;" />
-				<attribute name="Cast Shadows" value="1" />
+				<attribute name="Cast Shadows" value="true" />
 			</component>
 		</node>
 		<node id="125">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Spot Light" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="0 1 1.5" />
@@ -710,11 +711,11 @@
 				<attribute name="Brightness Multiplier" value="2.000000" />
 				<attribute name="Indirect Brightness" value="4.000000" />
 				<attribute name="Radius" value="0.200000" />
-				<attribute name="Cast Shadows" value="1" />
+				<attribute name="Cast Shadows" value="true" />
 			</component>
 		</node>
 		<node id="127">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Logo" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="0 1 -2" />
@@ -724,14 +725,14 @@
 			<component type="StaticModel" id="123">
 				<attribute name="Model" value="Model;Models/Plane.mdl" />
 				<attribute name="Material" value="Material;Materials/LightmapLogo.xml" />
-				<attribute name="Cast Shadows" value="1" />
-				<attribute name="Bake Lightmap" value="1" />
+				<attribute name="Cast Shadows" value="true" />
+				<attribute name="Bake Lightmap" value="true" />
 				<attribute name="Lightmap Scale &amp; Offset" value="0.046875 0.046875 0.619141 0.791016" />
 			</component>
 		</node>
 	</node>
 	<node id="210">
-		<attribute name="Is Enabled" value="1" />
+		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Global Light Probe Group" />
 		<attribute name="Tags" />
 		<attribute name="Position" value="-5 1.1 10" />
@@ -747,7 +748,7 @@
 		</component>
 	</node>
 	<node id="326">
-		<attribute name="Is Enabled" value="1" />
+		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Skybox" />
 		<attribute name="Tags" />
 		<attribute name="Position" value="0 0 0" />
@@ -760,7 +761,7 @@
 		</component>
 	</node>
 	<node id="108">
-		<attribute name="Is Enabled" value="1" />
+		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Terrain" />
 		<attribute name="Tags" />
 		<attribute name="Position" value="-5 0 10" />
@@ -771,14 +772,14 @@
 			<attribute name="Height Map" value="Image;Textures/LightmapTerrainHeightMap.png" />
 			<attribute name="Material" value="Material;Materials/LightmapTerrain.xml" />
 			<attribute name="Vertex Spacing" value="0.6 0.01 0.6" />
-			<attribute name="Bake Lightmap" value="1" />
+			<attribute name="Bake Lightmap" value="true" />
 			<attribute name="Lightmap Index" value="1" />
 			<attribute name="Lightmap Scale &amp; Offset" value="0.375 0.75 0.00195313 0.00195313" />
 		</component>
 		<component type="Navigable" id="368" />
 	</node>
 	<node id="363">
-		<attribute name="Is Enabled" value="1" />
+		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Actor" />
 		<attribute name="Tags" />
 		<attribute name="Position" value="-3.7489 1.66292e-07 -4.18749" />
@@ -791,7 +792,7 @@
 			<attribute name="Height" value="1.000000" />
 		</component>
 		<node id="390">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Model Rotation" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="0 0 0" />
@@ -799,7 +800,7 @@
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
 			<node id="364">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Graphics" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="1.48605e-08 0 -0.169985" />
@@ -809,38 +810,39 @@
 				<component type="AnimatedModel" id="359">
 					<attribute name="Model" value="Model;Models/Mutant/Mutant.mdl" />
 					<attribute name="Material" value="Material;Models/Mutant/Materials/mutant_M.xml" />
+					<attribute name="Global Illumination" value="Blend Light Probes" />
 					<attribute name="Bone Animation Enabled">
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
-						<variant type="Bool" value="1" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
+						<variant type="Bool" value="true" />
 					</attribute>
 					<attribute name="Animation States">
 						<variant type="Int" value="0" />
@@ -852,7 +854,7 @@
 					</attribute>
 				</component>
 				<node id="16777457">
-					<attribute name="Is Enabled" value="1" />
+					<attribute name="Is Enabled" value="true" />
 					<attribute name="Name" value="Mutant:Hips" />
 					<attribute name="Tags" />
 					<attribute name="Position" value="4.16877e-09 0.924499 0.0032974" />
@@ -860,7 +862,7 @@
 					<attribute name="Scale" value="0.01 0.01 0.01" />
 					<attribute name="Variables" />
 					<node id="16777458">
-						<attribute name="Is Enabled" value="1" />
+						<attribute name="Is Enabled" value="true" />
 						<attribute name="Name" value="Mutant:Spine" />
 						<attribute name="Tags" />
 						<attribute name="Position" value="-2.9976e-15 10.7639 -1.24352" />
@@ -868,7 +870,7 @@
 						<attribute name="Scale" value="1 1 1" />
 						<attribute name="Variables" />
 						<node id="16777459">
-							<attribute name="Is Enabled" value="1" />
+							<attribute name="Is Enabled" value="true" />
 							<attribute name="Name" value="Mutant:Spine1" />
 							<attribute name="Tags" />
 							<attribute name="Position" value="-0.0189266 13.0613 -0.227481" />
@@ -876,7 +878,7 @@
 							<attribute name="Scale" value="1 1 1" />
 							<attribute name="Variables" />
 							<node id="16777460">
-								<attribute name="Is Enabled" value="1" />
+								<attribute name="Is Enabled" value="true" />
 								<attribute name="Name" value="Mutant:Spine2" />
 								<attribute name="Tags" />
 								<attribute name="Position" value="-0.0216304 12.9882 0.916687" />
@@ -884,7 +886,7 @@
 								<attribute name="Scale" value="1 1 1" />
 								<attribute name="Variables" />
 								<node id="16777461">
-									<attribute name="Is Enabled" value="1" />
+									<attribute name="Is Enabled" value="true" />
 									<attribute name="Name" value="Mutant:Neck" />
 									<attribute name="Tags" />
 									<attribute name="Position" value="-0.0119271 24.6707 -2.0281" />
@@ -892,7 +894,7 @@
 									<attribute name="Scale" value="1 1 1" />
 									<attribute name="Variables" />
 									<node id="16777462">
-										<attribute name="Is Enabled" value="1" />
+										<attribute name="Is Enabled" value="true" />
 										<attribute name="Name" value="Mutant:Head" />
 										<attribute name="Tags" />
 										<attribute name="Position" value="-2.57757e-09 8.81732 -6.10262" />
@@ -902,7 +904,7 @@
 									</node>
 								</node>
 								<node id="16777463">
-									<attribute name="Is Enabled" value="1" />
+									<attribute name="Is Enabled" value="true" />
 									<attribute name="Name" value="Mutant:LeftShoulder" />
 									<attribute name="Tags" />
 									<attribute name="Position" value="9.55357 16.0654 5.22783" />
@@ -910,7 +912,7 @@
 									<attribute name="Scale" value="1 1 1" />
 									<attribute name="Variables" />
 									<node id="16777464">
-										<attribute name="Is Enabled" value="1" />
+										<attribute name="Is Enabled" value="true" />
 										<attribute name="Name" value="Mutant:LeftArm" />
 										<attribute name="Tags" />
 										<attribute name="Position" value="17.893 2.06608 0.922929" />
@@ -918,7 +920,7 @@
 										<attribute name="Scale" value="1 1 1" />
 										<attribute name="Variables" />
 										<node id="16777465">
-											<attribute name="Is Enabled" value="1" />
+											<attribute name="Is Enabled" value="true" />
 											<attribute name="Name" value="Mutant:LeftForeArm" />
 											<attribute name="Tags" />
 											<attribute name="Position" value="26.3748 -0.000101682 1.45906" />
@@ -929,7 +931,7 @@
 									</node>
 								</node>
 								<node id="16777466">
-									<attribute name="Is Enabled" value="1" />
+									<attribute name="Is Enabled" value="true" />
 									<attribute name="Name" value="Mutant:RightShoulder" />
 									<attribute name="Tags" />
 									<attribute name="Position" value="-9.55357 16.0654 5.22783" />
@@ -937,7 +939,7 @@
 									<attribute name="Scale" value="1 1 1" />
 									<attribute name="Variables" />
 									<node id="16777467">
-										<attribute name="Is Enabled" value="1" />
+										<attribute name="Is Enabled" value="true" />
 										<attribute name="Name" value="Mutant:RightArm" />
 										<attribute name="Tags" />
 										<attribute name="Position" value="-17.8119 2.06608 0.922929" />
@@ -945,7 +947,7 @@
 										<attribute name="Scale" value="1 1 1" />
 										<attribute name="Variables" />
 										<node id="16777468">
-											<attribute name="Is Enabled" value="1" />
+											<attribute name="Is Enabled" value="true" />
 											<attribute name="Name" value="Mutant:RightForeArm" />
 											<attribute name="Tags" />
 											<attribute name="Position" value="-26.3748 -0.000101682 1.45906" />
@@ -953,7 +955,7 @@
 											<attribute name="Scale" value="1 1 1" />
 											<attribute name="Variables" />
 											<node id="16777469">
-												<attribute name="Is Enabled" value="1" />
+												<attribute name="Is Enabled" value="true" />
 												<attribute name="Name" value="Mutant:RightHand" />
 												<attribute name="Tags" />
 												<attribute name="Position" value="-26.7534 0.000357201 -1.605e-05" />
@@ -961,7 +963,7 @@
 												<attribute name="Scale" value="1 1 1" />
 												<attribute name="Variables" />
 												<node id="16777470">
-													<attribute name="Is Enabled" value="1" />
+													<attribute name="Is Enabled" value="true" />
 													<attribute name="Name" value="Mutant:RightHandThumb1" />
 													<attribute name="Tags" />
 													<attribute name="Position" value="-2.49235 -4.44635 -6.16348" />
@@ -969,7 +971,7 @@
 													<attribute name="Scale" value="1 1 1" />
 													<attribute name="Variables" />
 													<node id="16777471">
-														<attribute name="Is Enabled" value="1" />
+														<attribute name="Is Enabled" value="true" />
 														<attribute name="Name" value="Mutant:RightHandThumb2" />
 														<attribute name="Tags" />
 														<attribute name="Position" value="-6.60264 -4.314 -6.89045" />
@@ -977,7 +979,7 @@
 														<attribute name="Scale" value="1 1 1" />
 														<attribute name="Variables" />
 														<node id="16777472">
-															<attribute name="Is Enabled" value="1" />
+															<attribute name="Is Enabled" value="true" />
 															<attribute name="Name" value="Mutant:RightHandThumb3" />
 															<attribute name="Tags" />
 															<attribute name="Position" value="-6.78477 -2.9669 -4.17053" />
@@ -985,7 +987,7 @@
 															<attribute name="Scale" value="1 1 1" />
 															<attribute name="Variables" />
 															<node id="16777473">
-																<attribute name="Is Enabled" value="1" />
+																<attribute name="Is Enabled" value="true" />
 																<attribute name="Name" value="Mutant:RightHandThumb4" />
 																<attribute name="Tags" />
 																<attribute name="Position" value="-7.13065 -2.03375 -3.06964" />
@@ -997,7 +999,7 @@
 													</node>
 												</node>
 												<node id="16777474">
-													<attribute name="Is Enabled" value="1" />
+													<attribute name="Is Enabled" value="true" />
 													<attribute name="Name" value="Mutant:RightHandIndex1" />
 													<attribute name="Tags" />
 													<attribute name="Position" value="-18.4478 1.47989 -8.65425" />
@@ -1005,7 +1007,7 @@
 													<attribute name="Scale" value="1 1 1" />
 													<attribute name="Variables" />
 													<node id="16777475">
-														<attribute name="Is Enabled" value="1" />
+														<attribute name="Is Enabled" value="true" />
 														<attribute name="Name" value="Mutant:RightHandIndex2" />
 														<attribute name="Tags" />
 														<attribute name="Position" value="-7.51438 7.94918e-09 1.83943e-10" />
@@ -1013,7 +1015,7 @@
 														<attribute name="Scale" value="1 1 1" />
 														<attribute name="Variables" />
 														<node id="16777476">
-															<attribute name="Is Enabled" value="1" />
+															<attribute name="Is Enabled" value="true" />
 															<attribute name="Name" value="Mutant:RightHandIndex3" />
 															<attribute name="Tags" />
 															<attribute name="Position" value="-7.48939 6.8506e-09 -8.88178e-16" />
@@ -1024,7 +1026,7 @@
 													</node>
 												</node>
 												<node id="16777477">
-													<attribute name="Is Enabled" value="1" />
+													<attribute name="Is Enabled" value="true" />
 													<attribute name="Name" value="Mutant:RightHandPinky1" />
 													<attribute name="Tags" />
 													<attribute name="Position" value="-17.5078 -0.477745 10.0031" />
@@ -1032,7 +1034,7 @@
 													<attribute name="Scale" value="1 1 1" />
 													<attribute name="Variables" />
 													<node id="16777478">
-														<attribute name="Is Enabled" value="1" />
+														<attribute name="Is Enabled" value="true" />
 														<attribute name="Name" value="Mutant:RightHandPinky2" />
 														<attribute name="Tags" />
 														<attribute name="Position" value="-7.04422 7.94896e-09 1.83922e-10" />
@@ -1040,7 +1042,7 @@
 														<attribute name="Scale" value="1 1 1" />
 														<attribute name="Variables" />
 														<node id="16777479">
-															<attribute name="Is Enabled" value="1" />
+															<attribute name="Is Enabled" value="true" />
 															<attribute name="Name" value="Mutant:RightHandPinky3" />
 															<attribute name="Tags" />
 															<attribute name="Position" value="-7.0789 4.11814e-09 -0" />
@@ -1058,7 +1060,7 @@
 						</node>
 					</node>
 					<node id="16777480">
-						<attribute name="Is Enabled" value="1" />
+						<attribute name="Is Enabled" value="true" />
 						<attribute name="Name" value="Mutant:LeftUpLeg" />
 						<attribute name="Tags" />
 						<attribute name="Position" value="13.656 -7.13524 -0.129696" />
@@ -1066,7 +1068,7 @@
 						<attribute name="Scale" value="1 1 1" />
 						<attribute name="Variables" />
 						<node id="16777481">
-							<attribute name="Is Enabled" value="1" />
+							<attribute name="Is Enabled" value="true" />
 							<attribute name="Name" value="Mutant:LeftLeg" />
 							<attribute name="Tags" />
 							<attribute name="Position" value="2.6874e-05 -35.9191 -1.48144" />
@@ -1074,7 +1076,7 @@
 							<attribute name="Scale" value="1 1 1" />
 							<attribute name="Variables" />
 							<node id="16777482">
-								<attribute name="Is Enabled" value="1" />
+								<attribute name="Is Enabled" value="true" />
 								<attribute name="Name" value="Mutant:LeftFoot" />
 								<attribute name="Tags" />
 								<attribute name="Position" value="6.21725e-14 -34.3074 2.64674" />
@@ -1082,7 +1084,7 @@
 								<attribute name="Scale" value="1 1 1" />
 								<attribute name="Variables" />
 								<node id="16777483">
-									<attribute name="Is Enabled" value="1" />
+									<attribute name="Is Enabled" value="true" />
 									<attribute name="Name" value="Mutant:LeftToeBase" />
 									<attribute name="Tags" />
 									<attribute name="Position" value="4.79616e-14 -15.1931 -14.9118" />
@@ -1094,7 +1096,7 @@
 						</node>
 					</node>
 					<node id="16777484">
-						<attribute name="Is Enabled" value="1" />
+						<attribute name="Is Enabled" value="true" />
 						<attribute name="Name" value="Mutant:RightUpLeg" />
 						<attribute name="Tags" />
 						<attribute name="Position" value="-13.656 -7.13524 -0.129696" />
@@ -1102,7 +1104,7 @@
 						<attribute name="Scale" value="1 1 1" />
 						<attribute name="Variables" />
 						<node id="16777485">
-							<attribute name="Is Enabled" value="1" />
+							<attribute name="Is Enabled" value="true" />
 							<attribute name="Name" value="Mutant:RightLeg" />
 							<attribute name="Tags" />
 							<attribute name="Position" value="-2.6874e-05 -35.9191 -1.48144" />
@@ -1110,7 +1112,7 @@
 							<attribute name="Scale" value="1 1 1" />
 							<attribute name="Variables" />
 							<node id="16777486">
-								<attribute name="Is Enabled" value="1" />
+								<attribute name="Is Enabled" value="true" />
 								<attribute name="Name" value="Mutant:RightFoot" />
 								<attribute name="Tags" />
 								<attribute name="Position" value="-4.26326e-14 -34.3074 2.64674" />
@@ -1118,7 +1120,7 @@
 								<attribute name="Scale" value="1 1 1" />
 								<attribute name="Variables" />
 								<node id="16777487">
-									<attribute name="Is Enabled" value="1" />
+									<attribute name="Is Enabled" value="true" />
 									<attribute name="Name" value="Mutant:RightToeBase" />
 									<attribute name="Tags" />
 									<attribute name="Position" value="-6.57252e-14 -15.1931 -14.9118" />
@@ -1133,7 +1135,7 @@
 			</node>
 		</node>
 		<node id="391">
-			<attribute name="Is Enabled" value="1" />
+			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Camera Rotation Yaw" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="0 0 0" />
@@ -1141,7 +1143,7 @@
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
 			<node id="366">
-				<attribute name="Is Enabled" value="1" />
+				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Camera Rotation Pitch" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="0 1.1 0" />
@@ -1149,7 +1151,7 @@
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 				<node id="368">
-					<attribute name="Is Enabled" value="1" />
+					<attribute name="Is Enabled" value="true" />
 					<attribute name="Name" value="Camera" />
 					<attribute name="Tags" />
 					<attribute name="Position" value="0 0 -3" />
@@ -1165,7 +1167,7 @@
 		</node>
 	</node>
 	<node id="432">
-		<attribute name="Is Enabled" value="0" />
+		<attribute name="Is Enabled" value="false" />
 		<attribute name="Name" value="Probe Object" />
 		<attribute name="Tags" />
 		<attribute name="Position" value="-11.3865 3.34096 15.8676" />
@@ -1175,8 +1177,8 @@
 		<component type="StaticModel" id="430">
 			<attribute name="Model" value="Model;Models/Sphere.mdl" />
 			<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
-			<attribute name="Cast Shadows" value="1" />
-			<attribute name="Bake Lightmap" value="1" />
+			<attribute name="Cast Shadows" value="true" />
+			<attribute name="Bake Lightmap" value="true" />
 			<attribute name="Scale in Lightmap" value="0.000000" />
 			<attribute name="Lightmap Scale &amp; Offset" value="0.0683594 0.0449219 0.216797 0.00195313" />
 		</component>

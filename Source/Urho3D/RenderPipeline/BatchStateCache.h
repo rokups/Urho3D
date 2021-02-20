@@ -145,9 +145,10 @@ class URHO3D_API BatchStateCache : public NonCopyable
 public:
     /// Invalidate cache.
     void Invalidate();
-    /// Return existing pipeline state. Thread-safe.
+    /// Return existing pipeline state or nullptr if not found. Thread-safe.
     PipelineState* GetPipelineState(const BatchStateLookupKey& key) const;
     /// Return existing or create new pipeline state. Not thread safe.
+    /// Return nullptr in case of errors. Errors are cached too.
     PipelineState* GetOrCreatePipelineState(const BatchStateCreateKey& key,
         BatchStateCreateContext& ctx, BatchStateCacheCallback* callback);
 

@@ -46,9 +46,9 @@ enum class CreateBatchTag
     Unlit
 };
 
-/// Create batch.
-PipelineBatch CreatePipelineBatch(const BatchStateCreateKey& key, PipelineState* pipelineState,
-    CreateBatchTag tag = CreateBatchTag::Default)
+/// Create batch. TODO(renderer): Use constexpr if
+PipelineBatch CreatePipelineBatch(const BatchStateCreateKey& key,
+    PipelineState* pipelineState, CreateBatchTag tag = CreateBatchTag::Default)
 {
     PipelineBatch batch;
     batch.lightIndex_ = tag == CreateBatchTag::Unlit ? M_MAX_UNSIGNED : key.lightIndex_;
@@ -397,7 +397,7 @@ void BatchCompositor::FinalizeShadowBatchesComposition()
         const BatchStateCreateKey& key = splitAndKey.second;
         ShadowSplitProcessor& split = *splitAndKey.first;
         PipelineState* pipelineState = shadowCache_.GetOrCreatePipelineState(key, ctx, batchStateCacheCallback_);
-        if (pipelineState)
+        if (pipelineState && pipelineState->GetShaderProgramLayout())
             split.GetMutableShadowBatches().push_back(CreatePipelineBatch(key, pipelineState, CreateBatchTag::Unlit));
     }
 }

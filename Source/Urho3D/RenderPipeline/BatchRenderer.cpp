@@ -376,17 +376,20 @@ private:
             }
 
             // Add material shader parameters
-            if (drawQueue_.BeginShaderParameterGroup(SP_MATERIAL, materialDirty))
+            // TODO(renderer): Check for sourceBatch.lightmapScaleOffset_ dirty?
+            if (drawQueue_.BeginShaderParameterGroup(SP_MATERIAL, materialDirty || sourceBatch.lightmapScaleOffset_))
             {
                 const auto& materialParameters = pipelineBatch.material_->GetShaderParameters();
                 for (const auto& parameter : materialParameters)
                     drawQueue_.AddShaderParameter(parameter.first, parameter.second.value_);
+                if (enableAmbientLight_ && sourceBatch.lightmapScaleOffset_)
+                    drawQueue_.AddShaderParameter(VSP_LMOFFSET, *sourceBatch.lightmapScaleOffset_);
                 drawQueue_.CommitShaderParameterGroup(SP_MATERIAL);
             }
 
             // Add resources
             // TODO(renderer): Don't check for pixelLightDirty, check for shadow map and ramp/shape only
-            if (materialDirty || pixelLightDirty)
+            if (materialDirty || pixelLightDirty || sourceBatch.lightmapScaleOffset_)
             {
                 // Add global resources
                 for (const ShaderResourceDesc& desc : globalResources_)
@@ -396,6 +399,10 @@ private:
                 const auto& materialTextures = pipelineBatch.material_->GetTextures();
                 for (const auto& texture : materialTextures)
                     drawQueue_.AddShaderResource(texture.first, texture.second);
+
+                // Add lightmap
+                if (enableAmbientLight_)
+                    drawQueue_.AddShaderResource(TU_EMISSIVE, scene_->GetLightmapTexture(sourceBatch.lightmapIndex_));
 
                 // Add light resources
                 if (hasPixelLight_)
@@ -505,13 +512,13 @@ private:
     /// Frame info.
     const FrameInfo& frameInfo_;
     /// Scene.
-    const Scene* scene_{};
+    Scene* const scene_{};
     /// Light array for indexing.
     const ea::vector<LightProcessor*>& lights_;
     /// Render camera.
-    const Camera* camera_{};
+    const Camera* const camera_{};
     /// Render camera node.
-    const Node* cameraNode_{};
+    const Node* const cameraNode_{};
 
     /// Offset and scale of GBuffer.
     Vector4 geometryBufferOffsetAndScale_;
