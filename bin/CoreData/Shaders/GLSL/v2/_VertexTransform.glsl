@@ -1,7 +1,7 @@
 #ifndef _VERTEX_TRANSFORM_GLSL_
 #define _VERTEX_TRANSFORM_GLSL_
 
-#ifdef STAGE_VERTEX_SHADER
+#ifdef URHO3D_VERTEX_SHADER
 
 /// Return normal matrix from model matrix.
 mat3 GetNormalMatrix(mat4 modelMatrix)

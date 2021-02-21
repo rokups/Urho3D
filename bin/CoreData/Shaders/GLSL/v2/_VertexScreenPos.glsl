@@ -1,4 +1,4 @@
-#ifdef STAGE_VERTEX_SHADER
+#ifdef URHO3D_VERTEX_SHADER
 mat3 GetCameraRot()
 {
     return mat3(cViewInv[0][0], cViewInv[0][1], cViewInv[0][2],

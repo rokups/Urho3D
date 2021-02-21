@@ -152,6 +152,20 @@ struct DrawableProcessorSettings
     unsigned maxVertexLights_{ 4 };
     /// Max number of pixel lights.
     unsigned maxPixelLights_{ 4 };
+
+    /// Calculate pipeline state hash.
+    unsigned CalculatePipelineStateHash() const { return 0; }
+
+    /// Compare settings.
+    bool operator==(const DrawableProcessorSettings& rhs) const
+    {
+        return materialQuality_ == rhs.materialQuality_
+            && maxVertexLights_ == rhs.maxVertexLights_
+            && maxPixelLights_ == rhs.maxPixelLights_;
+    }
+
+    /// Compare settings.
+    bool operator!=(const DrawableProcessorSettings& rhs) const { return !(*this == rhs); }
 };
 
 /// Drawable processing utility.

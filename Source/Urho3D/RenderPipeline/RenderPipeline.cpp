@@ -167,13 +167,13 @@ void RenderPipeline::RegisterObject(Context* context)
 {
     context->RegisterFactory<RenderPipeline>();
 
-    URHO3D_ENUM_ATTRIBUTE("Ambient Mode", settings_.ambientMode_, ambientModeNames, AmbientMode::Flat, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Enable Instancing", bool, settings_.enableInstancing_, false, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE("Ambient Mode", settings_.rendering_.ambientMode_, ambientModeNames, AmbientMode::Directional, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Enable Instancing", bool, settings_.instancing_.enable_, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Enable Shadow", bool, settings_.enableShadows_, true, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Deferred Rendering", bool, settings_.deferred_, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Use Variance Shadow Maps", bool, settings_.varianceShadowMap_, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("VSM Shadow Settings", Vector2, settings_.vsmShadowParams_, SceneProcessorSettings::DefaultVSMShadowParams, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("VSM Multi Sample", int, settings_.varianceShadowMapMultiSample_, 1, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Use Variance Shadow Maps", bool, settings_.shadowMap_.varianceShadowMap_, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("VSM Shadow Settings", Vector2, settings_.rendering_.vsmShadowParams_, BatchRendererSettings{}.vsmShadowParams_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("VSM Multi Sample", int, settings_.shadowMap_.varianceShadowMapMultiSample_, 1, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Gamma Correction", bool, settings_.gammaCorrection_, false, AM_DEFAULT);
 }
 
@@ -221,7 +221,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         commonDefines += "LIGHTMAP ";
 
     // Add ambient vertex defines
-    switch (settings_.ambientMode_)
+    switch (settings_.rendering_.ambientMode_)
     {
     case AmbientMode::Constant:
         vertexShaderDefines += "URHO3D_AMBIENT_CONSTANT ";
@@ -296,8 +296,11 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     switch (key.geometryType_)
     {
     case GEOM_STATIC:
-        if (settings_.enableInstancing_)
+        if (settings_.instancing_.enable_)
+        {
             vertexShaderDefines += "GEOM_INSTANCED ";
+            vertexShaderDefines += "URHO3D_INSTANCING ";
+        }
         else
             vertexShaderDefines += "GEOM_STATIC ";
         break;
@@ -360,7 +363,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         commonDefines += "PERPIXEL ";
         if (key.light_->HasShadow())
         {
-            if (settings_.varianceShadowMap_)
+            if (settings_.shadowMap_.varianceShadowMap_)
                 commonDefines += "SHADOW VSM_SHADOW ";
             else
                 commonDefines += "SHADOW SIMPLE_SHADOW ";
@@ -459,7 +462,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
 
     if (sceneLight->GetNumSplits() > 0)
     {
-        if (settings_.varianceShadowMap_)
+        if (settings_.shadowMap_.varianceShadowMap_)
             pixelDefiles += "SHADOW VSM_SHADOW ";
         else
             pixelDefiles += "SHADOW SIMPLE_SHADOW ";
@@ -541,6 +544,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
     cameraProcessor_->Initialize(viewport->GetCamera());
 
     //settings_.enableInstancing_ = GetSubsystem<Renderer>()->GetDynamicInstancing();
+    //settings_.ambientMode_ = AmbientMode::Directional;
 
     // TODO(renderer): Optimize this
     previousSettings_ = settings_;
@@ -550,11 +554,22 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         && !Graphics::GetReadableDepthStencilFormat())
         settings_.deferred_ = false;
 
-    if (!settings_.lowPrecisionShadowMaps_ && !graphics_->GetHiresShadowMapFormat())
-        settings_.lowPrecisionShadowMaps_ = true;
+    if (!settings_.shadowMap_.lowPrecisionShadowMaps_ && !graphics_->GetHiresShadowMapFormat())
+        settings_.shadowMap_.lowPrecisionShadowMaps_ = true;
 
-    if (settings_.enableInstancing_ && !graphics_->GetInstancingSupport())
-        settings_.enableInstancing_ = false;
+    if (settings_.instancing_.enable_ && !graphics_->GetInstancingSupport())
+        settings_.instancing_.enable_ = false;
+
+    if (settings_.instancing_.enable_)
+    {
+        settings_.instancing_.firstUnusedTexCoord_ = 4;
+        settings_.instancing_.numReservedElems_ = 3 +
+            (settings_.rendering_.ambientMode_ == AmbientMode::Constant
+            ? 0
+            : settings_.rendering_.ambientMode_ == AmbientMode::Flat
+            ? 1
+            : 7);
+    }
 
     sceneProcessor_->SetSettings(settings_);
 
@@ -622,7 +637,7 @@ void RenderPipeline::Render()
 
     auto sceneBatchRenderer_ = sceneProcessor_->GetBatchRenderer();
     auto instancingBuffer = sceneProcessor_->GetInstancingBuffer();
-    auto flag = settings_.enableInstancing_ ? BatchRenderFlag::InstantiateStaticGeometry : BatchRenderFlag::None;
+    auto flag = settings_.instancing_.enable_ ? BatchRenderFlag::InstantiateStaticGeometry : BatchRenderFlag::None;
 
     // TODO(renderer): Remove this guard
 #ifdef DESKTOP_GRAPHICS
@@ -634,13 +649,12 @@ void RenderPipeline::Render()
         deferredDepth_->ClearDepthStencil();
         deferredDepth_->SetRenderTargets({ deferredFinal_, deferredAlbedo_, deferredNormal_ });
         drawQueue_->Reset();
-        if (settings_.enableInstancing_)
-            instancingBuffer->Reset();
-        sceneBatchRenderer_->SetInstancingBuffer(instancingBuffer);
+
+        instancingBuffer->Begin();
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
             BatchRenderFlag::AmbientLight | flag, deferredPass_->GetBatches());
-        if (settings_.enableInstancing_)
-            instancingBuffer->Commit();
+        instancingBuffer->End();
+
         drawQueue_->Execute();
 
         // Draw deferred lights
@@ -672,17 +686,14 @@ void RenderPipeline::Render()
         viewportDepth_->SetRenderTargets({ viewportColor_ });
 
         drawQueue_->Reset();
-        if (settings_.enableInstancing_)
-            instancingBuffer->Reset();
-        sceneBatchRenderer_->SetInstancingBuffer(instancingBuffer);
+        instancingBuffer->Begin();
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
             BatchRenderFlag::AmbientLight | BatchRenderFlag::VertexLights | BatchRenderFlag::PixelLight | flag, basePass_->GetSortedBaseBatches());
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
             BatchRenderFlag::PixelLight | flag, basePass_->GetSortedLightBatches());
         sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
             BatchRenderFlag::AmbientLight | BatchRenderFlag::VertexLights | BatchRenderFlag::PixelLight | flag, alphaPass_->GetSortedBatches());
-        if (settings_.enableInstancing_)
-            instancingBuffer->Commit();
+        instancingBuffer->End();
         drawQueue_->Execute();
     }
 
@@ -723,12 +734,8 @@ unsigned RenderPipeline::RecalculatePipelineStateHash() const
 {
     unsigned hash = 0;
     CombineHash(hash, cameraProcessor_->GetPipelineStateHash());
-    CombineHash(hash, static_cast<unsigned>(settings_.ambientMode_));
     CombineHash(hash, settings_.gammaCorrection_);
-    CombineHash(hash, settings_.enableInstancing_);
-    CombineHash(hash, settings_.enableShadows_);
-    CombineHash(hash, settings_.deferred_);
-    CombineHash(hash, settings_.varianceShadowMap_);
+    CombineHash(hash, settings_.CalculatePipelineStateHash());
     return hash;
 }
 

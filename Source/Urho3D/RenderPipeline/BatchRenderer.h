@@ -38,6 +38,41 @@ class Texture;
 struct PipelineBatchBackToFront;
 struct PipelineBatchByState;
 
+/// Ambient lighting mode.
+enum class AmbientMode
+{
+    Constant,
+    Flat,
+    Directional,
+};
+
+/// Batch renderer settings.
+struct BatchRendererSettings
+{
+    /// Ambient mode.
+    AmbientMode ambientMode_{ AmbientMode::Directional };
+    /// Variance shadow map parameters.
+    Vector2 vsmShadowParams_{ 0.0000001f, 0.9f };
+
+    /// Calculate pipeline state hash.
+    unsigned CalculatePipelineStateHash() const
+    {
+        unsigned hash = 0;
+        CombineHash(hash, MakeHash(ambientMode_));
+        return hash;
+    }
+
+    /// Compare settings.
+    bool operator==(const BatchRendererSettings& rhs) const
+    {
+        return ambientMode_ == rhs.ambientMode_
+            && vsmShadowParams_ == rhs.vsmShadowParams_;
+    }
+
+    /// Compare settings.
+    bool operator!=(const BatchRendererSettings& rhs) const { return !(*this == rhs); }
+};
+
 /// Batch rendering flags.
 enum class BatchRenderFlag
 {
@@ -82,12 +117,11 @@ class URHO3D_API BatchRenderer : public Object
 
 public:
     /// Construct.
-    BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor);
+    BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor,
+        InstancingBufferCompositor* instancingBuffer);
 
-    /// Set variance shadow map parameters.
-    void SetVSMShadowParams(const Vector2& vsmShadowParams);
-    /// Set instancing buffer.
-    void SetInstancingBuffer(InstancingBufferCompositor* instancingBuffer);
+    /// Set settings.
+    void SetSettings(const BatchRendererSettings& settings);
 
     /// Render batches (sorted by state).
     void RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
@@ -105,11 +139,11 @@ private:
     Renderer* renderer_{};
     /// Drawable processor.
     const DrawableProcessor* drawableProcessor_{};
-
     /// Instancing buffer.
     InstancingBufferCompositor* instancingBuffer_{};
-    /// Variance shadow map shader parameters.
-    Vector2 vsmShadowParams_;
+
+    /// Settings.
+    BatchRendererSettings settings_;
 };
 
 }

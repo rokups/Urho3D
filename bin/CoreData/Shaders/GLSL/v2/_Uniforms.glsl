@@ -66,7 +66,7 @@ CBUFFER_BEGIN(4, Material)
 CBUFFER_END()
 #endif
 
-#ifdef STAGE_VERTEX_SHADER
+#ifdef URHO3D_VERTEX_SHADER
 CBUFFER_BEGIN(5, Object)
     CBUFFER_UNIFORM(highp mat4 cModel)
 

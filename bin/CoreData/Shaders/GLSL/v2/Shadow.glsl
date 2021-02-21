@@ -6,12 +6,12 @@
 #include "Samplers.glsl"
 
 #ifdef VSM_SHADOW
-    VERTEX_SHADER_OUT(vec4 vTexCoord)
+    VERTEX_OUTPUT(vec4 vTexCoord)
 #else
-    VERTEX_SHADER_OUT(vec2 vTexCoord)
+    VERTEX_OUTPUT(vec2 vTexCoord)
 #endif
 
-#ifdef STAGE_VERTEX_SHADER
+#ifdef URHO3D_VERTEX_SHADER
 void main()
 {
     mat4 modelMatrix = iModelMatrix;
@@ -30,7 +30,7 @@ void main()
 }
 #endif
 
-#ifdef STAGE_PIXEL_SHADER
+#ifdef URHO3D_PIXEL_SHADER
 void main()
 {
     #ifdef ALPHAMASK

@@ -64,6 +64,15 @@ struct ShadowMapAllocatorSettings
     /// Size of shadow map atlas page.
     unsigned shadowMapPageSize_{ 2048 };
 
+    /// Calculate pipeline state hash.
+    unsigned CalculatePipelineStateHash() const
+    {
+        unsigned hash = 0;
+        CombineHash(hash, varianceShadowMap_);
+        CombineHash(hash, lowPrecisionShadowMaps_);
+        return hash;
+    }
+
     /// Compare settings.
     bool operator==(const ShadowMapAllocatorSettings& rhs) const
     {

@@ -3,27 +3,30 @@
 
 #extension GL_ARB_shading_language_420pack: enable
 
-// Vertex shader defines
+// URHO3D_VERTEX_SHADER: Defined for vertex shader
+// VERTEX_INPUT: Declare vertex input variable
+// VERTEX_OUTPUT: Declare vertex output variable
 #ifdef COMPILEVS
-    #define STAGE_VERTEX_SHADER
+    #define URHO3D_VERTEX_SHADER
 
     #ifdef GL3
-        #define VERTEX_SHADER_IN(decl) in decl;
-        #define VERTEX_SHADER_OUT(decl) out decl;
+        #define VERTEX_INPUT(decl) in decl;
+        #define VERTEX_OUTPUT(decl) out decl;
     #else
-        #define VERTEX_SHADER_IN(decl) attribute decl;
-        #define VERTEX_SHADER_OUT(decl) varying decl;
+        #define VERTEX_INPUT(decl) attribute decl;
+        #define VERTEX_OUTPUT(decl) varying decl;
     #endif
 #endif
 
-// Pixel shader defines
+// URHO3D_PIXEL_SHADER: Defined for vertex shader
+// VERTEX_OUTPUT: Declared vertex shader output
 #ifdef COMPILEPS
-    #define STAGE_PIXEL_SHADER
+    #define URHO3D_PIXEL_SHADER
 
     #ifdef GL3
-        #define VERTEX_SHADER_OUT(decl) in decl;
+        #define VERTEX_OUTPUT(decl) in decl;
     #else
-        #define VERTEX_SHADER_OUT(decl) varying decl;
+        #define VERTEX_OUTPUT(decl) varying decl;
     #endif
 
     // Set default precicion to medium for GL ES pixel shader
@@ -54,7 +57,7 @@
 
 // Hint that attribute is used only by vertex shader (so it can be highp on GL ES)
 // Ignored if not GL ES or if uniform buffers are used
-#if defined(GL_ES) && !defined(URHO3D_USE_CBUFFERS) && defined(STAGE_PIXEL_SHADER)
+#if defined(GL_ES) && !defined(URHO3D_USE_CBUFFERS) && defined(URHO3D_PIXEL_SHADER)
     #define CBUFFER_UNIFORM_VS(decl)
 #else
     #define CBUFFER_UNIFORM_VS(decl) CBUFFER_UNIFORM(decl)

@@ -12,16 +12,16 @@
 #include "Lighting.glsl"
 
 #ifdef DIRLIGHT
-    VERTEX_SHADER_OUT(vec2 vScreenPos)
+    VERTEX_OUTPUT(vec2 vScreenPos)
 #else
-    VERTEX_SHADER_OUT(vec4 vScreenPos)
+    VERTEX_OUTPUT(vec4 vScreenPos)
 #endif
-VERTEX_SHADER_OUT(vec3 vFarRay)
+VERTEX_OUTPUT(vec3 vFarRay)
 #ifdef ORTHO
-    VERTEX_SHADER_OUT(vec3 vNearRay)
+    VERTEX_OUTPUT(vec3 vNearRay)
 #endif
 
-#ifdef STAGE_VERTEX_SHADER
+#ifdef URHO3D_VERTEX_SHADER
 void main()
 {
     mat4 modelMatrix = iModelMatrix;
@@ -43,7 +43,7 @@ void main()
 }
 #endif
 
-#ifdef STAGE_PIXEL_SHADER
+#ifdef URHO3D_PIXEL_SHADER
 void main()
 {
     // If rendering a directional light quad, optimize out the w divide

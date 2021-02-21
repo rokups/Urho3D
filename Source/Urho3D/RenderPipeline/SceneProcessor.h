@@ -40,22 +40,23 @@ class Viewport;
 
 /// Scene processor settings.
 struct URHO3D_API SceneProcessorSettings
-    : public DrawableProcessorSettings
-    , public ShadowMapAllocatorSettings
 {
     /// Default VSM shadow params.
     static const Vector2 DefaultVSMShadowParams;
 
-    /// Whether to enable instanching.
-    // TODO(renderer): Make true when implemented
-    bool enableInstancing_{ false };
+    /// Drawable processor settings.
+    DrawableProcessorSettings drawableProcessing_;
+    /// Shadow map allocator settings.
+    ShadowMapAllocatorSettings shadowMap_;
+    /// Instancing buffer settings.
+    InstancingBufferCompositorSettings instancing_;
+    /// Batch rendering settings.
+    BatchRendererSettings rendering_;
+
     /// Whether to render shadows.
     bool enableShadows_{ true };
     /// Whether to enable deferred rendering.
     bool deferred_{ false };
-
-    /// Variance shadow map parameters.
-    Vector2 vsmShadowParams_{ DefaultVSMShadowParams };
 
     /// Whether to render occlusion triangles in multiple threads.
     bool threadedOcclusion_{};
@@ -65,6 +66,37 @@ struct URHO3D_API SceneProcessorSettings
     unsigned occlusionBufferSize_{ 256 };
     /// Occluder screen size threshold.
     float occluderSizeThreshold_{ 0.025f };
+
+    /// Calculate pipeline state hash.
+    unsigned CalculatePipelineStateHash() const
+    {
+        unsigned hash = 0;
+        CombineHash(hash, drawableProcessing_.CalculatePipelineStateHash());
+        CombineHash(hash, shadowMap_.CalculatePipelineStateHash());
+        CombineHash(hash, instancing_.CalculatePipelineStateHash());
+        CombineHash(hash, rendering_.CalculatePipelineStateHash());
+        CombineHash(hash, enableShadows_);
+        CombineHash(hash, deferred_);
+        return hash;
+    }
+
+    /// Compare settings.
+    bool operator==(const SceneProcessorSettings& rhs) const
+    {
+        return drawableProcessing_ == rhs.drawableProcessing_
+            && shadowMap_ == rhs.shadowMap_
+            && instancing_ == rhs.instancing_
+            && rendering_ == rhs.rendering_
+            && enableShadows_ == rhs.enableShadows_
+            && deferred_ == rhs.deferred_
+            && threadedOcclusion_ == rhs.threadedOcclusion_
+            && maxOccluderTriangles_ == rhs.maxOccluderTriangles_
+            && occlusionBufferSize_ == rhs.occlusionBufferSize_
+            && occluderSizeThreshold_ == rhs.occluderSizeThreshold_;
+    }
+
+    /// Compare settings.
+    bool operator!=(const SceneProcessorSettings& rhs) const { return !(*this == rhs); }
 };
 
 /// Scene processor for RenderPipeline

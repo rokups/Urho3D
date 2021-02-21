@@ -9,42 +9,42 @@
 #include "Fog.glsl"
 
 #ifdef NORMALMAP
-    VERTEX_SHADER_OUT(vec4 vTexCoord)
-    VERTEX_SHADER_OUT(vec4 vTangent)
+    VERTEX_OUTPUT(vec4 vTexCoord)
+    VERTEX_OUTPUT(vec4 vTangent)
 #else
-    VERTEX_SHADER_OUT(vec2 vTexCoord)
+    VERTEX_OUTPUT(vec2 vTexCoord)
 #endif
-VERTEX_SHADER_OUT(vec3 vNormal)
-VERTEX_SHADER_OUT(vec4 vWorldPos)
+VERTEX_OUTPUT(vec3 vNormal)
+VERTEX_OUTPUT(vec4 vWorldPos)
 #ifdef VERTEXCOLOR
-    VERTEX_SHADER_OUT(vec4 vColor)
+    VERTEX_OUTPUT(vec4 vColor)
 #endif
 #if defined(LIGHTMAP) || defined(AO)
-    VERTEX_SHADER_OUT(vec2 vTexCoord2)
+    VERTEX_OUTPUT(vec2 vTexCoord2)
 #endif
-VERTEX_SHADER_OUT(vec3 vVertexLight)
+VERTEX_OUTPUT(vec3 vVertexLight)
 #ifdef PERPIXEL
     #ifdef SHADOW
         #ifndef GL_ES
-            VERTEX_SHADER_OUT(vec4 vShadowPos[NUMCASCADES])
+            VERTEX_OUTPUT(vec4 vShadowPos[NUMCASCADES])
         #else
-            VERTEX_SHADER_OUT(highp vec4 vShadowPos[NUMCASCADES])
+            VERTEX_OUTPUT(highp vec4 vShadowPos[NUMCASCADES])
         #endif
     #endif
     #ifdef SPOTLIGHT
-        VERTEX_SHADER_OUT(vec4 vSpotPos)
+        VERTEX_OUTPUT(vec4 vSpotPos)
     #endif
     #ifdef POINTLIGHT
-        VERTEX_SHADER_OUT(vec3 vCubeMaskVec)
+        VERTEX_OUTPUT(vec3 vCubeMaskVec)
     #endif
 #else
-    VERTEX_SHADER_OUT(vec4 vScreenPos)
+    VERTEX_OUTPUT(vec4 vScreenPos)
     #ifdef ENVCUBEMAP
-        VERTEX_SHADER_OUT(vec3 vReflectionVec)
+        VERTEX_OUTPUT(vec3 vReflectionVec)
     #endif
 #endif
 
-#ifdef STAGE_VERTEX_SHADER
+#ifdef URHO3D_VERTEX_SHADER
 void main()
 {
     mat4 modelMatrix = iModelMatrix;
@@ -108,7 +108,7 @@ void main()
 }
 #endif
 
-#ifdef STAGE_PIXEL_SHADER
+#ifdef URHO3D_PIXEL_SHADER
 void main()
 {
     // Get material diffuse albedo

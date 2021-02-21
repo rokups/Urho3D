@@ -23,11 +23,7 @@
 #include "../Precompiled.h"
 
 #include "../IO/Log.h"
-/*#include "../Graphics/Renderer.h"
-#include "../RenderPipeline/BatchCompositor.h"
-#include "../RenderPipeline/LightProcessor.h"*/
 #include "../RenderPipeline/InstancingBufferCompositor.h"
-//#include "../Scene/Node.h"
 
 #include "../DebugNew.h"
 
@@ -36,25 +32,26 @@ namespace Urho3D
 
 InstancingBufferCompositor::InstancingBufferCompositor(Context* context)
     : Object(context)
-    , vertexBuffer_(MakeShared<VertexBuffer>(context_))
 {
-    static const unsigned numDefaultElements = 4;
-    static const unsigned firstUnusedTexCoord = 4;
-
-    vertexElements_.clear();
-    for (unsigned i = 0; i < numDefaultElements; ++i)
-        vertexElements_.push_back(VertexElement(TYPE_VECTOR4, SEM_TEXCOORD, firstUnusedTexCoord + i, true));
-    vertexStride_ = numDefaultElements * ElementStride;
 }
 
-void InstancingBufferCompositor::Reset()
+void InstancingBufferCompositor::SetSettings(const InstancingBufferCompositorSettings& settings)
+{
+    if (settings_ != settings)
+    {
+        settings_ = settings;
+        Initialize();
+    }
+}
+
+void InstancingBufferCompositor::Begin()
 {
     nextVertex_ = 0;
 }
 
-void InstancingBufferCompositor::Commit()
+void InstancingBufferCompositor::End()
 {
-    if (nextVertex_ == 0)
+    if (nextVertex_ == 0 || !settings_.enable_)
         return;
 
     if (vertexBufferDirty_)
@@ -68,6 +65,27 @@ void InstancingBufferCompositor::Commit()
     }
 
     vertexBuffer_->SetData(data_.data());
+}
+
+void InstancingBufferCompositor::Initialize()
+{
+    nextVertex_ = 0;
+    vertexElements_.clear();
+    data_.clear();
+    vertexBuffer_ = nullptr;
+
+    if (settings_.enable_)
+    {
+        for (unsigned i = 0; i < settings_.numReservedElems_; ++i)
+        {
+            const unsigned index = settings_.firstUnusedTexCoord_ + i;
+            vertexElements_.push_back(VertexElement(TYPE_VECTOR4, SEM_TEXCOORD, index, true));
+        }
+        vertexStride_ = settings_.numReservedElems_ * ElementStride;
+        vertexBufferDirty_ = true;
+
+        vertexBuffer_ = MakeShared<VertexBuffer>(context_);
+    }
 }
 
 void InstancingBufferCompositor::GrowBuffer()

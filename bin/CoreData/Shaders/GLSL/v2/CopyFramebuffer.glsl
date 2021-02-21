@@ -10,9 +10,9 @@
 
 uniform sampler2D sDiffMap;
 
-VERTEX_SHADER_OUT(vec2 vScreenPos)
+VERTEX_OUTPUT(vec2 vScreenPos)
 
-#ifdef STAGE_VERTEX_SHADER
+#ifdef URHO3D_VERTEX_SHADER
 void main()
 {
     mat4 modelMatrix = iModelMatrix;
@@ -22,7 +22,7 @@ void main()
 }
 #endif
 
-#ifdef STAGE_PIXEL_SHADER
+#ifdef URHO3D_PIXEL_SHADER
 void main()
 {
     gl_FragColor = texture2D(sDiffMap, vScreenPos);

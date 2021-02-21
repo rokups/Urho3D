@@ -29,6 +29,39 @@
 namespace Urho3D
 {
 
+/// Instancing buffer compositor settings.
+struct InstancingBufferCompositorSettings
+{
+    /// Whether to enable instanching.
+    // TODO(renderer): Make true when implemented
+    bool enable_{ false };
+    /// First UV element that can be used by instancing.
+    unsigned firstUnusedTexCoord_{};
+    /// Number of elements reserved for internal usage.
+    unsigned numReservedElems_{};
+
+    /// Calculate pipeline state hash.
+    unsigned CalculatePipelineStateHash() const
+    {
+        unsigned hash = 0;
+        CombineHash(hash, enable_);
+        CombineHash(hash, firstUnusedTexCoord_);
+        CombineHash(hash, numReservedElems_);
+        return hash;
+    }
+
+    /// Compare settings.
+    bool operator==(const InstancingBufferCompositorSettings& rhs) const
+    {
+        return enable_ == rhs.enable_
+            && firstUnusedTexCoord_ == rhs.firstUnusedTexCoord_
+            && numReservedElems_ == rhs.numReservedElems_;
+    }
+
+    /// Compare settings.
+    bool operator!=(const InstancingBufferCompositorSettings& rhs) const { return !(*this == rhs); }
+};
+
 /// Instancing buffer compositor.
 class URHO3D_API InstancingBufferCompositor : public Object
 {
@@ -40,11 +73,13 @@ public:
 
     /// Construct.
     explicit InstancingBufferCompositor(Context* context);
+    /// Set settings.
+    void SetSettings(const InstancingBufferCompositorSettings& settings);
 
-    /// Reset buffer.
-    void Reset();
-    /// Commit buffer to GPU.
-    void Commit();
+    /// Begin buffer composition.
+    void Begin();
+    /// End buffer composition and commit added instances to GPU.
+    void End();
 
     /// Add "vertex" to buffer. Use SetElements to fill it after.
     unsigned AddInstance()
@@ -68,8 +103,13 @@ public:
     VertexBuffer* GetVertexBuffer() const { return vertexBuffer_; }
 
 private:
+    /// Initialize instancing buffer.
+    void Initialize();
     /// Grow buffer.
     void GrowBuffer();
+
+    /// Settings.
+    InstancingBufferCompositorSettings settings_;
 
     /// GPU buffer.
     SharedPtr<VertexBuffer> vertexBuffer_;

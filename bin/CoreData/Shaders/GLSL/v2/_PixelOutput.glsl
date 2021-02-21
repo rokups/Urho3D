@@ -1,7 +1,7 @@
 #ifndef _PIXEL_OUTPUT_GLSL_
 #define _PIXEL_OUTPUT_GLSL_
 
-#ifdef STAGE_PIXEL_SHADER
+#ifdef URHO3D_PIXEL_SHADER
 
 #ifdef GL3
     #ifndef NUM_RENDER_TARGETS

@@ -48,18 +48,9 @@ class DrawableProcessor;
 class SceneBatchCollector;
 class BatchRenderer;
 
-enum class AmbientMode
-{
-    Constant,
-    Flat,
-    Directional,
-};
-
 ///
 struct RenderPipelineSettings : public SceneProcessorSettings
 {
-    ///
-    AmbientMode ambientMode_{ AmbientMode::Flat };
     /// Whether to apply gamma correction.
     bool gammaCorrection_{};
 };

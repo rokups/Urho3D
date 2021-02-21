@@ -102,15 +102,18 @@ class DrawCommandCompositor : public NonCopyable
 {
 public:
     /// Construct.
-    DrawCommandCompositor(DrawCommandQueue& drawQueue,
-        const DrawableProcessor& drawableProcessor, const Camera* renderCamera, BatchRenderFlags flags)
+    DrawCommandCompositor(DrawCommandQueue& drawQueue, const BatchRendererSettings& settings,
+        const DrawableProcessor& drawableProcessor, InstancingBufferCompositor& instancingBuffer,
+        const Camera* renderCamera, BatchRenderFlags flags)
         : drawQueue_(drawQueue)
         , enableAmbientLight_(flags.Test(BatchRenderFlag::AmbientLight))
         , enableVertexLights_(flags.Test(BatchRenderFlag::VertexLights))
         , enablePixelLights_(flags.Test(BatchRenderFlag::PixelLight))
         , enableLight_(enableAmbientLight_ || enableVertexLights_ || enablePixelLights_)
         , enableStaticInstancing_(flags.Test(BatchRenderFlag::InstantiateStaticGeometry))
+        , settings_(settings)
         , drawableProcessor_(drawableProcessor)
+        , instancingBuffer_(instancingBuffer)
         , frameInfo_(drawableProcessor_.GetFrameInfo())
         , scene_(frameInfo_.scene_)
         , lights_(drawableProcessor_.GetLightProcessors())
@@ -118,18 +121,6 @@ public:
         , cameraNode_(camera_->GetNode())
     {
         lightVolumeSourceBatch_.worldTransform_ = &lightVolumeTransform_;
-    }
-
-    /// Set variance shadow map parameters.
-    void SetVSMShadowParams(const Vector2& vsmShadowParams)
-    {
-        vsmShadowParams_ = vsmShadowParams;
-    }
-
-    /// Set instancing buffer.
-    void SetInstancingBuffer(InstancingBufferCompositor* instancingBuffer)
-    {
-        instancingBuffer_ = instancingBuffer;
     }
 
     /// Set GBuffer parameters.
@@ -165,7 +156,7 @@ public:
         if (instanceCount_ > 0)
         {
             drawQueue_.SetBuffers(lastGeometry_->GetVertexBuffers(), lastGeometry_->GetIndexBuffer(),
-                instancingBuffer_->GetVertexBuffer());
+                instancingBuffer_.GetVertexBuffer());
             drawQueue_.DrawIndexedInstanced(lastGeometry_->GetIndexStart(), lastGeometry_->GetIndexCount(),
                 startInstance_, instanceCount_);
             instanceCount_ = 0;
@@ -275,7 +266,7 @@ private:
             drawQueue_.AddShaderParameter(PSP_SHADOWCUBEUVBIAS, lightParams_->shadowCubeUVBias_);
             drawQueue_.AddShaderParameter(PSP_SHADOWCUBEADJUST, lightParams_->shadowCubeAdjust_);
             drawQueue_.AddShaderParameter(VSP_NORMALOFFSETSCALE, lightParams_->normalOffsetScale_);
-            drawQueue_.AddShaderParameter(PSP_VSMSHADOWPARAMS, vsmShadowParams_);
+            drawQueue_.AddShaderParameter(PSP_VSMSHADOWPARAMS, settings_.vsmShadowParams_);
         }
     }
 
@@ -424,13 +415,16 @@ private:
             {
                 // TODO(renderer): Refactor me
                 instanceCount_ = 1;
-                startInstance_ = instancingBuffer_->AddInstance();
-                instancingBuffer_->SetElements(sourceBatch.worldTransform_, 0, 3);
+                startInstance_ = instancingBuffer_.AddInstance();
+                instancingBuffer_.SetElements(sourceBatch.worldTransform_, 0, 3);
                 if (enableAmbientLight_)
                 {
                     const SphericalHarmonicsDot9& sh = lightAccumulator->sphericalHarmonics_;
                     const Vector4 ambient(sh.EvaluateAverage(), 1.0f);
-                    instancingBuffer_->SetElements(&ambient, 3, 1);
+                    if (settings_.ambientMode_ == AmbientMode::Flat)
+                        instancingBuffer_.SetElements(&ambient, 3, 1);
+                    else if (settings_.ambientMode_ == AmbientMode::Directional)
+                        instancingBuffer_.SetElements(&sh, 3, 7);
                 }
             }
             else if (drawQueue_.BeginShaderParameterGroup(SP_OBJECT, true))
@@ -482,13 +476,16 @@ private:
         {
             // TODO(renderer): Refactor me
             instanceCount_ += 1;
-            instancingBuffer_->AddInstance();
-            instancingBuffer_->SetElements(sourceBatch.worldTransform_, 0, 3);
+            instancingBuffer_.AddInstance();
+            instancingBuffer_.SetElements(sourceBatch.worldTransform_, 0, 3);
             if (enableAmbientLight_)
             {
                 const SphericalHarmonicsDot9& sh = lightAccumulator->sphericalHarmonics_;
                 const Vector4 ambient(sh.EvaluateAverage(), 1.0f);
-                instancingBuffer_->SetElements(&ambient, 3, 1);
+                if (settings_.ambientMode_ == AmbientMode::Flat)
+                    instancingBuffer_.SetElements(&ambient, 3, 1);
+                else if (settings_.ambientMode_ == AmbientMode::Directional)
+                    instancingBuffer_.SetElements(&sh, 3, 7);
             }
         }
     }
@@ -507,8 +504,13 @@ private:
     /// Use instancing buffer for object parameters of static geometry.
     const bool enableStaticInstancing_;
 
+    /// Settings.
+    const BatchRendererSettings& settings_;
+
     /// Drawable processor.
     const DrawableProcessor& drawableProcessor_;
+    /// Instancing buffer.
+    InstancingBufferCompositor& instancingBuffer_;
     /// Frame info.
     const FrameInfo& frameInfo_;
     /// Scene.
@@ -524,10 +526,6 @@ private:
     Vector4 geometryBufferOffsetAndScale_;
     /// Inverse size of GBuffer.
     Vector2 geometryBufferInvSize_;
-    /// Variance shadow map parameters.
-    Vector2 vsmShadowParams_;
-    /// Set instancing buffer.
-    InstancingBufferCompositor* instancingBuffer_{};
 
     /// Global resources.
     ea::span<const ShaderResourceDesc> globalResources_;
@@ -574,29 +572,26 @@ private:
 
 }
 
-BatchRenderer::BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor)
+BatchRenderer::BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor,
+    InstancingBufferCompositor* instancingBuffer)
     : Object(context)
     , renderer_(context_->GetSubsystem<Renderer>())
     , drawableProcessor_(drawableProcessor)
+    , instancingBuffer_(instancingBuffer)
 {
 }
 
-void BatchRenderer::SetVSMShadowParams(const Vector2& vsmShadowParams)
+void BatchRenderer::SetSettings(const BatchRendererSettings& settings)
 {
-    vsmShadowParams_ = vsmShadowParams;
-}
-
-void BatchRenderer::SetInstancingBuffer(InstancingBufferCompositor* instancingBuffer)
-{
-    instancingBuffer_ = instancingBuffer;
+    settings_ = settings;
 }
 
 void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
     ea::span<const PipelineBatchByState> batches)
 {
-    DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, flags };
-    compositor.SetVSMShadowParams(vsmShadowParams_);
-    compositor.SetInstancingBuffer(instancingBuffer_);
+    DrawCommandCompositor compositor(drawQueue, settings_,
+        *drawableProcessor_, *instancingBuffer_, camera, flags);
+
     for (const auto& sortedBatch : batches)
         compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
     compositor.FlushDrawCommands();
@@ -605,9 +600,9 @@ void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* cam
 void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
     ea::span<const PipelineBatchBackToFront> batches)
 {
-    DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, flags };
-    compositor.SetVSMShadowParams(vsmShadowParams_);
-    compositor.SetInstancingBuffer(instancingBuffer_);
+    DrawCommandCompositor compositor(drawQueue, settings_,
+        *drawableProcessor_, *instancingBuffer_, camera, flags);
+
     for (const auto& sortedBatch : batches)
         compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
     compositor.FlushDrawCommands();
@@ -616,10 +611,12 @@ void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* cam
 void BatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera* camera,
     const LightVolumeRenderContext& ctx, ea::span<const PipelineBatchByState> batches)
 {
-    DrawCommandCompositor compositor{ drawQueue, *drawableProcessor_, camera, BatchRenderFlag::PixelLight };
-    compositor.SetVSMShadowParams(vsmShadowParams_);
+    DrawCommandCompositor compositor(drawQueue, settings_,
+        *drawableProcessor_, *instancingBuffer_, camera, BatchRenderFlag::PixelLight);
+
     compositor.SetGBufferParameters(ctx.geometryBufferOffsetAndScale_, ctx.geometryBufferInvSize_);
     compositor.SetGlobalResources(ctx.geometryBuffer_);
+
     for (const auto& sortedBatch : batches)
         compositor.ProcessLightVolumeBatch(*sortedBatch.pipelineBatch_);
     compositor.FlushDrawCommands();
