@@ -162,6 +162,8 @@ void DebugHud::RenderUI(DebugHudModeFlags mode)
 
         float left_offset = ui::GetCursorPos().x;
 
+        ui::Text("[%s]", graphics->GetApiName().c_str());
+        ui::SetCursorPosX(left_offset);
         ui::Text("FPS %d", fps_);
         ui::SetCursorPosX(left_offset);
         ui::Text("Triangles %u", primitives);

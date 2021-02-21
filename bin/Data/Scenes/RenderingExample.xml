@@ -62,9 +62,9 @@
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Occluder" />
 			<attribute name="Tags" />
-			<attribute name="Position" value="2.5 5 -10" />
+			<attribute name="Position" value="2.5 5 -5" />
 			<attribute name="Rotation" value="1 0 0 0" />
-			<attribute name="Scale" value="10 10 10" />
+			<attribute name="Scale" value="10 10 1" />
 			<attribute name="Variables" />
 			<component type="StaticModel" id="171">
 				<attribute name="Model" value="Model;Models/Box.mdl" />

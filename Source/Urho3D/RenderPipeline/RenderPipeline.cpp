@@ -133,15 +133,6 @@ CullMode GetEffectiveCullMode(CullMode mode, const Camera* camera)
     return mode;
 }
 
-Color GetDefaultFogColor(Graphics* graphics)
-{
-#ifdef URHO3D_OPENGL
-    return graphics->GetForceGL2() ? Color::RED * 0.5f : Color::BLUE * 0.5f;
-#else
-    return Color::GREEN * 0.5f;
-#endif
-}
-
 static const ea::vector<ea::string> ambientModeNames =
 {
     "Constant",
@@ -638,13 +629,14 @@ void RenderPipeline::Render()
     auto sceneBatchRenderer_ = sceneProcessor_->GetBatchRenderer();
     auto instancingBuffer = sceneProcessor_->GetInstancingBuffer();
     auto flag = settings_.instancing_.enable_ ? BatchRenderFlag::InstantiateStaticGeometry : BatchRenderFlag::None;
+    const Color fogColor = sceneProcessor_->GetFrameInfo().camera_->GetEffectiveFogColor();
 
     // TODO(renderer): Remove this guard
 #ifdef DESKTOP_GRAPHICS
     if (settings_.deferred_)
     {
         // Draw deferred GBuffer
-        deferredFinal_->ClearColor(GetDefaultFogColor(graphics_));
+        deferredFinal_->ClearColor(fogColor);
         deferredAlbedo_->ClearColor();
         deferredDepth_->ClearDepthStencil();
         deferredDepth_->SetRenderTargets({ deferredFinal_, deferredAlbedo_, deferredNormal_ });
@@ -681,7 +673,7 @@ void RenderPipeline::Render()
     else
 #endif
     {
-        viewportColor_->ClearColor(GetDefaultFogColor(graphics_));
+        viewportColor_->ClearColor(fogColor);
         viewportDepth_->ClearDepthStencil();
         viewportDepth_->SetRenderTargets({ viewportColor_ });
 
