@@ -25,22 +25,6 @@
     VERTEX_INPUT(vec4 iBlendWeights)
     VERTEX_INPUT(ivec4_attrib iBlendIndices)
 #endif
-#ifdef GEOM_INSTANCED
-    VERTEX_INPUT(vec4 iTexCoord4)
-    VERTEX_INPUT(vec4 iTexCoord5)
-    VERTEX_INPUT(vec4 iTexCoord6)
-    #if defined(URHO3D_AMBIENT_DIRECTIONAL)
-        VERTEX_INPUT(vec4 iTexCoord7)
-        VERTEX_INPUT(vec4 iTexCoord8)
-        VERTEX_INPUT(vec4 iTexCoord9)
-        VERTEX_INPUT(vec4 iTexCoord10)
-        VERTEX_INPUT(vec4 iTexCoord11)
-        VERTEX_INPUT(vec4 iTexCoord12)
-        VERTEX_INPUT(vec4 iTexCoord13)
-    #elif defined(URHO3D_AMBIENT_FLAT)
-        VERTEX_INPUT(vec4 iTexCoord7)
-    #endif
-#endif
 
 #endif
 

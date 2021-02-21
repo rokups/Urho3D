@@ -212,20 +212,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         commonDefines += "LIGHTMAP ";
 
     // Add ambient vertex defines
-    switch (settings_.rendering_.ambientMode_)
-    {
-    case AmbientMode::Constant:
-        vertexShaderDefines += "URHO3D_AMBIENT_CONSTANT ";
-        break;
-    case AmbientMode::Flat:
-        vertexShaderDefines += "URHO3D_AMBIENT_FLAT ";
-        break;
-    case AmbientMode::Directional:
-        vertexShaderDefines += "URHO3D_AMBIENT_DIRECTIONAL ";
-        break;
-    default:
-        break;
-    }
+    vertexShaderDefines += Format("URHO3D_AMBIENT_MODE={} ", static_cast<int>(settings_.rendering_.ambientMode_));
 
     // Add vertex input layout defines
     for (const VertexElement& element : desc.vertexElements_)

@@ -22,33 +22,11 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
 }
 
 #if defined(URHO3D_AMBIENT_DIRECTIONAL)
-    #ifdef GEOM_INSTANCED
-        #define iSHAr iTexCoord7
-        #define iSHAg iTexCoord8
-        #define iSHAb iTexCoord9
-        #define iSHBr iTexCoord10
-        #define iSHBg iTexCoord11
-        #define iSHBb iTexCoord12
-        #define iSHC iTexCoord13
-    #else
-        #define iSHAr cSHAr
-        #define iSHAg cSHAg
-        #define iSHAb cSHAb
-        #define iSHBr cSHBr
-        #define iSHBg cSHBg
-        #define iSHBb cSHBb
-        #define iSHC cSHC
-    #endif
-
-    #define GetAmbientLight(normal) LinearToGammaSpace(EvaluateSH01(normal, iSHAr, iSHAg, iSHAb) + EvaluateSH2(normal, iSHBr, iSHBg, iSHBb, iSHC))
+    #define GetAmbientLight(normal) LinearToGammaSpace(EvaluateSH01(normal, cSHAr, cSHAg, cSHAb) + EvaluateSH2(normal, cSHBr, cSHBg, cSHBb, cSHC))
 #elif defined(URHO3D_AMBIENT_FLAT)
-    #ifdef GEOM_INSTANCED
-        #define iAmbient iTexCoord7
-    #else
-        #define iAmbient cAmbient
-    #endif
+    #define iAmbient cAmbient
 
-    #define GetAmbientLight(normal) iAmbient.rgb
+    #define GetAmbientLight(normal) cAmbient.rgb
 #elif defined(URHO3D_AMBIENT_CONSTANT)
     #define GetAmbientLight(normal) cAmbientColor.rgb
 #endif

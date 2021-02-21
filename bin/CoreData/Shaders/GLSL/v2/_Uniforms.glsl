@@ -1,94 +1,128 @@
 #ifndef _UNIFORMS_GLSL_
 #define _UNIFORMS_GLSL_
 
-CBUFFER_BEGIN(0, Frame)
-    CBUFFER_UNIFORM(mediump float cDeltaTime)
-    CBUFFER_UNIFORM(mediump float cElapsedTime)
-CBUFFER_END()
+UNIFORM_BUFFER_BEGIN(0, Frame)
+    UNIFORM(mediump float cDeltaTime)
+    UNIFORM(mediump float cElapsedTime)
+UNIFORM_BUFFER_END()
 
-CBUFFER_BEGIN(1, Camera)
-    CBUFFER_UNIFORM(mediump vec3 cCameraPos) // TODO(renderer): Increase precision
-    CBUFFER_UNIFORM(mediump float cNearClip)
-    CBUFFER_UNIFORM(mediump float cFarClip)
-    CBUFFER_UNIFORM(mediump vec4 cDepthMode)
-    CBUFFER_UNIFORM(mediump vec3 cFrustumSize)
-    CBUFFER_UNIFORM(mediump vec4 cGBufferOffsets)
-    CBUFFER_UNIFORM(highp mat4 cView)
-    CBUFFER_UNIFORM(highp mat4 cViewInv)
-    CBUFFER_UNIFORM(highp mat4 cViewProj)
-    CBUFFER_UNIFORM(highp vec4 cClipPlane)
-    CBUFFER_UNIFORM(mediump vec4 cDepthReconstruct)
-    CBUFFER_UNIFORM(mediump vec2 cGBufferInvSize)
-    CBUFFER_UNIFORM(mediump vec4 cAmbientColor)
-    CBUFFER_UNIFORM(mediump vec4 cFogParams)
-    CBUFFER_UNIFORM(mediump vec3 cFogColor)
-CBUFFER_END()
+UNIFORM_BUFFER_BEGIN(1, Camera)
+    UNIFORM(mediump vec3 cCameraPos) // TODO(renderer): Increase precision
+    UNIFORM(mediump float cNearClip)
+    UNIFORM(mediump float cFarClip)
+    UNIFORM(mediump vec4 cDepthMode)
+    UNIFORM(mediump vec3 cFrustumSize)
+    UNIFORM(mediump vec4 cGBufferOffsets)
+    UNIFORM(highp mat4 cView)
+    UNIFORM(highp mat4 cViewInv)
+    UNIFORM(highp mat4 cViewProj)
+    UNIFORM(highp vec4 cClipPlane)
+    UNIFORM(mediump vec4 cDepthReconstruct)
+    UNIFORM(mediump vec2 cGBufferInvSize)
+    UNIFORM(mediump vec4 cAmbientColor)
+    UNIFORM(mediump vec4 cFogParams)
+    UNIFORM(mediump vec3 cFogColor)
+UNIFORM_BUFFER_END()
 
-CBUFFER_BEGIN(3, Light)
-    CBUFFER_UNIFORM(mediump vec4 cLightPos) // TODO(renderer): Increase precision
-    CBUFFER_UNIFORM(mediump vec3 cLightDir)
-    CBUFFER_UNIFORM(mediump vec4 cNormalOffsetScale)
+UNIFORM_BUFFER_BEGIN(3, Light)
+    UNIFORM(mediump vec4 cLightPos) // TODO(renderer): Increase precision
+    UNIFORM(mediump vec3 cLightDir)
+    UNIFORM(mediump vec4 cNormalOffsetScale)
 #ifdef NUMVERTEXLIGHTS
-    CBUFFER_UNIFORM_VS(highp vec4 cVertexLights[4 * 3])
+    UNIFORM_VERTEX(highp vec4 cVertexLights[4 * 3])
 #endif
-    CBUFFER_UNIFORM(mediump mat4 cLightMatrices[4])
+    UNIFORM(mediump mat4 cLightMatrices[4])
 
-    CBUFFER_UNIFORM(mediump vec4 cLightColor)
-    CBUFFER_UNIFORM(mediump vec4 cShadowCubeAdjust)
-    CBUFFER_UNIFORM(mediump vec2 cShadowCubeUVBias)
-    CBUFFER_UNIFORM(mediump vec4 cShadowDepthFade)
-    CBUFFER_UNIFORM(mediump vec2 cShadowIntensity)
-    CBUFFER_UNIFORM(mediump vec2 cShadowMapInvSize)
-    CBUFFER_UNIFORM(mediump vec4 cShadowSplits)
+    UNIFORM(mediump vec4 cLightColor)
+    UNIFORM(mediump vec4 cShadowCubeAdjust)
+    UNIFORM(mediump vec2 cShadowCubeUVBias)
+    UNIFORM(mediump vec4 cShadowDepthFade)
+    UNIFORM(mediump vec2 cShadowIntensity)
+    UNIFORM(mediump vec2 cShadowMapInvSize)
+    UNIFORM(mediump vec4 cShadowSplits)
 #ifdef VSM_SHADOW
-    CBUFFER_UNIFORM(mediump vec2 cVSMShadowParams)
+    UNIFORM(mediump vec2 cVSMShadowParams)
 #endif
 #ifdef PBR
-    CBUFFER_UNIFORM(mediump float cLightRad)
-    CBUFFER_UNIFORM(mediump float cLightLength)
+    UNIFORM(mediump float cLightRad)
+    UNIFORM(mediump float cLightLength)
 #endif
-CBUFFER_END()
+UNIFORM_BUFFER_END()
 
 #ifndef CUSTOM_MATERIAL_CBUFFER
-CBUFFER_BEGIN(4, Material)
-    CBUFFER_UNIFORM(mediump vec4 cUOffset)
-    CBUFFER_UNIFORM(mediump vec4 cVOffset)
-    CBUFFER_UNIFORM(mediump vec4 cLMOffset)
+UNIFORM_BUFFER_BEGIN(4, Material)
+    UNIFORM(mediump vec4 cUOffset)
+    UNIFORM(mediump vec4 cVOffset)
+    UNIFORM(mediump vec4 cLMOffset)
 
-    CBUFFER_UNIFORM(mediump vec4 cMatDiffColor)
-    CBUFFER_UNIFORM(mediump vec3 cMatEmissiveColor)
-    CBUFFER_UNIFORM(mediump vec3 cMatEnvMapColor)
-    CBUFFER_UNIFORM(mediump vec4 cMatSpecColor)
+    UNIFORM(mediump vec4 cMatDiffColor)
+    UNIFORM(mediump vec3 cMatEmissiveColor)
+    UNIFORM(mediump vec3 cMatEnvMapColor)
+    UNIFORM(mediump vec4 cMatSpecColor)
 #ifdef PBR
-    CBUFFER_UNIFORM(mediump float cRoughness)
-    CBUFFER_UNIFORM(mediump float cMetallic)
+    UNIFORM(mediump float cRoughness)
+    UNIFORM(mediump float cMetallic)
 #endif
-CBUFFER_END()
+UNIFORM_BUFFER_END()
 #endif
 
+// Object: Per-instance data
 #ifdef URHO3D_VERTEX_SHADER
-CBUFFER_BEGIN(5, Object)
-    CBUFFER_UNIFORM(highp mat4 cModel)
+INSTANCE_BUFFER_BEGIN(5, Object)
+    // Model-to-world transform matrix
+    #ifdef URHO3D_INSTANCING
+        VERTEX_INPUT(highp vec4 iTexCoord4)
+        VERTEX_INPUT(highp vec4 iTexCoord5)
+        VERTEX_INPUT(highp vec4 iTexCoord6)
+        #define cModel mat4(iTexCoord4, iTexCoord5, iTexCoord6, vec4(0.0, 0.0, 0.0, 1.0))
+    #else
+        UNIFORM(highp mat4 cModel)
+    #endif
 
-#if defined(URHO3D_AMBIENT_DIRECTIONAL)
-    CBUFFER_UNIFORM(mediump vec4 cSHAr)
-    CBUFFER_UNIFORM(mediump vec4 cSHAg)
-    CBUFFER_UNIFORM(mediump vec4 cSHAb)
-    CBUFFER_UNIFORM(mediump vec4 cSHBr)
-    CBUFFER_UNIFORM(mediump vec4 cSHBg)
-    CBUFFER_UNIFORM(mediump vec4 cSHBb)
-    CBUFFER_UNIFORM(mediump vec4 cSHC)
-#elif defined(URHO3D_AMBIENT_FLAT)
-    CBUFFER_UNIFORM(mediump vec4 cAmbient)
-#endif
+    // Per-object ambient lighting
+    #ifdef URHO3D_INSTANCING
+        #if defined(URHO3D_AMBIENT_DIRECTIONAL)
+            VERTEX_INPUT(mediump vec4 iTexCoord7)
+            VERTEX_INPUT(mediump vec4 iTexCoord8)
+            VERTEX_INPUT(mediump vec4 iTexCoord9)
+            VERTEX_INPUT(mediump vec4 iTexCoord10)
+            VERTEX_INPUT(mediump vec4 iTexCoord11)
+            VERTEX_INPUT(mediump vec4 iTexCoord12)
+            VERTEX_INPUT(mediump vec4 iTexCoord13)
+            #define cSHAr iTexCoord7
+            #define cSHAg iTexCoord8
+            #define cSHAb iTexCoord9
+            #define cSHBr iTexCoord10
+            #define cSHBg iTexCoord11
+            #define cSHBb iTexCoord12
+            #define cSHC  iTexCoord13
+        #elif defined(URHO3D_AMBIENT_FLAT)
+            VERTEX_INPUT(mediump vec4 iTexCoord7)
+            #define cAmbient iTexCoord7
+        #endif
+    #else
+        #if defined(URHO3D_AMBIENT_DIRECTIONAL)
+            UNIFORM(mediump vec4 cSHAr)
+            UNIFORM(mediump vec4 cSHAg)
+            UNIFORM(mediump vec4 cSHAb)
+            UNIFORM(mediump vec4 cSHBr)
+            UNIFORM(mediump vec4 cSHBg)
+            UNIFORM(mediump vec4 cSHBb)
+            UNIFORM(mediump vec4 cSHC)
+        #elif defined(URHO3D_AMBIENT_FLAT)
+            UNIFORM(mediump vec4 cAmbient)
+        #endif
+    #endif
 
-#ifdef GEOM_BILLBOARD
-    CBUFFER_UNIFORM(mediump mat3 cBillboardRot)
-#endif
-#ifdef GEOM_SKINNED
-    CBUFFER_UNIFORM(highp vec4 cSkinMatrices[MAXBONES * 3])
-#endif
-CBUFFER_END()
+    // Instancing is not supported for these geometry types:
+    #ifdef GEOM_BILLBOARD
+        UNIFORM(mediump mat3 cBillboardRot)
+    #endif
+    #ifdef GEOM_SKINNED
+        UNIFORM(highp vec4 cSkinMatrices[MAXBONES * 3])
+    #endif
+
+INSTANCE_BUFFER_END()
 #endif
 
 #endif
