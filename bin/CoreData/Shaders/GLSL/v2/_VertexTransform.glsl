@@ -73,8 +73,10 @@ struct VertexTransform
     vec3 normal;
 #endif
 #ifndef URHO3D_IGNORE_TANGENT
-    /// Vertex tangent in world space with binormal direction sign as last component
-    vec4 tangent;
+    /// Vertex tangent in world space
+    vec3 tangent;
+    /// Vertex bitangent in world space
+    vec3 bitangent;
 #endif
 };
 
@@ -100,24 +102,28 @@ struct VertexTransform
 /// Return vertex transform in world space.
 ///
 /// URHO3D_GEOMETRY_STATIC, URHO3D_GEOMETRY_SKINNED:
-///   iPos: Vertex position in model space
-///   iNormal: (optional) Vertex normal in model space
-///   iTangent: (optional) Vertex tangent in model space and sign of binormal
+///   iPos.xyz: Vertex position in model space
+///   iNormal.xyz: (optional) Vertex normal in model space
+///   iTangent.xyz: (optional) Vertex tangent in model space and sign of binormal
 ///
 /// URHO3D_GEOMETRY_BILLBOARD:
-///   iPos: Billboard position in model space
-///   iTexCoord1: Billboard size
+///   iPos.xyz: Billboard position in model space
+///   iTexCoord1.xy: Billboard size
 ///
 /// URHO3D_GEOMETRY_DIRBILLBOARD:
-///   iPos: Billboard position in model space
-///   iNormal: Billboard normal in model space
-///   iTexCoord1: Billboard size
+///   iPos.xyz: Billboard position in model space
+///   iNormal.xyz: Billboard up direction in model space
+///   iTexCoord1.xy: Billboard size
 ///
 /// URHO3D_GEOMETRY_TRAIL_FACE_CAMERA:
+///   iPos.xyz: Trail position in model space
+///   iTangent.xyz: Trail direction
+///   iTangent.w: Trail width
 ///
-/// iTangent(URHO3D_GEOMETRY_TRAIL_FACE_CAMERA): Trail direction in model space and trail scale
-/// iTangent(URHO3D_GEOMETRY_TRAIL_BONE): Parent position in world space and trail scale
-/// iTexCoord1(URHO3D_GEOMETRY_BILLBOARD, URHO3D_GEOMETRY_DIRBILLBOARD): Size of bilboard
+/// URHO3D_GEOMETRY_TRAIL_BONE:
+///   iPos.xyz: Trail position in model space
+///   iTangent.xyz: Trail previous position in model space
+///   iTangent.w: Trail width
 #if defined(URHO3D_GEOMETRY_STATIC) || defined(URHO3D_GEOMETRY_SKINNED)
     VertexTransform GetVertexTransform()
     {
@@ -131,7 +137,8 @@ struct VertexTransform
             result.normal = normalize(iNormal * normalMatrix);
 
             #ifndef URHO3D_IGNORE_TANGENT
-                result.tangent = vec4(normalize(iTangent.xyz * normalMatrix), iTangent.w);
+                result.tangent = normalize(iTangent.xyz * normalMatrix);
+                result.bitangent = cross(result.tangent, result.normal) * iTangent.w;
             #endif
         #endif
 
@@ -147,11 +154,11 @@ struct VertexTransform
         result.position += vec3(iTexCoord1.x, iTexCoord1.y, 0.0) * cBillboardRot;
 
         #ifndef URHO3D_IGNORE_NORMAL
-            mat3 normalMatrix = GetNormalMatrix(modelMatrix);
             result.normal = vec3(-cBillboardRot[0][2], -cBillboardRot[1][2], -cBillboardRot[2][2]);
 
             #ifndef URHO3D_IGNORE_TANGENT
-                result.tangent = vec4(normalize(vec3(1.0, 0.0, 0.0) * cBillboardRot), 1.0);
+                result.tangent = vec3(cBillboardRot[0][0], cBillboardRot[1][0], cBillboardRot[2][0]);
+                result.bitangent = vec3(cBillboardRot[0][1], cBillboardRot[1][1], cBillboardRot[2][1]);
             #endif
         #endif
         return result;
@@ -181,12 +188,11 @@ struct VertexTransform
         result.position += vec3(iTexCoord1.x, 0.0, iTexCoord1.y) * rotation;
 
         #ifndef URHO3D_IGNORE_NORMAL
-            mat3 normalMatrix = GetNormalMatrix(modelMatrix);
-            result.normal = vec3(0.0, 1.0, 0.0) * rotation;
+            result.normal = vec3(rotation[0][1], rotation[1][1], rotation[2][1]);
 
             #ifndef URHO3D_IGNORE_TANGENT
-                // TODO(renderer): Revisit
-                result.tangent = vec4(normalize(vec3(1.0, 0.0, 0.0) * GetNormalMatrix(modelMatrix)), 1.0);
+                result.tangent = vec3(rotation[0][0], rotation[1][0], rotation[2][0]);
+                result.bitangent = vec3(rotation[0][2], rotation[1][2], rotation[2][2]);
             #endif
         #endif
         return result;
@@ -202,10 +208,11 @@ struct VertexTransform
         result.position = (vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix).xyz;
 
         #ifndef URHO3D_IGNORE_NORMAL
-            result.normal = up;
+            result.normal = normalize(cross(right, iTangent.xyz));
 
             #ifndef URHO3D_IGNORE_TANGENT
-                result.tangent = vec4(iTangent.xyz, 1.0);
+                result.tangent = iTangent.xyz;
+                result.bitangent = right;
             #endif
         #endif
 
@@ -216,17 +223,18 @@ struct VertexTransform
     {
         mat4 modelMatrix = GetModelMatrix();
         vec3 right = iTangent.xyz - iPos.xyz;
-        vec3 up = normalize(cross(normalize(iNormal), right));
+        vec3 front = normalize(iNormal);
+        vec3 up = normalize(cross(front, right));
 
         VertexTransform result;
         result.position = (vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix).xyz;
 
         #ifndef URHO3D_IGNORE_NORMAL
-            mat3 normalMatrix = GetNormalMatrix(modelMatrix);
             result.normal = up;
 
             #ifndef URHO3D_IGNORE_TANGENT
-                result.tangent = vec4(normalize(iNormal), 1.0);
+                result.tangent = front;
+                result.bitangent = normalize(cross(result.tangent, result.normal));
             #endif
         #endif
 

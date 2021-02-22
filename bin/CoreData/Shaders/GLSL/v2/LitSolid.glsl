@@ -65,8 +65,8 @@ void main()
     #endif
 
     #ifdef NORMALMAP
-        vec4 tangent = vertexTransform.tangent; //GetWorldTangent(modelMatrix);
-        vec3 bitangent = cross(tangent.xyz, vNormal) * tangent.w;
+        vec3 tangent = vertexTransform.tangent; //GetWorldTangent(modelMatrix);
+        vec3 bitangent = vertexTransform.bitangent ;//cross(tangent.xyz, vNormal) * tangent.w;
         vTexCoord.zw = bitangent.xy;
         vTangent = vec4(tangent.xyz, bitangent.z);
     #endif
