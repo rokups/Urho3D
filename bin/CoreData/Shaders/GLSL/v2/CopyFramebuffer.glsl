@@ -1,5 +1,4 @@
-#define GEOM_STATIC
-#define LAYOUT_HAS_POSITION
+#define URHO3D_GEOMETRY_STATIC
 
 #include "_Config.glsl"
 #include "_Uniforms.glsl"
@@ -15,8 +14,9 @@ VERTEX_OUTPUT(vec2 vScreenPos)
 #ifdef URHO3D_VERTEX_SHADER
 void main()
 {
-    mat4 modelMatrix = iModelMatrix;
-    vec3 worldPos = GetWorldPos(modelMatrix);
+    VertexTransform vertexTransform = GetVertexTransform();
+    //mat4 modelMatrix = iModelMatrix;
+    vec3 worldPos = vertexTransform.position;// GetWorldPos(modelMatrix);
     gl_Position = GetClipPos(worldPos);
     vScreenPos = GetScreenPosPreDiv(gl_Position);
 }

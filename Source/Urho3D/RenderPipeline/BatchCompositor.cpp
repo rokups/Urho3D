@@ -308,7 +308,8 @@ void BatchCompositor::ComposeLightVolumeBatches()
         key.vertexLightsHash_ = 0;
 
         PipelineState* pipelineState = lightVolumeCache_.GetOrCreatePipelineState(key, ctx, batchStateCacheCallback_);
-        lightVolumeBatches_.push_back(CreatePipelineBatch(key, pipelineState));
+        if (pipelineState)
+            lightVolumeBatches_.push_back(CreatePipelineBatch(key, pipelineState));
     }
 
     SortBatches(sortedLightVolumeBatches_, lightVolumeBatches_);

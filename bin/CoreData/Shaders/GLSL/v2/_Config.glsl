@@ -3,14 +3,7 @@
 
 #extension GL_ARB_shading_language_420pack: enable
 
-// URHO3D_AMBIENT_MODE: Defines used ambient lighting mode
-#if URHO3D_AMBIENT_MODE == 0
-    #define URHO3D_AMBIENT_CONSTANT
-#elif URHO3D_AMBIENT_MODE == 1
-    #define URHO3D_AMBIENT_FLAT
-#elif URHO3D_AMBIENT_MODE == 2
-    #define URHO3D_AMBIENT_DIRECTIONAL
-#endif
+// NORMALMAP: Whether to apply normal mapping
 
 // URHO3D_VERTEX_SHADER: Defined for vertex shader
 // VERTEX_INPUT: Declare vertex input variable

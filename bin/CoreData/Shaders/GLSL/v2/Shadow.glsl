@@ -14,8 +14,9 @@
 #ifdef URHO3D_VERTEX_SHADER
 void main()
 {
-    mat4 modelMatrix = iModelMatrix;
-    vec3 worldPos = GetWorldPos(modelMatrix);
+    VertexTransform vertexTransform = GetVertexTransform();
+    //mat4 modelMatrix = iModelMatrix;
+    vec3 worldPos = vertexTransform.position;// GetWorldPos(modelMatrix);
     gl_Position = GetClipPos(worldPos);
 
     #ifdef NOUV

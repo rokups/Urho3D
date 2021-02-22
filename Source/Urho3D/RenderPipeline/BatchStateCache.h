@@ -117,7 +117,7 @@ struct CachedBatchState
     /// Pipeline state.
     SharedPtr<PipelineState> pipelineState_;
     /// Whether the state is invalidated.
-    mutable std::atomic_bool invalidated_;
+    mutable std::atomic_bool invalidated_{ true };
 };
 
 /// External context that is not present in the key but is necessary to create new pipeline state.

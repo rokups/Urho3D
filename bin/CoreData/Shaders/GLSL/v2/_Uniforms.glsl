@@ -115,10 +115,10 @@ INSTANCE_BUFFER_BEGIN(5, Object)
     #endif
 
     // Instancing is not supported for these geometry types:
-    #ifdef GEOM_BILLBOARD
+    #ifdef URHO3D_GEOMETRY_BILLBOARD
         UNIFORM(mediump mat3 cBillboardRot)
     #endif
-    #ifdef GEOM_SKINNED
+    #ifdef URHO3D_GEOMETRY_SKINNED
         UNIFORM(highp vec4 cSkinMatrices[MAXBONES * 3])
     #endif
 

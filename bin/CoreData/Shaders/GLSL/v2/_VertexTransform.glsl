@@ -1,7 +1,37 @@
 #ifndef _VERTEX_TRANSFORM_GLSL_
 #define _VERTEX_TRANSFORM_GLSL_
 
+#ifndef _VERTEX_LAYOUT_GLSL_
+    #error Include "_VertexLayout.glsl" before "_VertexTransform.glsl"
+#endif
+
 #ifdef URHO3D_VERTEX_SHADER
+
+// Fake normal and tangent defines for some geometry types because they are calculated
+#if defined(URHO3D_GEOMETRY_BILLBOARD) || defined(URHO3D_GEOMETRY_DIRBILLBOARD) || defined(URHO3D_GEOMETRY_TRAIL_FACE_CAMERA) || defined(URHO3D_GEOMETRY_TRAIL_BONE)
+    #ifndef URHO3D_VERTEX_HAS_NORMAL
+        #define URHO3D_VERTEX_HAS_NORMAL
+    #endif
+    #ifndef URHO3D_VERTEX_HAS_TANGENT
+        #define URHO3D_VERTEX_HAS_TANGENT
+    #endif
+#endif
+
+// URHO3D_USE_NORMAL_MAPPING: Whether to apply normal mapping
+#if defined(NORMALMAP) && defined(URHO3D_VERTEX_HAS_NORMAL) && defined(URHO3D_VERTEX_HAS_TANGENT) //&& defined(URHO3D_MATERIAL_HAS_NORMAL)
+    #define URHO3D_USE_NORMAL_MAPPING
+#endif
+
+// URHO3D_IGNORE_NORMAL: Whether shader is not interested in vertex normal
+// TODO(renderer): Check for unlit here
+#if !defined(URHO3D_VERTEX_HAS_NORMAL)
+    #define URHO3D_IGNORE_NORMAL
+#endif
+
+// URHO3D_IGNORE_TANGENT: Whether shader is not interested in vertex tangent
+#if defined(URHO3D_IGNORE_NORMAL) || !defined(URHO3D_VERTEX_HAS_TANGENT) || !defined(URHO3D_USE_NORMAL_MAPPING)
+    #define URHO3D_IGNORE_TANGENT
+#endif
 
 /// Return normal matrix from model matrix.
 mat3 GetNormalMatrix(mat4 modelMatrix)
@@ -24,17 +54,7 @@ vec2 GetLightMapTexCoord(vec2 texCoord)
 /// Return position in clip space from position in world space.
 vec4 GetClipPos(vec3 worldPos)
 {
-    vec4 ret = vec4(worldPos, 1.0) * cViewProj;
-    // While getting the clip coordinate, also automatically set gl_ClipVertex for user clip planes
-    // TODO(renderer): Implement clip planes
-/*#if !defined(GL_ES)
-#   if !defined(GL3)
-    gl_ClipVertex = ret;
-#   else
-    gl_ClipDistance[0] = dot(cClipPlane, ret);
-#   endif
-#endif*/
-    return ret;
+    return vec4(worldPos, 1.0) * cViewProj;
 }
 
 /// Return depth from position in clip space.
@@ -43,75 +63,100 @@ float GetDepth(vec4 clipPos)
     return dot(clipPos.zw, cDepthMode.zw);
 }
 
-/// Return model matrix.
-#if defined(GEOM_SKINNED)
-    mat4 GetSkinMatrix(vec4 blendWeights, ivec4 blendIndices)
+/// Vertex data in world space
+struct VertexTransform
+{
+    /// Vertex position in world space
+    vec3 position;
+#ifndef URHO3D_IGNORE_NORMAL
+    /// Vertex normal in world space
+    vec3 normal;
+#endif
+#ifndef URHO3D_IGNORE_TANGENT
+    /// Vertex tangent in world space with binormal direction sign as last component
+    vec4 tangent;
+#endif
+};
+
+/// Return model-to-world space matrix.
+#if defined(URHO3D_GEOMETRY_SKINNED)
+    mat4 GetModelMatrix()
     {
+        ivec4 idx = ivec4(iBlendIndices) * 3;
+
         #define GetSkinMatrixColumn(i1, i2, i3, i4, k) (cSkinMatrices[i1] * k.x + cSkinMatrices[i2] * k.y + cSkinMatrices[i3] * k.z + cSkinMatrices[i4] * k.w)
-        ivec4 idx = blendIndices * 3;
-        vec4 col1 = GetSkinMatrixColumn(idx.x, idx.y, idx.z, idx.w, blendWeights);
-        vec4 col2 = GetSkinMatrixColumn(idx.x + 1, idx.y + 1, idx.z + 1, idx.w + 1, blendWeights);
-        vec4 col3 = GetSkinMatrixColumn(idx.x + 2, idx.y + 2, idx.z + 2, idx.w + 2, blendWeights);
+        vec4 col1 = GetSkinMatrixColumn(idx.x, idx.y, idx.z, idx.w, iBlendWeights);
+        vec4 col2 = GetSkinMatrixColumn(idx.x + 1, idx.y + 1, idx.z + 1, idx.w + 1, iBlendWeights);
+        vec4 col3 = GetSkinMatrixColumn(idx.x + 2, idx.y + 2, idx.z + 2, idx.w + 2, iBlendWeights);
+        #undef GetSkinMatrixColumn
+
         const vec4 col4 = vec4(0.0, 0.0, 0.0, 1.0);
         return mat4(col1, col2, col3, col4);
-        #undef GetSkinMatrixColumn
     }
-    #define GetModelMatrix() GetSkinMatrix(iBlendWeights, ivec4(iBlendIndices))
-#elif defined(GEOM_INSTANCED)
-    #define GetModelMatrix() mat4(iTexCoord4, iTexCoord5, iTexCoord6, vec4(0.0, 0.0, 0.0, 1.0))
 #else
     #define GetModelMatrix() cModel
 #endif
 
-// TODO(renderer): Deprecated
-#define iModelMatrix GetModelMatrix()
-
-#ifdef LAYOUT_HAS_POSITION
-/// Return world position for simple geometry.
-vec3 GetGeometryPos(mat4 modelMatrix)
-{
-    return (iPos * modelMatrix).xyz;
-}
-#endif
-
-#ifdef LAYOUT_HAS_NORMAL
-/// Return world normal for simple geometry.
-vec3 GetGeometryNormal(mat4 modelMatrix)
-{
-    return normalize(iNormal * GetNormalMatrix(modelMatrix));
-}
-#endif
-
-#ifdef LAYOUT_HAS_TANGENT
-/// Return world tangent for simple geometry.
-vec4 GetGeometryTangent(mat4 modelMatrix)
-{
-    return vec4(normalize(iTangent.xyz * GetNormalMatrix(modelMatrix)), iTangent.w);
-}
-#endif
-
-/// Return world position/normal/tangent for current geometry type.
-#if defined(GEOM_STATIC) || defined(GEOM_SKINNED) || defined(GEOM_INSTANCED)
-    #define GetWorldPos(modelMatrix) GetGeometryPos(modelMatrix)
-    #define GetWorldNormal(modelMatrix) GetGeometryNormal(modelMatrix)
-    #define GetWorldTangent(modelMatrix) GetGeometryTangent(modelMatrix)
-#elif defined(GEOM_BILLBOARD)
-    vec3 GetBillboardPos(vec4 position, vec2 size, mat4 modelMatrix)
+/// Return vertex transform in world space.
+///
+/// URHO3D_GEOMETRY_STATIC, URHO3D_GEOMETRY_SKINNED:
+///   iPos: Vertex position in model space
+///   iNormal: (optional) Vertex normal in model space
+///   iTangent: (optional) Vertex tangent in model space and sign of binormal
+///
+/// URHO3D_GEOMETRY_BILLBOARD:
+///   iPos: Billboard position in model space
+///   iTexCoord1: Billboard size
+///
+/// URHO3D_GEOMETRY_DIRBILLBOARD:
+///   iPos: Billboard position in model space
+///   iNormal: Billboard normal in model space
+///   iTexCoord1: Billboard size
+///
+/// URHO3D_GEOMETRY_TRAIL_FACE_CAMERA:
+///
+/// iTangent(URHO3D_GEOMETRY_TRAIL_FACE_CAMERA): Trail direction in model space and trail scale
+/// iTangent(URHO3D_GEOMETRY_TRAIL_BONE): Parent position in world space and trail scale
+/// iTexCoord1(URHO3D_GEOMETRY_BILLBOARD, URHO3D_GEOMETRY_DIRBILLBOARD): Size of bilboard
+#if defined(URHO3D_GEOMETRY_STATIC) || defined(URHO3D_GEOMETRY_SKINNED)
+    VertexTransform GetVertexTransform()
     {
-        return (position * modelMatrix).xyz + vec3(size.x, size.y, 0.0) * cBillboardRot;
+        mat4 modelMatrix = GetModelMatrix();
+
+        VertexTransform result;
+        result.position = (iPos * modelMatrix).xyz;
+
+        #ifndef URHO3D_IGNORE_NORMAL
+            mat3 normalMatrix = GetNormalMatrix(modelMatrix);
+            result.normal = normalize(iNormal * normalMatrix);
+
+            #ifndef URHO3D_IGNORE_TANGENT
+                result.tangent = vec4(normalize(iTangent.xyz * normalMatrix), iTangent.w);
+            #endif
+        #endif
+
+        return result;
     }
-    vec3 GetBillboardNormal()
+#elif defined(URHO3D_GEOMETRY_BILLBOARD)
+    VertexTransform GetVertexTransform()
     {
-        return vec3(-cBillboardRot[0][2], -cBillboardRot[1][2], -cBillboardRot[2][2]);
+        mat4 modelMatrix = GetModelMatrix();
+
+        VertexTransform result;
+        result.position = (iPos * modelMatrix).xyz;
+        result.position += vec3(iTexCoord1.x, iTexCoord1.y, 0.0) * cBillboardRot;
+
+        #ifndef URHO3D_IGNORE_NORMAL
+            mat3 normalMatrix = GetNormalMatrix(modelMatrix);
+            result.normal = vec3(-cBillboardRot[0][2], -cBillboardRot[1][2], -cBillboardRot[2][2]);
+
+            #ifndef URHO3D_IGNORE_TANGENT
+                result.tangent = vec4(normalize(vec3(1.0, 0.0, 0.0) * cBillboardRot), 1.0);
+            #endif
+        #endif
+        return result;
     }
-    vec4 GetBilboardTangent()
-    {
-        return vec4(normalize(vec3(1.0, 0.0, 0.0) * cBillboardRot), 1.0);
-    }
-    #define GetWorldPos(modelMatrix) GetBillboardPos(iPos, iTexCoord1, modelMatrix);
-    #define GetWorldNormal(modelMatrix) GetBillboardNormal()
-    #define GetWorldTangent(modelMatrix) GetBilboardTangent()
-#elif defined(GEOM_DIRBILLBOARD)
+#elif defined(URHO3D_GEOMETRY_DIRBILLBOARD)
     mat3 GetFaceCameraRotation(vec3 position, vec3 direction)
     {
         vec3 cameraDir = normalize(position - cCameraPos);
@@ -125,55 +170,68 @@ vec4 GetGeometryTangent(mat4 modelMatrix)
             right.z, up.z, front.z
         );
     }
-    vec3 GetBillboardPos(vec4 iPos, vec3 iDirection, mat4 modelMatrix)
-    {
-        vec3 worldPos = (iPos * modelMatrix).xyz;
-        return worldPos + vec3(iTexCoord1.x, 0.0, iTexCoord1.y) * GetFaceCameraRotation(worldPos, iDirection);
-    }
-    vec3 GetBillboardNormal(vec4 iPos, vec3 iDirection, mat4 modelMatrix)
-    {
-        vec3 worldPos = (iPos * modelMatrix).xyz;
-        return vec3(0.0, 1.0, 0.0) * GetFaceCameraRotation(worldPos, iDirection);
-    }
-    vec4 GetBilboardTangent(mat4 modelMatrix)
-    {
-        return vec4(normalize(vec3(1.0, 0.0, 0.0) * GetNormalMatrix(modelMatrix)), 1.0);
-    }
-    #define GetWorldPos(modelMatrix) GetBillboardPos(iPos, iNormal, modelMatrix);
-    #define GetWorldNormal(modelMatrix) GetBillboardNormal(iPos, iNormal, modelMatrix)
-    #define GetWorldTangent(modelMatrix) GetBilboardTangent(modelMatrix)
-#elif defined(GEOM_TRAIL_FACE_CAMERA)
-    vec3 GetTrailPos(vec4 iPos, vec3 iFront, float iScale, mat4 modelMatrix)
-    {
-        vec3 up = normalize(cCameraPos - iPos.xyz);
-        vec3 right = normalize(cross(iFront, up));
-        return (vec4((iPos.xyz + right * iScale), 1.0) * modelMatrix).xyz;
-    }
-    vec3 GetTrailNormal(vec4 iPos)
-    {
-        return normalize(cCameraPos - iPos.xyz);
-    }
-    #define GetWorldPos(modelMatrix) GetTrailPos(iPos, iTangent.xyz, iTangent.w, modelMatrix)
-    #define GetWorldNormal(modelMatrix) GetTrailNormal(iPos)
-    #define GetWorldTangent(modelMatrix) GetGeometryTangent(modelMatrix)
-#elif defined(GEOM_TRAIL_BONE)
-    vec3 GetTrailPos(vec4 iPos, vec3 iParentPos, float iScale, mat4 modelMatrix)
-    {
-        vec3 right = iParentPos - iPos.xyz;
-        return (vec4((iPos.xyz + right * iScale), 1.0) * modelMatrix).xyz;
-    }
 
-    vec3 GetTrailNormal(vec4 iPos, vec3 iParentPos, vec3 iForward)
+    VertexTransform GetVertexTransform()
     {
-        vec3 left = normalize(iPos.xyz - iParentPos);
-        vec3 up = normalize(cross(normalize(iForward), left));
-        return up;
+        mat4 modelMatrix = GetModelMatrix();
+
+        VertexTransform result;
+        result.position = (iPos * modelMatrix).xyz;
+        mat3 rotation = GetFaceCameraRotation(result.position, iNormal);
+        result.position += vec3(iTexCoord1.x, 0.0, iTexCoord1.y) * rotation;
+
+        #ifndef URHO3D_IGNORE_NORMAL
+            mat3 normalMatrix = GetNormalMatrix(modelMatrix);
+            result.normal = vec3(0.0, 1.0, 0.0) * rotation;
+
+            #ifndef URHO3D_IGNORE_TANGENT
+                // TODO(renderer): Revisit
+                result.tangent = vec4(normalize(vec3(1.0, 0.0, 0.0) * GetNormalMatrix(modelMatrix)), 1.0);
+            #endif
+        #endif
+        return result;
     }
-    #define GetWorldPos(modelMatrix) GetTrailPos(iPos, iTangent.xyz, iTangent.w, modelMatrix)
-    #define GetWorldNormal(modelMatrix) GetTrailNormal(iPos, iTangent.xyz, iNormal)
-    #define GetWorldTangent(modelMatrix) GetGeometryTangent(modelMatrix)
-#else
-    #error Exactly one geometry type define GEOM_* shall be defined!
+#elif defined(URHO3D_GEOMETRY_TRAIL_FACE_CAMERA)
+    VertexTransform GetVertexTransform()
+    {
+        mat4 modelMatrix = GetModelMatrix();
+        vec3 up = normalize(cCameraPos - iPos.xyz);
+        vec3 right = normalize(cross(iTangent.xyz, up));
+
+        VertexTransform result;
+        result.position = (vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix).xyz;
+
+        #ifndef URHO3D_IGNORE_NORMAL
+            result.normal = up;
+
+            #ifndef URHO3D_IGNORE_TANGENT
+                result.tangent = vec4(iTangent.xyz, 1.0);
+            #endif
+        #endif
+
+        return result;
+    }
+#elif defined(URHO3D_GEOMETRY_TRAIL_BONE)
+    VertexTransform GetVertexTransform()
+    {
+        mat4 modelMatrix = GetModelMatrix();
+        vec3 right = iTangent.xyz - iPos.xyz;
+        vec3 up = normalize(cross(normalize(iNormal), right));
+
+        VertexTransform result;
+        result.position = (vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix).xyz;
+
+        #ifndef URHO3D_IGNORE_NORMAL
+            mat3 normalMatrix = GetNormalMatrix(modelMatrix);
+            result.normal = up;
+
+            #ifndef URHO3D_IGNORE_TANGENT
+                result.tangent = vec4(normalize(iNormal), 1.0);
+            #endif
+        #endif
+
+        return result;
+    }
 #endif
 
 #endif

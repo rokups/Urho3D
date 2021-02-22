@@ -47,10 +47,11 @@ VERTEX_OUTPUT(vec3 vVertexLight)
 #ifdef URHO3D_VERTEX_SHADER
 void main()
 {
-    mat4 modelMatrix = iModelMatrix;
-    vec3 worldPos = GetWorldPos(modelMatrix);
+    VertexTransform vertexTransform = GetVertexTransform();
+    //mat4 modelMatrix = iModelMatrix;
+    vec3 worldPos = vertexTransform.position; //GetWorldPos(modelMatrix);
     gl_Position = GetClipPos(worldPos);
-    vNormal = GetWorldNormal(modelMatrix);
+    vNormal = vertexTransform.normal; //GetWorldNormal(modelMatrix);
     vWorldPos = vec4(worldPos, GetDepth(gl_Position));
 
     #ifdef VERTEXCOLOR
@@ -64,7 +65,7 @@ void main()
     #endif
 
     #ifdef NORMALMAP
-        vec4 tangent = GetWorldTangent(modelMatrix);
+        vec4 tangent = vertexTransform.tangent; //GetWorldTangent(modelMatrix);
         vec3 bitangent = cross(tangent.xyz, vNormal) * tangent.w;
         vTexCoord.zw = bitangent.xy;
         vTangent = vec4(tangent.xyz, bitangent.z);

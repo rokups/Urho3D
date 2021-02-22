@@ -211,8 +211,26 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     if (key.drawable_->GetBatches()[key.sourceBatchIndex_].lightmapScaleOffset_)
         commonDefines += "LIGHTMAP ";
 
-    // Add ambient vertex defines
-    vertexShaderDefines += Format("URHO3D_AMBIENT_MODE={} ", static_cast<int>(settings_.rendering_.ambientMode_));
+    // Add vertex defines: ambient
+    static const ea::string ambientModeDefines[] = {
+        "URHO3D_AMBIENT_CONSTANT ",
+        "URHO3D_AMBIENT_FLAT ",
+        "URHO3D_AMBIENT_DIRECTIONAL ",
+    };
+    vertexShaderDefines += ambientModeDefines[static_cast<int>(settings_.rendering_.ambientMode_)];
+
+    // Add vertex defines: geometry
+    static const ea::string geometryTypeDefines[] = {
+        "URHO3D_GEOMETRY_STATIC ",
+        "URHO3D_GEOMETRY_SKINNED ",
+        "URHO3D_GEOMETRY_STATIC ",
+        "URHO3D_GEOMETRY_BILLBOARD ",
+        "URHO3D_GEOMETRY_DIRBILLBOARD ",
+        "URHO3D_GEOMETRY_TRAIL_FACE_CAMERA ",
+        "URHO3D_GEOMETRY_TRAIL_BONE ",
+        "URHO3D_GEOMETRY_STATIC ",
+    };
+    vertexShaderDefines += geometryTypeDefines[static_cast<int>(key.geometryType_)];
 
     // Add vertex input layout defines
     for (const VertexElement& element : desc.vertexElements_)
@@ -220,30 +238,26 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         if (element.index_ != 0)
         {
             if (element.semantic_)
-                vertexShaderDefines += "LAYOUT_HAS_TEXCOORD1 ";
+                vertexShaderDefines += "URHO3D_VERTEX_HAS_TEXCOORD1 ";
         }
         else
         {
             switch (element.semantic_)
             {
-            case SEM_POSITION:
-                vertexShaderDefines += "LAYOUT_HAS_POSITION ";
-                break;
-
             case SEM_NORMAL:
-                vertexShaderDefines += "LAYOUT_HAS_NORMAL ";
+                vertexShaderDefines += "URHO3D_VERTEX_HAS_NORMAL ";
                 break;
 
             case SEM_COLOR:
-                vertexShaderDefines += "LAYOUT_HAS_COLOR ";
+                vertexShaderDefines += "URHO3D_VERTEX_HAS_COLOR ";
                 break;
 
             case SEM_TEXCOORD:
-                vertexShaderDefines += "LAYOUT_HAS_TEXCOORD0 ";
+                vertexShaderDefines += "URHO3D_VERTEX_HAS_TEXCOORD0 ";
                 break;
 
             case SEM_TANGENT:
-                vertexShaderDefines += "LAYOUT_HAS_TANGENT ";
+                vertexShaderDefines += "URHO3D_VERTEX_HAS_TANGENT ";
                 break;
 
             default:
@@ -255,7 +269,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     // Add material defines
     if (Texture* diffuseTexture = material->GetTexture(TU_DIFFUSE))
     {
-        pixelShaderDefines += "MATERIAL_HAS_DIFFUSE_TEXTURE ";
+        pixelShaderDefines += "URHO3D_MATERIAL_HAS_DIFFUSE ";
         const bool isLinear = diffuseTexture->GetLinear();
         const bool sRGB = diffuseTexture->GetSRGB();
         pixelShaderDefines += "MATERIAL_DIFFUSE_TEXTURE_LINEAR=";
@@ -264,20 +278,22 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         pixelShaderDefines += GetSampleConversionFunction(GetSampleGammaConversion(isLinear, sRGB));
     }
     if (material->GetTexture(TU_NORMAL))
-        pixelShaderDefines += "MATERIAL_HAS_NORMAL_TEXTURE ";
+        pixelShaderDefines += "URHO3D_MATERIAL_HAS_NORMAL ";
     if (material->GetTexture(TU_SPECULAR))
-        pixelShaderDefines += "MATERIAL_HAS_SPECULAR_TEXTURE ";
+        pixelShaderDefines += "URHO3D_MATERIAL_HAS_SPECULAR ";
     if (material->GetTexture(TU_EMISSIVE))
-        pixelShaderDefines += "MATERIAL_HAS_EMISSIVE_TEXTURE ";
+        pixelShaderDefines += "URHO3D_MATERIAL_HAS_EMISSIVE ";
 
     // Add geometry type defines
-    switch (key.geometryType_)
+    if (key.geometryType_ == GEOM_STATIC && settings_.instancing_.enable_)
+        vertexShaderDefines += "URHO3D_INSTANCING ";
+
+    /*switch (key.geometryType_)
     {
     case GEOM_STATIC:
         if (settings_.instancing_.enable_)
         {
             vertexShaderDefines += "GEOM_INSTANCED ";
-            vertexShaderDefines += "URHO3D_INSTANCING ";
         }
         else
             vertexShaderDefines += "GEOM_STATIC ";
@@ -305,7 +321,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         break;
     default:
         break;
-    }
+    }*/
 
     if (isShadowPass)
         commonDefines += "PASS_SHADOW ";

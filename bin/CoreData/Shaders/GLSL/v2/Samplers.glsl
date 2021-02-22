@@ -35,7 +35,7 @@ SAMPLER(9, samplerCube sLightCubeMap)
 #define texture2DLodOffset textureLodOffset
 #endif
 
-#ifdef MATERIAL_HAS_DIFFUSE_TEXTURE
+#ifdef URHO3D_MATERIAL_HAS_DIFFUSE
     #define Color_DiffMapToLinear(color) MATERIAL_DIFFUSE_TEXTURE_LINEAR(color)
     #define Color_DiffMapToGamma(color)  MATERIAL_DIFFUSE_TEXTURE_GAMMA(color)
     #ifdef URHO3D_GAMMA_CORRECTION

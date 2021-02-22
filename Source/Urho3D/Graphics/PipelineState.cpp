@@ -49,7 +49,7 @@ bool PipelineState::Create(const PipelineStateDesc& desc)
     ReloadShader();
     if (!shaderProgramLayout_)
     {
-        URHO3D_LOGERROR("Shader program layout of pipeline state is invalid");
+        //URHO3D_LOGERROR("Shader program layout of pipeline state is invalid");
         return false;
     }
 
