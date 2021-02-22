@@ -28,8 +28,8 @@ UNIFORM_BUFFER_BEGIN(3, Light)
     UNIFORM(mediump vec4 cLightPos) // TODO(renderer): Increase precision
     UNIFORM(mediump vec3 cLightDir)
     UNIFORM(mediump vec4 cNormalOffsetScale)
-#ifdef NUMVERTEXLIGHTS
-    UNIFORM_VERTEX(highp vec4 cVertexLights[4 * 3])
+#ifdef URHO3D_NUM_VERTEX_LIGHTS
+    UNIFORM_VERTEX(highp vec4 cVertexLights[URHO3D_NUM_VERTEX_LIGHTS * 3])
 #endif
     UNIFORM(mediump mat4 cLightMatrices[4])
 
@@ -123,6 +123,6 @@ INSTANCE_BUFFER_BEGIN(5, Object)
     #endif
 
 INSTANCE_BUFFER_END()
-#endif
+#endif // URHO3D_VERTEX_SHADER
 
-#endif
+#endif // _UNIFORMS_GLSL_

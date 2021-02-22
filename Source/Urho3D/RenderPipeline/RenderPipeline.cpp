@@ -187,6 +187,9 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     Light* light = key.light_ ? key.light_->GetLight() : nullptr;
     const bool isLitBasePass = ctx.subpassIndex_ == 1;
     const bool isShadowPass = isInternalPass;
+    const bool isAdditiveLightPass = !isInternalPass && ctx.subpassIndex_ == 2;
+    const bool isVertexLitPass = ctx.pass_ == alphaPass_ || ctx.pass_ == basePass_;
+    const bool isAmbientLitPass = !isAdditiveLightPass && (isVertexLitPass || ctx.pass_ == deferredPass_);
 
     PipelineStateDesc desc;
     ea::string commonDefines;
@@ -206,6 +209,15 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     // TODO(renderer): Don't use ShadowMapAllocator for this
     if (isShadowPass)
         sceneProcessor_->GetShadowMapAllocator()->ExportPipelineState(desc, light->GetShadowBias());
+
+    if (isVertexLitPass)
+        commonDefines += "URHO3D_NUM_VERTEX_LIGHTS=4 ";
+
+    if (isAmbientLitPass)
+        commonDefines += "URHO3D_AMBIENT_PASS ";
+
+    if (isAdditiveLightPass)
+        commonDefines += "URHO3D_ADDITIVE_PASS ";
 
     // Add lightmap
     if (key.drawable_->GetBatches()[key.sourceBatchIndex_].lightmapScaleOffset_)

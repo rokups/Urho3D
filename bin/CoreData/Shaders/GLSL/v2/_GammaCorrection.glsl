@@ -1,3 +1,6 @@
+#ifndef _GAMMA_CORRECTION_GLSL_
+#define _GAMMA_CORRECTION_GLSL_
+
 /// Convert color from gamma to linear space.
 vec3 GammaToLinearSpace(vec3 color)
 {
@@ -11,6 +14,20 @@ vec3 LinearToGammaSpace(vec3 color)
     color = max(color, vec3(0.0, 0.0, 0.0));
     return max(1.055 * pow(color, vec3(p, p, p)) - 0.055, 0.0);
 }
+
+/// Convert from and to light space.
+#ifdef URHO3D_GAMMA_CORRECTION
+    #define GammaToLightSpace(color) GammaToLinearSpace(color)
+    #define LightToGammaSpace(color) LinearToGammaSpace(color)
+    #define LinearToLightSpace(color) (color)
+    #define LightToLinearSpace(color) (color)
+#else
+    #define GammaToLightSpace(color) (color)
+    #define LightToGammaSpace(color) (color)
+    #define LinearToLightSpace(color) LinearToGammaSpace(color)
+    #define LightToLinearSpace(color) GammaToLinearSpace(color)
+#endif
+
 
 /// Helper utilities to convert between color spaces.
 /// @{
@@ -47,3 +64,5 @@ vec4 Color_LinearToGammaSquare4(vec4 color) { return vec4(LinearToGammaSpace(Lin
     #define Color_LightToGamma4(color) (color)
 #endif
 /// @}
+
+#endif // _GAMMA_CORRECTION_GLSL_

@@ -1,6 +1,10 @@
 #ifndef _VERTEX_LAYOUT_GLSL_
 #define _VERTEX_LAYOUT_GLSL_
 
+#ifndef _CONFIG_GLSL_
+    #error Include "_Config.glsl" before "_VertexLayout.glsl"
+#endif
+
 #ifdef URHO3D_VERTEX_SHADER
 
 // Vertex position
@@ -33,6 +37,6 @@ VERTEX_INPUT(vec4 iPos)
     VERTEX_INPUT(vec4 iColor)
 #endif
 
-#endif
+#endif // URHO3D_VERTEX_SHADER
 
-#endif
+#endif // _VERTEX_LAYOUT_GLSL_

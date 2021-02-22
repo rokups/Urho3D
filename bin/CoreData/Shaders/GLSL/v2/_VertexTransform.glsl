@@ -99,7 +99,7 @@ struct VertexTransform
     #define GetModelMatrix() cModel
 #endif
 
-/// Return vertex transform in world space.
+/// Return vertex transform in world space. Expected vertex inputs are listed below:
 ///
 /// URHO3D_GEOMETRY_STATIC, URHO3D_GEOMETRY_SKINNED:
 ///   iPos.xyz: Vertex position in model space
@@ -242,6 +242,6 @@ struct VertexTransform
     }
 #endif
 
-#endif
+#endif // URHO3D_VERTEX_SHADER
 
-#endif
+#endif // _VERTEX_TRANSFORM_GLSL_

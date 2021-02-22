@@ -4,6 +4,8 @@
 #extension GL_ARB_shading_language_420pack: enable
 
 // NORMALMAP: Whether to apply normal mapping
+// TRANSLUCENT: Whether to use two-sided ligthing for geometries
+// VOLUMETRIC: Whether to use volumetric ligthing for geometries
 
 // URHO3D_VERTEX_SHADER: Defined for vertex shader
 // VERTEX_INPUT: Declare vertex input variable
@@ -43,17 +45,15 @@
 // SAMPLER: Declares texture sampler
 #ifdef URHO3D_USE_CBUFFERS
     #ifdef GL_ARB_shading_language_420pack
-        #define LAYOUT(index) layout(binding=index)
+        #define _URHO3D_LAYOUT(index) layout(binding=index)
     #else
-        #define LAYOUT(index)
+        #define _URHO3D_LAYOUT(index)
     #endif
 
-    #define UNIFORM_BUFFER_BEGIN(index, name) LAYOUT(index) uniform name {
+    #define UNIFORM_BUFFER_BEGIN(index, name) _URHO3D_LAYOUT(index) uniform name {
     #define UNIFORM(decl) decl;
     #define UNIFORM_BUFFER_END() };
-    #define SAMPLER(index, decl) LAYOUT(index) uniform decl;
-
-    #undef LAYOUT
+    #define SAMPLER(index, decl) _URHO3D_LAYOUT(index) uniform decl;
 #else
     #define UNIFORM_BUFFER_BEGIN(index, name)
     #define UNIFORM(decl) uniform decl;
@@ -85,6 +85,21 @@
     #define URHO3D_FLIP_FRAMEBUFFER
 #endif
 
+// URHO3D_SURFACE_ONE_SIDED: Normal is clamped when calculating lighting. Ignored in deferred rendering.
+// URHO3D_SURFACE_TWO_SIDED: Normal is mirrored when calculating lighting. Ignored in deferred rendering.
+// URHO3D_SURFACE_VOLUMETRIC: Normal is ignored when calculating lighting. Ignored in deferred rendering.
+// CONVERT_N_DOT_L: Conversion function
+#if defined(VOLUMETRIC)
+    #define URHO3D_SURFACE_VOLUMETRIC
+    #define CONVERT_N_DOT_L(NdotL) 1.0
+#elif defined(TRANSLUCENT)
+    #define URHO3D_SURFACE_TWO_SIDED
+    #define CONVERT_N_DOT_L(NdotL) abs(NdotL)
+#else
+    #define URHO3D_SURFACE_ONE_SIDED
+    #define CONVERT_N_DOT_L(NdotL) max(0.0, NdotL)
+#endif
+
 // ivec4_attrib: Compatible ivec4 vertex attribite. Cast to ivec4 before use.
 #ifdef D3D11
     #define ivec4_attrib ivec4
@@ -109,4 +124,4 @@
     #define lowp
 #endif
 
-#endif
+#endif // _CONFIG_GLSL_

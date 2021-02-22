@@ -20,6 +20,6 @@
     #define gl_FragData fragData
 #endif
 
-#endif
+#endif // URHO3D_PIXEL_SHADER
 
-#endif
+#endif // _PIXEL_OUTPUT_GLSL_

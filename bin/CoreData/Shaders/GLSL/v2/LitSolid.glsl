@@ -4,6 +4,7 @@
 #include "_VertexTransform.glsl"
 #include "_PixelOutput.glsl"
 #include "_GammaCorrection.glsl"
+#include "_AmbientLighting.glsl"
 #include "Samplers.glsl"
 #include "Lighting.glsl"
 #include "Fog.glsl"
@@ -81,15 +82,8 @@ void main()
         //vVertexLight = GetAmbientLight(vec4(vNormal, 1)) + GetAmbient(0.0);
     #endif
 
-    #if defined(PASS_BASE_LITBASE) || defined(PASS_ALPHA_LITBASE) || defined(PASS_BASE_UNLIT) || defined(PASS_ALPHA_UNLIT)
-        vVertexLight = GetAmbientLight(vec4(vNormal, 1));
-
-        #ifdef NUMVERTEXLIGHTS
-            for (int i = 0; i < NUMVERTEXLIGHTS; ++i)
-                vVertexLight += GetVertexLight(i, worldPos, vNormal) * cVertexLights[i * 3].rgb;
-        #endif
-    #elif defined(PASS_DEFERRED)
-        vVertexLight = GetAmbientLight(vec4(vNormal, 1));
+    #if defined(URHO3D_AMBIENT_PASS) || defined(URHO3D_NUM_VERTEX_LIGHTS)
+        vVertexLight = GetAmbientAndVertexLights(vertexTransform.position, vertexTransform.normal);
     #endif
 
     vec4 projWorldPos = vec4(worldPos, 1.0);
