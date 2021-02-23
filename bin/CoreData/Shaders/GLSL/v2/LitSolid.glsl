@@ -9,20 +9,20 @@
 #include "Lighting.glsl"
 #include "Fog.glsl"
 
-#ifdef NORMALMAP
-    VERTEX_OUTPUT(vec4 vTexCoord)
+VERTEX_OUTPUT(vec2 vTexCoord)
+#ifdef URHO3D_NORMAL_MAPPING
     VERTEX_OUTPUT(vec4 vTangent)
-#else
-    VERTEX_OUTPUT(vec2 vTexCoord)
+    VERTEX_OUTPUT(vec2 vBitangentXY)
 #endif
-VERTEX_OUTPUT(vec3 vNormal)
-VERTEX_OUTPUT(vec4 vWorldPos)
-#ifdef VERTEXCOLOR
-    VERTEX_OUTPUT(vec4 vColor)
-#endif
-#if defined(LIGHTMAP) || defined(AO)
+#ifdef URHO3D_NEED_SECONDARY_TEXCOORD
     VERTEX_OUTPUT(vec2 vTexCoord2)
 #endif
+#ifdef URHO3D_VERTEX_HAS_COLOR
+    VERTEX_OUTPUT(vec4 vColor)
+#endif
+
+VERTEX_OUTPUT(vec3 vNormal)
+VERTEX_OUTPUT(vec4 vWorldPos)
 VERTEX_OUTPUT(vec3 vVertexLight)
 #ifdef PERPIXEL
     #ifdef SHADOW
@@ -49,44 +49,30 @@ VERTEX_OUTPUT(vec3 vVertexLight)
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    //mat4 modelMatrix = iModelMatrix;
-    vec3 worldPos = vertexTransform.position; //GetWorldPos(modelMatrix);
-    gl_Position = GetClipPos(worldPos);
-    vNormal = vertexTransform.normal; //GetWorldNormal(modelMatrix);
-    vWorldPos = vec4(worldPos, GetDepth(gl_Position));
+    gl_Position = WorldToClipSpace(vertexTransform.position);
 
-    #ifdef VERTEXCOLOR
+    vTexCoord = GetTransformedTexCoord();
+    vNormal = vertexTransform.normal;
+    vWorldPos = vec4(vertexTransform.position, GetDepth(gl_Position));
+
+    #ifdef URHO3D_VERTEX_HAS_COLOR
         vColor = iColor;
     #endif
 
-    #ifdef NOUV
-        vTexCoord.xy = vec2(0.0, 0.0);
-    #else
-        vTexCoord.xy = GetTexCoord(iTexCoord);
+    #ifdef URHO3D_NORMAL_MAPPING
+        vTangent = vec4(vertexTransform.tangent.xyz, vertexTransform.bitangent.z);
+        vBitangentXY = vertexTransform.bitangent.xy;
     #endif
 
-    #ifdef NORMALMAP
-        vec3 tangent = vertexTransform.tangent; //GetWorldTangent(modelMatrix);
-        vec3 bitangent = vertexTransform.bitangent ;//cross(tangent.xyz, vNormal) * tangent.w;
-        vTexCoord.zw = bitangent.xy;
-        vTangent = vec4(tangent.xyz, bitangent.z);
+    #ifdef URHO3D_NEED_SECONDARY_TEXCOORD
+        vTexCoord2 = GetTransformedTexCoord1();
     #endif
 
-    // Ambient & per-vertex lighting
-    #if defined(LIGHTMAP) || defined(AO)
-        // If using lightmap, disregard zone ambient light
-        // If using AO, calculate ambient in the PS
-        //vVertexLight = vec3(0.0, 0.0, 0.0);
-        vTexCoord2 = GetLightMapTexCoord(iTexCoord1);
-    //#else
-        //vVertexLight = GetAmbientLight(vec4(vNormal, 1)) + GetAmbient(0.0);
-    #endif
-
-    #if defined(URHO3D_AMBIENT_PASS) || defined(URHO3D_NUM_VERTEX_LIGHTS)
+    #ifdef URHO3D_HAS_AMBIENT_LIGHT
         vVertexLight = GetAmbientAndVertexLights(vertexTransform.position, vertexTransform.normal);
     #endif
 
-    vec4 projWorldPos = vec4(worldPos, 1.0);
+    vec4 projWorldPos = vec4(vertexTransform.position, 1.0);
     #ifdef SHADOW
         // Shadow projection: transform from world space to shadow space
         for (int i = 0; i < NUMCASCADES; i++)
@@ -98,7 +84,7 @@ void main()
     #endif
 
     #ifdef POINTLIGHT
-        vCubeMaskVec = (worldPos - cLightPos.xyz) * mat3(cLightMatrices[0][0].xyz, cLightMatrices[0][1].xyz, cLightMatrices[0][2].xyz);
+        vCubeMaskVec = (vertexTransform.position - cLightPos.xyz) * mat3(cLightMatrices[0][0].xyz, cLightMatrices[0][1].xyz, cLightMatrices[0][2].xyz);
     #endif
 }
 #endif
@@ -118,7 +104,7 @@ void main()
         vec4 diffColor = Color_GammaToLight4(cMatDiffColor);
     #endif
 
-    #ifdef VERTEXCOLOR
+    #ifdef URHO3D_VERTEX_HAS_COLOR
         diffColor *= vColor;
     #endif
 
@@ -130,8 +116,8 @@ void main()
     #endif
 
     // Get normal
-    #ifdef NORMALMAP
-        mat3 tbn = mat3(vTangent.xyz, vec3(vTexCoord.zw, vTangent.w), vNormal);
+    #ifdef URHO3D_NORMAL_MAPPING
+        mat3 tbn = mat3(vTangent.xyz, vec3(vBitangentXY.xy, vTangent.w), vNormal);
         vec3 normal = normalize(tbn * DecodeNormal(texture2D(sNormalMap, vTexCoord.xy)));
     #else
         vec3 normal = normalize(vNormal);

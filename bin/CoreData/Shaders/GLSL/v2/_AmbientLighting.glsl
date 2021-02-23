@@ -5,11 +5,6 @@
     #error Include "_GammaCorrection.glsl" before "_AmbientLighting.glsl"
 #endif
 
-// URHO3D_HAS_AMBIENT_LIGHT: Whether the shader need to process ambient and/or vertex lighting
-#if defined(URHO3D_AMBIENT_PASS) || defined(URHO3D_NUM_VERTEX_LIGHTS)
-    #define URHO3D_HAS_AMBIENT_LIGHT
-#endif
-
 #ifdef URHO3D_VERTEX_SHADER
 
 // Evalualte linear part of spherical harmonics

@@ -140,6 +140,21 @@ static const ea::vector<ea::string> ambientModeNames =
     "Directional",
 };
 
+/*enum class ShaderInputFlag
+{
+    None = 0,
+    VertexHasNormal     = 1 << 0,
+    VertexHasTangent    = 1 << 1,
+    VertexHasColor      = 1 << 2,
+    VertexHasTexCoord0  = 1 << 3,
+    MaterialHasDiffuse  = 1 << 4,
+    MaterialHasNormal   = 1 << 5,
+    MaterialHasSpecular = 1 << 6,
+    MaterialHasEmissive = 1 << 7,
+};
+
+URHO3D_FLAGSET(ShaderInputFlag, ShaderInputFlags);*/
+
 }
 
 RenderPipeline::RenderPipeline(Context* context)
@@ -221,7 +236,10 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
 
     // Add lightmap
     if (key.drawable_->GetBatches()[key.sourceBatchIndex_].lightmapScaleOffset_)
+    {
+        commonDefines += "URHO3D_HAS_LIGHTMAP ";
         commonDefines += "LIGHTMAP ";
+    }
 
     // Add vertex defines: ambient
     static const ea::string ambientModeDefines[] = {
@@ -248,33 +266,28 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     for (const VertexElement& element : desc.vertexElements_)
     {
         if (element.index_ != 0)
+            continue;
+
+        switch (element.semantic_)
         {
-            if (element.semantic_)
-                vertexShaderDefines += "URHO3D_VERTEX_HAS_TEXCOORD1 ";
-        }
-        else
-        {
-            switch (element.semantic_)
-            {
-            case SEM_NORMAL:
-                vertexShaderDefines += "URHO3D_VERTEX_HAS_NORMAL ";
-                break;
+        case SEM_NORMAL:
+            commonDefines += "URHO3D_VERTEX_HAS_NORMAL ";
+            break;
 
-            case SEM_COLOR:
-                vertexShaderDefines += "URHO3D_VERTEX_HAS_COLOR ";
-                break;
+        case SEM_TANGENT:
+            commonDefines += "URHO3D_VERTEX_HAS_TANGENT ";
+            break;
 
-            case SEM_TEXCOORD:
-                vertexShaderDefines += "URHO3D_VERTEX_HAS_TEXCOORD0 ";
-                break;
+        case SEM_COLOR:
+            commonDefines += "URHO3D_VERTEX_HAS_COLOR ";
+            break;
 
-            case SEM_TANGENT:
-                vertexShaderDefines += "URHO3D_VERTEX_HAS_TANGENT ";
-                break;
+        case SEM_TEXCOORD:
+            vertexShaderDefines += "URHO3D_VERTEX_HAS_TEXCOORD0 ";
+            break;
 
-            default:
-                break;
-            }
+        default:
+            break;
         }
     }
 

@@ -17,11 +17,6 @@
     #endif
 #endif
 
-// URHO3D_USE_NORMAL_MAPPING: Whether to apply normal mapping
-#if defined(NORMALMAP) && defined(URHO3D_VERTEX_HAS_NORMAL) && defined(URHO3D_VERTEX_HAS_TANGENT) //&& defined(URHO3D_MATERIAL_HAS_NORMAL)
-    #define URHO3D_USE_NORMAL_MAPPING
-#endif
-
 // URHO3D_IGNORE_NORMAL: Whether shader is not interested in vertex normal
 // TODO(renderer): Check for unlit here
 #if !defined(URHO3D_VERTEX_HAS_NORMAL)
@@ -29,7 +24,7 @@
 #endif
 
 // URHO3D_IGNORE_TANGENT: Whether shader is not interested in vertex tangent
-#if defined(URHO3D_IGNORE_NORMAL) || !defined(URHO3D_VERTEX_HAS_TANGENT) || !defined(URHO3D_USE_NORMAL_MAPPING)
+#if defined(URHO3D_IGNORE_NORMAL) || !defined(URHO3D_VERTEX_HAS_TANGENT) || !defined(URHO3D_NORMAL_MAPPING)
     #define URHO3D_IGNORE_TANGENT
 #endif
 
@@ -39,23 +34,36 @@ mat3 GetNormalMatrix(mat4 modelMatrix)
     return mat3(modelMatrix[0].xyz, modelMatrix[1].xyz, modelMatrix[2].xyz);
 }
 
-/// Return transformed tex coords.
-vec2 GetTexCoord(vec2 texCoord)
+/// Return transformed primary UV coordinate.
+vec2 GetTransformedTexCoord()
 {
-    return vec2(dot(texCoord, cUOffset.xy) + cUOffset.w, dot(texCoord, cVOffset.xy) + cVOffset.w);
+    #ifdef URHO3D_VERTEX_HAS_TEXCOORD0
+        return vec2(dot(iTexCoord, cUOffset.xy) + cUOffset.w, dot(iTexCoord, cVOffset.xy) + cVOffset.w);
+    #else
+        return vec2(0.0, 0.0);
+    #endif
 }
 
-/// Return transformed lightmap tex coords.
-vec2 GetLightMapTexCoord(vec2 texCoord)
-{
-    return texCoord * cLMOffset.xy + cLMOffset.zw;
-}
+#ifdef URHO3D_NEED_SECONDARY_TEXCOORD
+    /// Return transformed secondary UV coordinate.
+    vec2 GetTransformedTexCoord1()
+    {
+        #ifdef URHO3D_HAS_LIGHTMAP
+            return iTexCoord1 * cLMOffset.xy + cLMOffset.zw;
+        #else
+            return iTexCoord1;
+        #endif
+    }
+#endif
 
 /// Return position in clip space from position in world space.
-vec4 GetClipPos(vec3 worldPos)
+vec4 WorldToClipSpace(vec3 worldPos)
 {
     return vec4(worldPos, 1.0) * cViewProj;
 }
+
+// TODO(renderer): Deprecated
+#define GetClipPos(x) WorldToClipSpace(x)
 
 /// Return depth from position in clip space.
 float GetDepth(vec4 clipPos)

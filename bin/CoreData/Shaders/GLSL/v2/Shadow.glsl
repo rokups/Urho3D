@@ -19,11 +19,7 @@ void main()
     vec3 worldPos = vertexTransform.position;// GetWorldPos(modelMatrix);
     gl_Position = GetClipPos(worldPos);
 
-    #ifdef NOUV
-        vTexCoord.xy = vec2(0.0, 0.0);
-    #else
-        vTexCoord.xy = GetTexCoord(iTexCoord);
-    #endif
+    vTexCoord.xy = GetTransformedTexCoord();
 
     #ifdef VSM_SHADOW
         vTexCoord.zw = gl_Position.zw;
