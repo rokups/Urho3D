@@ -61,62 +61,9 @@ namespace Urho3D
 namespace
 {
 
-enum class SampleConversionType
+int GetTextureColorSpaceHint(bool linearInput, bool srgbTexture)
 {
-    GammaToLinear,
-    None,
-    LinearToGamma,
-    LinearToGammaSquare,
-};
-
-SampleConversionType GetSampleLinearConversion(bool linearInput, bool srgbTexture)
-{
-    static const SampleConversionType mapping[2][2] = {
-        // linearInput = false
-        {
-            // srgbTexture = false
-            SampleConversionType::GammaToLinear,
-            // srgbTexture = true
-            SampleConversionType::None
-        },
-        // linearInput = true
-        {
-            // srgbTexture = false
-            SampleConversionType::None,
-            // srgbTexture = true
-            SampleConversionType::LinearToGamma
-        },
-    };
-    return mapping[linearInput][srgbTexture];
-}
-
-SampleConversionType GetSampleGammaConversion(bool linearInput, bool srgbTexture)
-{
-    static const SampleConversionType mapping[3] = {
-        SampleConversionType::None,
-        SampleConversionType::LinearToGamma,
-        SampleConversionType::LinearToGammaSquare
-    };
-
-    const auto sampleLinear = GetSampleLinearConversion(linearInput, srgbTexture);
-    assert(sampleLinear != SampleConversionType::LinearToGammaSquare);
-    return mapping[static_cast<int>(sampleLinear)];
-}
-
-const char* GetSampleConversionFunction(SampleConversionType conversion)
-{
-    switch (conversion)
-    {
-    case SampleConversionType::GammaToLinear:
-        return "COLOR_GAMMATOLINEAR4 ";
-    case SampleConversionType::LinearToGamma:
-        return "COLOR_LINEARTOGAMMA4 ";
-    case SampleConversionType::LinearToGammaSquare:
-        return "COLOR_LINEARTOGAMMASQUARE4 ";
-    case SampleConversionType::None:
-    default:
-        return "COLOR_NOOP ";
-    }
+    return static_cast<int>(linearInput) + static_cast<int>(srgbTexture);
 }
 
 CullMode GetEffectiveCullMode(CullMode mode, const Camera* camera)
@@ -180,7 +127,7 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE("Use Variance Shadow Maps", bool, settings_.shadowMap_.varianceShadowMap_, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE("VSM Shadow Settings", Vector2, settings_.rendering_.vsmShadowParams_, BatchRendererSettings{}.vsmShadowParams_, AM_DEFAULT);
     URHO3D_ATTRIBUTE("VSM Multi Sample", int, settings_.shadowMap_.varianceShadowMapMultiSample_, 1, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Gamma Correction", bool, settings_.gammaCorrection_, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Gamma Correction", bool, settings_.rendering_.gammaCorrection_, false, AM_DEFAULT);
 }
 
 void RenderPipeline::ApplyAttributes()
@@ -235,7 +182,8 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         commonDefines += "URHO3D_ADDITIVE_PASS ";
 
     // Add lightmap
-    if (key.drawable_->GetBatches()[key.sourceBatchIndex_].lightmapScaleOffset_)
+    const bool isLightmap = !!key.drawable_->GetBatches()[key.sourceBatchIndex_].lightmapScaleOffset_;
+    if (isLightmap)
     {
         commonDefines += "URHO3D_HAS_LIGHTMAP ";
         commonDefines += "LIGHTMAP ";
@@ -297,10 +245,11 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         pixelShaderDefines += "URHO3D_MATERIAL_HAS_DIFFUSE ";
         const bool isLinear = diffuseTexture->GetLinear();
         const bool sRGB = diffuseTexture->GetSRGB();
-        pixelShaderDefines += "MATERIAL_DIFFUSE_TEXTURE_LINEAR=";
-        pixelShaderDefines += GetSampleConversionFunction(GetSampleLinearConversion(isLinear, sRGB));
-        pixelShaderDefines += "MATERIAL_DIFFUSE_TEXTURE_GAMMA=";
-        pixelShaderDefines += GetSampleConversionFunction(GetSampleGammaConversion(isLinear, sRGB));
+        const int hint = GetTextureColorSpaceHint(isLinear, sRGB);
+        // TODO(renderer): Throttle logging
+        if (hint > 1)
+            URHO3D_LOGWARNING("Texture {} cannot be both sRGB and Linear", diffuseTexture->GetName());
+        pixelShaderDefines += Format("URHO3D_MATERIAL_DIFFUSE_HINT={} ", ea::min(1, hint));
     }
     if (material->GetTexture(TU_NORMAL))
         pixelShaderDefines += "URHO3D_MATERIAL_HAS_NORMAL ";
@@ -312,41 +261,6 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     // Add geometry type defines
     if (key.geometryType_ == GEOM_STATIC && settings_.instancing_.enable_)
         vertexShaderDefines += "URHO3D_INSTANCING ";
-
-    /*switch (key.geometryType_)
-    {
-    case GEOM_STATIC:
-        if (settings_.instancing_.enable_)
-        {
-            vertexShaderDefines += "GEOM_INSTANCED ";
-        }
-        else
-            vertexShaderDefines += "GEOM_STATIC ";
-        break;
-    case GEOM_STATIC_NOINSTANCING:
-        vertexShaderDefines += "GEOM_STATIC ";
-        break;
-    case GEOM_INSTANCED:
-        vertexShaderDefines += "GEOM_INSTANCED ";
-        break;
-    case GEOM_SKINNED:
-        vertexShaderDefines += "GEOM_SKINNED ";
-        break;
-    case GEOM_BILLBOARD:
-        vertexShaderDefines += "GEOM_BILLBOARD ";
-        break;
-    case GEOM_DIRBILLBOARD:
-        vertexShaderDefines += "GEOM_DIRBILLBOARD ";
-        break;
-    case GEOM_TRAIL_FACE_CAMERA:
-        vertexShaderDefines += "GEOM_TRAIL_FACE_CAMERA ";
-        break;
-    case GEOM_TRAIL_BONE:
-        vertexShaderDefines += "GEOM_TRAIL_BONE ";
-        break;
-    default:
-        break;
-    }*/
 
     if (isShadowPass)
         commonDefines += "PASS_SHADOW ";
@@ -403,7 +317,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     if (graphics_->GetConstantBuffersEnabled())
         commonDefines += "URHO3D_USE_CBUFFERS ";
 
-    if (settings_.gammaCorrection_)
+    if (settings_.rendering_.gammaCorrection_)
         commonDefines += "URHO3D_GAMMA_CORRECTION ";
 
     vertexShaderDefines += commonDefines;
@@ -453,7 +367,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
         pixelDefiles += "URHO3D_USE_CBUFFERS ";
     }
 
-    if (settings_.gammaCorrection_)
+    if (settings_.rendering_.gammaCorrection_)
     {
         vertexDefines += "URHO3D_GAMMA_CORRECTION ";
         pixelDefiles += "URHO3D_GAMMA_CORRECTION ";
@@ -754,7 +668,6 @@ unsigned RenderPipeline::RecalculatePipelineStateHash() const
 {
     unsigned hash = 0;
     CombineHash(hash, cameraProcessor_->GetPipelineStateHash());
-    CombineHash(hash, settings_.gammaCorrection_);
     CombineHash(hash, settings_.CalculatePipelineStateHash());
     return hash;
 }

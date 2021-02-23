@@ -64,8 +64,10 @@ struct LightShaderParameters
     /// Light matrix and shadow matrix (for spot and point lights).
     Matrix4 lightMatrices_[MAX_CASCADE_SPLITS];
 
-    /// Light color (faded).
-    Vector3 color_;
+    /// Light color in gamma space (faded).
+    Vector3 colorGamma_;
+    /// Light color in linear space (faded).
+    Vector3 colorLinear_;
     /// Specular intensity (faded).
     float specularIntensity_{};
 
@@ -100,6 +102,9 @@ struct LightShaderParameters
     Texture* lightRamp_{};
     /// Light shape texture.
     Texture* lightShape_{};
+
+    /// Return light color in appropriate color space.
+    Vector3 GetColor(bool isLinear) const { return isLinear ? colorLinear_ : colorGamma_; }
 };
 
 /// Light and shadow processing utility.

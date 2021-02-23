@@ -98,7 +98,7 @@ public:
 
     /// Return zone's ambient light in linear space.
     /// TODO(renderer): Cache this value
-    const Color GetLinearAmbient() const { return ambientColor_.GammaToLinear() * ambientBrightness_; }
+    const Color GetLinearAmbient() const { return (ambientColor_ * ambientBrightness_).GammaToLinear(); }
 
     /// Return ambient start color. Not safe to call from worker threads due to possible octree query.
     /// @property

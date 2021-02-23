@@ -49,6 +49,9 @@ enum class AmbientMode
 /// Batch renderer settings.
 struct BatchRendererSettings
 {
+    /// Whether to apply gamma correction.
+    bool gammaCorrection_{};
+
     /// Ambient mode.
     AmbientMode ambientMode_{ AmbientMode::Directional };
     /// Variance shadow map parameters.
@@ -58,6 +61,7 @@ struct BatchRendererSettings
     unsigned CalculatePipelineStateHash() const
     {
         unsigned hash = 0;
+        CombineHash(hash, gammaCorrection_);
         CombineHash(hash, MakeHash(ambientMode_));
         return hash;
     }
@@ -65,7 +69,8 @@ struct BatchRendererSettings
     /// Compare settings.
     bool operator==(const BatchRendererSettings& rhs) const
     {
-        return ambientMode_ == rhs.ambientMode_
+        return gammaCorrection_ == rhs.gammaCorrection_
+            && ambientMode_ == rhs.ambientMode_
             && vsmShadowParams_ == rhs.vsmShadowParams_;
     }
 

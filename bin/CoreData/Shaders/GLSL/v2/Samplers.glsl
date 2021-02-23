@@ -36,13 +36,9 @@ SAMPLER(9, samplerCube sLightCubeMap)
 #endif
 
 #ifdef URHO3D_MATERIAL_HAS_DIFFUSE
-    #define Color_DiffMapToLinear(color) MATERIAL_DIFFUSE_TEXTURE_LINEAR(color)
-    #define Color_DiffMapToGamma(color)  MATERIAL_DIFFUSE_TEXTURE_GAMMA(color)
-    #ifdef URHO3D_GAMMA_CORRECTION
-        #define Color_DiffMapToLight(color) Color_DiffMapToLinear(color)
-    #else
-        #define Color_DiffMapToLight(color) Color_DiffMapToGamma(color)
-    #endif
+    #define DiffMap_ToGamma(color)  CONCATENATE_2(Texture_ToGamma_,  URHO3D_MATERIAL_DIFFUSE_HINT)(color)
+    #define DiffMap_ToLinear(color) CONCATENATE_2(Texture_ToLinear_, URHO3D_MATERIAL_DIFFUSE_HINT)(color)
+    #define DiffMap_ToLight(color)  CONCATENATE_2(Texture_ToLight_,  URHO3D_MATERIAL_DIFFUSE_HINT)(color)
 #endif
 
 vec3 DecodeNormal(vec4 normalInput)

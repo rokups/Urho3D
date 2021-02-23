@@ -15,7 +15,7 @@
 #endif
 
 // URHO3D_NEED_SECONDARY_TEXCOORD: Whether vertex needs second UV coordinate
-#if defined(AO) || defined(URHO3D_HAS_LIGHTMAP)
+#if defined(AO) || defined(URHO3D_HAS_LIGHTMAP) || defined(URHO3D_GEOMETRY_BILLBOARD) || defined(URHO3D_GEOMETRY_DIRBILLBOARD)
     #define URHO3D_NEED_SECONDARY_TEXCOORD
 #endif
 
@@ -40,6 +40,10 @@
 #endif
 
 // =================================== Platform configuration ===================================
+
+// Helper utility to generate names
+#define _CONCATENATE_2(x, y) x##y
+#define CONCATENATE_2(x, y) _CONCATENATE_2(x, y)
 
 // URHO3D_VERTEX_SHADER: Defined for vertex shader
 // VERTEX_INPUT: Declare vertex input variable

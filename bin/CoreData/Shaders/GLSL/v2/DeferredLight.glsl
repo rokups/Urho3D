@@ -102,9 +102,9 @@ void main()
 
     #ifdef SPECULAR
         float spec = GetSpecular(normal, eyeVec, lightDir, normalInput.a * 255.0);
-        gl_FragColor = Color_LightToGamma4(diff * vec4(lightColor * (albedoInput.rgb + spec * cLightColor.a * albedoInput.aaa), 0.0));
+        gl_FragColor = LightToGammaSpaceAlpha(diff * vec4(lightColor * (albedoInput.rgb + spec * cLightColor.a * albedoInput.aaa), 0.0));
     #else
-        gl_FragColor = Color_LightToGamma4(diff * vec4(lightColor * albedoInput.rgb, 0.0));
+        gl_FragColor = LightToGammaSpaceAlpha(diff * vec4(lightColor * albedoInput.rgb, 0.0));
     #endif
 }
 #endif

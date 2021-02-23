@@ -62,6 +62,8 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
 
 #ifdef URHO3D_AMBIENT_PASS
     // Calculate ambient lighting from zones and/or spherical harmonics
+    // cAmbient and cAmbientColor should contain color in light space.
+    // cSH* should contain harmonics in linear space.
     #if defined(URHO3D_AMBIENT_DIRECTIONAL)
         #define GetAmbientLight(normal) LinearToLightSpace(EvaluateSH01(normal, cSHAr, cSHAg, cSHAb) + EvaluateSH2(normal, cSHBr, cSHBg, cSHBb, cSHC))
     #elif defined(URHO3D_AMBIENT_FLAT)
@@ -72,6 +74,7 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
 #endif // URHO3D_AMBIENT_PASS
 
 // Calculate combined ambient lighting from zones, spherical harmonics and vertex lights
+// cVertexLights should contain light color in light space.
 vec3 GetAmbientAndVertexLights(vec3 position, vec3 normal)
 {
 #ifdef URHO3D_AMBIENT_PASS

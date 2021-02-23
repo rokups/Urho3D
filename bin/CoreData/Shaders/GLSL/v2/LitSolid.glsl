@@ -49,7 +49,7 @@ VERTEX_OUTPUT(vec3 vVertexLight)
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    gl_Position = WorldToClipSpace(vertexTransform.position);
+        gl_Position = WorldToClipSpace(vertexTransform.position);
 
     vTexCoord = GetTransformedTexCoord();
     vNormal = vertexTransform.normal;
@@ -99,9 +99,9 @@ void main()
             if (diffInput.a < 0.5)
                 discard;
         #endif
-        vec4 diffColor = Color_DiffMapToLight(cMatDiffColor * diffInput);
+        vec4 diffColor = DiffMap_ToLight(cMatDiffColor * diffInput);
     #else
-        vec4 diffColor = Color_GammaToLight4(cMatDiffColor);
+        vec4 diffColor = GammaToLightSpaceAlpha(cMatDiffColor);
     #endif
 
     #ifdef URHO3D_VERTEX_HAS_COLOR
@@ -166,12 +166,10 @@ void main()
             #else
                 finalColor += cMatEmissiveColor;
             #endif
-            gl_FragColor = vec4(GetFog(Color_LightToGamma3(finalColor), fogFactor), diffColor.a);
+            gl_FragColor = vec4(GetFog(LightToGammaSpace(finalColor), fogFactor), diffColor.a);
         #else
-            gl_FragColor = vec4(GetLitFog(Color_LightToGamma3(finalColor), fogFactor), diffColor.a);
+            gl_FragColor = vec4(GetLitFog(LightToGammaSpace(finalColor), fogFactor), diffColor.a);
         #endif
-
-        //gl_FragColor = vec4(GetFog(Color_LightToGamma3(finalColor), fogFactor), diffColor.a);
     #elif defined(PASS_DEFERRED)
         // Fill deferred G-buffer
         float specIntensity = specColor.g;
@@ -194,7 +192,7 @@ void main()
             finalColor += cMatEmissiveColor;
         #endif
 
-        gl_FragData[0] = vec4(GetFog(Color_LightToGamma3(finalColor), fogFactor), 1.0);
+        gl_FragData[0] = vec4(GetFog(LightToGammaSpace(finalColor), fogFactor), 1.0);
         gl_FragData[1] = fogFactor * vec4(diffColor.rgb, specIntensity);
         gl_FragData[2] = vec4(normal * 0.5 + 0.5, specPower);
     #endif

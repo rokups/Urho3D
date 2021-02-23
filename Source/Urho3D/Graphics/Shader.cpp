@@ -225,7 +225,7 @@ bool Shader::ProcessSource(ea::string& code, Deserializer& source)
             if (!ProcessSource(code, *includeFile))
                 return false;
 
-            code += FormatLineDirective(isGLSL, fileName, fileIndex, currentLine + 1);
+            code += FormatLineDirective(isGLSL, fileName, fileIndex, currentLine);
         }
         else
         {

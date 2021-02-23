@@ -51,8 +51,6 @@ class BatchRenderer;
 ///
 struct RenderPipelineSettings : public SceneProcessorSettings
 {
-    /// Whether to apply gamma correction.
-    bool gammaCorrection_{};
 };
 
 ///

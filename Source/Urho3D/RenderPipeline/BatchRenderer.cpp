@@ -164,6 +164,9 @@ public:
     }
 
 private:
+    /// TODO(renderer): Refactor me
+    Vector3 AdjustSHAmbient(const Vector3& x) const { return settings_.gammaCorrection_ ? x : Color(x).LinearToGamma().ToVector3(); };
+
     /// Add Frame shader parameters.
     void AddFrameShaderParameters()
     {
@@ -199,7 +202,9 @@ private:
 
         drawQueue_.AddShaderParameter(VSP_VIEWPROJ, camera_->GetEffectiveGPUViewProjection(constantDepthBias));
 
-        drawQueue_.AddShaderParameter(PSP_AMBIENTCOLOR, camera_->GetEffectiveAmbientColor());
+        const Color ambientColorGamma = camera_->GetEffectiveAmbientColor() * camera_->GetEffectiveAmbientBrightness();
+        drawQueue_.AddShaderParameter(PSP_AMBIENTCOLOR,
+            settings_.gammaCorrection_ ? ambientColorGamma.GammaToLinear() : ambientColorGamma);
         drawQueue_.AddShaderParameter(PSP_FOGCOLOR, camera_->GetEffectiveFogColor());
         drawQueue_.AddShaderParameter(PSP_FOGPARAMS, GetFogParameter(camera_));
     }
@@ -218,7 +223,7 @@ private:
             else
             {
                 const LightShaderParameters& vertexLightParams = lights_[vertexLights[i]]->GetShaderParams();
-                vertexLightsData_[i * 3] = { vertexLightParams.color_, vertexLightParams.invRange_ };
+                vertexLightsData_[i * 3] = { vertexLightParams.GetColor(settings_.gammaCorrection_), vertexLightParams.invRange_ };
                 vertexLightsData_[i * 3 + 1] = { vertexLightParams.direction_, vertexLightParams.cutoff_ };
                 vertexLightsData_[i * 3 + 2] = { vertexLightParams.position_, vertexLightParams.invCutoff_ };
             }
@@ -246,7 +251,7 @@ private:
         drawQueue_.AddShaderParameter(VSP_LIGHTPOS,
             Vector4{ lightParams_->position_, lightParams_->invRange_ });
         drawQueue_.AddShaderParameter(PSP_LIGHTCOLOR,
-            Vector4{ lightParams_->color_, lightParams_->specularIntensity_ });
+            Vector4{ lightParams_->GetColor(settings_.gammaCorrection_), lightParams_->specularIntensity_ });
 
         drawQueue_.AddShaderParameter(PSP_LIGHTRAD, lightParams_->radius_);
         drawQueue_.AddShaderParameter(PSP_LIGHTLENGTH, lightParams_->length_);
@@ -420,7 +425,7 @@ private:
                 if (enableAmbientLight_)
                 {
                     const SphericalHarmonicsDot9& sh = lightAccumulator->sphericalHarmonics_;
-                    const Vector4 ambient(sh.EvaluateAverage(), 1.0f);
+                    const Vector4 ambient(AdjustSHAmbient(sh.EvaluateAverage()), 1.0f);
                     if (settings_.ambientMode_ == AmbientMode::Flat)
                         instancingBuffer_.SetElements(&ambient, 3, 1);
                     else if (settings_.ambientMode_ == AmbientMode::Directional)
@@ -440,7 +445,7 @@ private:
                     drawQueue_.AddShaderParameter(VSP_SHBG, sh.Bg_);
                     drawQueue_.AddShaderParameter(VSP_SHBB, sh.Bb_);
                     drawQueue_.AddShaderParameter(VSP_SHC, sh.C_);
-                    drawQueue_.AddShaderParameter(VSP_AMBIENT, Vector4(sh.EvaluateAverage(), 1.0f));
+                    drawQueue_.AddShaderParameter(VSP_AMBIENT, Vector4(AdjustSHAmbient(sh.EvaluateAverage()), 1.0f));
                 }
 
                 // Add transform parameters
@@ -481,7 +486,7 @@ private:
             if (enableAmbientLight_)
             {
                 const SphericalHarmonicsDot9& sh = lightAccumulator->sphericalHarmonics_;
-                const Vector4 ambient(sh.EvaluateAverage(), 1.0f);
+                const Vector4 ambient(AdjustSHAmbient(sh.EvaluateAverage()), 1.0f);
                 if (settings_.ambientMode_ == AmbientMode::Flat)
                     instancingBuffer_.SetElements(&ambient, 3, 1);
                 else if (settings_.ambientMode_ == AmbientMode::Directional)
