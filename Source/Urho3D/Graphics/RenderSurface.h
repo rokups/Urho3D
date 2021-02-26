@@ -140,11 +140,14 @@ public:
     /// Set or clear the need resolve flag. Called internally by Graphics.
     void SetResolveDirty(bool enable) { resolveDirty_ = enable; }
 
-    /// Return size of render surface. Nullptr corresponds to default render surface.
+    /// Property getters that can work with null RenderSurface corresponding to main viewport
+    /// @{
     static IntVector2 GetSize(Graphics* graphics, const RenderSurface* renderSurface);
-
-    /// Return multisampling of render surface. Nullptr corresponds to default render surface.
+    static IntRect GetRect(Graphics* graphics, const RenderSurface* renderSurface);
+    static unsigned GetFormat(Graphics* graphics, const RenderSurface* renderSurface);
     static int GetMultiSample(Graphics* graphics, const RenderSurface* renderSurface);
+    static bool GetSRGB(Graphics* graphics, const RenderSurface* renderSurface);
+    /// @}
 
 private:
     /// Graphics subsystem.

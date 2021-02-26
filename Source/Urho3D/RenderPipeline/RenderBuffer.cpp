@@ -187,7 +187,7 @@ RenderBuffer::~RenderBuffer()
 {
 }
 
-bool RenderBuffer::IsCompatibleWith(RenderBuffer* otherTexture) const
+bool RenderBuffer::IsCompatibleWith(RenderBuffer* otherTexture, bool ignoreRect) const
 {
     RenderSurface* thisSurface = GetRenderSurface();
     RenderSurface* otherSurface = otherTexture->GetRenderSurface();
@@ -203,8 +203,7 @@ bool RenderBuffer::IsCompatibleWith(RenderBuffer* otherTexture) const
         return false;
 
     // If sizes are different, textures are incompatible
-    // TODO(renderer): This limitation may be lifted
-    if (GetViewportRect() != otherTexture->GetViewportRect())
+    if (!ignoreRect && GetViewportRect() != otherTexture->GetViewportRect())
         return false;
 
     return true;

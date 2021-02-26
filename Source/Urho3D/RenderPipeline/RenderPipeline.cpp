@@ -463,11 +463,12 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
     if (!drawQueue_)
     {
         drawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
+        renderBufferManager_ = MakeShared<RenderBufferManager>(this);
         sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow");
         cameraProcessor_ = MakeShared<CameraProcessor>(this);
 
-        viewportColor_ = RenderBuffer::ConnectToViewportColor(this);
-        viewportDepth_ = RenderBuffer::ConnectToViewportDepthStencil(this);
+        //viewportColor_ = RenderBuffer::ConnectToViewportColor(this);
+        //viewportDepth_ = RenderBuffer::ConnectToViewportDepthStencil(this);
     }
 
     sceneProcessor_->Define(renderTarget, viewport);
@@ -476,6 +477,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
     cameraProcessor_->Initialize(viewport->GetCamera());
 
+    //settings_.deferred_ = true;
     //settings_.enableInstancing_ = GetSubsystem<Renderer>()->GetDynamicInstancing();
     //settings_.ambientMode_ = AmbientMode::Directional;
 
@@ -514,12 +516,16 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         alphaPass_ = nullptr;
         deferredPass_ = MakeShared<UnlitScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "deferred");
 
-        deferredFinal_ = RenderBuffer::Create(this, RenderBufferFlag::RGBA);
+        //deferredFinal_ = RenderBuffer::Create(this, RenderBufferFlag::RGBA);
         deferredAlbedo_ = RenderBuffer::Create(this, RenderBufferFlag::RGBA);
         deferredNormal_ = RenderBuffer::Create(this, RenderBufferFlag::RGBA);
-        deferredDepth_ = RenderBuffer::Create(this, RenderBufferFlag::Depth | RenderBufferFlag::Stencil);
+        //deferredDepth_ = RenderBuffer::Create(this, RenderBufferFlag::Depth | RenderBufferFlag::Stencil);
 
         sceneProcessor_->SetPasses({ deferredPass_ });
+
+        TextureRenderBufferParams viewportParams;
+        viewportParams.format_ = Graphics::GetRGBFormat();
+        renderBufferManager_->SetViewportParameters(viewportParams);
     }
 
     if (!settings_.deferred_ && !basePass_)
@@ -528,12 +534,16 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         alphaPass_ = MakeShared<AlphaForwardLightingScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "alpha", "alpha", "litalpha");
         deferredPass_ = nullptr;
 
-        deferredFinal_ = nullptr;
+        //deferredFinal_ = nullptr;
         deferredAlbedo_ = nullptr;
         deferredNormal_ = nullptr;
-        deferredDepth_ = nullptr;
+        //deferredDepth_ = nullptr;
 
         sceneProcessor_->SetPasses({ basePass_, alphaPass_ });
+
+        TextureRenderBufferParams viewportParams;
+        viewportParams.format_ = Graphics::GetRGBFormat();
+        renderBufferManager_->SetViewportParameters(viewportParams);
     }
 
     return true;
@@ -561,6 +571,19 @@ void RenderPipeline::Update(const FrameInfo& frameInfo)
 
 void RenderPipeline::Render()
 {
+    ViewportRenderBufferFlags viewportFlags;
+    if (settings_.deferred_)
+    {
+        viewportFlags |= ViewportRenderBufferFlag::UsableWithMultipleRenderTargets;
+        viewportFlags |= ViewportRenderBufferFlag::IsReadableDepth;
+        viewportFlags |= ViewportRenderBufferFlag::HasStencil;
+    }
+    else
+    {
+        viewportFlags |= ViewportRenderBufferFlag::InheritMultiSampleLevel;
+    }
+    renderBufferManager_->SetViewportFlags(viewportFlags);
+
     OnRenderBegin(this, sceneProcessor_->GetFrameInfo());
 
     // TODO(renderer): Do something about this hack
@@ -577,11 +600,23 @@ void RenderPipeline::Render()
 #ifdef DESKTOP_GRAPHICS
     if (settings_.deferred_)
     {
+        //deferredFinal_ = renderBufferManager_->GetColorOutput();
+
         // Draw deferred GBuffer
-        deferredFinal_->ClearColor(fogColor);
+        renderBufferManager_->ClearColor(deferredAlbedo_, Color::TRANSPARENT_BLACK);
+        renderBufferManager_->ClearOutput(fogColor, 1.0f, 0);
+
+        RenderBuffer* const gBuffer[] = {
+            renderBufferManager_->GetColorOutput(),
+            deferredAlbedo_,
+            deferredNormal_
+        };
+        renderBufferManager_->SetRenderTargets(renderBufferManager_->GetDepthStencilOutput(), gBuffer);
+
+        /*deferredFinal_->ClearColor(fogColor);
         deferredAlbedo_->ClearColor();
         deferredDepth_->ClearDepthStencil();
-        deferredDepth_->SetRenderTargets({ deferredFinal_, deferredAlbedo_, deferredNormal_ });
+        deferredDepth_->SetRenderTargets({ deferredFinal_, deferredAlbedo_, deferredNormal_ });*/
         drawQueue_->Reset();
 
         instancingBuffer->Begin();
@@ -593,31 +628,36 @@ void RenderPipeline::Render()
 
         // Draw deferred lights
         ShaderResourceDesc geometryBuffer[] = {
-            { TU_ALBEDOBUFFER, deferredAlbedo_->GetRenderSurface()->GetParentTexture() },
-            { TU_NORMALBUFFER, deferredNormal_->GetRenderSurface()->GetParentTexture() },
-            { TU_DEPTHBUFFER, deferredDepth_->GetRenderSurface()->GetParentTexture() }
+            { TU_ALBEDOBUFFER, deferredAlbedo_->GetTexture() },
+            { TU_NORMALBUFFER, deferredNormal_->GetTexture() },
+            { TU_DEPTHBUFFER, renderBufferManager_->GetDepthStencilTexture() }
         };
 
         LightVolumeRenderContext lightVolumeRenderContext;
         lightVolumeRenderContext.geometryBuffer_ = geometryBuffer;
-        lightVolumeRenderContext.geometryBufferOffsetAndScale_ = deferredDepth_->GetViewportOffsetAndScale();
-        lightVolumeRenderContext.geometryBufferInvSize_ = deferredDepth_->GetInvSize();
+        lightVolumeRenderContext.geometryBufferOffsetAndScale_ = renderBufferManager_->GetDefaultViewportOffsetAndScale();
+        lightVolumeRenderContext.geometryBufferInvSize_ = renderBufferManager_->GetInvOutputSize();
 
         drawQueue_->Reset();
         sceneBatchRenderer_->RenderLightVolumeBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
             lightVolumeRenderContext, sceneProcessor_->GetLightVolumeBatches());
 
-        deferredDepth_->SetRenderTargets({ deferredFinal_ });
+        //deferredDepth_->SetRenderTargets({ deferredFinal_ });
+        renderBufferManager_->SetOutputRenderTargers();
         drawQueue_->Execute();
 
-        viewportColor_->CopyFrom(deferredFinal_);
+        //viewportColor_->CopyFrom(deferredFinal_);
+        graphics_->SetDepthWrite(true);
     }
     else
 #endif
     {
+        renderBufferManager_->ClearOutput(fogColor, 1.0f, 0);
+        renderBufferManager_->SetOutputRenderTargers();
+        /*renderBufferManager_->SetRenderTargets(renderBufferManager_->)
         viewportColor_->ClearColor(fogColor);
         viewportDepth_->ClearDepthStencil();
-        viewportDepth_->SetRenderTargets({ viewportColor_ });
+        viewportDepth_->SetRenderTargets({ viewportColor_ });*/
 
         drawQueue_->Reset();
         instancingBuffer->Begin();
@@ -667,6 +707,7 @@ void RenderPipeline::Render()
 unsigned RenderPipeline::RecalculatePipelineStateHash() const
 {
     unsigned hash = 0;
+    CombineHash(hash, graphics_->GetConstantBuffersEnabled());
     CombineHash(hash, cameraProcessor_->GetPipelineStateHash());
     CombineHash(hash, settings_.CalculatePipelineStateHash());
     return hash;

@@ -80,7 +80,7 @@ public:
     static SharedPtr<RenderBuffer> ConnectToViewportDepthStencil(RenderPipelineInterface* renderPipeline);
 
     /// Return whether this texture is compatible with another, i.e. can be set together.
-    bool IsCompatibleWith(RenderBuffer* otherTexture) const;
+    bool IsCompatibleWith(RenderBuffer* otherTexture, bool ignoreRect = false) const;
 
     /// Clear as color texture. No-op for depth-stencil texture.
     virtual void ClearColor(const Color& color = Color::TRANSPARENT_BLACK, CubeMapFace face = FACE_POSITIVE_X);
@@ -164,6 +164,7 @@ private:
 };
 
 /// Render buffer texture creation parameters.
+/// TODO(renderer): Rename
 struct TextureRenderBufferParams
 {
     /// Texture format.
@@ -178,6 +179,18 @@ struct TextureRenderBufferParams
     int multiSample_{ 1 };
     /// Whether to automatically resolve multisampled texture.
     bool autoResolve_{ true };
+
+    bool operator==(const TextureRenderBufferParams& rhs) const
+    {
+        return format_ == rhs.format_
+            && sRGB_ == rhs.sRGB_
+            && cubemap_ == rhs.cubemap_
+            && filtered_ == rhs.filtered_
+            && multiSample_ == rhs.multiSample_
+            && autoResolve_ == rhs.autoResolve_;
+    }
+
+    bool operator!=(const TextureRenderBufferParams& rhs) const { return !(*this == rhs); }
 };
 
 /// Writable and readable render buffer texture (2D or cubemap).

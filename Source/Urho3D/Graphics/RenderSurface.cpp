@@ -124,9 +124,24 @@ IntVector2 RenderSurface::GetSize(Graphics* graphics, const RenderSurface* rende
     return renderSurface ? renderSurface->GetSize() : graphics->GetSize();
 }
 
+IntRect RenderSurface::GetRect(Graphics* graphics, const RenderSurface* renderSurface)
+{
+    return { IntVector2::ZERO, GetSize(graphics, renderSurface) };
+}
+
+unsigned RenderSurface::GetFormat(Graphics* /*graphics*/, const RenderSurface* renderSurface)
+{
+    return renderSurface ? renderSurface->GetParentTexture()->GetFormat() : Graphics::GetRGBFormat();
+}
+
 int RenderSurface::GetMultiSample(Graphics* graphics, const RenderSurface* renderSurface)
 {
     return renderSurface ? renderSurface->GetMultiSample() : graphics->GetMultiSample();
+}
+
+bool RenderSurface::GetSRGB(Graphics* graphics, const RenderSurface* renderSurface)
+{
+    return renderSurface ? renderSurface->GetParentTexture()->GetSRGB() : graphics->GetSRGB();
 }
 
 }

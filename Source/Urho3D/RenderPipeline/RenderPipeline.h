@@ -28,6 +28,7 @@
 #include "../RenderPipeline/SceneProcessor.h"
 #include "../RenderPipeline/CameraProcessor.h"
 #include "../RenderPipeline/RenderBuffer.h"
+#include "../RenderPipeline/RenderBufferManager.h"
 #include "../RenderPipeline/RenderPipelineInterface.h"
 #include "../RenderPipeline/ScenePass.h"
 #include "../Scene/Serializable.h"
@@ -106,25 +107,27 @@ private:
     /// Previous pipeline state hash.
     unsigned oldPipelineStateHash_{};
 
-    /// Scene processor.
-    SharedPtr<SceneProcessor> sceneProcessor_;
     /// Default draw queue.
     SharedPtr<DrawCommandQueue> drawQueue_;
+    /// Render buffer manager.
+    SharedPtr<RenderBufferManager> renderBufferManager_;
+    /// Scene processor.
+    SharedPtr<SceneProcessor> sceneProcessor_;
     /// Main camera of render pipeline.
     SharedPtr<CameraProcessor> cameraProcessor_;
     /// Viewport color texture handler.
-    SharedPtr<RenderBuffer> viewportColor_;
+    //SharedPtr<RenderBuffer> viewportColor_;
     /// Viewport depth stencil texture handler.
-    SharedPtr<RenderBuffer> viewportDepth_;
+    //SharedPtr<RenderBuffer> viewportDepth_;
 
     SharedPtr<OpaqueForwardLightingScenePass> basePass_;
     SharedPtr<AlphaForwardLightingScenePass> alphaPass_;
     SharedPtr<UnlitScenePass> deferredPass_;
 
-    SharedPtr<RenderBuffer> deferredFinal_;
+    //SharedPtr<RenderBuffer> deferredFinal_;
     SharedPtr<RenderBuffer> deferredAlbedo_;
     SharedPtr<RenderBuffer> deferredNormal_;
-    SharedPtr<RenderBuffer> deferredDepth_;
+    //SharedPtr<RenderBuffer> deferredDepth_;
 };
 
 }
