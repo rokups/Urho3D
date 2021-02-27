@@ -123,7 +123,6 @@ URHO3D_REFCOUNTED(Urho3D::Renderer);
 URHO3D_REFCOUNTED(Urho3D::RibbonTrail);
 URHO3D_REFCOUNTED(Urho3D::Shader);
 URHO3D_REFCOUNTED(Urho3D::ShaderPrecache);
-URHO3D_REFCOUNTED(Urho3D::ShaderProgram);
 URHO3D_REFCOUNTED(Urho3D::Skybox);
 URHO3D_REFCOUNTED(Urho3D::SoftwareModelAnimator);
 URHO3D_REFCOUNTED(Urho3D::StaticModelGroup);
