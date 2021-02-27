@@ -65,8 +65,10 @@ class URHO3D_API RenderBufferManager : public Object
 public:
     explicit RenderBufferManager(RenderPipelineInterface* renderPipeline);
 
-    void SetViewportParameters(const TextureRenderBufferParams& params) { viewportParams_ = params; }
+    void SetViewportParameters(const RenderBufferParams& params) { viewportParams_ = params; }
     void SetViewportFlags(ViewportRenderBufferFlags flags) { viewportFlags_ = flags; }
+
+    SharedPtr<RenderBuffer> CreateColorBuffer(const RenderBufferParams& params, const Vector2& size = Vector2::ONE);
 
     /// Prepare for simultaneous reading from and writing to color buffer.
     /// Invalid if SupportSimultaneousReadAndWrite is not requested.
@@ -118,11 +120,11 @@ public:
 
     /// Return readable depth texture.
     /// It's not allowed to write depth and read it from shader input simultaneously for same depth-stencil buffer.
-    Texture2D* GetDepthStencilTexture() const { return depthStencilTexture_; };
+    Texture2D* GetDepthStencilTexture() const { return depthStencilBuffer_->GetTexture2D(); };
     /// Return secondary color render buffer texture that can be used while writing to color render buffer.
     /// Texture content is defined at the moment of previous PrepareForColorReadWrite.
     /// Content is undefined if PrepareForColorReadWrite was not called during current frame.
-    Texture2D* GetSecondaryColorTexture() const { return readableColorTexture_; }
+    Texture2D* GetSecondaryColorTexture() const { return readableColorBuffer_->GetTexture2D(); }
 
     /// Return size of output region (not size of output texture itself).
     IntVector2 GetOutputSize() const { return viewportRect_.Size(); }
@@ -132,7 +134,7 @@ public:
     Vector4 GetDefaultViewportOffsetAndScale() const;
 
 private:
-    /// Callbacks from RenderPipeline
+    /// RenderPipeline callbacks
     /// @{
     void OnPipelineStatesInvalidated();
     void OnRenderBegin(const FrameInfo& frameInfo);
@@ -152,7 +154,7 @@ private:
     SharedPtr<DrawCommandQueue> drawQueue_;
     /// @}
 
-    /// Objects cached between frames
+    /// Cached between frames
     /// @{
     SharedPtr<RenderBuffer> viewportColorBuffer_;
     SharedPtr<RenderBuffer> viewportDepthBuffer_;
@@ -161,21 +163,19 @@ private:
     SharedPtr<RenderBuffer> substituteRenderBuffers_[2];
     SharedPtr<RenderBuffer> substituteDepthBuffer_;
 
-    TextureRenderBufferParams previousViewportParams_;
+    RenderBufferParams previousViewportParams_;
     /// @}
 
     /// State of current frame
     /// @{
     ViewportRenderBufferFlags viewportFlags_;
-    TextureRenderBufferParams viewportParams_;
+    RenderBufferParams viewportParams_;
 
     IntRect viewportRect_;
 
     RenderBuffer* depthStencilBuffer_{};
     RenderBuffer* writeableColorBuffer_{};
     RenderBuffer* readableColorBuffer_{};
-    Texture2D* depthStencilTexture_{};
-    Texture2D* readableColorTexture_{};
     /// @}
 };
 

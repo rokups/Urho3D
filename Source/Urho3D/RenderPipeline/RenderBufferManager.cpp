@@ -27,17 +27,6 @@
 #include "../Graphics/RenderSurface.h"
 #include "../RenderPipeline/RenderBufferManager.h"
 #include "../RenderPipeline/RenderPipelineInterface.h"
-/*#include "../Core/Context.h"
-#include "../Core/Mutex.h"
-#include "../Graphics/Drawable.h"
-#include "../Graphics/DrawCommandQueue.h"
-#include "../Graphics/PipelineState.h"
-#include "../Graphics/RenderSurface.h"
-#include "../Graphics/Texture2D.h"
-#include "../Graphics/TextureCube.h"
-#include "../Graphics/Viewport.h"
-#include "../RenderPipeline/RenderPipelineInterface.h"
-#include "../IO/Log.h"*/
 
 #include <EASTL/optional.h>
 
@@ -57,41 +46,41 @@ ea::span<const T> ToSpan(std::initializer_list<T> list)
 
 Texture2D* GetParentTexture2D(RenderSurface* renderSurface)
 {
-    return renderSurface ? renderSurface->GetParentTexture()->Cast<Texture2D>() : nullptr;
+    return renderSurface && renderSurface->GetParentTexture() ? renderSurface->GetParentTexture()->Cast<Texture2D>() : nullptr;
 }
 
 Texture2D* GetParentTexture2D(RenderBuffer* renderBuffer)
 {
-    return renderBuffer ? renderBuffer->GetTexture()->Cast<Texture2D>() : nullptr;
+    return renderBuffer && renderBuffer->GetTexture() ? renderBuffer->GetTexture()->Cast<Texture2D>() : nullptr;
 }
 
-bool HasStencilBufferLinked(RenderSurface* renderSurface)
+ea::optional<RenderSurface*> GetLinkedDepthStencil(RenderSurface* renderSurface)
+{
+    if (!renderSurface)
+        return nullptr;
+    if (RenderSurface* depthStencil = renderSurface->GetLinkedDepthStencil())
+        return depthStencil;
+    return ea::nullopt;
+}
+
+bool HasStencilBuffer(RenderSurface* renderSurface)
 {
     // TODO(renderer): Assume that backbuffer always has stencil, otherwise we cannot do anything about it.
     if (!renderSurface)
         return true;
 
-    // New depth-stencil is allocated if not linked, assume true
-    RenderSurface* depthStencil = renderSurface->GetLinkedDepthStencil();
-    if (!depthStencil)
-        return true;
-
-    const unsigned format = depthStencil->GetParentTexture()->GetFormat();
+    const unsigned format = renderSurface->GetParentTexture()->GetFormat();
     return format == Graphics::GetDepthStencilFormat()
         || format == Graphics::GetReadableDepthStencilFormat();
 }
 
-bool HasReadableDepthLinked(RenderSurface* renderSurface)
+bool HasReadableDepth(RenderSurface* renderSurface)
 {
+    // Backbuffer depth is never readable
     if (!renderSurface)
         return false;
 
-    // New depth-stencil is allocated if not linked, consider readable if formats are the same
-    RenderSurface* depthStencil = renderSurface->GetLinkedDepthStencil();
-    if (!depthStencil)
-        return Graphics::GetDepthStencilFormat() == Graphics::GetReadableDepthStencilFormat();
-
-    const unsigned format = depthStencil->GetParentTexture()->GetFormat();
+    const unsigned format = renderSurface->GetParentTexture()->GetFormat();
     return format == Graphics::GetReadableDepthFormat()
         || format == Graphics::GetReadableDepthStencilFormat();
 }
@@ -106,17 +95,25 @@ bool IsColorFormatMatching(unsigned outputFormat, unsigned requestedFormat)
     return outputFormat == requestedFormat;
 }
 
-RenderSurface* GetOrCreateDepthStencil(Renderer* renderer, RenderSurface* renderSurface)
+bool AreRenderBuffersCompatible(RenderBuffer* firstBuffer, RenderBuffer* secondBuffer, bool ignoreRect)
 {
-    // If using the backbuffer, return the backbuffer depth-stencil
-    if (!renderSurface)
-        return nullptr;
+    Graphics* graphics = firstBuffer->GetSubsystem<Graphics>();
+    RenderSurface* firstSurface = firstBuffer->GetRenderSurface();
+    RenderSurface* secondSurface = secondBuffer->GetRenderSurface();
 
-    if (RenderSurface* linkedDepthStencil = renderSurface->GetLinkedDepthStencil())
-        return linkedDepthStencil;
+#ifdef URHO3D_OPENGL
+    // Due to FBO limitations, in OpenGL default color and depth surfaces cannot be mixed with custom ones
+    if (!!firstSurface != !!secondSurface)
+        return false;
+#endif
 
-    return renderer->GetDepthStencil(renderSurface->GetWidth(), renderSurface->GetHeight(),
-        renderSurface->GetMultiSample(), renderSurface->GetAutoResolve());
+    if (RenderSurface::GetMultiSample(graphics, firstSurface) != RenderSurface::GetMultiSample(graphics, secondSurface))
+        return false;
+
+    if (!ignoreRect && firstBuffer->GetViewportRect() != secondBuffer->GetViewportRect())
+        return false;
+
+    return true;
 }
 
 struct RenderSurfaceArray
@@ -142,7 +139,7 @@ ea::optional<RenderSurfaceArray> PrepareRenderSurfaces(bool ignoreRect,
 
     for (unsigned i = 0; i < colorBuffers.size(); ++i)
     {
-        if (!depthStencilBuffer->IsCompatibleWith(colorBuffers[i], ignoreRect))
+        if (!AreRenderBuffersCompatible(depthStencilBuffer, colorBuffers[i], ignoreRect))
         {
             URHO3D_LOGERROR("Depth-stencil is incompatible with color render buffer #{}", i);
             return ea::nullopt;
@@ -183,6 +180,19 @@ Vector4 CalculateViewportOffsetAndScale(const IntVector2& textureSize, const Int
 #endif
 }
 
+RenderSurface* GetOrCreateDepthStencil(Renderer* renderer, RenderSurface* renderSurface)
+{
+    // If using the backbuffer, return the backbuffer depth-stencil
+    if (!renderSurface)
+        return nullptr;
+
+    if (RenderSurface* linkedDepthStencil = renderSurface->GetLinkedDepthStencil())
+        return linkedDepthStencil;
+
+    return renderer->GetDepthStencil(renderSurface->GetWidth(), renderSurface->GetHeight(),
+        renderSurface->GetMultiSample(), renderSurface->GetAutoResolve());
+}
+
 }
 
 RenderBufferManager::RenderBufferManager(RenderPipelineInterface* renderPipeline)
@@ -191,12 +201,19 @@ RenderBufferManager::RenderBufferManager(RenderPipelineInterface* renderPipeline
     , graphics_(GetSubsystem<Graphics>())
     , renderer_(GetSubsystem<Renderer>())
     , drawQueue_(renderPipeline_->GetDefaultDrawQueue())
-    , viewportColorBuffer_(RenderBuffer::ConnectToViewportColor(renderPipeline_))
-    , viewportDepthBuffer_(RenderBuffer::ConnectToViewportDepthStencil(renderPipeline_))
 {
+    // Order is important. RenderBufferManager should receive callbacks before any of render buffers
     renderPipeline_->OnPipelineStatesInvalidated.Subscribe(this, &RenderBufferManager::OnPipelineStatesInvalidated);
     renderPipeline_->OnRenderBegin.Subscribe(this, &RenderBufferManager::OnRenderBegin);
     renderPipeline_->OnRenderEnd.Subscribe(this, &RenderBufferManager::OnRenderEnd);
+
+    viewportColorBuffer_ = MakeShared<ViewportColorRenderBuffer>(renderPipeline_);
+    viewportDepthBuffer_ = MakeShared<ViewportDepthStencilRenderBuffer>(renderPipeline_);
+}
+
+SharedPtr<RenderBuffer> RenderBufferManager::CreateColorBuffer(const RenderBufferParams& params, const Vector2& size)
+{
+    return MakeShared<TextureRenderBuffer>(renderPipeline_, params, size);
 }
 
 void RenderBufferManager::PrepareForColorReadWrite(bool synchronizeInputAndOutput)
@@ -210,7 +227,6 @@ void RenderBufferManager::PrepareForColorReadWrite(bool synchronizeInputAndOutpu
 
     assert(readableColorBuffer_ && writeableColorBuffer_);
     ea::swap(writeableColorBuffer_, readableColorBuffer_);
-    readableColorTexture_ = GetParentTexture2D(readableColorBuffer_);
 
     if (synchronizeInputAndOutput)
     {
@@ -342,8 +358,10 @@ void RenderBufferManager::OnRenderBegin(const FrameInfo& frameInfo)
     const unsigned outputFormat = RenderSurface::GetFormat(graphics_, frameInfo.renderTarget_);
     const bool outputSRGB = RenderSurface::GetSRGB(graphics_, frameInfo.renderTarget_);
     const int outputMultiSample = RenderSurface::GetMultiSample(graphics_, frameInfo.renderTarget_);
-    const bool outputHasStencil = HasStencilBufferLinked(frameInfo.renderTarget_);
-    const bool outputHasReadableDepth = HasReadableDepthLinked(frameInfo.renderTarget_);
+
+    const ea::optional<RenderSurface*> outputDepthStencil = GetLinkedDepthStencil(frameInfo.renderTarget_);
+    const bool outputHasStencil = outputDepthStencil && HasStencilBuffer(*outputDepthStencil);
+    const bool outputHasReadableDepth = outputDepthStencil && HasReadableDepth(*outputDepthStencil);
 
     const bool isTextureOutput = GetParentTexture2D(frameInfo.renderTarget_) != nullptr;
     const bool isFullRectOutput = frameInfo.viewRect_ == IntRect::ZERO
@@ -351,11 +369,16 @@ void RenderBufferManager::OnRenderBegin(const FrameInfo& frameInfo)
     const bool isSimpleTextureOutput = isTextureOutput && isFullRectOutput;
 
     if (viewportFlags_.Test(ViewportRenderBufferFlag::InheritColorFormat))
-        viewportParams_.format_ = outputFormat;
+        viewportParams_.textureFormat_ = outputFormat;
     if (viewportFlags_.Test(ViewportRenderBufferFlag::InheritSRGB))
-        viewportParams_.sRGB_ = outputSRGB;
+    {
+        if (outputSRGB)
+            viewportParams_.flags_ |= RenderBufferFlag::sRGB;
+        else
+            viewportParams_.flags_ &= ~RenderBufferFlag::sRGB;
+    }
     if (viewportFlags_.Test(ViewportRenderBufferFlag::InheritMultiSampleLevel))
-        viewportParams_.multiSample_ = outputMultiSample;
+        viewportParams_.multiSampleLevel_ = outputMultiSample;
 
     if (previousViewportParams_ != viewportParams_)
     {
@@ -370,41 +393,47 @@ void RenderBufferManager::OnRenderBegin(const FrameInfo& frameInfo)
     const bool needSimultaneousReadAndWrite = viewportFlags_.Test(ViewportRenderBufferFlag::SupportSimultaneousReadAndWrite);
     const bool needViewportMRT = viewportFlags_.Test(ViewportRenderBufferFlag::UsableWithMultipleRenderTargets);
 
-    const bool isColorFormatMatching = IsColorFormatMatching(outputFormat, viewportParams_.format_);
-    const bool isColorSRGBMatching = outputSRGB == viewportParams_.sRGB_;
-    const bool isMultiSampleMatching = outputMultiSample == viewportParams_.multiSample_;
+    const bool isColorFormatMatching = IsColorFormatMatching(outputFormat, viewportParams_.textureFormat_);
+    const bool isColorSRGBMatching = outputSRGB == viewportParams_.flags_.Test(RenderBufferFlag::sRGB);
+    const bool isMultiSampleMatching = outputMultiSample == viewportParams_.multiSampleLevel_;
 
     const bool needSecondaryBuffer = needSimultaneousReadAndWrite;
     const bool needSubstitutePrimaryBuffer = !isColorFormatMatching || !isColorSRGBMatching || !isMultiSampleMatching
         || ((needReadableColor || needReadableDepth || needSimultaneousReadAndWrite) && !isSimpleTextureOutput)
         || (needViewportMRT && !isSimpleTextureOutput);
-    const bool needSubstituteDepthBuffer = !isMultiSampleMatching
+    const bool needSubstituteDepthBuffer = !isMultiSampleMatching || !outputDepthStencil.has_value()
         || (needReadableDepth && (!outputHasReadableDepth || !isSimpleTextureOutput))
         || (needStencilBuffer && !outputHasStencil);
 
     // Allocate substitute buffers if necessary
     if (needSubstitutePrimaryBuffer && !substituteRenderBuffers_[0])
     {
-        substituteRenderBuffers_[0] = MakeShared<TextureRenderBuffer>(
-            renderPipeline_, viewportParams_, Vector2::ONE, IntVector2::ZERO, false);
+        substituteRenderBuffers_[0] = MakeShared<TextureRenderBuffer>(renderPipeline_, viewportParams_);
     }
     if (needSecondaryBuffer && !substituteRenderBuffers_[1])
     {
-        substituteRenderBuffers_[1] = MakeShared<TextureRenderBuffer>(
-            renderPipeline_, viewportParams_, Vector2::ONE, IntVector2::ZERO, false);
+        substituteRenderBuffers_[1] = MakeShared<TextureRenderBuffer>(renderPipeline_, viewportParams_);
     }
     if (needSubstituteDepthBuffer && !substituteDepthBuffer_)
     {
-        substituteDepthBuffer_ = RenderBuffer::Create(renderPipeline_,
-            RenderBufferFlag::Depth | RenderBufferFlag::Stencil | RenderBufferFlag::Persistent,
-            Vector2::ONE, viewportParams_.multiSample_);
+        RenderBufferParams depthBufferParams = viewportParams_;
+        depthBufferParams.flags_ |= RenderBufferFlag::Persistent;
+        if (needReadableDepth)
+        {
+            depthBufferParams.textureFormat_ = needStencilBuffer
+                ? Graphics::GetReadableDepthStencilFormat()
+                : Graphics::GetReadableDepthFormat();
+        }
+        else
+        {
+            depthBufferParams.textureFormat_ = Graphics::GetDepthStencilFormat();
+        }
+        substituteDepthBuffer_ = MakeShared<TextureRenderBuffer>(renderPipeline_, depthBufferParams);
     }
 
     depthStencilBuffer_ = needSubstituteDepthBuffer ? substituteDepthBuffer_.Get() : viewportDepthBuffer_.Get();
     writeableColorBuffer_ = needSubstitutePrimaryBuffer ? substituteRenderBuffers_[0].Get() : viewportColorBuffer_.Get();
     readableColorBuffer_ = needSecondaryBuffer ? substituteRenderBuffers_[1].Get() : nullptr;
-    depthStencilTexture_ = GetParentTexture2D(depthStencilBuffer_);
-    readableColorTexture_ = GetParentTexture2D(readableColorBuffer_);
 }
 
 void RenderBufferManager::OnRenderEnd(const FrameInfo& frameInfo)

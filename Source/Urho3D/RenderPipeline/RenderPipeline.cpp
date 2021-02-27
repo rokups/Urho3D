@@ -517,14 +517,14 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         deferredPass_ = MakeShared<UnlitScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "deferred");
 
         //deferredFinal_ = RenderBuffer::Create(this, RenderBufferFlag::RGBA);
-        deferredAlbedo_ = RenderBuffer::Create(this, RenderBufferFlag::RGBA);
-        deferredNormal_ = RenderBuffer::Create(this, RenderBufferFlag::RGBA);
+        deferredAlbedo_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
+        deferredNormal_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
         //deferredDepth_ = RenderBuffer::Create(this, RenderBufferFlag::Depth | RenderBufferFlag::Stencil);
 
         sceneProcessor_->SetPasses({ deferredPass_ });
 
-        TextureRenderBufferParams viewportParams;
-        viewportParams.format_ = Graphics::GetRGBFormat();
+        RenderBufferParams viewportParams;
+        viewportParams.textureFormat_ = Graphics::GetRGBFormat();
         renderBufferManager_->SetViewportParameters(viewportParams);
     }
 
@@ -541,8 +541,8 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
         sceneProcessor_->SetPasses({ basePass_, alphaPass_ });
 
-        TextureRenderBufferParams viewportParams;
-        viewportParams.format_ = Graphics::GetRGBFormat();
+        RenderBufferParams viewportParams;
+        viewportParams.textureFormat_ = Graphics::GetRGBFormat();
         renderBufferManager_->SetViewportParameters(viewportParams);
     }
 
