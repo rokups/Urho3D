@@ -44,10 +44,11 @@ PipelineState* BatchStateCache::GetPipelineState(const BatchStateLookupKey& key)
         return nullptr;
 
     const CachedBatchState& entry = iter->second;
-    if (key.geometry_->GetPipelineStateHash() != entry.geometryHash_
+    if (!entry.pipelineState_
+        || key.geometry_->GetPipelineStateHash() != entry.geometryHash_
         || key.material_->GetPipelineStateHash() != entry.materialHash_
         || key.pass_->GetPipelineStateHash() != entry.passHash_
-        || (entry.pipelineState_ && !entry.pipelineState_->GetShaderProgramLayout()))
+        || !entry.pipelineState_->IsValid())
     {
         entry.invalidated_.store(true, std::memory_order_relaxed);
         return nullptr;
@@ -64,7 +65,7 @@ PipelineState* BatchStateCache::GetOrCreatePipelineState(const BatchStateCreateK
         || key.geometry_->GetPipelineStateHash() != entry.geometryHash_
         || key.material_->GetPipelineStateHash() != entry.materialHash_
         || key.pass_->GetPipelineStateHash() != entry.passHash_
-        || !entry.pipelineState_->GetShaderProgramLayout())
+        || !entry.pipelineState_->IsValid())
     {
         entry.pipelineState_ = callback->CreateBatchPipelineState(key, ctx);
         entry.geometryHash_ = key.geometry_->GetPipelineStateHash();

@@ -142,13 +142,13 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     const bool isInternalPass = sceneProcessor_->IsInternalPass(ctx.pass_);
     if (isInternalPass && ctx.subpassIndex_ == BatchCompositor::LitVolumeSubpass)
     {
-        return CreateLightVolumePipelineState(key.light_, key.geometry_);
+        return CreateLightVolumePipelineState(key.pixelLight_, key.geometry_);
     }
 
     Geometry* geometry = key.geometry_;
     Material* material = key.material_;
     Pass* pass = key.pass_;
-    Light* light = key.light_ ? key.light_->GetLight() : nullptr;
+    Light* light = key.pixelLight_ ? key.pixelLight_->GetLight() : nullptr;
     const bool isLitBasePass = ctx.subpassIndex_ == 1;
     const bool isShadowPass = isInternalPass;
     const bool isAdditiveLightPass = !isInternalPass && ctx.subpassIndex_ == 2;
@@ -161,12 +161,9 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     ea::string pixelShaderDefines;
 
     // Update vertex elements
-    for (VertexBuffer* vertexBuffer : geometry->GetVertexBuffers())
-    {
-        const auto& elements = vertexBuffer->GetElements();
-        desc.vertexElements_.append(elements);
-    }
-    if (desc.vertexElements_.empty())
+    // TODO(renderer): Consider instancing buffer here
+    desc.InitializeInputLayoutAndPrimitiveType(geometry);
+    if (desc.numVertexElements_ == 0)
         return nullptr;
 
     // Update shadow parameters
@@ -296,7 +293,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     if (light)
     {
         commonDefines += "PERPIXEL ";
-        if (key.light_->HasShadow())
+        if (key.pixelLight_->HasShadow())
         {
             if (settings_.shadowMap_.varianceShadowMap_)
                 commonDefines += "SHADOW VSM_SHADOW ";
@@ -329,17 +326,14 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     desc.vertexShader_ = graphics_->GetShader(VS, "v2/" + pass->GetVertexShader(), vertexShaderDefines);
     desc.pixelShader_ = graphics_->GetShader(PS, "v2/" + pass->GetPixelShader(), pixelShaderDefines);
 
-    desc.primitiveType_ = geometry->GetPrimitiveType();
-    desc.indexType_ = IndexBuffer::GetIndexBufferType(geometry->GetIndexBuffer());
+    desc.depthWriteEnabled_ = pass->GetDepthWrite();
+    desc.depthCompareFunction_ = pass->GetDepthTestMode();
+    desc.stencilTestEnabled_ = false;
+    desc.stencilCompareFunction_ = CMP_ALWAYS;
 
-    desc.depthWrite_ = pass->GetDepthWrite();
-    desc.depthMode_ = pass->GetDepthTestMode();
-    desc.stencilEnabled_ = false;
-    desc.stencilMode_ = CMP_ALWAYS;
-
-    desc.colorWrite_ = true;
+    desc.colorWriteEnabled_ = true;
     desc.blendMode_ = pass->GetBlendMode();
-    desc.alphaToCoverage_ = pass->GetAlphaToCoverage();
+    desc.alphaToCoverageEnabled_ = pass->GetAlphaToCoverage();
 
     desc.fillMode_ = FILL_SOLID;
     const CullMode passCullMode = pass->GetCullMode();
@@ -349,10 +343,10 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
 
     if (ctx.pass_ == deferredPass_)
     {
-        desc.stencilEnabled_ = true;
-        desc.stencilPass_ = OP_REF;
-        desc.writeMask_ = PORTABLE_LIGHTMASK;
-        desc.stencilRef_ = key.drawable_->GetLightMaskInZone() & PORTABLE_LIGHTMASK;
+        desc.stencilTestEnabled_ = true;
+        desc.stencilOperationOnPassed_ = OP_REF;
+        desc.stencilWriteMask_ = PORTABLE_LIGHTMASK;
+        desc.stencilReferenceValue_ = key.drawable_->GetLightMaskInZone() & PORTABLE_LIGHTMASK;
     }
 
     return renderer_->GetOrCreatePipelineState(desc);
@@ -416,16 +410,13 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
     }*/
 
     PipelineStateDesc desc;
-    desc.vertexElements_ = lightGeometry->GetVertexBuffer(0)->GetElements();
+    desc.InitializeInputLayoutAndPrimitiveType(lightGeometry);
+    desc.stencilTestEnabled_ = false;
+    desc.stencilCompareFunction_ = CMP_ALWAYS;
 
-    desc.primitiveType_ = lightGeometry->GetPrimitiveType();
-    desc.indexType_ = IndexBuffer::GetIndexBufferType(lightGeometry->GetIndexBuffer());
-    desc.stencilEnabled_ = false;
-    desc.stencilMode_ = CMP_ALWAYS;
-
-    desc.colorWrite_ = true;
+    desc.colorWriteEnabled_ = true;
     desc.blendMode_ = light->IsNegative() ? BLEND_SUBTRACT : BLEND_ADD;
-    desc.alphaToCoverage_ = false;
+    desc.alphaToCoverageEnabled_ = false;
 
     desc.fillMode_ = FILL_SOLID;
 
@@ -434,27 +425,27 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
         if (sceneLight->DoesOverlapCamera())
         {
             desc.cullMode_ = GetEffectiveCullMode(CULL_CW, sceneProcessor_->GetFrameInfo().camera_);
-            desc.depthMode_ = CMP_GREATER;
+            desc.depthCompareFunction_ = CMP_GREATER;
         }
         else
         {
             desc.cullMode_ = GetEffectiveCullMode(CULL_CCW, sceneProcessor_->GetFrameInfo().camera_);
-            desc.depthMode_ = CMP_LESSEQUAL;
+            desc.depthCompareFunction_ = CMP_LESSEQUAL;
         }
     }
     else
     {
         desc.cullMode_ = CULL_NONE;
-        desc.depthMode_ = CMP_ALWAYS;
+        desc.depthCompareFunction_ = CMP_ALWAYS;
     }
 
     desc.vertexShader_ = graphics_->GetShader(VS, "v2/DeferredLight", vertexDefines);
     desc.pixelShader_ = graphics_->GetShader(PS, "v2/DeferredLight", pixelDefiles);
 
-    desc.stencilEnabled_ = true;
-    desc.stencilMode_ = CMP_NOTEQUAL;
-    desc.compareMask_ = light->GetLightMaskEffective() & PORTABLE_LIGHTMASK;
-    desc.stencilRef_ = 0;
+    desc.stencilTestEnabled_ = true;
+    desc.stencilCompareFunction_ = CMP_NOTEQUAL;
+    desc.stencilCompareMask_ = light->GetLightMaskEffective() & PORTABLE_LIGHTMASK;
+    desc.stencilReferenceValue_ = 0;
 
     return renderer_->GetOrCreatePipelineState(desc);
 }

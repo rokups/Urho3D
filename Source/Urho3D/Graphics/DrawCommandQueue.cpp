@@ -120,25 +120,25 @@ void DrawCommandQueue::Execute()
         // Set pipeline state
         if (cmd.pipelineState_ != currentPipelineState)
         {
-            cmd.pipelineState_->Apply();
+            cmd.pipelineState_->Apply(graphics_);
             currentPipelineState = cmd.pipelineState_;
             currentPrimitiveType = currentPipelineState->GetDesc().primitiveType_;
         }
 
         // Set index buffer
-        if (cmd.indexBuffer_ != currentIndexBuffer)
+        if (cmd.inputBuffers_.indexBuffer_ != currentIndexBuffer)
         {
-            graphics_->SetIndexBuffer(cmd.indexBuffer_);
-            currentIndexBuffer = cmd.indexBuffer_;
+            graphics_->SetIndexBuffer(cmd.inputBuffers_.indexBuffer_);
+            currentIndexBuffer = cmd.inputBuffers_.indexBuffer_;
         }
 
         // Set vertex buffers
-        if (cmd.vertexBuffers_ != currentVertexBuffers || cmd.instanceCount_ != 0)
+        if (cmd.inputBuffers_.vertexBuffers_ != currentVertexBuffers || cmd.instanceCount_ != 0)
         {
             tempVertexBuffers.clear();
-            tempVertexBuffers.assign(cmd.vertexBuffers_.begin(), cmd.vertexBuffers_.end());
+            tempVertexBuffers.assign(cmd.inputBuffers_.vertexBuffers_.begin(), cmd.inputBuffers_.vertexBuffers_.end());
             graphics_->SetVertexBuffers(tempVertexBuffers, cmd.instanceStart_);
-            currentVertexBuffers = cmd.vertexBuffers_;
+            currentVertexBuffers = cmd.inputBuffers_.vertexBuffers_;
         }
 
         // Set shader resources

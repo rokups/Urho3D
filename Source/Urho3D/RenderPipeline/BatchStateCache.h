@@ -35,50 +35,41 @@ class Material;
 class Pass;
 class Drawable;
 class LightProcessor;
-//class BatchCompositorPass;
 
 /// Key used to lookup cached pipeline states for PipelineBatch.
 ///
 /// PipelineState creation may depend only on variables that contribute to BatchStateLookupKey:
 ///
 /// - Parameters of Drawable that contribute to hash calculation. Key does not depend on Drawable for better reuse.
-/// - Parameters of relevant Light or LightProcessor that contribute to hash calculation. Relevant for forward rendering only.
+/// - Parameters of per-pixel Light that contribute to hash calculation (for both lit and shadow geometry rendering).
 /// - Geometry type from SourceBatch.
 /// - Hashed state of Geometry.
 /// - Hashed state of Material.
 /// - Hashed state of Pass.
 struct BatchStateLookupKey
 {
-    /// Drawable settings that affect pipeline state.
     unsigned drawableHash_{};
-    /// Light settings that affect pipeline state.
-    unsigned lightHash_{};
-    /// Geometry type.
+    unsigned pixelLightHash_{};
     GeometryType geometryType_{};
-    /// Geometry to be rendered.
     Geometry* geometry_{};
-    /// Material to be rendered.
     Material* material_{};
-    /// Pass of the material technique to be used.
     Pass* pass_{};
 
-    /// Compare.
     bool operator ==(const BatchStateLookupKey& rhs) const
     {
         return drawableHash_ == rhs.drawableHash_
-            && lightHash_ == rhs.lightHash_
+            && pixelLightHash_ == rhs.pixelLightHash_
             && geometryType_ == rhs.geometryType_
             && geometry_ == rhs.geometry_
             && material_ == rhs.material_
             && pass_ == rhs.pass_;
     }
 
-    /// Return hash.
     unsigned ToHash() const
     {
         unsigned hash = 0;
         CombineHash(hash, MakeHash(drawableHash_));
-        CombineHash(hash, MakeHash(lightHash_));
+        CombineHash(hash, MakeHash(pixelLightHash_));
         CombineHash(hash, MakeHash(geometryType_));
         CombineHash(hash, MakeHash(geometry_));
         CombineHash(hash, MakeHash(material_));
@@ -88,35 +79,28 @@ struct BatchStateLookupKey
 };
 
 /// Key used to create cached pipeline states for PipelineBatch.
-/// Contains actual objects instead of hashes.
+/// Contains actual objects instead of just hashes.
 struct BatchStateCreateKey : public BatchStateLookupKey
 {
-    /// Drawable geometry that requested this state.
     Drawable* drawable_{};
-    /// Index of source batch within geometry.
     unsigned sourceBatchIndex_{};
-    /// Light processor corresponging to per-pixel forward light.
-    LightProcessor* light_{};
-    /// Index of per-pixel forward light.
-    unsigned lightIndex_{};
-    /// Order-independed hash of vertex lights.
+    LightProcessor* pixelLight_{};
+    unsigned pixelLightIndex_{};
     unsigned vertexLightsHash_{};
 };
-
 
 /// Pipeline state cache entry. May be invalid.
 struct CachedBatchState
 {
-    /// Cached state of the geometry.
+    /// Hashes of corresponding objects at the moment of caching
+    /// @{
     unsigned geometryHash_{};
-    /// Cached state of the material.
     unsigned materialHash_{};
-    /// Cached state of the pass.
     unsigned passHash_{};
+    /// @}
 
-    /// Pipeline state.
     SharedPtr<PipelineState> pipelineState_;
-    /// Whether the state is invalidated.
+    /// Whether the PipelineState is invalidated and should be recreated.
     mutable std::atomic_bool invalidated_{ true };
 };
 
@@ -146,9 +130,10 @@ public:
     /// Invalidate cache.
     void Invalidate();
     /// Return existing pipeline state or nullptr if not found. Thread-safe.
+    /// Resulting state is always valid.
     PipelineState* GetPipelineState(const BatchStateLookupKey& key) const;
     /// Return existing or create new pipeline state. Not thread safe.
-    /// Return nullptr in case of errors. Errors are cached too.
+    /// Resulting state may be invalid.
     PipelineState* GetOrCreatePipelineState(const BatchStateCreateKey& key,
         BatchStateCreateContext& ctx, BatchStateCacheCallback* callback);
 

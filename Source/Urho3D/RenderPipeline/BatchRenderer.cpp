@@ -155,8 +155,8 @@ public:
     {
         if (instanceCount_ > 0)
         {
-            drawQueue_.SetBuffers(lastGeometry_->GetVertexBuffers(), lastGeometry_->GetIndexBuffer(),
-                instancingBuffer_.GetVertexBuffer());
+            drawQueue_.SetBuffers({ lastGeometry_->GetVertexBuffers(), lastGeometry_->GetIndexBuffer(),
+                instancingBuffer_.GetVertexBuffer() });
             drawQueue_.DrawIndexedInstanced(lastGeometry_->GetIndexStart(), lastGeometry_->GetIndexCount(),
                 startInstance_, instanceCount_);
             instanceCount_ = 0;
@@ -473,7 +473,7 @@ private:
                 drawQueue_.CommitShaderParameterGroup(SP_OBJECT);
 
                 // Set buffers and draw
-                drawQueue_.SetBuffers(pipelineBatch.geometry_->GetVertexBuffers(), pipelineBatch.geometry_->GetIndexBuffer());
+                drawQueue_.SetBuffers({ pipelineBatch.geometry_->GetVertexBuffers(), pipelineBatch.geometry_->GetIndexBuffer(), nullptr });
                 drawQueue_.DrawIndexed(pipelineBatch.geometry_->GetIndexStart(), pipelineBatch.geometry_->GetIndexCount());
             }
         }

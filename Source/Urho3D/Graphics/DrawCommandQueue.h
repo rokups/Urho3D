@@ -64,42 +64,32 @@ using ShaderResourceRange = ea::pair<unsigned, unsigned>;
 /// Description of draw command.
 struct DrawCommandDescription
 {
-    /// Pipeline state.
     PipelineState* pipelineState_{};
-    /// Index buffer.
-    IndexBuffer* indexBuffer_{};
-    /// Vertex buffers.
-    ea::array<VertexBuffer*, MAX_VERTEX_STREAMS> vertexBuffers_{};
+    GeometryBufferArray inputBuffers_;
 
     union
     {
-        /// Shader parameters bound to the command.
         ea::array<ShaderParameterRange, MAX_SHADER_PARAMETER_GROUPS> shaderParameters_;
-        /// Constant buffers bound to the command.
         ea::array<ConstantBufferCollectionRef, MAX_SHADER_PARAMETER_GROUPS> constantBuffers_;
     };
 
-    /// Shader resources bound to the command.
     ShaderResourceRange shaderResources_;
 
     /// Index of scissor rectangle. 0 if disabled.
     unsigned scissorRect_{};
-    /// Start vertex/index.
+
+    /// Draw call parameters
+    /// @{
     unsigned indexStart_{};
-    /// Number of vertices/indices.
     unsigned indexCount_{};
-    /// Base vertex.
     unsigned baseVertexIndex_{};
-    /// Start instance.
     unsigned instanceStart_{};
-    /// Number of instances.
     unsigned instanceCount_{};
 #ifdef URHO3D_D3D9
-    /// Index of first vertex.
     unsigned vertexStart_{};
-    /// Number of vertices.
     unsigned vertexCount_{};
 #endif
+    /// @}
 };
 
 /// Queue of draw commands.
@@ -225,43 +215,15 @@ public:
     }
 
     /// Set vertex and index buffers.
-    void SetBuffers(VertexBuffer* vertexBuffer, IndexBuffer* indexBuffer)
+    void SetBuffers(const GeometryBufferArray& buffers)
     {
-        currentDrawCommand_.vertexBuffers_[0] = vertexBuffer;
-        currentDrawCommand_.indexBuffer_ = indexBuffer;
-    }
-
-    /// Set vertex and index buffers.
-    void SetBuffers(ea::span<VertexBuffer*> vertexBuffers, IndexBuffer* indexBuffer)
-    {
-        ea::copy(vertexBuffers.begin(), vertexBuffers.end(), currentDrawCommand_.vertexBuffers_.begin());
-        currentDrawCommand_.indexBuffer_ = indexBuffer;
-    }
-
-    /// Set vertex and index buffers.
-    void SetBuffers(const ea::vector<SharedPtr<VertexBuffer>>& vertexBuffers, IndexBuffer* indexBuffer)
-    {
-        currentDrawCommand_.indexBuffer_ = indexBuffer;
-
-        assert(vertexBuffers.size() < MAX_VERTEX_STREAMS);
-        ea::copy(vertexBuffers.begin(), vertexBuffers.end(), currentDrawCommand_.vertexBuffers_.begin());
-    }
-
-    /// Set vertex, index and instancing buffers.
-    void SetBuffers(const ea::vector<SharedPtr<VertexBuffer>>& vertexBuffers,
-        IndexBuffer* indexBuffer, VertexBuffer* instancingBuffer)
-    {
-        currentDrawCommand_.indexBuffer_ = indexBuffer;
-
-        assert(vertexBuffers.size() + 1 < MAX_VERTEX_STREAMS);
-        const auto iter = ea::copy(vertexBuffers.begin(), vertexBuffers.end(), currentDrawCommand_.vertexBuffers_.begin());
-        *iter = instancingBuffer;
+        currentDrawCommand_.inputBuffers_ = buffers;
     }
 
     /// Enqueue draw non-indexed geometry.
     void Draw(unsigned vertexStart, unsigned vertexCount)
     {
-        currentDrawCommand_.indexBuffer_ = nullptr;
+        currentDrawCommand_.inputBuffers_.indexBuffer_ = nullptr;
         currentDrawCommand_.indexStart_ = vertexStart;
         currentDrawCommand_.indexCount_ = vertexCount;
         currentDrawCommand_.baseVertexIndex_ = 0;
@@ -277,7 +239,7 @@ public:
     /// Enqueue draw indexed geometry.
     void DrawIndexed(unsigned indexStart, unsigned indexCount)
     {
-        assert(currentDrawCommand_.indexBuffer_);
+        assert(currentDrawCommand_.inputBuffers_.indexBuffer_);
         currentDrawCommand_.indexStart_ = indexStart;
         currentDrawCommand_.indexCount_ = indexCount;
         currentDrawCommand_.baseVertexIndex_ = 0;
@@ -289,7 +251,7 @@ public:
     /// Enqueue draw indexed geometry with vertex index offset.
     void DrawIndexed(unsigned indexStart, unsigned indexCount, unsigned baseVertexIndex)
     {
-        assert(currentDrawCommand_.indexBuffer_);
+        assert(currentDrawCommand_.inputBuffers_.indexBuffer_);
         currentDrawCommand_.indexStart_ = indexStart;
         currentDrawCommand_.indexCount_ = indexCount;
         currentDrawCommand_.baseVertexIndex_ = baseVertexIndex;
@@ -301,7 +263,7 @@ public:
     /// Enqueue draw indexed, instanced geometry.
     void DrawIndexedInstanced(unsigned indexStart, unsigned indexCount, unsigned instanceStart, unsigned instanceCount)
     {
-        assert(currentDrawCommand_.indexBuffer_);
+        assert(currentDrawCommand_.inputBuffers_.indexBuffer_);
         currentDrawCommand_.indexStart_ = indexStart;
         currentDrawCommand_.indexCount_ = indexCount;
         currentDrawCommand_.baseVertexIndex_ = 0;
@@ -314,7 +276,7 @@ public:
     void DrawIndexedInstanced(unsigned indexStart, unsigned indexCount, unsigned baseVertexIndex,
         unsigned instanceStart, unsigned instanceCount)
     {
-        assert(currentDrawCommand_.indexBuffer_);
+        assert(currentDrawCommand_.inputBuffers_.indexBuffer_);
         currentDrawCommand_.indexStart_ = indexStart;
         currentDrawCommand_.indexCount_ = indexCount;
         currentDrawCommand_.baseVertexIndex_ = baseVertexIndex;
@@ -327,7 +289,7 @@ public:
     void DrawIndexedLegacy(unsigned indexStart, unsigned indexCount,
         unsigned vertexStart, unsigned vertexCount)
     {
-        assert(currentDrawCommand_.indexBuffer_);
+        assert(currentDrawCommand_.inputBuffers_.indexBuffer_);
         currentDrawCommand_.indexStart_ = indexStart;
         currentDrawCommand_.indexCount_ = indexCount;
         currentDrawCommand_.baseVertexIndex_ = 0;
@@ -344,7 +306,7 @@ public:
     void DrawIndexedLegacy(unsigned indexStart, unsigned indexCount, unsigned baseVertexIndex,
         unsigned vertexStart, unsigned vertexCount)
     {
-        assert(currentDrawCommand_.indexBuffer_);
+        assert(currentDrawCommand_.inputBuffers_.indexBuffer_);
         currentDrawCommand_.indexStart_ = indexStart;
         currentDrawCommand_.indexCount_ = indexCount;
         currentDrawCommand_.baseVertexIndex_ = baseVertexIndex;
@@ -361,7 +323,7 @@ public:
     void DrawIndexedInstancedLegacy(unsigned indexStart, unsigned indexCount, unsigned instanceStart,
         unsigned vertexStart, unsigned vertexCount, unsigned instanceCount)
     {
-        assert(currentDrawCommand_.indexBuffer_);
+        assert(currentDrawCommand_.inputBuffers_.indexBuffer_);
         currentDrawCommand_.indexStart_ = indexStart;
         currentDrawCommand_.indexCount_ = indexCount;
         currentDrawCommand_.baseVertexIndex_ = 0;
@@ -378,7 +340,7 @@ public:
     void DrawIndexedInstancedLegacy(unsigned indexStart, unsigned indexCount, unsigned baseVertexIndex,
         unsigned vertexStart, unsigned vertexCount, unsigned instanceStart, unsigned instanceCount)
     {
-        assert(currentDrawCommand_.indexBuffer_);
+        assert(currentDrawCommand_.inputBuffers_.indexBuffer_);
         currentDrawCommand_.indexStart_ = indexStart;
         currentDrawCommand_.indexCount_ = indexCount;
         currentDrawCommand_.baseVertexIndex_ = baseVertexIndex;

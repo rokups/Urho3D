@@ -68,7 +68,7 @@ void PostProcessPass::ApplyAttributes()
 
 void PostProcessPass::Execute()
 {
-    if (!pipelineState_)
+    if (!pipelineState_->IsValid())
         return;
 
     renderBufferManager_->PrepareForColorReadWrite(false);

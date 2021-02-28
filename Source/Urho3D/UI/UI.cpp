@@ -920,20 +920,20 @@ PipelineState* UI::GetPipelineState(const UIBatch& batch, bool renderToTexture)
     if (!pipelineState)
     {
         PipelineStateDesc desc;
+        desc.InitializeInputLayout(GeometryBufferArray{ { vertexBuffer_ }, nullptr, nullptr });
         desc.primitiveType_ = TRIANGLE_LIST;
-        desc.colorWrite_ = true;
+        desc.colorWriteEnabled_ = true;
         desc.cullMode_ = CULL_CCW;
 #ifdef URHO3D_OPENGL
         // Reverse winding if rendering to texture on OpenGL
         if (renderToTexture)
             desc.cullMode_ = CULL_CW;
 #endif
-        desc.depthMode_ = CMP_ALWAYS;
-        desc.depthWrite_ = false;
+        desc.depthCompareFunction_ = CMP_ALWAYS;
+        desc.depthWriteEnabled_ = false;
         desc.fillMode_ = FILL_SOLID;
-        desc.stencilEnabled_ = false;
+        desc.stencilTestEnabled_ = false;
         desc.blendMode_ = batch.blendMode_;
-        desc.vertexElements_ = vertexBuffer_->GetElements();
 
         // Set vertex shader
         if (key.shaderType_ == UIBatchShaderType::NoTexture)
@@ -1064,7 +1064,7 @@ void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsign
             drawQueue_->CommitShaderParameterGroup(SP_MATERIAL);
         }
 
-        drawQueue_->SetBuffers(vertexBuffer_, nullptr);
+        drawQueue_->SetBuffers({ { vertexBuffer_ }, nullptr, nullptr });
 
         IntRect scissor = batch.scissor_;
         scissor.left_ = (int)(scissor.left_ * uiScale_);

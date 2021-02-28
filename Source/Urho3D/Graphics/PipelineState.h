@@ -32,72 +32,115 @@
 #include "../Graphics/VertexBuffer.h"
 
 #include <EASTL/algorithm.h>
-#include <EASTL/vector.h>
+#include <EASTL/array.h>
+#include <EASTL/span.h>
 
 namespace Urho3D
 {
 
+class Geometry;
+class PipelineStateCache;
 class ShaderVariation;
 
-/// Pipeline state description.
+/// Set of input buffers with vertex and index data.
+struct GeometryBufferArray
+{
+    IndexBuffer* indexBuffer_{};
+    ea::array<VertexBuffer*, MAX_VERTEX_STREAMS> vertexBuffers_{};
+
+    GeometryBufferArray() = default;
+
+    GeometryBufferArray(std::initializer_list<VertexBuffer*> vertexBuffers,
+        IndexBuffer* indexBuffer, VertexBuffer* instancingBuffer)
+    {
+        ea::span<VertexBuffer* const> tempVertexBuffers(vertexBuffers.begin(), vertexBuffers.size());
+        Initialize(tempVertexBuffers, indexBuffer, instancingBuffer);
+    }
+
+    template <class Container>
+    GeometryBufferArray(Container&& vertexBuffers, IndexBuffer* indexBuffer, VertexBuffer* instancingBuffer)
+    {
+        Initialize(vertexBuffers, indexBuffer, instancingBuffer);
+    }
+
+    explicit GeometryBufferArray(Geometry* geometry, VertexBuffer* instancingBuffer = nullptr);
+
+    template <class Container>
+    void Initialize(Container&& vertexBuffers, IndexBuffer* indexBuffer, VertexBuffer* instancingBuffer)
+    {
+        using namespace ea;
+
+        const unsigned numVertexBuffers = size(vertexBuffers);
+        assert(numVertexBuffers + !!instancingBuffer <= MAX_VERTEX_STREAMS);
+
+        const auto iter = ea::copy(begin(vertexBuffers), end(vertexBuffers), vertexBuffers_.begin());
+        if (instancingBuffer)
+            *iter = instancingBuffer;
+
+        indexBuffer_ = indexBuffer;
+    }
+};
+
+/// Description structure used to create PipelineState.
+/// Should contain all relevant information about input layout,
+/// shader resources and parameters and pipeline configuration.
+/// TODO(renderer): Add scissor test
+/// TODO(renderer): Add information about render targets too
 struct PipelineStateDesc
 {
-    /// Input layout: vertex elements.
-    ea::vector<VertexElement> vertexElements_;
+    static const unsigned MaxNumVertexElements = 32;
 
-    /// Vertex shader used.
-    ShaderVariation* vertexShader_{};
-    /// Pixel shader used.
-    ShaderVariation* pixelShader_{};
-
-    /// Primitive type.
     PrimitiveType primitiveType_{};
-    /// Index type.
+
+    /// Input layout
+    /// @{
+    unsigned numVertexElements_{};
+    ea::array<VertexElement, MaxNumVertexElements> vertexElements_;
     IndexBufferType indexType_{};
 
-    /// Whether the depth write enabled.
-    bool depthWrite_{};
-    /// Depth compare function.
-    CompareMode depthMode_{};
-    /// Whether the stencil enabled.
-    bool stencilEnabled_{};
-    /// Stencil compare function.
-    CompareMode stencilMode_{};
-    /// Stencil pass op.
-    StencilOp stencilPass_{};
-    /// Stencil fail op.
-    StencilOp stencilFail_{};
-    /// Stencil depth test fail op.
-    StencilOp stencilDepthFail_{};
-    /// Stencil reference value.
-    unsigned stencilRef_{};
-    /// Stencil compare mask.
-    unsigned compareMask_{};
-    /// Stencil write mask.
-    unsigned writeMask_{};
+    void InitializeInputLayout(const GeometryBufferArray& buffers);
+    void InitializeInputLayoutAndPrimitiveType(Geometry* geometry, VertexBuffer* instancingBuffer = nullptr);
+    /// @}
 
-    /// Whether the color write enabled.
-    bool colorWrite_{};
-    /// Stencil write mask.
-    BlendMode blendMode_{};
-    /// Whether the a2c is enabled.
-    bool alphaToCoverage_{};
+    /// Shaders
+    /// @{
+    ShaderVariation* vertexShader_{};
+    ShaderVariation* pixelShader_{};
+    /// @}
 
-    /// Fill mode.
+    /// Depth-stencil state
+    /// @{
+    bool depthWriteEnabled_{};
+    CompareMode depthCompareFunction_{};
+    bool stencilTestEnabled_{};
+    CompareMode stencilCompareFunction_{};
+    StencilOp stencilOperationOnPassed_{};
+    StencilOp stencilOperationOnStencilFailed_{};
+    StencilOp stencilOperationOnDepthFailed_{};
+    unsigned stencilReferenceValue_{};
+    unsigned stencilCompareMask_{};
+    unsigned stencilWriteMask_{};
+    /// @}
+
+    /// Rasterizer state
+    /// @{
     FillMode fillMode_{};
-    /// Cull mode.
     CullMode cullMode_{};
-    /// Constant depth bias.
     float constantDepthBias_{};
-    /// Slope-scaled depth bias.
     float slopeScaledDepthBias_{};
+    /// @}
+
+    /// Blend state
+    /// @{
+    bool colorWriteEnabled_{};
+    BlendMode blendMode_{};
+    bool alphaToCoverageEnabled_{};
+    /// @}
 
     /// Cached hash of the structure.
     unsigned hash_{};
-    /// Return hash.
     unsigned ToHash() const { return hash_; }
 
-    /// Compare.
     bool operator ==(const PipelineStateDesc& rhs) const
     {
         if (hash_ != rhs.hash_)
@@ -111,20 +154,20 @@ struct PipelineStateDesc
             && primitiveType_ == rhs.primitiveType_
             && indexType_ == rhs.indexType_
 
-            && depthWrite_ == rhs.depthWrite_
-            && depthMode_ == rhs.depthMode_
-            && stencilEnabled_ == rhs.stencilEnabled_
-            && stencilMode_ == rhs.stencilMode_
-            && stencilPass_ == rhs.stencilPass_
-            && stencilFail_ == rhs.stencilFail_
-            && stencilDepthFail_ == rhs.stencilDepthFail_
-            && stencilRef_ == rhs.stencilRef_
-            && compareMask_ == rhs.compareMask_
-            && writeMask_ == rhs.writeMask_
+            && depthWriteEnabled_ == rhs.depthWriteEnabled_
+            && depthCompareFunction_ == rhs.depthCompareFunction_
+            && stencilTestEnabled_ == rhs.stencilTestEnabled_
+            && stencilCompareFunction_ == rhs.stencilCompareFunction_
+            && stencilOperationOnPassed_ == rhs.stencilOperationOnPassed_
+            && stencilOperationOnStencilFailed_ == rhs.stencilOperationOnStencilFailed_
+            && stencilOperationOnDepthFailed_ == rhs.stencilOperationOnDepthFailed_
+            && stencilReferenceValue_ == rhs.stencilReferenceValue_
+            && stencilCompareMask_ == rhs.stencilCompareMask_
+            && stencilWriteMask_ == rhs.stencilWriteMask_
 
-            && colorWrite_ == rhs.colorWrite_
+            && colorWriteEnabled_ == rhs.colorWriteEnabled_
             && blendMode_ == rhs.blendMode_
-            && alphaToCoverage_ == rhs.alphaToCoverage_
+            && alphaToCoverageEnabled_ == rhs.alphaToCoverageEnabled_
 
             && fillMode_ == rhs.fillMode_
             && cullMode_ == rhs.cullMode_
@@ -132,10 +175,12 @@ struct PipelineStateDesc
             && slopeScaledDepthBias_ == rhs.slopeScaledDepthBias_;
     }
 
-    /// Return whether the state is valid.
-    bool IsValid() const { return vertexShader_ && pixelShader_; }
+    /// Return whether the description structure is properly initialized.
+    bool IsInitialized() const
+    {
+        return vertexShader_ && pixelShader_;
+    }
 
-    /// Recalculate hash.
     void RecalculateHash()
     {
         unsigned hash = 0;
@@ -149,20 +194,20 @@ struct PipelineStateDesc
         CombineHash(hash, primitiveType_);
         CombineHash(hash, indexType_);
 
-        CombineHash(hash, depthWrite_);
-        CombineHash(hash, depthMode_);
-        CombineHash(hash, stencilEnabled_);
-        CombineHash(hash, stencilMode_);
-        CombineHash(hash, stencilPass_);
-        CombineHash(hash, stencilFail_);
-        CombineHash(hash, stencilDepthFail_);
-        CombineHash(hash, stencilRef_);
-        CombineHash(hash, compareMask_);
-        CombineHash(hash, writeMask_);
+        CombineHash(hash, depthWriteEnabled_);
+        CombineHash(hash, depthCompareFunction_);
+        CombineHash(hash, stencilTestEnabled_);
+        CombineHash(hash, stencilCompareFunction_);
+        CombineHash(hash, stencilOperationOnPassed_);
+        CombineHash(hash, stencilOperationOnStencilFailed_);
+        CombineHash(hash, stencilOperationOnDepthFailed_);
+        CombineHash(hash, stencilReferenceValue_);
+        CombineHash(hash, stencilCompareMask_);
+        CombineHash(hash, stencilWriteMask_);
 
-        CombineHash(hash, colorWrite_);
+        CombineHash(hash, colorWriteEnabled_);
         CombineHash(hash, blendMode_);
-        CombineHash(hash, alphaToCoverage_);
+        CombineHash(hash, alphaToCoverageEnabled_);
 
         CombineHash(hash, fillMode_);
         CombineHash(hash, cullMode_);
@@ -174,66 +219,59 @@ struct PipelineStateDesc
     }
 };
 
-/// Pipeline state.
-class URHO3D_API PipelineState : public Object, public GPUObject, public IDFamily<PipelineState>
+/// Cooked pipeline state. It's not an Object to keep it lightweight.
+class URHO3D_API PipelineState : public RefCounted, public IDFamily<PipelineState>
 {
-    URHO3D_OBJECT(PipelineState, Object);
-
 public:
-    /// Construct.
-    explicit PipelineState(Context* context);
-    /// Create pipeline state.
-    bool Create(const PipelineStateDesc& desc);
+    explicit PipelineState(PipelineStateCache* owner);
+    ~PipelineState() override;
+    void Setup(const PipelineStateDesc& desc);
+    void ResetCachedState();
+    void RestoreCachedState(Graphics* graphics);
 
-    /// Validate on shader reload.
-    void ReloadShader();
-    /// Apply pipeline state.
-    void Apply();
+    /// Set pipeline state to GPU.
+    void Apply(Graphics* graphics);
 
-    /// Return description.
+    /// Getters
+    /// @{
+    bool IsValid() const { return !!shaderProgramLayout_; }
     const PipelineStateDesc& GetDesc() const { return desc_; }
-
-    /// Return constant buffer layout.
     ShaderProgramLayout* GetShaderProgramLayout() const { return shaderProgramLayout_; }
-
-    /// Return ID of used shader program.
     unsigned GetShaderID() const { return shaderProgramLayout_->GetObjectID(); }
-
-    /// Mark the GPU resource destroyed on graphics context destruction.
-    virtual void OnDeviceLost();
-    /// Recreate the GPU resource and restore data if applicable.
-    virtual void OnDeviceReset();
-    /// Unconditionally release the GPU resource.
-    virtual void Release();
+    /// @}
 
 private:
-    /// Description.
+    PipelineStateCache* owner_{};
     PipelineStateDesc desc_;
-    /// Layout of constant buffers.
     WeakPtr<ShaderProgramLayout> shaderProgramLayout_{};
 };
 
 /// Generic pipeline state cache.
-class URHO3D_API PipelineStateCache : public Object
+class URHO3D_API PipelineStateCache : public Object, private GPUObject
 {
     URHO3D_OBJECT(PipelineStateCache, Object);
 
 public:
-    /// Construct.
     explicit PipelineStateCache(Context* context);
 
-    /// Create new or return existing pipeline state.
-    /// Return nullptr in case of error. Errored states are not cached.
+    /// Create new or return existing pipeline state. Returned state may be invalid.
+    /// Return nullptr if description is malformed.
     SharedPtr<PipelineState> GetPipelineState(PipelineStateDesc desc);
 
-private:
-    /// Handle reload finished.
-    void HandleResourceReload(StringHash eventType, VariantMap& eventData);
-    /// Reload shaders for all cached states.
-    void ReloadShaders();
+    /// Internal. Remove pipeline state with given description from cache.
+    void ReleasePipelineState(const PipelineStateDesc& desc);
 
-    /// Cached states.
-    ea::unordered_map<PipelineStateDesc, SharedPtr<PipelineState>> states_;
+private:
+    /// GPUObject callbacks
+    /// @{
+    virtual void OnDeviceLost();
+    virtual void OnDeviceReset();
+    virtual void Release();
+    /// @}
+
+    void HandleResourceReload(StringHash eventType, VariantMap& eventData);
+
+    ea::unordered_map<PipelineStateDesc, WeakPtr<PipelineState>> states_;
 };
 
 }

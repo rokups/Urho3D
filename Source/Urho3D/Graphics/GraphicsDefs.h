@@ -153,7 +153,7 @@ enum LegacyVertexElement
 };
 
 /// Arbitrary vertex declaration element datatypes.
-enum VertexElementType
+enum VertexElementType : unsigned char
 {
     TYPE_INT = 0,
     TYPE_FLOAT,
@@ -166,7 +166,7 @@ enum VertexElementType
 };
 
 /// Arbitrary vertex declaration element semantics.
-enum VertexElementSemantic
+enum VertexElementSemantic : unsigned char
 {
     SEM_POSITION = 0,
     SEM_NORMAL,

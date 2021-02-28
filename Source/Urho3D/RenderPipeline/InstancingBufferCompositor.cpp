@@ -84,7 +84,9 @@ void InstancingBufferCompositor::Initialize()
         vertexStride_ = settings_.numReservedElems_ * ElementStride;
         vertexBufferDirty_ = true;
 
+        // Always pre-initialize buffer so it has valid layout
         vertexBuffer_ = MakeShared<VertexBuffer>(context_);
+        vertexBuffer_->SetSize(1u, vertexElements_, true);
     }
 }
 

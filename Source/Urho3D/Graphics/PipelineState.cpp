@@ -23,7 +23,9 @@
 #include "../Graphics/PipelineState.h"
 
 #include "../Core/Context.h"
+#include "../Core/Thread.h"
 #include "../IO/Log.h"
+#include "../Graphics/Geometry.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Shader.h"
 #include "../Resource/ResourceEvents.h"
@@ -31,111 +33,155 @@
 namespace Urho3D
 {
 
-PipelineState::PipelineState(Context* context)
-    : Object(context)
-    , GPUObject(context_->GetSubsystem<Graphics>())
+GeometryBufferArray::GeometryBufferArray(Geometry* geometry, VertexBuffer* instancingBuffer)
+    : GeometryBufferArray(geometry->GetVertexBuffers(), geometry->GetIndexBuffer(), instancingBuffer)
 {
 }
 
-bool PipelineState::Create(const PipelineStateDesc& desc)
+void PipelineStateDesc::InitializeInputLayout(const GeometryBufferArray& buffers)
 {
-    if (!desc.IsValid())
+    indexType_ = IndexBuffer::GetIndexBufferType(buffers.indexBuffer_);
+    numVertexElements_ = 0;
+    for (VertexBuffer* vertexBuffer : buffers.vertexBuffers_)
     {
-        URHO3D_LOGERROR("Pipeline state is missing one or more shaders");
-        return false;
+        if (vertexBuffer)
+        {
+            const auto& elements = vertexBuffer->GetElements();
+            const unsigned numElements = ea::min(elements.size(), MaxNumVertexElements - numVertexElements_);
+            if (numElements > 0)
+            {
+                ea::copy_n(elements.begin(), numElements, vertexElements_.begin() + numVertexElements_);
+                numVertexElements_ += numElements;
+            }
+            if (elements.size() != numElements)
+            {
+                URHO3D_LOGWARNING("Too many vertex elements: PipelineState cannot handle more than {}", MaxNumVertexElements);
+            }
+        }
     }
+}
 
+void PipelineStateDesc::InitializeInputLayoutAndPrimitiveType(Geometry* geometry, VertexBuffer* instancingBuffer)
+{
+    InitializeInputLayout(GeometryBufferArray{ geometry, instancingBuffer });
+    primitiveType_ = geometry->GetPrimitiveType();
+}
+
+PipelineState::PipelineState(PipelineStateCache* owner)
+    : owner_(owner)
+{
+}
+
+PipelineState::~PipelineState()
+{
+    owner_->ReleasePipelineState(desc_);
+}
+
+void PipelineState::Setup(const PipelineStateDesc& desc)
+{
+    assert(desc.IsInitialized());
     desc_ = desc;
-    ReloadShader();
-    if (!shaderProgramLayout_)
-    {
-        //URHO3D_LOGERROR("Shader program layout of pipeline state is invalid");
-        return false;
-    }
-
-    return true;
 }
 
-void PipelineState::ReloadShader()
-{
-    if (!shaderProgramLayout_)
-        shaderProgramLayout_ = graphics_->GetShaderProgramLayout(desc_.vertexShader_, desc_.pixelShader_);
-}
-
-void PipelineState::Apply()
-{
-    graphics_->SetShaders(desc_.vertexShader_, desc_.pixelShader_);
-    graphics_->SetDepthWrite(desc_.depthWrite_);
-    graphics_->SetDepthTest(desc_.depthMode_);
-    graphics_->SetStencilTest(desc_.stencilEnabled_, desc_.stencilMode_,
-        desc_.stencilPass_, desc_.stencilFail_, desc_.stencilDepthFail_,
-        desc_.stencilRef_, desc_.compareMask_, desc_.writeMask_);
-
-    graphics_->SetColorWrite(desc_.colorWrite_);
-    graphics_->SetBlendMode(desc_.blendMode_, desc_.alphaToCoverage_);
-
-    graphics_->SetFillMode(desc_.fillMode_);
-    graphics_->SetCullMode(desc_.cullMode_);
-    graphics_->SetDepthBias(desc_.constantDepthBias_, desc_.slopeScaledDepthBias_);
-}
-
-void PipelineState::OnDeviceLost()
+void PipelineState::ResetCachedState()
 {
     shaderProgramLayout_ = nullptr;
 }
 
-void PipelineState::OnDeviceReset()
+void PipelineState::RestoreCachedState(Graphics* graphics)
 {
-    ReloadShader();
+    if (!shaderProgramLayout_)
+        shaderProgramLayout_ = graphics->GetShaderProgramLayout(desc_.vertexShader_, desc_.pixelShader_);
 }
 
-void PipelineState::Release()
+void PipelineState::Apply(Graphics* graphics)
 {
-    shaderProgramLayout_ = nullptr;
+    graphics->SetShaders(desc_.vertexShader_, desc_.pixelShader_);
+    graphics->SetDepthWrite(desc_.depthWriteEnabled_);
+    graphics->SetDepthTest(desc_.depthCompareFunction_);
+    graphics->SetStencilTest(desc_.stencilTestEnabled_, desc_.stencilCompareFunction_,
+        desc_.stencilOperationOnPassed_, desc_.stencilOperationOnStencilFailed_, desc_.stencilOperationOnDepthFailed_,
+        desc_.stencilReferenceValue_, desc_.stencilCompareMask_, desc_.stencilWriteMask_);
+
+    graphics->SetColorWrite(desc_.colorWriteEnabled_);
+    graphics->SetBlendMode(desc_.blendMode_, desc_.alphaToCoverageEnabled_);
+
+    graphics->SetFillMode(desc_.fillMode_);
+    graphics->SetCullMode(desc_.cullMode_);
+    graphics->SetDepthBias(desc_.constantDepthBias_, desc_.slopeScaledDepthBias_);
 }
 
 PipelineStateCache::PipelineStateCache(Context* context)
     : Object(context)
+    , GPUObject(GetSubsystem<Graphics>())
 {
     SubscribeToEvent(E_RELOADFINISHED, &PipelineStateCache::HandleResourceReload);
 }
 
 SharedPtr<PipelineState> PipelineStateCache::GetPipelineState(PipelineStateDesc desc)
 {
+    if (!desc.IsInitialized())
+        return nullptr;
+
     desc.RecalculateHash();
-    auto iter = states_.find(desc);
-    if (iter != states_.end())
+
+    WeakPtr<PipelineState>& weakPipelineState = states_[desc];
+    SharedPtr<PipelineState> pipelineState = weakPipelineState.Lock();
+    if (!pipelineState)
     {
-        const SharedPtr<PipelineState>& existingState = iter->second;
-        if (!existingState->GetShaderProgramLayout())
-        {
-            existingState->ReloadShader();
-            if (!existingState->GetShaderProgramLayout())
-                return nullptr;
-        }
-        return existingState;
+        pipelineState = MakeShared<PipelineState>(this);
+        pipelineState->Setup(desc);
+        weakPipelineState = pipelineState;
+    }
+    pipelineState->RestoreCachedState(graphics_);
+    return pipelineState;
+}
+
+void PipelineStateCache::ReleasePipelineState(const PipelineStateDesc& desc)
+{
+    if (!Thread::IsMainThread())
+    {
+        URHO3D_LOGWARNING("Pipeline state should be released only from main thread");
+        return;
     }
 
-    auto newState = MakeShared<PipelineState>(context_);
-    if (newState->Create(desc))
-    {
-        states_.emplace(desc, newState);
-        return newState;
-    }
+    if (states_.erase(desc) != 1)
+        URHO3D_LOGERROR("Unexpected call of PipelineStateCache::ReleasePipelineState");
+}
 
-    return nullptr;
+void PipelineStateCache::OnDeviceLost()
+{
+    for (const auto& item : states_)
+    {
+        if (SharedPtr<PipelineState> pipelineState = item.second.Lock())
+            pipelineState->ResetCachedState();
+    }
+}
+
+void PipelineStateCache::OnDeviceReset()
+{
+    for (const auto& item : states_)
+    {
+        if (SharedPtr<PipelineState> pipelineState = item.second.Lock())
+            pipelineState->RestoreCachedState(graphics_);
+    }
+}
+
+void PipelineStateCache::Release()
+{
+    OnDeviceLost();
 }
 
 void PipelineStateCache::HandleResourceReload(StringHash /*eventType*/, VariantMap& /*eventData*/)
 {
     if (context_->GetEventSender()->GetType() == Shader::GetTypeStatic())
-        ReloadShaders();
-}
-
-void PipelineStateCache::ReloadShaders()
-{
-    for (const auto& item : states_)
-        item.second->ReloadShader();
+    {
+        for (const auto& item : states_)
+        {
+            if (SharedPtr<PipelineState> pipelineState = item.second.Lock())
+                pipelineState->RestoreCachedState(graphics_);
+        }
+    }
 }
 
 }

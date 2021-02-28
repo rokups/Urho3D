@@ -355,10 +355,8 @@ SharedPtr<PipelineState> RenderBufferManager::CreateQuadPipelineState(PipelineSt
 {
     Geometry* quadGeometry = renderer_->GetQuadGeometry();
 
-    desc.vertexElements_ = quadGeometry->GetVertexBuffer(0)->GetElements();
-    desc.indexType_ = IndexBuffer::GetIndexBufferType(quadGeometry->GetIndexBuffer());
-    desc.primitiveType_ = TRIANGLE_LIST;
-    desc.colorWrite_ = true;
+    desc.InitializeInputLayoutAndPrimitiveType(quadGeometry);
+    desc.colorWriteEnabled_ = true;
 
     return renderer_->GetOrCreatePipelineState(desc);
 }
@@ -427,7 +425,7 @@ void RenderBufferManager::DrawQuad(const DrawQuadParams& params, bool flipVertic
     }
     drawQueue_->CommitShaderResources();
 
-    drawQueue_->SetBuffers(quadGeometry->GetVertexBuffer(0), quadGeometry->GetIndexBuffer());
+    drawQueue_->SetBuffers(GeometryBufferArray{ quadGeometry });
     drawQueue_->DrawIndexed(quadGeometry->GetIndexStart(), quadGeometry->GetIndexCount());
 
     drawQueue_->Execute();

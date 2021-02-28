@@ -217,7 +217,7 @@ void ForEachParallel(WorkQueue* workQueue, unsigned bucket, unsigned size, Callb
 template <class Callback, class Collection>
 void ForEachParallel(WorkQueue* workQueue, unsigned bucket, Collection&& collection, const Callback& callback)
 {
-    using namespace std;
+    using namespace ea;
     const auto collectionSize = static_cast<unsigned>(size(collection));
     ForEachParallel(workQueue, bucket, collectionSize,
         [iter = begin(collection), iterIndex = 0u, &callback](unsigned beginIndex, unsigned endIndex) mutable
