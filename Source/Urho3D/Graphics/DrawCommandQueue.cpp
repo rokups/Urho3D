@@ -147,8 +147,8 @@ void DrawCommandQueue::Execute()
             for (unsigned i = cmd.shaderResources_.first; i < cmd.shaderResources_.second; ++i)
             {
                 const auto& unitAndResource = shaderResources_[i];
-                if (graphics_->HasTextureUnit(unitAndResource.first))
-                    graphics_->SetTexture(unitAndResource.first, unitAndResource.second);
+                if (graphics_->HasTextureUnit(unitAndResource.unit_))
+                    graphics_->SetTexture(unitAndResource.unit_, unitAndResource.texture_);
             }
             currentShaderResources = cmd.shaderResources_;
         }

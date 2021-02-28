@@ -190,21 +190,6 @@ public:
         ea::sort(sortedBatches.begin(), sortedBatches.end());
     }
 
-    /// Sort batches (from WorkQueueVector).
-    template <class T>
-    static void SortBatches(const WorkQueueVector<PipelineBatch>& sceneBatches, ea::vector<T>& sortedBatches)
-    {
-        const unsigned numBatches = sceneBatches.Size();
-        sortedBatches.resize(numBatches);
-        unsigned elementIndex = 0;
-        for (const PipelineBatch& lightBatch : sceneBatches)
-        {
-            sortedBatches[elementIndex] = T{ &lightBatch };
-            ++elementIndex;
-        }
-        ea::sort(sortedBatches.begin(), sortedBatches.end());
-    }
-
 protected:
     /// Called when update begins.
     virtual void OnUpdateBegin(const FrameInfo& frameInfo);

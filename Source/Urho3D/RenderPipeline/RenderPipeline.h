@@ -30,6 +30,7 @@
 #include "../RenderPipeline/RenderBuffer.h"
 #include "../RenderPipeline/RenderBufferManager.h"
 #include "../RenderPipeline/RenderPipelineInterface.h"
+#include "../RenderPipeline/PostProcessPass.h"
 #include "../RenderPipeline/ScenePass.h"
 #include "../Scene/Serializable.h"
 
@@ -52,6 +53,8 @@ class BatchRenderer;
 ///
 struct RenderPipelineSettings : public SceneProcessorSettings
 {
+    bool fxaa2_{};
+    bool fxaa3_{};
 };
 
 ///
@@ -88,6 +91,10 @@ protected:
     /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
     unsigned RecalculatePipelineStateHash() const override;
 
+    void MarkSettingsDirty() { settingsDirty_ = true; }
+    void ValidateSettings();
+    void ApplySettings();
+
     SharedPtr<PipelineState> CreateBatchPipelineState(
         const BatchStateCreateKey& key, const BatchStateCreateContext& ctx) override;
     /// Return new or existing pipeline state for deferred light volume.
@@ -98,12 +105,8 @@ private:
     Renderer* renderer_{};
     WorkQueue* workQueue_{};
 
-    /// Pipeline settings from previous frame.
-    RenderPipelineSettings previousSettings_;
-    /// Current pipeline settings.
+    bool settingsDirty_{ true };
     RenderPipelineSettings settings_;
-    /// Current frame info.
-    //FrameInfo frameInfo_{};
     /// Previous pipeline state hash.
     unsigned oldPipelineStateHash_{};
 
@@ -115,19 +118,15 @@ private:
     SharedPtr<SceneProcessor> sceneProcessor_;
     /// Main camera of render pipeline.
     SharedPtr<CameraProcessor> cameraProcessor_;
-    /// Viewport color texture handler.
-    //SharedPtr<RenderBuffer> viewportColor_;
-    /// Viewport depth stencil texture handler.
-    //SharedPtr<RenderBuffer> viewportDepth_;
 
     SharedPtr<OpaqueForwardLightingScenePass> basePass_;
     SharedPtr<AlphaForwardLightingScenePass> alphaPass_;
     SharedPtr<UnlitScenePass> deferredPass_;
 
-    //SharedPtr<RenderBuffer> deferredFinal_;
     SharedPtr<RenderBuffer> deferredAlbedo_;
     SharedPtr<RenderBuffer> deferredNormal_;
-    //SharedPtr<RenderBuffer> deferredDepth_;
+
+    ea::vector<SharedPtr<PostProcessPass>> postProcessPasses_;
 };
 
 }

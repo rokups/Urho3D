@@ -93,8 +93,8 @@ protected:
 
     /// RenderPipeline callbacks
     /// @{
-    virtual void OnRenderBegin(const FrameInfo& frameInfo);
-    virtual void OnRenderEnd(const FrameInfo& frameInfo);
+    virtual void OnRenderBegin(const FrameInfo& frameInfo) = 0;
+    virtual void OnRenderEnd(const FrameInfo& frameInfo) = 0;
     /// @}
 
     Renderer* renderer_{};
@@ -120,6 +120,7 @@ public:
 
 private:
     void OnRenderBegin(const FrameInfo& frameInfo) override;
+    void OnRenderEnd(const FrameInfo& frameInfo) override;
 
     /// Immutable properties
     /// @{
@@ -155,6 +156,7 @@ public:
 
 private:
     void OnRenderBegin(const FrameInfo& frameInfo) override;
+    void OnRenderEnd(const FrameInfo& frameInfo) override;
 
     IntRect viewportRect_{};
     /// Null if rendering to backbuffer.
@@ -179,10 +181,11 @@ public:
 
 private:
     void OnRenderBegin(const FrameInfo& frameInfo) override;
+    void OnRenderEnd(const FrameInfo& frameInfo) override;
 
     IntRect viewportRect_{};
-    /// Null if rendering to backbuffer.
-    ea::optional<RenderSurface*> depthStencil_;
+    /// Null if rendering to backbuffer or invalid.
+    RenderSurface* depthStencil_{};
 };
 
 }

@@ -23,6 +23,7 @@
 #pragma once
 
 #include "../Core/Object.h"
+#include "../Graphics/DrawCommandQueue.h"
 #include "../Graphics/GraphicsDefs.h"
 
 #include <EASTL/span.h>
@@ -31,7 +32,6 @@ namespace Urho3D
 {
 
 class Camera;
-class DrawCommandQueue;
 class DrawableProcessor;
 class InstancingBufferCompositor;
 class Texture;
@@ -94,15 +94,6 @@ enum class BatchRenderFlag
 };
 
 URHO3D_FLAGSET(BatchRenderFlag, BatchRenderFlags);
-
-/// Shader resource binding (for global resources).
-struct ShaderResourceDesc
-{
-    /// Texture unit.
-    TextureUnit unit_{};
-    /// Texture resource.
-    Texture* texture_{};
-};
 
 /// Light volume batch rendering context.
 struct LightVolumeRenderContext

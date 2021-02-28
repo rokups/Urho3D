@@ -6,26 +6,35 @@
 
 // Adapted for Urho3D from http://timothylottes.blogspot.com/2011/04/nvidia-fxaa-ii-for-console.html
 
-#include "Uniforms.glsl"
+#define URHO3D_GEOMETRY_STATIC
+
+#include "_Config.glsl"
+#include "_Uniforms.glsl"
+#include "_VertexLayout.glsl"
+#include "_VertexTransform.glsl"
+#include "_VertexScreenPos.glsl"
+#include "_PixelOutput.glsl"
 #include "Samplers.glsl"
-#include "Transform.glsl"
-#include "ScreenPos.glsl"
 
-varying vec2 vScreenPos;
-
-#ifdef COMPILEPS
-uniform vec3 cFXAAParams;
+#ifdef URHO3D_PIXEL_SHADER
+    UNIFORM_BUFFER_BEGIN(6, Custom)
+        UNIFORM(mediump vec3 cFXAAParams)
+    UNIFORM_BUFFER_END()
 #endif
 
-void VS()
+VERTEX_OUTPUT(vec2 vScreenPos);
+
+#ifdef URHO3D_VERTEX_SHADER
+void main()
 {
-    mat4 modelMatrix = iModelMatrix;
-    vec3 worldPos = GetWorldPos(modelMatrix);
-    gl_Position = GetClipPos(worldPos);
+    VertexTransform vertexTransform = GetVertexTransform();
+    gl_Position = GetClipPos(vertexTransform.position);
     vScreenPos = GetScreenPosPreDiv(gl_Position);
 }
+#endif
 
-void PS()
+#ifdef URHO3D_PIXEL_SHADER
+void main()
 {
     float FXAA_SUBPIX_SHIFT = 1.0/4.0; // Not used
     float FXAA_SPAN_MAX = 8.0;
@@ -79,10 +88,11 @@ void PS()
             rgbOut = rgbA;
         else
             rgbOut = rgbB;
-    
+
         gl_FragColor = vec4(rgbOut, 1.0);
     }
     else
         gl_FragColor = vec4(rgbM, 1.0);
 }
+#endif
 

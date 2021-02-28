@@ -43,19 +43,32 @@ enum class ViewportRenderBufferFlag
     InheritColorFormat = 1 << 0,
     InheritSRGB = 1 << 1,
     InheritMultiSampleLevel = 1 << 2,
+    InheritBilinearFiltering = 1 << 3,
     /// @}
 
     /// Traits required from output color and depth-stencil buffers
     /// @{
-    IsReadableColor = 1 << 3,
-    IsReadableDepth = 1 << 4,
-    HasStencil = 1 << 5,
-    SupportSimultaneousReadAndWrite = 1 << 6,
-    UsableWithMultipleRenderTargets = 1 << 7,
+    IsReadableColor = 1 << 4,
+    IsReadableDepth = 1 << 5,
+    HasStencil = 1 << 6,
+    SupportOutputColorReadWrite = 1 << 7,
+    UsableWithMultipleRenderTargets = 1 << 8,
     /// @}
 };
 
 URHO3D_FLAGSET(ViewportRenderBufferFlag, ViewportRenderBufferFlags);
+
+/// Pipeline state, shader parameters and shader resources needed to draw a fullscreen quad.
+/// clipToUVOffsetAndScale_ and invInputSize_ are filled automatically for viewport quad.
+struct DrawQuadParams
+{
+    PipelineState* pipelineState_{};
+    Vector4 clipToUVOffsetAndScale_;
+    Vector2 invInputSize_;
+    bool bindSecondaryColorToDiffuse_{};
+    ea::span<const ShaderResourceDesc> resources_;
+    ea::span<const ShaderParameterDesc> parameters_;
+};
 
 /// Class that manages all render buffers within viewport and viewport itself.
 class URHO3D_API RenderBufferManager : public Object
@@ -65,13 +78,14 @@ class URHO3D_API RenderBufferManager : public Object
 public:
     explicit RenderBufferManager(RenderPipelineInterface* renderPipeline);
 
-    void SetViewportParameters(const RenderBufferParams& params) { viewportParams_ = params; }
-    void SetViewportFlags(ViewportRenderBufferFlags flags) { viewportFlags_ = flags; }
+    /// Request certain behaviour from output color and depth-stencil buffers.
+    /// This call is lightweight, it's fine to call it on every frame.
+    void RequestViewport(ViewportRenderBufferFlags flags, const RenderBufferParams& params);
 
     SharedPtr<RenderBuffer> CreateColorBuffer(const RenderBufferParams& params, const Vector2& size = Vector2::ONE);
 
     /// Prepare for simultaneous reading from and writing to color buffer.
-    /// Invalid if SupportSimultaneousReadAndWrite is not requested.
+    /// Invalid if SupportOutputColorReadWrite is not requested.
     void PrepareForColorReadWrite(bool synchronizeInputAndOutput);
 
     /// Set depth-stencil and color buffers. Depth-stencil is required, color buffers are optional.
@@ -113,6 +127,15 @@ public:
     void ClearOutput(const Color& color, float depth, unsigned stencil);
     /// @}
 
+    /// Render utilities for post-process passes.
+    /// @{
+    SharedPtr<PipelineState> CreateQuadPipelineState(PipelineStateDesc desc);
+    SharedPtr<PipelineState> CreateQuadPipelineState(BlendMode blendMode,
+        const ea::string& shaderName, const ea::string& shaderDefines);
+    void DrawQuad(const DrawQuadParams& params, bool flipVertical = false);
+    void DrawViewportQuad(DrawQuadParams params, bool flipVertical = false);
+    /// @}
+
     /// Return depth-stencil buffer. Stays the same during the frame.
     RenderBuffer* GetDepthStencilOutput() const { return depthStencilBuffer_; }
     /// Return color render buffer. Changes on PrepareForColorReadWrite.
@@ -129,9 +152,9 @@ public:
     /// Return size of output region (not size of output texture itself).
     IntVector2 GetOutputSize() const { return viewportRect_.Size(); }
     Vector2 GetInvOutputSize() const { return Vector2::ONE / static_cast<Vector2>(GetOutputSize()); }
-    /// Return offset and scale used to convert viewport space to UV space.
+    /// Return offset and scale used to convert clip space to UV space.
     /// Ignores actual viewport rectangle.
-    Vector4 GetDefaultViewportOffsetAndScale() const;
+    Vector4 GetOutputClipToUVSpaceOffsetAndScale() const;
 
 private:
     /// RenderPipeline callbacks

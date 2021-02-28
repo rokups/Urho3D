@@ -120,14 +120,16 @@ void RenderPipeline::RegisterObject(Context* context)
 {
     context->RegisterFactory<RenderPipeline>();
 
-    URHO3D_ENUM_ATTRIBUTE("Ambient Mode", settings_.rendering_.ambientMode_, ambientModeNames, AmbientMode::Directional, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Enable Instancing", bool, settings_.instancing_.enable_, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Enable Shadow", bool, settings_.enableShadows_, true, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Deferred Rendering", bool, settings_.deferred_, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Use Variance Shadow Maps", bool, settings_.shadowMap_.varianceShadowMap_, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("VSM Shadow Settings", Vector2, settings_.rendering_.vsmShadowParams_, BatchRendererSettings{}.vsmShadowParams_, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("VSM Multi Sample", int, settings_.shadowMap_.varianceShadowMapMultiSample_, 1, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Gamma Correction", bool, settings_.rendering_.gammaCorrection_, false, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Ambient Mode", settings_.rendering_.ambientMode_, MarkSettingsDirty, ambientModeNames, AmbientMode::Directional, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Enable Instancing", bool, settings_.instancing_.enable_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Enable Shadow", bool, settings_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Deferred Rendering", bool, settings_.deferred_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Use Variance Shadow Maps", bool, settings_.shadowMap_.varianceShadowMap_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, settings_.rendering_.vsmShadowParams_, MarkSettingsDirty, BatchRendererSettings{}.vsmShadowParams_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("VSM Multi Sample", int, settings_.shadowMap_.varianceShadowMapMultiSample_, MarkSettingsDirty, 1, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Gamma Correction", bool, settings_.rendering_.gammaCorrection_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("FXAA 2", bool, settings_.fxaa2_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("FXAA 3", bool, settings_.fxaa3_, MarkSettingsDirty, false, AM_DEFAULT);
 }
 
 void RenderPipeline::ApplyAttributes()
@@ -457,34 +459,8 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
     return renderer_->GetOrCreatePipelineState(desc);
 }
 
-bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
+void RenderPipeline::ValidateSettings()
 {
-    // Lazy initialize heavy objects
-    if (!drawQueue_)
-    {
-        drawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
-        renderBufferManager_ = MakeShared<RenderBufferManager>(this);
-        sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow");
-        cameraProcessor_ = MakeShared<CameraProcessor>(this);
-
-        //viewportColor_ = RenderBuffer::ConnectToViewportColor(this);
-        //viewportDepth_ = RenderBuffer::ConnectToViewportDepthStencil(this);
-    }
-
-    sceneProcessor_->Define(renderTarget, viewport);
-    if (!sceneProcessor_->IsValid())
-        return false;
-
-    cameraProcessor_->Initialize(viewport->GetCamera());
-
-    //settings_.deferred_ = true;
-    //settings_.enableInstancing_ = GetSubsystem<Renderer>()->GetDynamicInstancing();
-    //settings_.ambientMode_ = AmbientMode::Directional;
-
-    // TODO(renderer): Optimize this
-    previousSettings_ = settings_;
-
-    // Validate settings
     if (settings_.deferred_ && !graphics_->GetDeferredSupport()
         && !Graphics::GetReadableDepthStencilFormat())
         settings_.deferred_ = false;
@@ -505,7 +481,10 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
             ? 1
             : 7);
     }
+}
 
+void RenderPipeline::ApplySettings()
+{
     sceneProcessor_->SetSettings(settings_);
 
     // Initialize or reset deferred rendering
@@ -516,16 +495,10 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         alphaPass_ = nullptr;
         deferredPass_ = MakeShared<UnlitScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "deferred");
 
-        //deferredFinal_ = RenderBuffer::Create(this, RenderBufferFlag::RGBA);
         deferredAlbedo_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
         deferredNormal_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
-        //deferredDepth_ = RenderBuffer::Create(this, RenderBufferFlag::Depth | RenderBufferFlag::Stencil);
 
         sceneProcessor_->SetPasses({ deferredPass_ });
-
-        RenderBufferParams viewportParams;
-        viewportParams.textureFormat_ = Graphics::GetRGBFormat();
-        renderBufferManager_->SetViewportParameters(viewportParams);
     }
 
     if (!settings_.deferred_ && !basePass_)
@@ -534,16 +507,43 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         alphaPass_ = MakeShared<AlphaForwardLightingScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "alpha", "alpha", "litalpha");
         deferredPass_ = nullptr;
 
-        //deferredFinal_ = nullptr;
         deferredAlbedo_ = nullptr;
         deferredNormal_ = nullptr;
-        //deferredDepth_ = nullptr;
 
         sceneProcessor_->SetPasses({ basePass_, alphaPass_ });
+    }
 
-        RenderBufferParams viewportParams;
-        viewportParams.textureFormat_ = Graphics::GetRGBFormat();
-        renderBufferManager_->SetViewportParameters(viewportParams);
+    postProcessPasses_.clear();
+    if (settings_.fxaa2_)
+        postProcessPasses_.push_back(MakeShared<PostProcessPass>(this, renderBufferManager_));
+}
+
+bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
+{
+    // Lazy initialize heavy objects
+    if (!drawQueue_)
+    {
+        drawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
+        renderBufferManager_ = MakeShared<RenderBufferManager>(this);
+        sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow");
+        cameraProcessor_ = MakeShared<CameraProcessor>(this);
+    }
+
+    sceneProcessor_->Define(renderTarget, viewport);
+    if (!sceneProcessor_->IsValid())
+        return false;
+
+    cameraProcessor_->Initialize(viewport->GetCamera());
+
+    settings_.deferred_ = true;
+    //settings_.enableInstancing_ = GetSubsystem<Renderer>()->GetDynamicInstancing();
+    //settings_.ambientMode_ = AmbientMode::Directional;
+
+    if (settingsDirty_)
+    {
+        settingsDirty_ = false;
+        ValidateSettings();
+        ApplySettings();
     }
 
     return true;
@@ -571,7 +571,21 @@ void RenderPipeline::Update(const FrameInfo& frameInfo)
 
 void RenderPipeline::Render()
 {
+    RenderBufferParams viewportParams{ Graphics::GetRGBFormat() };
+
     ViewportRenderBufferFlags viewportFlags;
+    viewportFlags |= ViewportRenderBufferFlag::InheritBilinearFiltering;
+    for (PostProcessPass* postProcessPass : postProcessPasses_)
+    {
+        if (postProcessPass->NeedColorOutputReadAndWrite())
+            viewportFlags |= ViewportRenderBufferFlag::SupportOutputColorReadWrite;
+        if (postProcessPass->NeedColorOutputBilinear())
+        {
+            viewportParams.flags_ |= RenderBufferFlag::BilinearFiltering;
+            viewportFlags &= ~ViewportRenderBufferFlag::InheritBilinearFiltering;
+        }
+    }
+
     if (settings_.deferred_)
     {
         viewportFlags |= ViewportRenderBufferFlag::UsableWithMultipleRenderTargets;
@@ -582,7 +596,7 @@ void RenderPipeline::Render()
     {
         viewportFlags |= ViewportRenderBufferFlag::InheritMultiSampleLevel;
     }
-    renderBufferManager_->SetViewportFlags(viewportFlags);
+    renderBufferManager_->RequestViewport(viewportFlags, viewportParams);
 
     OnRenderBegin(this, sceneProcessor_->GetFrameInfo());
 
@@ -613,10 +627,6 @@ void RenderPipeline::Render()
         };
         renderBufferManager_->SetRenderTargets(renderBufferManager_->GetDepthStencilOutput(), gBuffer);
 
-        /*deferredFinal_->ClearColor(fogColor);
-        deferredAlbedo_->ClearColor();
-        deferredDepth_->ClearDepthStencil();
-        deferredDepth_->SetRenderTargets({ deferredFinal_, deferredAlbedo_, deferredNormal_ });*/
         drawQueue_->Reset();
 
         instancingBuffer->Begin();
@@ -635,18 +645,16 @@ void RenderPipeline::Render()
 
         LightVolumeRenderContext lightVolumeRenderContext;
         lightVolumeRenderContext.geometryBuffer_ = geometryBuffer;
-        lightVolumeRenderContext.geometryBufferOffsetAndScale_ = renderBufferManager_->GetDefaultViewportOffsetAndScale();
+        lightVolumeRenderContext.geometryBufferOffsetAndScale_ = renderBufferManager_->GetOutputClipToUVSpaceOffsetAndScale();
         lightVolumeRenderContext.geometryBufferInvSize_ = renderBufferManager_->GetInvOutputSize();
 
         drawQueue_->Reset();
         sceneBatchRenderer_->RenderLightVolumeBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
             lightVolumeRenderContext, sceneProcessor_->GetLightVolumeBatches());
 
-        //deferredDepth_->SetRenderTargets({ deferredFinal_ });
         renderBufferManager_->SetOutputRenderTargers();
         drawQueue_->Execute();
 
-        //viewportColor_->CopyFrom(deferredFinal_);
         graphics_->SetDepthWrite(true);
     }
     else
@@ -654,10 +662,6 @@ void RenderPipeline::Render()
     {
         renderBufferManager_->ClearOutput(fogColor, 1.0f, 0);
         renderBufferManager_->SetOutputRenderTargers();
-        /*renderBufferManager_->SetRenderTargets(renderBufferManager_->)
-        viewportColor_->ClearColor(fogColor);
-        viewportDepth_->ClearDepthStencil();
-        viewportDepth_->SetRenderTargets({ viewportColor_ });*/
 
         drawQueue_->Reset();
         instancingBuffer->Begin();
@@ -701,6 +705,10 @@ void RenderPipeline::Render()
         debug->Render();
 #endif
     }
+
+    for (PostProcessPass* postProcessPass : postProcessPasses_)
+        postProcessPass->Execute();
+
     OnRenderEnd(this, sceneProcessor_->GetFrameInfo());
 }
 

@@ -37,8 +37,23 @@ namespace Urho3D
 
 class Graphics;
 
+/// Reference to input shader resource. Only textures are supported now.
+struct ShaderResourceDesc
+{
+    TextureUnit unit_{};
+    Texture* texture_{};
+};
+
+/// Generic description of shader parameter.
+/// Beware of Variant allocations for types larger than Vector4!
+struct ShaderParameterDesc
+{
+    StringHash name_;
+    Variant value_;
+};
+
 /// Collection of shader resources.
-using ShaderResourceCollection = ea::vector<ea::pair<TextureUnit, Texture*>>;
+using ShaderResourceCollection = ea::vector<ShaderResourceDesc>;
 
 /// Shader parameter group, range in array. Plain old data.
 struct ShaderParameterRange { unsigned first; unsigned second; };
@@ -197,7 +212,7 @@ public:
     /// Add shader resource.
     void AddShaderResource(TextureUnit unit, Texture* texture)
     {
-        shaderResources_.emplace_back(unit, texture);
+        shaderResources_.push_back(ShaderResourceDesc{ unit, texture });
         ++currentShaderResourceGroup_.second;
     }
 

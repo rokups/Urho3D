@@ -47,8 +47,8 @@ namespace Urho3D
 namespace
 {
 
-/// Calculate optimal size for render target.
-IntVector2 CalculateRenderTargetSize(const IntRect& viewportRect, const Vector2& sizeMultiplier, const IntVector2& explicitSize)
+IntVector2 CalculateRenderTargetSize(const IntRect& viewportRect,
+    const Vector2& sizeMultiplier, const IntVector2& explicitSize)
 {
     if (explicitSize != IntVector2::ZERO)
         return explicitSize;
@@ -56,7 +56,6 @@ IntVector2 CalculateRenderTargetSize(const IntRect& viewportRect, const Vector2&
     return VectorMax(IntVector2::ONE, VectorRoundToInt(static_cast<Vector2>(viewportSize) * sizeMultiplier));
 }
 
-/// Return render surface of texture.
 RenderSurface* GetRenderSurfaceFromTexture(Texture* texture, CubeMapFace face = FACE_POSITIVE_X)
 {
     if (!texture)
@@ -90,21 +89,11 @@ RenderBuffer::~RenderBuffer()
 {
 }
 
-void RenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
-{
-    bufferIsReady_ = true;
-}
-
-void RenderBuffer::OnRenderEnd(const FrameInfo& frameInfo)
-{
-    bufferIsReady_ = false;
-}
-
 bool RenderBuffer::CheckIfBufferIsReady() const
 {
     if (!bufferIsReady_)
     {
-        URHO3D_LOGERROR("Cannot access RenderBuffer outside of RenderPipeline::Render");
+        URHO3D_LOGERROR("RenderBuffer is not available");
         return false;
     }
     return true;
@@ -132,8 +121,6 @@ TextureRenderBuffer::~TextureRenderBuffer()
 
 void TextureRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
 {
-    BaseClassName::OnRenderBegin(frameInfo);
-
     currentSize_ = CalculateRenderTargetSize(frameInfo.viewRect_, sizeMultiplier_, fixedSize_);
     const bool autoResolve = !params_.flags_.Test(RenderBufferFlag::NoMultiSampledAutoResolve);
     const bool isCubemap = params_.flags_.Test(RenderBufferFlag::CubeMap);
@@ -143,6 +130,13 @@ void TextureRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
     currentTexture_ = renderer_->GetScreenBuffer(currentSize_.x_, currentSize_.y_,
         params_.textureFormat_, params_.multiSampleLevel_, autoResolve,
         isCubemap, isFiltered, isSRGB, persistenceKey_);
+    bufferIsReady_ = true;
+}
+
+void TextureRenderBuffer::OnRenderEnd(const FrameInfo& frameInfo)
+{
+    currentTexture_ = nullptr;
+    bufferIsReady_ = false;
 }
 
 Texture* TextureRenderBuffer::GetTexture() const
@@ -177,9 +171,14 @@ RenderSurface* ViewportColorRenderBuffer::GetRenderSurface(CubeMapFace face) con
 
 void ViewportColorRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
 {
-    BaseClassName::OnRenderBegin(frameInfo);
     renderTarget_ = frameInfo.renderTarget_;
     viewportRect_ = frameInfo.viewRect_;
+    bufferIsReady_ = true;
+}
+
+void ViewportColorRenderBuffer::OnRenderEnd(const FrameInfo& frameInfo)
+{
+    bufferIsReady_ = false;
 }
 
 ViewportDepthStencilRenderBuffer::ViewportDepthStencilRenderBuffer(RenderPipelineInterface* renderPipeline)
@@ -189,17 +188,16 @@ ViewportDepthStencilRenderBuffer::ViewportDepthStencilRenderBuffer(RenderPipelin
 
 Texture* ViewportDepthStencilRenderBuffer::GetTexture() const
 {
-    return CheckIfBufferIsReady() && *depthStencil_ ? (*depthStencil_)->GetParentTexture() : nullptr;
+    return CheckIfBufferIsReady() && depthStencil_ ? depthStencil_->GetParentTexture() : nullptr;
 }
 
 RenderSurface* ViewportDepthStencilRenderBuffer::GetRenderSurface(CubeMapFace face) const
 {
-    return CheckIfBufferIsReady() ? *depthStencil_ : nullptr;
+    return CheckIfBufferIsReady() ? depthStencil_ : nullptr;
 }
 
 void ViewportDepthStencilRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
 {
-    BaseClassName::OnRenderBegin(frameInfo);
     viewportRect_ = frameInfo.viewRect_;
 
     if (!frameInfo.renderTarget_)
@@ -215,9 +213,14 @@ void ViewportDepthStencilRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
     }
     else
     {
-        depthStencil_ = ea::nullopt;
+        depthStencil_ = nullptr;
         bufferIsReady_ = false;
     }
+}
+
+void ViewportDepthStencilRenderBuffer::OnRenderEnd(const FrameInfo& frameInfo)
+{
+    bufferIsReady_ = false;
 }
 
 }
