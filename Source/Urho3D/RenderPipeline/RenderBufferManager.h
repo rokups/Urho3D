@@ -127,14 +127,22 @@ public:
     void ClearOutput(const Color& color, float depth, unsigned stencil);
     /// @}
 
-    /// Render utilities for post-process passes.
+    /// Create pipeline states for fullscreen quad rendering
     /// @{
     SharedPtr<PipelineState> CreateQuadPipelineState(PipelineStateDesc desc);
     SharedPtr<PipelineState> CreateQuadPipelineState(BlendMode blendMode,
         const ea::string& shaderName, const ea::string& shaderDefines);
-    void DrawQuad(const DrawQuadParams& params, bool flipVertical = false);
-    void DrawViewportQuad(DrawQuadParams params, bool flipVertical = false);
     /// @}
+
+    /// Render fullscreen quad with custom parameters into currently bound render buffer.
+    void DrawQuad(const DrawQuadParams& params, bool flipVertical = false);
+    /// Render fullscreen quad into currently bound viewport-sized render buffer.
+    void DrawViewportQuad(PipelineState* pipelineState, ea::span<const ShaderResourceDesc> resources,
+        ea::span<const ShaderParameterDesc> parameters, bool flipVertical = false);
+    /// Render fullscreen quad into currently bound viewport-sized render buffer.
+    /// Current secondary color render buffer is passed as diffuse texture input.
+    void DrawFeedbackViewportQuad(PipelineState* pipelineState, ea::span<const ShaderResourceDesc> resources,
+        ea::span<const ShaderParameterDesc> parameters, bool flipVertical = false);
 
     /// Return depth-stencil buffer. Stays the same during the frame.
     RenderBuffer* GetDepthStencilOutput() const { return depthStencilBuffer_; }

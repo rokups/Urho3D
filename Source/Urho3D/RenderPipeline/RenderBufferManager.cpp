@@ -366,7 +366,7 @@ SharedPtr<PipelineState> RenderBufferManager::CreateQuadPipelineState(BlendMode 
 {
     ea::string defines = shaderDefines;
     if (graphics_->GetConstantBuffersEnabled())
-        defines += "URHO3D_USE_CBUFFERS ";
+        defines += " URHO3D_USE_CBUFFERS";
 
     PipelineStateDesc desc;
     desc.blendMode_ = blendMode;
@@ -431,10 +431,28 @@ void RenderBufferManager::DrawQuad(const DrawQuadParams& params, bool flipVertic
     drawQueue_->Execute();
 }
 
-void RenderBufferManager::DrawViewportQuad(DrawQuadParams params, bool flipVertical)
+void RenderBufferManager::DrawViewportQuad(PipelineState* pipelineState, ea::span<const ShaderResourceDesc> resources,
+    ea::span<const ShaderParameterDesc> parameters, bool flipVertical)
 {
+    DrawQuadParams params;
+    params.pipelineState_ = pipelineState;
     params.clipToUVOffsetAndScale_ = GetOutputClipToUVSpaceOffsetAndScale();
     params.invInputSize_ = GetInvOutputSize();
+    params.resources_ = resources;
+    params.parameters_ = parameters;
+    DrawQuad(params, flipVertical);
+}
+
+void RenderBufferManager::DrawFeedbackViewportQuad(PipelineState* pipelineState, ea::span<const ShaderResourceDesc> resources,
+    ea::span<const ShaderParameterDesc> parameters, bool flipVertical)
+{
+    DrawQuadParams params;
+    params.pipelineState_ = pipelineState;
+    params.clipToUVOffsetAndScale_ = GetOutputClipToUVSpaceOffsetAndScale();
+    params.invInputSize_ = GetInvOutputSize();
+    params.bindSecondaryColorToDiffuse_ = true;
+    params.resources_ = resources;
+    params.parameters_ = parameters;
     DrawQuad(params, flipVertical);
 }
 

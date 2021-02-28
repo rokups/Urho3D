@@ -22,7 +22,9 @@
 
 #pragma once
 
-#include "../Scene/Serializable.h"
+#include "../Container/FlagSet.h"
+#include "../Core/Object.h"
+#include "../Graphics/DrawCommandQueue.h"
 
 namespace Urho3D
 {
@@ -31,32 +33,55 @@ class PipelineState;
 class RenderBufferManager;
 class RenderPipelineInterface;
 
+enum class PostProcessPassFlag
+{
+    None = 0,
+    NeedColorOutputReadAndWrite = 1 << 0,
+    NeedColorOutputBilinear = 1 << 1,
+};
+
+URHO3D_FLAGSET(PostProcessPassFlag, PostProcessPassFlags);
+
 /// Post-processing pass of render pipeline. Expected to output to color buffer.
 class URHO3D_API PostProcessPass
-    : public Serializable
+    : public Object
 {
-    URHO3D_OBJECT(PostProcessPass, Serializable);
+    URHO3D_OBJECT(PostProcessPass, Object);
 
 public:
     PostProcessPass(RenderPipelineInterface* renderPipeline, RenderBufferManager* renderBufferManager);
     ~PostProcessPass() override;
 
-    static void RegisterObject(Context* context);
-    void ApplyAttributes() override;
-
-    virtual bool NeedColorOutputReadAndWrite() { return true; }
-
-    virtual bool NeedColorOutputBilinear() { return true; }
-
-    virtual void Execute();
+    virtual PostProcessPassFlags GetExecutionFlags() const = 0;
+    virtual void Execute() = 0;
 
 protected:
-    /// External dependencies
-    /// @{
     RenderBufferManager* renderBufferManager_{};
-    /// @}
+};
 
+/// Base class for simplest post-process effects.
+class URHO3D_API SimplePostProcessPass
+    : public PostProcessPass
+{
+    URHO3D_OBJECT(SimplePostProcessPass, PostProcessPass);
+
+public:
+    SimplePostProcessPass(RenderPipelineInterface* renderPipeline, RenderBufferManager* renderBufferManager,
+        PostProcessPassFlags flags, BlendMode blendMode,
+        const ea::string& shaderName, const ea::string& shaderDefines);
+
+    void AddShaderParameter(StringHash name, const Variant& value);
+    void AddShaderResource(TextureUnit unit, Texture* texture);
+
+    PostProcessPassFlags GetExecutionFlags() const override { return flags_; }
+    void Execute() override;
+
+protected:
+    const PostProcessPassFlags flags_;
     SharedPtr<PipelineState> pipelineState_;
+
+    ea::vector<ShaderParameterDesc> shaderParameters_;
+    ea::vector<ShaderResourceDesc> shaderResources_;
 };
 
 }

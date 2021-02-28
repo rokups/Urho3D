@@ -102,8 +102,7 @@ bool Shader::BeginLoad(Deserializer& source)
     // Load the shader source code and resolve any includes
     timeStamp_ = 0;
     ea::string shaderCode;
-    if (!ProcessSource(shaderCode, source))
-        return false;
+    ProcessSource(shaderCode, source);
 
     // Comment out the unneeded shader function
     vsSourceCode_ = shaderCode;
@@ -181,7 +180,7 @@ unsigned Shader::GetShaderDefinesHash(const char* defines) const
     return definesHash;
 }
 
-bool Shader::ProcessSource(ea::string& code, Deserializer& source)
+void Shader::ProcessSource(ea::string& code, Deserializer& source)
 {
     auto* cache = GetSubsystem<ResourceCache>();
     const ea::string& fileName = source.GetName();
@@ -217,13 +216,12 @@ bool Shader::ProcessSource(ea::string& code, Deserializer& source)
         {
             ea::string includeFileName = GetPath(source.GetName()) + line.substr(9).replaced("\"", "").trimmed();
 
+            // Add included code or error directive
             SharedPtr<File> includeFile = cache->GetFile(includeFileName);
-            if (!includeFile)
-                return false;
-
-            // Add the include file into the current code recursively
-            if (!ProcessSource(code, *includeFile))
-                return false;
+            if (includeFile)
+                ProcessSource(code, *includeFile);
+            else
+                code += Format("#error Missing include file <{}>\n", includeFileName);
 
             code += FormatLineDirective(isGLSL, fileName, fileIndex, currentLine);
         }
@@ -237,8 +235,6 @@ bool Shader::ProcessSource(ea::string& code, Deserializer& source)
 
     // Finally insert an empty line to mark the space between files
     code += "\n";
-
-    return true;
 }
 
 ea::string Shader::NormalizeDefines(const ea::string& defines)

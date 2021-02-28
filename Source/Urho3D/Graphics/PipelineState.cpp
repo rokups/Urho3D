@@ -47,7 +47,7 @@ void PipelineStateDesc::InitializeInputLayout(const GeometryBufferArray& buffers
         if (vertexBuffer)
         {
             const auto& elements = vertexBuffer->GetElements();
-            const unsigned numElements = ea::min(elements.size(), MaxNumVertexElements - numVertexElements_);
+            const unsigned numElements = ea::min<unsigned>(elements.size(), MaxNumVertexElements - numVertexElements_);
             if (numElements > 0)
             {
                 ea::copy_n(elements.begin(), numElements, vertexElements_.begin() + numVertexElements_);

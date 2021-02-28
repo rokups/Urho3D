@@ -65,6 +65,7 @@ struct GeometryBufferArray
 
     explicit GeometryBufferArray(Geometry* geometry, VertexBuffer* instancingBuffer = nullptr);
 
+private:
     template <class Container>
     void Initialize(Container&& vertexBuffers, IndexBuffer* indexBuffer, VertexBuffer* instancingBuffer)
     {
@@ -84,6 +85,7 @@ struct GeometryBufferArray
 /// Description structure used to create PipelineState.
 /// Should contain all relevant information about input layout,
 /// shader resources and parameters and pipeline configuration.
+/// PipelineState is automatically updated on shader reload.
 /// TODO(renderer): Add scissor test
 /// TODO(renderer): Add information about render targets too
 struct PipelineStateDesc

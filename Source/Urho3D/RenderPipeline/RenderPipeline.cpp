@@ -87,6 +87,21 @@ static const ea::vector<ea::string> ambientModeNames =
     "Directional",
 };
 
+static const ea::vector<ea::string> postProcessAntialiasingNames =
+{
+    "None",
+    "FXAA2",
+    "FXAA3"
+};
+
+static const ea::vector<ea::string> postProcessTonemappingNames =
+{
+    "None",
+    "ReinhardEq3",
+    "ReinhardEq4",
+    "Uncharted2",
+};
+
 /*enum class ShaderInputFlag
 {
     None = 0,
@@ -128,8 +143,9 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, settings_.rendering_.vsmShadowParams_, MarkSettingsDirty, BatchRendererSettings{}.vsmShadowParams_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("VSM Multi Sample", int, settings_.shadowMap_.varianceShadowMapMultiSample_, MarkSettingsDirty, 1, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Gamma Correction", bool, settings_.rendering_.gammaCorrection_, MarkSettingsDirty, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("FXAA 2", bool, settings_.fxaa2_, MarkSettingsDirty, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("FXAA 3", bool, settings_.fxaa3_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Post Process Antialiasing", settings_.postProcess_.antialiasing_, MarkSettingsDirty, postProcessAntialiasingNames, PostProcessAntialiasing::None, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Post Process Tonemapping", settings_.postProcess_.tonemapping_, MarkSettingsDirty, postProcessTonemappingNames, PostProcessTonemapping::None, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Post Process Grey Scale", bool, settings_.postProcess_.greyScale_, MarkSettingsDirty, false, AM_DEFAULT);
 }
 
 void RenderPipeline::ApplyAttributes()
@@ -505,8 +521,72 @@ void RenderPipeline::ApplySettings()
     }
 
     postProcessPasses_.clear();
-    if (settings_.fxaa2_)
-        postProcessPasses_.push_back(MakeShared<PostProcessPass>(this, renderBufferManager_));
+
+    switch (settings_.postProcess_.antialiasing_)
+    {
+    case PostProcessAntialiasing::FXAA2:
+    {
+        auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
+            PostProcessPassFlag::NeedColorOutputReadAndWrite | PostProcessPassFlag::NeedColorOutputBilinear,
+            BLEND_REPLACE, "v2/PP_FXAA2", "");
+        pass->AddShaderParameter("FXAAParams", Vector3(0.4f, 0.5f, 0.75f));
+        postProcessPasses_.push_back(pass);
+        break;
+    }
+    case PostProcessAntialiasing::FXAA3:
+    {
+        auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
+            PostProcessPassFlag::NeedColorOutputReadAndWrite | PostProcessPassFlag::NeedColorOutputBilinear,
+            BLEND_REPLACE, "v2/PP_FXAA3", "FXAA_QUALITY_PRESET=12");
+        postProcessPasses_.push_back(pass);
+        break;
+    }
+    default:
+        break;
+    }
+
+    switch (settings_.postProcess_.tonemapping_)
+    {
+    case PostProcessTonemapping::ReinhardEq3:
+    {
+        auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
+            PostProcessPassFlag::NeedColorOutputReadAndWrite,
+            BLEND_REPLACE, "v2/PP_Tonemap", "REINHARDEQ3");
+        pass->AddShaderParameter("TonemapExposureBias", 1.0f);
+        postProcessPasses_.push_back(pass);
+        break;
+    }
+    case PostProcessTonemapping::ReinhardEq4:
+    {
+        auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
+            PostProcessPassFlag::NeedColorOutputReadAndWrite,
+            BLEND_REPLACE, "v2/PP_Tonemap", "REINHARDEQ4");
+        pass->AddShaderParameter("TonemapExposureBias", 1.0f);
+        pass->AddShaderParameter("TonemapMaxWhite", 8.0f);
+        postProcessPasses_.push_back(pass);
+        break;
+    }
+    case PostProcessTonemapping::Uncharted2:
+    {
+        auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
+            PostProcessPassFlag::NeedColorOutputReadAndWrite,
+            BLEND_REPLACE, "v2/PP_Tonemap", "UNCHARTED2");
+        pass->AddShaderParameter("TonemapExposureBias", 1.0f);
+        pass->AddShaderParameter("TonemapMaxWhite", 4.0f);
+        postProcessPasses_.push_back(pass);
+        break;
+    }
+    default:
+        break;
+    }
+
+    if (settings_.postProcess_.greyScale_)
+    {
+        auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
+            PostProcessPassFlag::NeedColorOutputReadAndWrite,
+            BLEND_REPLACE, "v2/PP_GreyScale", "");
+        postProcessPasses_.push_back(pass);
+    }
 }
 
 bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
@@ -526,7 +606,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
     cameraProcessor_->Initialize(viewport->GetCamera());
 
-    settings_.deferred_ = true;
+    //settings_.deferred_ = true;
     //settings_.enableInstancing_ = GetSubsystem<Renderer>()->GetDynamicInstancing();
     //settings_.ambientMode_ = AmbientMode::Directional;
 
@@ -562,20 +642,18 @@ void RenderPipeline::Update(const FrameInfo& frameInfo)
 
 void RenderPipeline::Render()
 {
+    PostProcessPassFlags postProcessFlags;
+    for (PostProcessPass* postProcessPass : postProcessPasses_)
+        postProcessFlags |= postProcessPass->GetExecutionFlags();
+    const bool needColorOutputBilinear = postProcessFlags.Test(PostProcessPassFlag::NeedColorOutputBilinear);
+    const bool needColorOutputReadAndWrite = postProcessFlags.Test(PostProcessPassFlag::NeedColorOutputReadAndWrite);
+
     RenderBufferParams viewportParams{ Graphics::GetRGBFormat() };
 
     ViewportRenderBufferFlags viewportFlags;
-    viewportFlags |= ViewportRenderBufferFlag::InheritBilinearFiltering;
-    for (PostProcessPass* postProcessPass : postProcessPasses_)
-    {
-        if (postProcessPass->NeedColorOutputReadAndWrite())
-            viewportFlags |= ViewportRenderBufferFlag::SupportOutputColorReadWrite;
-        if (postProcessPass->NeedColorOutputBilinear())
-        {
-            viewportParams.flags_ |= RenderBufferFlag::BilinearFiltering;
-            viewportFlags &= ~ViewportRenderBufferFlag::InheritBilinearFiltering;
-        }
-    }
+    viewportFlags.Assign(ViewportRenderBufferFlag::SupportOutputColorReadWrite, needColorOutputReadAndWrite);
+    viewportFlags.Assign(ViewportRenderBufferFlag::InheritBilinearFiltering, !needColorOutputBilinear);
+    viewportParams.flags_.Assign(RenderBufferFlag::BilinearFiltering, needColorOutputBilinear);
 
     if (settings_.deferred_)
     {

@@ -50,11 +50,32 @@ class DrawableProcessor;
 class SceneBatchCollector;
 class BatchRenderer;
 
+enum class PostProcessAntialiasing
+{
+    None,
+    FXAA2,
+    FXAA3
+};
+
+enum class PostProcessTonemapping
+{
+    None,
+    ReinhardEq3,
+    ReinhardEq4,
+    Uncharted2,
+};
+
+struct PostProcessSettings
+{
+    PostProcessAntialiasing antialiasing_{};
+    PostProcessTonemapping tonemapping_{};
+    bool greyScale_{};
+};
+
 ///
 struct RenderPipelineSettings : public SceneProcessorSettings
 {
-    bool fxaa2_{};
-    bool fxaa3_{};
+    PostProcessSettings postProcess_;
 };
 
 ///

@@ -46,41 +46,50 @@ namespace Urho3D
 {
 
 PostProcessPass::PostProcessPass(RenderPipelineInterface* renderPipeline, RenderBufferManager* renderBufferManager)
-    : Serializable(renderPipeline->GetContext())
+    : Object(renderPipeline->GetContext())
     , renderBufferManager_(renderBufferManager)
 {
-    pipelineState_ = renderBufferManager_->CreateQuadPipelineState(BLEND_REPLACE, "v2/FXAA2", "");
 }
 
 PostProcessPass::~PostProcessPass()
 {
 }
 
-void PostProcessPass::RegisterObject(Context* context)
+SimplePostProcessPass::SimplePostProcessPass(
+    RenderPipelineInterface* renderPipeline, RenderBufferManager* renderBufferManager,
+    PostProcessPassFlags flags, BlendMode blendMode,
+    const ea::string& shaderName, const ea::string& shaderDefines)
+    : PostProcessPass(renderPipeline, renderBufferManager)
+    , flags_(flags)
+    , pipelineState_(renderBufferManager_->CreateQuadPipelineState(blendMode, shaderName, shaderDefines))
 {
-
 }
 
-void PostProcessPass::ApplyAttributes()
+void SimplePostProcessPass::AddShaderParameter(StringHash name, const Variant& value)
 {
-
+    shaderParameters_.push_back(ShaderParameterDesc{ name, value });
 }
 
-void PostProcessPass::Execute()
+void SimplePostProcessPass::AddShaderResource(TextureUnit unit, Texture* texture)
+{
+    shaderResources_.push_back(ShaderResourceDesc{ unit, texture });
+}
+
+void SimplePostProcessPass::Execute()
 {
     if (!pipelineState_->IsValid())
         return;
 
-    renderBufferManager_->PrepareForColorReadWrite(false);
+    const bool colorReadAndWrite = flags_.Test(PostProcessPassFlag::NeedColorOutputReadAndWrite);
+
+    if (colorReadAndWrite)
+        renderBufferManager_->PrepareForColorReadWrite(false);
     renderBufferManager_->SetOutputRenderTargers();
 
-    ShaderParameterDesc shaderParameters[] = { { "FXAAParams", Vector3(0.4, 0.5, 0.75) } };
-
-    DrawQuadParams params;
-    params.pipelineState_ = pipelineState_;
-    params.bindSecondaryColorToDiffuse_ = true;
-    params.parameters_ = shaderParameters;
-    renderBufferManager_->DrawViewportQuad(params);
+    if (colorReadAndWrite)
+        renderBufferManager_->DrawFeedbackViewportQuad(pipelineState_, shaderResources_, shaderParameters_);
+    else
+        renderBufferManager_->DrawViewportQuad(pipelineState_, shaderResources_, shaderParameters_);
 }
 
 }
