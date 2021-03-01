@@ -30,6 +30,8 @@
 #include "../Graphics/Shader.h"
 #include "../Resource/ResourceEvents.h"
 
+#include "../DebugNew.h"
+
 namespace Urho3D
 {
 
@@ -74,7 +76,14 @@ PipelineState::PipelineState(PipelineStateCache* owner)
 
 PipelineState::~PipelineState()
 {
-    owner_->ReleasePipelineState(desc_);
+    if (!Thread::IsMainThread())
+    {
+        URHO3D_LOGWARNING("Pipeline state should be released only from main thread");
+        return;
+    }
+
+    if (PipelineStateCache* owner = owner_)
+        owner->ReleasePipelineState(desc_);
 }
 
 void PipelineState::Setup(const PipelineStateDesc& desc)
@@ -139,12 +148,6 @@ SharedPtr<PipelineState> PipelineStateCache::GetPipelineState(PipelineStateDesc 
 
 void PipelineStateCache::ReleasePipelineState(const PipelineStateDesc& desc)
 {
-    if (!Thread::IsMainThread())
-    {
-        URHO3D_LOGWARNING("Pipeline state should be released only from main thread");
-        return;
-    }
-
     if (states_.erase(desc) != 1)
         URHO3D_LOGERROR("Unexpected call of PipelineStateCache::ReleasePipelineState");
 }

@@ -105,7 +105,7 @@ public:
     /// Begin shadow map rendering. Clears shadow map if necessary.
     bool BeginShadowMap(const ShadowMap& shadowMap);
     /// Export relevant parts of pipeline state. Thread safe unless called simultaneously with Reset.
-    void ExportPipelineState(PipelineStateDesc& desc, const BiasParameters& biasParameters);
+    void ExportPipelineState(PipelineStateDesc& desc, const BiasParameters& biasParameters, float scale);
 
 private:
     /// Element of texture pool.

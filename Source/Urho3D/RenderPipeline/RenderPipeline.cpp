@@ -185,7 +185,11 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     // Update shadow parameters
     // TODO(renderer): Don't use ShadowMapAllocator for this
     if (isShadowPass)
-        sceneProcessor_->GetShadowMapAllocator()->ExportPipelineState(desc, light->GetShadowBias());
+    {
+        const LightShaderParameters& lightParams = key.pixelLight_->GetShaderParams();
+        sceneProcessor_->GetShadowMapAllocator()->ExportPipelineState(desc, light->GetShadowBias(),
+            lightParams.shadowDepthBiasMultiplier_[ctx.shadowSplitIndex_]);
+    }
 
     if (isVertexLitPass)
         commonDefines += "URHO3D_NUM_VERTEX_LIGHTS=4 ";

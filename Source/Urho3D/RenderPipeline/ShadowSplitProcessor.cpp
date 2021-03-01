@@ -74,8 +74,9 @@ Vector2 CalculateViewSize(const Vector2& minViewSize, const FocusParameters& par
 
 }
 
-ShadowSplitProcessor::ShadowSplitProcessor(LightProcessor* owner)
+ShadowSplitProcessor::ShadowSplitProcessor(LightProcessor* owner, unsigned splitIndex)
     : owner_(owner)
+    , splitIndex_(splitIndex)
     , light_(owner_->GetLight())
     , shadowCameraNode_(MakeShared<Node>(light_->GetContext()))
     , shadowCamera_(shadowCameraNode_->CreateComponent<Camera>())

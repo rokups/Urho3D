@@ -46,7 +46,7 @@ class URHO3D_API ShadowSplitProcessor
 {
 public:
     /// Construct.
-    explicit ShadowSplitProcessor(LightProcessor* owner);
+    ShadowSplitProcessor(LightProcessor* owner, unsigned splitIndex);
     /// Destruct.
     ~ShadowSplitProcessor();
 
@@ -73,6 +73,7 @@ public:
     LightProcessor* GetLightProcessor() const { return owner_; }
     /// Return light.
     Light* GetLight() const { return light_; }
+    unsigned GetSplitIndex() const { return splitIndex_; }
     /// Return shadow map.
     const ShadowMap& GetShadowMap() const { return shadowMap_; }
     /// Return shadow camera.
@@ -101,6 +102,7 @@ private:
 
     /// Owner light processor.
     LightProcessor* owner_{};
+    unsigned splitIndex_{};
     /// Light.
     Light* light_{};
 

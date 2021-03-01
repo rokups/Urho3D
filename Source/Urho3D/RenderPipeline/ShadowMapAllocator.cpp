@@ -161,16 +161,15 @@ bool ShadowMapAllocator::BeginShadowMap(const ShadowMap& shadowMap)
     return true;
 }
 
-void ShadowMapAllocator::ExportPipelineState(PipelineStateDesc& desc, const BiasParameters& biasParameters)
+void ShadowMapAllocator::ExportPipelineState(PipelineStateDesc& desc, const BiasParameters& biasParameters, float scale)
 {
     desc.fillMode_ = FILL_SOLID;
     desc.stencilTestEnabled_ = false;
     if (!settings_.varianceShadowMap_)
     {
         desc.colorWriteEnabled_ = false;
-        // TODO(renderer): For directional light there's bias auto adjust, do we need it?
-        desc.constantDepthBias_ = biasParameters.constantBias_;
-        desc.slopeScaledDepthBias_ = biasParameters.slopeScaledBias_;
+        desc.constantDepthBias_ = scale * biasParameters.constantBias_;
+        desc.slopeScaledDepthBias_ = scale * biasParameters.slopeScaledBias_;
     }
     else
     {

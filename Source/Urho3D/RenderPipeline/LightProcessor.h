@@ -30,6 +30,7 @@
 #include "../RenderPipeline/ShadowSplitProcessor.h"
 #include "../Scene/Node.h"
 
+#include <EASTL/array.h>
 #include <EASTL/vector.h>
 
 namespace Urho3D
@@ -96,6 +97,8 @@ struct LightShaderParameters
     /// Inverse cutoff for vertex lighting.
     float invCutoff_{};
 
+    ea::array<float, MAX_CUBEMAP_FACES> shadowDepthBiasMultiplier_{};
+
     /// Shadow map texture.
     Texture2D* shadowMap_{};
     /// Light ramp texture.
@@ -129,7 +132,7 @@ public:
     /// Return hash for forward light.
     unsigned GetForwardLitHash() const { return forwardHash_; }
     /// Return hash for shadow batches.
-    unsigned GetShadowHash() const { return forwardHash_; }
+    unsigned GetShadowHash(unsigned splitIndex) const { return shadowBatchStateHashes_[splitIndex]; }
     /// Return hash for light volumes batches.
     unsigned GetLightVolumeHash() const { return lightVolumeHash_; }
 
@@ -181,6 +184,7 @@ private:
     unsigned forwardHash_{};
     /// Light hash for deferred light volume rendering.
     unsigned lightVolumeHash_{};
+    ea::array<unsigned, MAX_CUBEMAP_FACES> shadowBatchStateHashes_{};
 
     /// Splits.
     ea::vector<ShadowSplitProcessor> splits_;

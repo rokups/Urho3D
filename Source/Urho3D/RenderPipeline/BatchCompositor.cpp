@@ -332,7 +332,7 @@ void BatchCompositor::OnPipelineStatesInvalidated()
 void BatchCompositor::BeginShadowBatchesComposition(unsigned lightIndex, ShadowSplitProcessor* splitProcessor)
 {
     LightProcessor* lightProcessor = splitProcessor->GetLightProcessor();
-    const unsigned lightHash = lightProcessor->GetShadowHash();
+    const unsigned lightHash = lightProcessor->GetShadowHash(splitProcessor->GetSplitIndex());
 
     const unsigned threadIndex = WorkQueue::GetWorkerThreadIndex();
     const auto& shadowCasters = splitProcessor->GetShadowCasters();
@@ -397,6 +397,7 @@ void BatchCompositor::FinalizeShadowBatchesComposition()
     {
         const BatchStateCreateKey& key = splitAndKey.second;
         ShadowSplitProcessor& split = *splitAndKey.first;
+        ctx.shadowSplitIndex_ = split.GetSplitIndex();
         PipelineState* pipelineState = shadowCache_.GetOrCreatePipelineState(key, ctx, batchStateCacheCallback_);
         if (pipelineState && pipelineState->IsValid())
             split.GetMutableShadowBatches().push_back(CreatePipelineBatch(key, pipelineState, CreateBatchTag::Unlit));

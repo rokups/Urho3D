@@ -54,7 +54,7 @@
 				<attribute name="Color" value="1 0.937415 0.771429 1" />
 				<attribute name="Brightness Multiplier" value="0.700000" />
 				<attribute name="Cast Shadows" value="true" />
-				<attribute name="CSM Splits" value="5 12 30 200" />
+				<attribute name="CSM Splits" value="20 70 200 400" />
 				<attribute name="Light Mask" value="-8" />
 			</component>
 		</node>
@@ -563,6 +563,57 @@
 					<attribute name="Per Vertex" value="true" />
 				</component>
 			</node>
+		</node>
+	</node>
+	<node id="350">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Shadow Bias Test" />
+		<attribute name="Tags" />
+		<attribute name="Position" value="0 0 0" />
+		<attribute name="Rotation" value="1 0 0 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<node id="351">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Geometry 200" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="-200 0 -200" />
+			<attribute name="Rotation" value="-0.770202 -0.13552 0.533263 0.322463" />
+			<attribute name="Scale" value="200 200 200" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="342">
+				<attribute name="Model" value="Model;Models/TeaPot.mdl" />
+				<attribute name="Material" value="Material;Materials/DefaultWhite.xml;Materials/DefaultWhite.xml" />
+				<attribute name="Cast Shadows" value="true" />
+			</component>
+		</node>
+		<node id="352">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Geometry 100" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="-50 0 -80" />
+			<attribute name="Rotation" value="0.297662 -0.326535 -0.459332 -0.77058" />
+			<attribute name="Scale" value="100 100 100" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="343">
+				<attribute name="Model" value="Model;Models/TeaPot.mdl" />
+				<attribute name="Material" value="Material;Materials/DefaultWhite.xml;Materials/DefaultWhite.xml" />
+				<attribute name="Cast Shadows" value="true" />
+			</component>
+		</node>
+		<node id="353">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Geometry 50" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="-50 0 0" />
+			<attribute name="Rotation" value="0.211987 0.864049 -0.262261 0.373728" />
+			<attribute name="Scale" value="50 50 50" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="344">
+				<attribute name="Model" value="Model;Models/TeaPot.mdl" />
+				<attribute name="Material" value="Material;Materials/DefaultWhite.xml;Materials/DefaultWhite.xml" />
+				<attribute name="Cast Shadows" value="true" />
+			</component>
 		</node>
 	</node>
 </scene>

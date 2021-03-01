@@ -172,7 +172,7 @@ void LightProcessor::BeginUpdate(DrawableProcessor* drawableProcessor, LightProc
         // Allocate splits and reset timer immediately
         splitTimeToLive_ = NumSplitFramesToLive;
         while (splits_.size() < numSplitsRequested_)
-            splits_.emplace_back(this);
+            splits_.emplace_back(this, splits_.size());
     }
     else
     {
@@ -297,8 +297,8 @@ void LightProcessor::EndUpdate(DrawableProcessor* drawableProcessor, LightProces
 
     // TODO(renderer): Fill second parameter
     Camera* cullCamera = drawableProcessor->GetFrameInfo().cullCamera_;
-    UpdateHashes();
     CookShaderParameters(cullCamera, 0.0f);
+    UpdateHashes();
 }
 
 void LightProcessor::InitializeShadowSplits(DrawableProcessor* drawableProcessor)
@@ -507,6 +507,18 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
         normalOffsetScale *= renderer->GetMobileNormalOffsetMul();
 #endif
     }*/
+
+    shaderParams_.shadowDepthBiasMultiplier_.fill(1.0f);
+    if (light_->GetLightType() == LIGHT_DIRECTIONAL)
+    {
+        const float biasAutoAdjust = light_->GetShadowCascade().biasAutoAdjust_;
+        for (unsigned i = 1; i < numActiveSplits_; ++i)
+        {
+            const float splitScale = ea::max(1.0f, splits_[i].GetSplitZRange().second / splits_[0].GetSplitZRange().second);
+            const float multiplier = 1.0f + (splitScale - 1.0f) * biasAutoAdjust;
+            shaderParams_.shadowDepthBiasMultiplier_[i] = SnapRound(multiplier, 0.1f);
+        }
+    }
 }
 
 void LightProcessor::UpdateHashes()
@@ -527,6 +539,17 @@ void LightProcessor::UpdateHashes()
 
     lightVolumeHash_ = commonHash;
     CombineHash(lightVolumeHash_, overlapsCamera_);
+
+    if (light_->GetLightType() != LIGHT_DIRECTIONAL)
+        shadowBatchStateHashes_.fill(commonHash);
+    else
+    {
+        for (unsigned i = 0; i < numActiveSplits_; ++i)
+        {
+            shadowBatchStateHashes_[i] = commonHash;
+            CombineHash(shadowBatchStateHashes_[i], MakeHash(100.0f * shaderParams_.shadowDepthBiasMultiplier_[i]));
+        }
+    }
 }
 
 IntVector2 LightProcessor::GetSplitsGridSize() const

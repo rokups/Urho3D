@@ -111,6 +111,7 @@ struct BatchStateCreateContext
     Object* pass_{};
     /// Index of subpass.
     unsigned subpassIndex_{};
+    unsigned shadowSplitIndex_{};
 };
 
 /// Pipeline state cache callback used to create actual pipeline state.

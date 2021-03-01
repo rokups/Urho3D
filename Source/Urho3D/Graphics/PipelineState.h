@@ -243,7 +243,7 @@ public:
     /// @}
 
 private:
-    PipelineStateCache* owner_{};
+    WeakPtr<PipelineStateCache> owner_;
     PipelineStateDesc desc_;
     WeakPtr<ShaderProgramLayout> shaderProgramLayout_{};
 };
