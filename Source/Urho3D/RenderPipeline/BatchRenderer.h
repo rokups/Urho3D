@@ -34,6 +34,7 @@ namespace Urho3D
 class Camera;
 class DrawableProcessor;
 class InstancingBufferCompositor;
+class ShadowSplitProcessor;
 class Texture;
 struct PipelineBatchBackToFront;
 struct PipelineBatchByState;
@@ -121,10 +122,10 @@ public:
 
     /// Render batches (sorted by state).
     void RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
-        ea::span<const PipelineBatchByState> batches);
+        ea::span<const PipelineBatchByState> batches, const ShadowSplitProcessor* destinationShadowSplit = nullptr);
     /// Render batches (sorted by distance).
     void RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
-        ea::span<const PipelineBatchBackToFront> batches);
+        ea::span<const PipelineBatchBackToFront> batches, const ShadowSplitProcessor* destinationShadowSplit = nullptr);
 
     /// Render light volume batches for deferred rendering.
     void RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera* camera,

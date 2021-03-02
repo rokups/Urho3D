@@ -37,9 +37,9 @@ class LightProcessor;
 class Material;
 class Pass;
 class PipelineState;
+class ShadowSplitProcessor;
 class WorkQueue;
 struct PipelineBatchByState;
-struct ShadowSplitProcessor;
 
 /// Self-sufficient batch that can be rendered by RenderPipeline.
 struct PipelineBatch

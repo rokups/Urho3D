@@ -148,7 +148,6 @@
 				<attribute name="Color" value="1 0.809031 0.296429 1" />
 				<attribute name="Brightness Multiplier" value="0.500000" />
 				<attribute name="Cast Shadows" value="true" />
-				<attribute name="CSM Splits" value="5 1000 0 0" />
 				<attribute name="Light Mask" value="1" />
 			</component>
 		</node>
@@ -235,7 +234,8 @@
 				<attribute name="Light Type" value="Directional" />
 				<attribute name="Color" value="1 0.999997 0.99999 1" />
 				<attribute name="Cast Shadows" value="true" />
-				<attribute name="CSM Splits" value="5 1000 0 0" />
+				<attribute name="CSM Splits" value="5 100 0 0" />
+				<attribute name="CSM Bias Auto Adjust" value="0.000000" />
 				<attribute name="Light Mask" value="2" />
 			</component>
 		</node>

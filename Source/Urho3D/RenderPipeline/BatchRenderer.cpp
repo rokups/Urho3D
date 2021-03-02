@@ -104,7 +104,7 @@ public:
     /// Construct.
     DrawCommandCompositor(DrawCommandQueue& drawQueue, const BatchRendererSettings& settings,
         const DrawableProcessor& drawableProcessor, InstancingBufferCompositor& instancingBuffer,
-        const Camera* renderCamera, BatchRenderFlags flags)
+        const Camera* renderCamera, BatchRenderFlags flags, const ShadowSplitProcessor* destinationShadowSplit)
         : drawQueue_(drawQueue)
         , enableAmbientLight_(flags.Test(BatchRenderFlag::AmbientLight))
         , enableVertexLights_(flags.Test(BatchRenderFlag::VertexLights))
@@ -114,6 +114,7 @@ public:
         , settings_(settings)
         , drawableProcessor_(drawableProcessor)
         , instancingBuffer_(instancingBuffer)
+        , destinationShadowSplit_(destinationShadowSplit)
         , frameInfo_(drawableProcessor_.GetFrameInfo())
         , scene_(frameInfo_.scene_)
         , lights_(drawableProcessor_.GetLightProcessors())
@@ -178,20 +179,23 @@ private:
     void AddCameraShaderParameters(float constantDepthBias)
     {
         drawQueue_.AddShaderParameter(VSP_GBUFFEROFFSETS, geometryBufferOffsetAndScale_);
-        drawQueue_.AddShaderParameter(PSP_GBUFFERINVSIZE, geometryBufferInvSize_);
 
         const Matrix3x4 cameraEffectiveTransform = camera_->GetEffectiveWorldTransform();
         drawQueue_.AddShaderParameter(VSP_CAMERAPOS, cameraEffectiveTransform.Translation());
         drawQueue_.AddShaderParameter(VSP_VIEWINV, cameraEffectiveTransform);
         drawQueue_.AddShaderParameter(VSP_VIEW, camera_->GetView());
-        drawQueue_.AddShaderParameter(PSP_CAMERAPOS, cameraEffectiveTransform.Translation());
 
         const float nearClip = camera_->GetNearClip();
         const float farClip = camera_->GetFarClip();
         drawQueue_.AddShaderParameter(VSP_NEARCLIP, nearClip);
         drawQueue_.AddShaderParameter(VSP_FARCLIP, farClip);
-        drawQueue_.AddShaderParameter(PSP_NEARCLIP, nearClip);
-        drawQueue_.AddShaderParameter(PSP_FARCLIP, farClip);
+
+        if (destinationShadowSplit_)
+        {
+            const LightShaderParameters& lightParams = destinationShadowSplit_->GetLightProcessor()->GetShaderParams();
+            drawQueue_.AddShaderParameter(VSP_NORMALOFFSETSCALE,
+                lightParams.shadowNormalBias_[destinationShadowSplit_->GetSplitIndex()]);
+        }
 
         drawQueue_.AddShaderParameter(VSP_DEPTHMODE, GetCameraDepthModeParameter(camera_));
         drawQueue_.AddShaderParameter(PSP_DEPTHRECONSTRUCT, GetCameraDepthReconstructParameter(camera_));
@@ -270,7 +274,6 @@ private:
             drawQueue_.AddShaderParameter(PSP_SHADOWSPLITS, lightParams_->shadowSplits_);
             drawQueue_.AddShaderParameter(PSP_SHADOWCUBEUVBIAS, lightParams_->shadowCubeUVBias_);
             drawQueue_.AddShaderParameter(PSP_SHADOWCUBEADJUST, lightParams_->shadowCubeAdjust_);
-            drawQueue_.AddShaderParameter(VSP_NORMALOFFSETSCALE, lightParams_->normalOffsetScale_);
             drawQueue_.AddShaderParameter(PSP_VSMSHADOWPARAMS, settings_.vsmShadowParams_);
         }
     }
@@ -365,7 +368,9 @@ private:
             }
 
             // Add light shader parameters
-            if (enableLight_ && drawQueue_.BeginShaderParameterGroup(SP_LIGHT, pixelLightDirty || vertexLightsDirty))
+            // TODO(renderer): Check for shadow map
+            if (drawQueue_.BeginShaderParameterGroup(SP_LIGHT, pixelLightDirty || vertexLightsDirty))
+            //if (enableLight_ && drawQueue_.BeginShaderParameterGroup(SP_LIGHT, pixelLightDirty || vertexLightsDirty))
             {
                 AddLightShaderParameters();
                 drawQueue_.CommitShaderParameterGroup(SP_LIGHT);
@@ -516,6 +521,7 @@ private:
     const DrawableProcessor& drawableProcessor_;
     /// Instancing buffer.
     InstancingBufferCompositor& instancingBuffer_;
+    const ShadowSplitProcessor* const destinationShadowSplit_{};
     /// Frame info.
     const FrameInfo& frameInfo_;
     /// Scene.
@@ -592,10 +598,10 @@ void BatchRenderer::SetSettings(const BatchRendererSettings& settings)
 }
 
 void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
-    ea::span<const PipelineBatchByState> batches)
+    ea::span<const PipelineBatchByState> batches, const ShadowSplitProcessor* destinationShadowSplit)
 {
     DrawCommandCompositor compositor(drawQueue, settings_,
-        *drawableProcessor_, *instancingBuffer_, camera, flags);
+        *drawableProcessor_, *instancingBuffer_, camera, flags, destinationShadowSplit);
 
     for (const auto& sortedBatch : batches)
         compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
@@ -603,10 +609,10 @@ void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* cam
 }
 
 void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
-    ea::span<const PipelineBatchBackToFront> batches)
+    ea::span<const PipelineBatchBackToFront> batches, const ShadowSplitProcessor* destinationShadowSplit)
 {
     DrawCommandCompositor compositor(drawQueue, settings_,
-        *drawableProcessor_, *instancingBuffer_, camera, flags);
+        *drawableProcessor_, *instancingBuffer_, camera, flags, destinationShadowSplit);
 
     for (const auto& sortedBatch : batches)
         compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
@@ -617,7 +623,7 @@ void BatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera
     const LightVolumeRenderContext& ctx, ea::span<const PipelineBatchByState> batches)
 {
     DrawCommandCompositor compositor(drawQueue, settings_,
-        *drawableProcessor_, *instancingBuffer_, camera, BatchRenderFlag::PixelLight);
+        *drawableProcessor_, *instancingBuffer_, camera, BatchRenderFlag::PixelLight, nullptr);
 
     compositor.SetGBufferParameters(ctx.geometryBufferOffsetAndScale_, ctx.geometryBufferInvSize_);
     compositor.SetGlobalResources(ctx.geometryBuffer_);

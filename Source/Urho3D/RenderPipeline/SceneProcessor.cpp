@@ -267,7 +267,7 @@ void SceneProcessor::RenderShadowMaps()
             drawQueue_->Reset();
 
             instancingBufferCompositor_->Begin();
-            batchRenderer_->RenderBatches(*drawQueue_, split.GetShadowCamera(), flags, sortedShadowBatches_);
+            batchRenderer_->RenderBatches(*drawQueue_, split.GetShadowCamera(), flags, sortedShadowBatches_, &split);
             instancingBufferCompositor_->End();
 
             shadowMapAllocator_->BeginShadowMap(split.GetShadowMap());

@@ -282,7 +282,12 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         vertexShaderDefines += "URHO3D_INSTANCING ";
 
     if (isShadowPass)
+    {
         commonDefines += "PASS_SHADOW ";
+        // TODO(renderer): Add define for normal offset
+        if (light->GetShadowBias().normalOffset_ > 0.0)
+            vertexShaderDefines += "NORMALOFFSET ";
+    }
     else if (ctx.pass_ == deferredPass_)
         commonDefines += "PASS_DEFERRED ";
     else if (ctx.pass_ == basePass_)
@@ -415,8 +420,9 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
             pixelDefiles += "SHADOW VSM_SHADOW ";
         else
             pixelDefiles += "SHADOW SIMPLE_SHADOW ";
-        if (light->GetShadowBias().normalOffset_ > 0.0)
-            pixelDefiles += "NORMALOFFSET ";
+        // TODO(renderer): Add define for normal offset
+        //if (light->GetShadowBias().normalOffset_ > 0.0)
+        //    pixelDefiles += "NORMALOFFSET ";
     }
 
     if (light->GetSpecularIntensity() > 0.0f)

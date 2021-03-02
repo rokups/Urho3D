@@ -480,7 +480,8 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
         shaderParams_.shadowSplits_.z_ = splits_[2].GetSplitZRange().second / cullCamera->GetFarClip();
 
     // TODO(renderer): Implement me
-    shaderParams_.normalOffsetScale_ = Vector4::ZERO;
+    //shaderParams_.shadowNormalBias_ = light_->GetShadowBias().normalOffset_;
+    //shaderParams_.shadowNormalBias_ = Vector4::ZERO;
     /*if (light->GetShadowBias().normalOffset_ > 0.0f)
     {
         Vector4 normalOffsetScale(Vector4::ZERO);
@@ -519,6 +520,10 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
             shaderParams_.shadowDepthBiasMultiplier_[i] = SnapRound(multiplier, 0.1f);
         }
     }
+
+    const float normalOffset = light_->GetShadowBias().normalOffset_;
+    for (unsigned i = 0; i < numActiveSplits_; ++i)
+        shaderParams_.shadowNormalBias_[i] = splits_[i].GetShadowMapTexelSizeInWorldSpace() * normalOffset;
 }
 
 void LightProcessor::UpdateHashes()
@@ -531,8 +536,8 @@ void LightProcessor::UpdateHashes()
     CombineHash(commonHash, !!light_->GetShapeTexture());
     CombineHash(commonHash, light_->GetSpecularIntensity() > 0.0f);
     CombineHash(commonHash, biasParameters.normalOffset_ > 0.0f);
-    CombineHash(commonHash, biasParameters.constantBias_);
-    CombineHash(commonHash, biasParameters.slopeScaledBias_);
+    CombineHash(commonHash, MakeHash(biasParameters.constantBias_ * 1000000.0f));
+    CombineHash(commonHash, MakeHash(biasParameters.slopeScaledBias_ * 1000.0f));
     CombineHash(commonHash, light_->GetLightMaskEffective() & PORTABLE_LIGHTMASK);
 
     forwardHash_ = commonHash;

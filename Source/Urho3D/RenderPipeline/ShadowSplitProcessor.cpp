@@ -212,15 +212,18 @@ void ShadowSplitProcessor::Finalize(const ShadowMap& shadowMap)
 
     // Perform a finalization step for all lights: ensure zoom out of 2 pixels to eliminate border filtering issues
     // For point lights use 4 pixels, as they must not cross sides of the virtual cube map (maximum 3x3 PCF)
-    if (shadowCamera_->GetZoom() >= 1.0f)
+    if (light_->GetLightType() != LIGHT_POINT)
+        shadowCamera_->SetZoom(((shadowMapWidth - 2.0f) / shadowMapWidth));
+    else
     {
-        if (light_->GetLightType() != LIGHT_POINT)
-            shadowCamera_->SetZoom(shadowCamera_->GetZoom() * ((shadowMapWidth - 2.0f) / shadowMapWidth));
-        else
-        {
-            const float scale = (shadowMapWidth - 2.0f * cubeShadowMapPadding) / shadowMapWidth;
-            shadowCamera_->SetZoom(shadowCamera_->GetZoom() * scale);
-        }
+        const float scale = (shadowMapWidth - 2.0f * cubeShadowMapPadding) / shadowMapWidth;
+        shadowCamera_->SetZoom(scale);
+    }
+
+    if (light_->GetLightType() == LIGHT_DIRECTIONAL)
+    {
+        const float cameraSize = shadowCamera_->GetOrthoSize() * ea::max(1.0f, shadowCamera_->GetAspectRatio());
+        shadowMapWorldSpaceTexelSize_ = cameraSize / shadowMapWidth / shadowCamera_->GetZoom();
     }
 }
 

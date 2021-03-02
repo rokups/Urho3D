@@ -89,15 +89,14 @@ struct LightShaderParameters
     Vector2 shadowCubeUVBias_;
     /// Shadow splits distances.
     Vector4 shadowSplits_;
-    /// Normal offset and scale.
-    Vector4 normalOffsetScale_;
 
     /// Cutoff for vertex lighting.
     float cutoff_{};
     /// Inverse cutoff for vertex lighting.
     float invCutoff_{};
 
-    ea::array<float, MAX_CUBEMAP_FACES> shadowDepthBiasMultiplier_{};
+    ea::array<float, MAX_LIGHT_SPLITS> shadowNormalBias_;
+    ea::array<float, MAX_LIGHT_SPLITS> shadowDepthBiasMultiplier_{};
 
     /// Shadow map texture.
     Texture2D* shadowMap_{};
@@ -184,7 +183,7 @@ private:
     unsigned forwardHash_{};
     /// Light hash for deferred light volume rendering.
     unsigned lightVolumeHash_{};
-    ea::array<unsigned, MAX_CUBEMAP_FACES> shadowBatchStateHashes_{};
+    ea::array<unsigned, MAX_LIGHT_SPLITS> shadowBatchStateHashes_{};
 
     /// Splits.
     ea::vector<ShadowSplitProcessor> splits_;

@@ -144,6 +144,14 @@ struct VertexTransform
             mat3 normalMatrix = GetNormalMatrix(modelMatrix);
             result.normal = normalize(iNormal * normalMatrix);
 
+            #ifdef NORMALOFFSET
+                // TODO(renderer): Support other light types
+                vec3 lightDir = cLightDir;
+                float lightAngleCos = dot(result.normal, lightDir);
+                float lightAngleSin = sqrt(1.0 - lightAngleCos * lightAngleCos);
+                result.position -= result.normal * lightAngleSin * cNormalOffsetScale;
+            #endif
+
             #ifndef URHO3D_IGNORE_TANGENT
                 result.tangent = normalize(iTangent.xyz * normalMatrix);
                 result.bitangent = cross(result.tangent, result.normal) * iTangent.w;

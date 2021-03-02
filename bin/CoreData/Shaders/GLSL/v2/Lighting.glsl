@@ -10,7 +10,7 @@
 
 vec4 GetShadowPos(int index, vec3 normal, vec4 projWorldPos)
 {
-    #ifdef NORMALOFFSET
+    /*#ifdef NORMALOFFSET
         float normalOffsetScale[4];
         normalOffsetScale[0] = cNormalOffsetScale.x;
         normalOffsetScale[1] = cNormalOffsetScale.y;
@@ -23,7 +23,7 @@ vec4 GetShadowPos(int index, vec3 normal, vec4 projWorldPos)
             float cosAngle = clamp(1.0 - dot(normal, normalize(cLightPos.xyz - projWorldPos.xyz)), 0.0, 1.0);
         #endif
         projWorldPos.xyz += cosAngle * normalOffsetScale[index] * normal;
-    #endif
+    #endif*/
 
     #if defined(DIRLIGHT)
         return projWorldPos * cLightMatrices[index];
@@ -271,7 +271,7 @@ float GetDirShadowDeferred(vec4 projWorldPos, vec3 normal, float depth)
 {
     vec4 shadowPos;
 
-    #ifdef NORMALOFFSET
+    /*#ifdef NORMALOFFSET
         float cosAngle = clamp(1.0 - dot(normal, cLightDir), 0.0, 1.0);
         if (depth < cShadowSplits.x)
             shadowPos = vec4(projWorldPos.xyz + cosAngle * cNormalOffsetScalePS.x * normal, 1.0) * cLightMatrices[0];
@@ -281,7 +281,7 @@ float GetDirShadowDeferred(vec4 projWorldPos, vec3 normal, float depth)
             shadowPos = vec4(projWorldPos.xyz + cosAngle * cNormalOffsetScalePS.z * normal, 1.0) * cLightMatrices[2];
         else
             shadowPos = vec4(projWorldPos.xyz + cosAngle * cNormalOffsetScalePS.w * normal, 1.0) * cLightMatrices[3];
-    #else
+    #else*/
         if (depth < cShadowSplits.x)
             shadowPos = projWorldPos * cLightMatrices[0];
         else if (depth < cShadowSplits.y)
@@ -290,7 +290,7 @@ float GetDirShadowDeferred(vec4 projWorldPos, vec3 normal, float depth)
             shadowPos = projWorldPos * cLightMatrices[2];
         else
             shadowPos = projWorldPos * cLightMatrices[3];
-    #endif
+    //#endif
 
     return GetDirShadowFade(GetShadow(shadowPos), depth);
 }

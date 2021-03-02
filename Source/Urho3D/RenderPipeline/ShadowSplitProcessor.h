@@ -25,6 +25,7 @@
 #include "../Graphics/Camera.h"
 #include "../Math/NumericRange.h"
 #include "../RenderPipeline/PipelineBatchSortKey.h"
+#include "../RenderPipeline/ShadowMapAllocator.h"
 
 #include <EASTL/vector.h>
 
@@ -37,9 +38,6 @@ class DrawableProcessor;
 class Light;
 class LightProcessor;
 class Node;
-struct PipelineBatch;
-struct PipelineBatchByState;
-struct ShadowMap;
 
 /// Class that manages single shadow split processing.
 class URHO3D_API ShadowSplitProcessor
@@ -76,6 +74,7 @@ public:
     unsigned GetSplitIndex() const { return splitIndex_; }
     /// Return shadow map.
     const ShadowMap& GetShadowMap() const { return shadowMap_; }
+    float GetShadowMapTexelSizeInWorldSpace() const { return shadowMapWorldSpaceTexelSize_; }
     /// Return shadow camera.
     Camera* GetShadowCamera() const { return shadowCamera_; }
     /// Return split Z range.
@@ -123,6 +122,7 @@ private:
 
     /// Shadow map for split.
     ShadowMap shadowMap_;
+    float shadowMapWorldSpaceTexelSize_{};
 };
 
 }
