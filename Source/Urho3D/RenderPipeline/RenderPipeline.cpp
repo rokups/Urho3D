@@ -187,8 +187,31 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     if (isShadowPass)
     {
         const LightShaderParameters& lightParams = key.pixelLight_->GetShaderParams();
-        sceneProcessor_->GetShadowMapAllocator()->ExportPipelineState(desc, light->GetShadowBias(),
-            lightParams.shadowDepthBiasMultiplier_[ctx.shadowSplitIndex_]);
+        const float biasMultiplier = lightParams.shadowDepthBiasMultiplier_[ctx.shadowSplitIndex_];
+        const BiasParameters& biasParameters = light->GetShadowBias();
+        desc.fillMode_ = FILL_SOLID;
+        desc.stencilTestEnabled_ = false;
+        if (!settings_.enableVarianceShadowMaps_)
+        {
+            desc.colorWriteEnabled_ = false;
+            desc.constantDepthBias_ = biasMultiplier * biasParameters.constantBias_;
+            desc.slopeScaledDepthBias_ = biasMultiplier * biasParameters.slopeScaledBias_;
+        }
+        else
+        {
+            desc.colorWriteEnabled_ = true;
+            desc.constantDepthBias_ = 0.0f;
+            desc.slopeScaledDepthBias_ = 0.0f;
+        }
+
+        // TODO(renderer): Revisit this place
+        // Perform further modification of depth bias on OpenGL ES, as shadow calculations' precision is limited
+#ifdef GL_ES_VERSION_2_0
+        const float multiplier = renderer_->GetMobileShadowBiasMul();
+        const float addition = renderer_->GetMobileShadowBiasAdd();
+        desc.constantDepthBias_ = desc.constantDepthBias_ * multiplier + addition;
+        desc.slopeScaledDepthBias_ *= multiplier;
+#endif
     }
 
     if (isVertexLitPass)

@@ -32,17 +32,17 @@
 namespace Urho3D
 {
 
-ShadowMap ShadowMap::GetSplit(unsigned split, const IntVector2& numSplits) const
+ShadowMapRegion ShadowMapRegion::GetSplit(unsigned split, const IntVector2& numSplits) const
 {
-    const IntVector2 splitSize = region_.Size() / numSplits;
-    assert(region_.Size() == splitSize * numSplits);
+    const IntVector2 splitSize = rect_.Size() / numSplits;
+    assert(rect_.Size() == splitSize * numSplits);
 
     const IntVector2 index{ static_cast<int>(split % numSplits.x_), static_cast<int>(split / numSplits.x_) };
-    const IntVector2 splitBegin = region_.Min() + splitSize * index;
+    const IntVector2 splitBegin = rect_.Min() + splitSize * index;
     const IntVector2 splitEnd = splitBegin + splitSize;
 
-    ShadowMap splitShadowMap = *this;
-    splitShadowMap.region_ = { splitBegin, splitEnd };
+    ShadowMapRegion splitShadowMap = *this;
+    splitShadowMap.rect_ = { splitBegin, splitEnd };
     return splitShadowMap;
 }
 
@@ -62,7 +62,7 @@ void ShadowMapAllocator::SetSettings(const ShadowMapAllocatorSettings& settings)
         CacheSettings();
 
         dummyColorTexture_ = nullptr;
-        pool_.clear();
+        pages_.clear();
     }
 }
 
@@ -80,42 +80,42 @@ void ShadowMapAllocator::CacheSettings()
     shadowAtlasPageSize_ = static_cast<int>(settings_.shadowAtlasPageSize_) * IntVector2::ONE;
 }
 
-void ShadowMapAllocator::Reset()
+void ShadowMapAllocator::ResetAllShadowMaps()
 {
-    for (PoolElement& element : pool_)
+    for (AtlasPage& element : pages_)
     {
-        element.allocator_.Reset(shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_, shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_);
-        element.needClear_ = false;
+        element.areaAllocator_.Reset(shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_, shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_);
+        element.clearBeforeRendering_ = false;
     }
 }
 
-ShadowMap ShadowMapAllocator::AllocateShadowMap(const IntVector2& size)
+ShadowMapRegion ShadowMapAllocator::AllocateShadowMap(const IntVector2& size)
 {
     if (!settings_.shadowAtlasPageSize_ || !shadowMapFormat_)
         return {};
 
     const IntVector2 clampedSize = VectorMin(size, shadowAtlasPageSize_);
 
-    for (PoolElement& element : pool_)
+    for (AtlasPage& element : pages_)
     {
-        const ShadowMap shadowMap = element.Allocate(clampedSize);
+        const ShadowMapRegion shadowMap = element.AllocateRegion(clampedSize);
         if (shadowMap)
             return shadowMap;
     }
 
-    AllocateNewTexture();
-    return pool_.back().Allocate(clampedSize);
+    AllocatePage();
+    return pages_.back().AllocateRegion(clampedSize);
 }
 
-bool ShadowMapAllocator::BeginShadowMap(const ShadowMap& shadowMap)
+bool ShadowMapAllocator::BeginShadowMapRendering(const ShadowMapRegion& shadowMap)
 {
-    if (!shadowMap || shadowMap.index_ >= pool_.size())
+    if (!shadowMap || shadowMap.pageIndex_ >= pages_.size())
         return false;
 
     graphics_->SetTexture(TU_SHADOWMAP, nullptr);
 
     Texture2D* shadowMapTexture = shadowMap.texture_;
-    PoolElement& poolElement = pool_[shadowMap.index_];
+    AtlasPage& poolElement = pages_[shadowMap.pageIndex_];
 
     if (shadowMapTexture->GetUsage() == TEXTURE_DEPTHSTENCIL)
     {
@@ -127,15 +127,15 @@ bool ShadowMapAllocator::BeginShadowMap(const ShadowMap& shadowMap)
             graphics_->SetRenderTarget(i, (RenderSurface*) nullptr);
 
         // Clear whole texture if needed
-        if (poolElement.needClear_)
+        if (poolElement.clearBeforeRendering_)
         {
-            poolElement.needClear_ = false;
+            poolElement.clearBeforeRendering_ = false;
 
             graphics_->SetViewport(shadowMapTexture->GetRect());
             graphics_->Clear(CLEAR_DEPTH);
         }
 
-        graphics_->SetViewport(shadowMap.region_);
+        graphics_->SetViewport(shadowMap.rect_);
     }
     else
     {
@@ -148,64 +148,38 @@ bool ShadowMapAllocator::BeginShadowMap(const ShadowMap& shadowMap)
             shadowMapTexture->GetMultiSample(), shadowMapTexture->GetAutoResolve()));
 
         // Clear whole texture if needed
-        if (poolElement.needClear_)
+        if (poolElement.clearBeforeRendering_)
         {
-            poolElement.needClear_ = false;
+            poolElement.clearBeforeRendering_ = false;
 
             graphics_->SetViewport(shadowMapTexture->GetRect());
             graphics_->Clear(CLEAR_DEPTH | CLEAR_COLOR, Color::WHITE);
         }
 
-        graphics_->SetViewport(shadowMap.region_);
+        graphics_->SetViewport(shadowMap.rect_);
     }
     return true;
 }
 
-void ShadowMapAllocator::ExportPipelineState(PipelineStateDesc& desc, const BiasParameters& biasParameters, float scale)
-{
-    desc.fillMode_ = FILL_SOLID;
-    desc.stencilTestEnabled_ = false;
-    if (!settings_.enableVarianceShadowMaps_)
-    {
-        desc.colorWriteEnabled_ = false;
-        desc.constantDepthBias_ = scale * biasParameters.constantBias_;
-        desc.slopeScaledDepthBias_ = scale * biasParameters.slopeScaledBias_;
-    }
-    else
-    {
-        desc.colorWriteEnabled_ = true;
-        desc.constantDepthBias_ = 0.0f;
-        desc.slopeScaledDepthBias_ = 0.0f;
-    }
-
-    // Perform further modification of depth bias on OpenGL ES, as shadow calculations' precision is limited
-#ifdef GL_ES_VERSION_2_0
-    const float multiplier = renderer_->GetMobileShadowBiasMul();
-    const float addition = renderer_->GetMobileShadowBiasAdd();
-    desc.constantDepthBias_ = desc.constantDepthBias_ * multiplier + addition;
-    desc.slopeScaledDepthBias_ *= multiplier;
-#endif
-}
-
-ShadowMap ShadowMapAllocator::PoolElement::Allocate(const IntVector2& size)
+ShadowMapRegion ShadowMapAllocator::AtlasPage::AllocateRegion(const IntVector2& size)
 {
     int x{}, y{};
-    if (allocator_.Allocate(size.x_, size.y_, x, y))
+    if (areaAllocator_.Allocate(size.x_, size.y_, x, y))
     {
         const IntVector2 offset{ x, y };
-        ShadowMap shadowMap;
-        shadowMap.index_ = index_;
+        ShadowMapRegion shadowMap;
+        shadowMap.pageIndex_ = index_;
         shadowMap.texture_ = texture_;
-        shadowMap.region_ = IntRect(offset, offset + size);
+        shadowMap.rect_ = IntRect(offset, offset + size);
 
         // Mark shadow map as used
-        needClear_ = true;
+        clearBeforeRendering_ = true;
         return shadowMap;
     }
     return {};
 }
 
-void ShadowMapAllocator::AllocateNewTexture()
+void ShadowMapAllocator::AllocatePage()
 {
     const bool isDepthTexture = !settings_.enableVarianceShadowMaps_;
     const TextureUsage textureUsage = isDepthTexture ? TEXTURE_DEPTHSTENCIL : TEXTURE_RENDERTARGET;
@@ -245,10 +219,10 @@ void ShadowMapAllocator::AllocateNewTexture()
     }
 
     // Store allocate shadow map
-    PoolElement& element = pool_.emplace_back();
-    element.index_ = pool_.size() - 1;
+    AtlasPage& element = pages_.emplace_back();
+    element.index_ = pages_.size() - 1;
     element.texture_ = newShadowMap;
-    element.allocator_.Reset(shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_, shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_);
+    element.areaAllocator_.Reset(shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_, shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_);
 }
 
 }

@@ -91,7 +91,7 @@ private:
     /// Return whether light needs shadow.
     bool IsLightShadowed(Light* light) override;
     /// Allocate shadow map for one frame.
-    ShadowMap AllocateTransientShadowMap(const IntVector2& size) override;
+    ShadowMapRegion AllocateTransientShadowMap(const IntVector2& size) override;
     /// Draw occluders.
     void DrawOccluders();
 

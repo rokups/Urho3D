@@ -414,7 +414,7 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
 
     case LIGHT_POINT:
     {
-        const auto& splitViewport = splits_[0].GetShadowMap().region_;
+        const auto& splitViewport = splits_[0].GetShadowMap().rect_;
         const float viewportSizeX = static_cast<float>(splitViewport.Width());
         const float viewportSizeY = static_cast<float>(splitViewport.Height());
         const float viewportOffsetX = static_cast<float>(splitViewport.Left());

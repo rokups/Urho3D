@@ -46,7 +46,7 @@ public:
     /// Return whether light needs shadow.
     virtual bool IsLightShadowed(Light* light) = 0;
     /// Allocate shadow map for one frame.
-    virtual ShadowMap AllocateTransientShadowMap(const IntVector2& size) = 0;
+    virtual ShadowMapRegion AllocateTransientShadowMap(const IntVector2& size) = 0;
 };
 
 /// Cooked shadow parameters of light.
@@ -151,7 +151,7 @@ public:
     /// Return shadow map size.
     IntVector2 GetShadowMapSize() const { return numActiveSplits_ != 0 ? shadowMapSize_ : IntVector2::ZERO; }
     /// Return shadow map.
-    ShadowMap GetShadowMap() const { return shadowMap_; }
+    ShadowMapRegion GetShadowMap() const { return shadowMap_; }
 
     /// Return number of active splits.
     unsigned GetNumSplits() const { return numActiveSplits_; }
@@ -217,7 +217,7 @@ private:
     ea::vector<Drawable*> shadowCasterCandidates_;
 
     /// Shadow map allocated to this light.
-    ShadowMap shadowMap_;
+    ShadowMapRegion shadowMap_;
     /// Shader parameters.
     LightShaderParameters shaderParams_;
 };

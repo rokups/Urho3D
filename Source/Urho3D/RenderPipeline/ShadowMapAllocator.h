@@ -25,6 +25,7 @@
 #include "../Core/Object.h"
 #include "../Math/AreaAllocator.h"
 #include "../Math/Rect.h"
+// TODO(renderer): Remove this dependency
 #include "../Graphics/PipelineState.h"
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Light.h"
@@ -37,81 +38,67 @@ namespace Urho3D
 
 class Renderer;
 
-/// Allocated shadow map.
-struct ShadowMap
+/// Region of shadow map that contains one or more shadow split.
+struct ShadowMapRegion
 {
-    /// Index of texture in the pool.
-    unsigned index_{};
-    /// Underlying texture.
+    unsigned pageIndex_{};
     SharedPtr<Texture2D> texture_;
-    /// Region in texture.
-    IntRect region_;
+    IntRect rect_;
 
-    /// Return whether the shadow map is valid.
+    /// Return whether the shadow map region is not empty.
     operator bool() const { return !!texture_; }
-    /// Return shadow map split.
-    ShadowMap GetSplit(unsigned split, const IntVector2& numSplits) const;
+    /// Return sub-region for split.
+    /// Splits are indexed as elements in rectangle grid, from left to right, top to bottom, row-major.
+    ShadowMapRegion GetSplit(unsigned split, const IntVector2& numSplits) const;
 };
 
-/// Utility to allocate shadow maps in texture pool.
-// TODO(renderer): Track pipeline state changes caused by renderer settings
+/// Utility to allocate shadow maps in texture atlas.
 class URHO3D_API ShadowMapAllocator : public Object
 {
     URHO3D_OBJECT(ShadowMapAllocator, Object);
 
 public:
-    /// Construct.
     explicit ShadowMapAllocator(Context* context);
-    /// Set settings.
     void SetSettings(const ShadowMapAllocatorSettings& settings);
 
     /// Reset allocated shadow maps.
-    void Reset();
+    void ResetAllShadowMaps();
     /// Allocate shadow map of given size. It is better to allocate from bigger to smaller sizes.
-    ShadowMap AllocateShadowMap(const IntVector2& size);
+    ShadowMapRegion AllocateShadowMap(const IntVector2& size);
     /// Begin shadow map rendering. Clears shadow map if necessary.
-    bool BeginShadowMap(const ShadowMap& shadowMap);
-    /// Export relevant parts of pipeline state. Thread safe unless called simultaneously with Reset.
-    void ExportPipelineState(PipelineStateDesc& desc, const BiasParameters& biasParameters, float scale);
+    bool BeginShadowMapRendering(const ShadowMapRegion& shadowMap);
 
 private:
-    /// Element of texture pool.
-    struct PoolElement
+    struct AtlasPage
     {
-        /// Index of pool element.
         unsigned index_{};
-        /// Underlying texture.
         SharedPtr<Texture2D> texture_;
-        /// Area allocator.
-        AreaAllocator allocator_;
-        /// Whether the texture has to be cleared.
-        bool needClear_{};
+        AreaAllocator areaAllocator_;
+        bool clearBeforeRendering_{};
 
         /// Allocate shadow map.
-        ShadowMap Allocate(const IntVector2& size);
+        ShadowMapRegion AllocateRegion(const IntVector2& size);
     };
 
-    /// Process and cache settings.
     void CacheSettings();
-    /// Allocate one more texture.
-    void AllocateNewTexture();
+    void AllocatePage();
 
-    /// Graphics subsystem.
+    /// External dependencies
+    /// @{
     Graphics* graphics_{};
-    /// Renderer subsystem.
     Renderer* renderer_{};
+    /// @}
 
-    /// Settings.
+    /// Settings
+    /// @{
     ShadowMapAllocatorSettings settings_;
-    /// Shadow map texture format.
     unsigned shadowMapFormat_{};
-    /// Shadow map texture size.
     IntVector2 shadowAtlasPageSize_;
+    /// @}
 
-    /// Dummy color map, if needed.
+    /// Dummy color map for workaround, if needed.
     SharedPtr<Texture2D> dummyColorTexture_;
-    /// Texture pool.
-    ea::vector<PoolElement> pool_;
+    ea::vector<AtlasPage> pages_;
 };
 
 }

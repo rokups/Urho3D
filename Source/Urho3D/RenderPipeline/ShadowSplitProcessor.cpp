@@ -192,11 +192,11 @@ void ShadowSplitProcessor::ProcessPointShadowCasters(
     drawableProcessor->PreprocessShadowCasters(shadowCasters_, shadowCasterCandidates, {}, light_, shadowCamera_);
 }
 
-void ShadowSplitProcessor::Finalize(const ShadowMap& shadowMap)
+void ShadowSplitProcessor::Finalize(const ShadowMapRegion& shadowMap)
 {
     shadowMap_ = shadowMap;
 
-    const auto shadowMapWidth = static_cast<float>(shadowMap_.region_.Width());
+    const auto shadowMapWidth = static_cast<float>(shadowMap_.rect_.Width());
 
     if (light_->GetLightType() == LIGHT_DIRECTIONAL)
     {
@@ -323,7 +323,7 @@ Matrix4 ShadowSplitProcessor::CalculateShadowMatrix(float subPixelOffset) const
     if (!shadowMap_)
         return Matrix4::IDENTITY;
 
-    const IntRect& viewport = shadowMap_.region_;
+    const IntRect& viewport = shadowMap_.rect_;
     const Matrix3x4& shadowView = shadowCamera_->GetView();
     const Matrix4 shadowProj = shadowCamera_->GetGPUProjection();
     const IntVector2 textureSize = shadowMap_.texture_->GetSize();

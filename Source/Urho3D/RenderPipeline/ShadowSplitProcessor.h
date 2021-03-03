@@ -62,7 +62,7 @@ public:
     /// Process shadow casters for point light split.
     void ProcessPointShadowCasters(DrawableProcessor* drawableProcessor, const ea::vector<Drawable*>& shadowCasterCandidates);
     /// Finalize shadow.
-    void Finalize(const ShadowMap& shadowMap);
+    void Finalize(const ShadowMapRegion& shadowMap);
 
     /// Calculate shadow matrix.
     Matrix4 CalculateShadowMatrix(float subPixelOffset) const;
@@ -73,7 +73,7 @@ public:
     Light* GetLight() const { return light_; }
     unsigned GetSplitIndex() const { return splitIndex_; }
     /// Return shadow map.
-    const ShadowMap& GetShadowMap() const { return shadowMap_; }
+    const ShadowMapRegion& GetShadowMap() const { return shadowMap_; }
     float GetShadowMapTexelSizeInWorldSpace() const { return shadowMapWorldSpaceTexelSize_; }
     /// Return shadow camera.
     Camera* GetShadowCamera() const { return shadowCamera_; }
@@ -121,7 +121,7 @@ private:
     ea::vector<PipelineBatch> shadowCasterBatches_;
 
     /// Shadow map for split.
-    ShadowMap shadowMap_;
+    ShadowMapRegion shadowMap_;
     float shadowMapWorldSpaceTexelSize_{};
 };
 

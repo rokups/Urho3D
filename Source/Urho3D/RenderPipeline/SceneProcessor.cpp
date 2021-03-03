@@ -268,7 +268,7 @@ void SceneProcessor::RenderShadowMaps()
             batchRenderer_->RenderBatches(*drawQueue_, split.GetShadowCamera(), flags, sortedShadowBatches_, &split);
             instancingBuffer_->End();
 
-            shadowMapAllocator_->BeginShadowMap(split.GetShadowMap());
+            shadowMapAllocator_->BeginShadowMapRendering(split.GetShadowMap());
             drawQueue_->Execute();
         }
     }
@@ -276,7 +276,7 @@ void SceneProcessor::RenderShadowMaps()
 
 void SceneProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
 {
-    shadowMapAllocator_->Reset();
+    shadowMapAllocator_->ResetAllShadowMaps();
     occluders_.clear();
     drawables_.clear();
 }
@@ -297,7 +297,7 @@ bool SceneProcessor::IsLightShadowed(Light* light)
     return true;
 }
 
-ShadowMap SceneProcessor::AllocateTransientShadowMap(const IntVector2& size)
+ShadowMapRegion SceneProcessor::AllocateTransientShadowMap(const IntVector2& size)
 {
     return shadowMapAllocator_->AllocateShadowMap(size);
 }
