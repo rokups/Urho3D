@@ -36,7 +36,6 @@ class Camera;
 class DrawableProcessor;
 class InstancingBuffer;
 class ShadowSplitProcessor;
-class Texture;
 struct PipelineBatchBackToFront;
 struct PipelineBatchByState;
 

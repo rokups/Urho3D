@@ -41,21 +41,19 @@ class URHO3D_API RenderPipelineInterface
     URHO3D_OBJECT(RenderPipelineInterface, Serializable);
 
 public:
-    /// Construct.
     using Serializable::Serializable;
+
     /// Return default draw queue that can be reused.
     virtual DrawCommandQueue* GetDefaultDrawQueue() = 0;
 
-    /// Signal when update begins.
+    /// Callbacks
+    /// @{
     Signal<void(const FrameInfo& frameInfo)> OnUpdateBegin;
-    /// Signal when update end.
     Signal<void(const FrameInfo& frameInfo)> OnUpdateEnd;
-    /// Signal when render begins.
     Signal<void(const FrameInfo& frameInfo)> OnRenderBegin;
-    /// Signal when render end.
     Signal<void(const FrameInfo& frameInfo)> OnRenderEnd;
-    /// Signal when all cached pipeline states are invalidated.
     Signal<void()> OnPipelineStatesInvalidated;
+    /// @}
 };
 
 }

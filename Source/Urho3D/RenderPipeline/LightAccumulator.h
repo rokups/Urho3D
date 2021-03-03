@@ -34,13 +34,9 @@ namespace Urho3D
 /// Common parameters for light accumulation.
 struct LightAccumulatorContext
 {
-    /// Max number of vertex lights.
     unsigned maxVertexLights_{ 4 };
-    /// Max number of pixel lights.
     unsigned maxPixelLights_{ 1 };
-    /// Light importance.
     LightImportance lightImportance_{};
-    /// Light index.
     unsigned lightIndex_{};
     /// Array of lights to be indexed.
     const ea::vector<Light*>* lights_;
@@ -49,17 +45,15 @@ struct LightAccumulatorContext
 /// Accumulated light for forward rendering.
 struct LightAccumulator
 {
-    /// Hint: Max number of per-pixel lights.
+    /// Hints used for small buffer optimization
+    /// @{
     static const unsigned MaxPixelLights = 4;
-    /// Hint: Max number of per-vertex lights.
     static const unsigned MaxVertexLights = 4;
-    /// Max number of lights that don't require allocations.
     static const unsigned NumElements = ea::max(MaxPixelLights + 1, 4u) + MaxVertexLights;
-    /// Light data.
+    /// @}
+
     using LightData = ea::pair<float, unsigned>;
-    /// Container for lights.
-    using Container = ea::fixed_vector<LightData, NumElements>;
-    /// Container for vertex lights.
+    using LightContainer = ea::fixed_vector<LightData, NumElements>;
     using VertexLightContainer = ea::array<unsigned, MaxVertexLights>;
 
     /// Reset lights.
@@ -115,7 +109,8 @@ struct LightAccumulator
         vertexLightsHash_ += !vertexLightsHash_;
     }
 
-    /// Return per-vertex lights.
+    /// Return light info, valid after cooking
+    /// @{
     VertexLightContainer GetVertexLights() const
     {
         VertexLightContainer vertexLights;
@@ -127,27 +122,25 @@ struct LightAccumulator
         return vertexLights;
     }
 
-    /// Return per-pixel lights.
     ea::span<const LightData> GetPixelLights() const
     {
         return { lights_.data(), ea::min(static_cast<unsigned>(lights_.size()), firstVertexLight_) };
     }
 
-    /// Return order-independent hash of vertex lights.
     unsigned GetVertexLightsHash() const { return vertexLightsHash_; }
+    /// @}
 
-    /// Accumulated SH lights.
+    /// Accumulated SH lights and ambient light.
     SphericalHarmonicsDot9 sphericalHarmonics_;
 
 private:
-    /// Container of per-pixel and per-pixel lights.
-    Container lights_;
-    /// Number of important lights.
+    /// Container with per-pixel and per-vertex lights.
+    LightContainer lights_;
+
     unsigned numImportantLights_{};
-    /// Number of automatic lights.
     unsigned numAutoLights_{};
-    /// First vertex light.
     unsigned firstVertexLight_{};
+
     /// Hash of vertex lights. Non-zero.
     unsigned vertexLightsHash_{};
 };

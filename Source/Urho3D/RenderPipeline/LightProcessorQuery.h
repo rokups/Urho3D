@@ -35,11 +35,8 @@ class Light;
 /// Result of light query for drawable.
 struct LightGeometryQueryResult
 {
-    /// Whether the geometry is lit.
     bool isLit_{};
-    /// Whether the geometry is lit using forward lighting.
     bool isForwardLit_{};
-    /// Whether the geometry is shadow caster.
     bool isShadowCaster_{};
 };
 
@@ -47,71 +44,63 @@ struct LightGeometryQueryResult
 class URHO3D_API PointLightGeometryQuery : public SphereOctreeQuery
 {
 public:
-    /// Construct.
     PointLightGeometryQuery(ea::vector<Drawable*>& result, bool& hasLitGeometries,
-            ea::vector<Drawable*>* shadowCasters,
+        ea::vector<Drawable*>* shadowCasters,
         const DrawableProcessor* drawableProcessor, Light* light, unsigned viewMask);
 
-    /// Intersection test for drawables.
     void TestDrawables(Drawable** start, Drawable** end, bool inside) override;
 
 private:
-    /// Return whether the drawable is lit and/or shadow caster.
     LightGeometryQueryResult IsLitOrShadowCaster(Drawable* drawable, bool inside) const;
 
-    /// Result flag: whether there are lit geometries, not limited to forward lighting.
+    /// Immutable
+    /// @{
+    const DrawableProcessor* drawableProcessor_{};
+    const unsigned lightMask_{};
+    /// @}
+
     bool& hasLitGeometries_;
     /// Result array of shadow casters, if applicable.
     ea::vector<Drawable*>* shadowCasters_{};
-    /// Visiblity cache.
-    const DrawableProcessor* drawableProcessor_{};
-    /// Light mask to check.
-    unsigned lightMask_{};
 };
 
 /// Frustum query for spot light forward lit geometries and shadow casters.
 class URHO3D_API SpotLightGeometryQuery : public FrustumOctreeQuery
 {
 public:
-    /// Construct.
     SpotLightGeometryQuery(ea::vector<Drawable*>& result, bool& hasLitGeometries,
         ea::vector<Drawable*>* shadowCasters,
         const DrawableProcessor* drawableProcessor, Light* light, unsigned viewMask);
 
-    /// Intersection test for drawables.
     void TestDrawables(Drawable** start, Drawable** end, bool inside) override;
 
 private:
-    /// Return whether the drawable is lit and/or shadow caster.
     LightGeometryQueryResult IsLitOrShadowCaster(Drawable* drawable, bool inside) const;
 
-    /// Result flag: whether there are lit geometries, not limited to forward lighting.
+    /// Immutable
+    /// @{
+    const DrawableProcessor* drawableProcessor_{};
+    const unsigned lightMask_{};
+    /// @}
+
     bool& hasLitGeometries_;
     /// Result array of shadow casters, if applicable.
     ea::vector<Drawable*>* shadowCasters_{};
-    /// Visiblity cache.
-    const DrawableProcessor* drawableProcessor_{};
-    /// Light mask to check.
-    unsigned lightMask_{};
 };
 
 /// Frustum query for directional light shadow casters.
 class URHO3D_API DirectionalLightShadowCasterQuery : public FrustumOctreeQuery
 {
 public:
-    /// Construct with frustum and query parameters.
     DirectionalLightShadowCasterQuery(ea::vector<Drawable*>& result,
         const Frustum& frustum, DrawableFlags drawableFlags, Light* light, unsigned viewMask);
 
-    /// Intersection test for drawables.
     void TestDrawables(Drawable** start, Drawable** end, bool inside) override;
 
 private:
-    /// Return whether the drawable is shadow caster.
     bool IsShadowCaster(Drawable* drawable, bool inside) const;
 
-    /// Light mask to check.
-    unsigned lightMask_{};
+    const unsigned lightMask_{};
 };
 
 }
