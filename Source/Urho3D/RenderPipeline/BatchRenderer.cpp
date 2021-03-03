@@ -48,10 +48,10 @@ namespace
 {
 
 /// Return shader parameter for camera depth mode.
-Vector4 GetCameraDepthModeParameter(const Camera* camera)
+Vector4 GetCameraDepthModeParameter(const Camera& camera)
 {
     Vector4 depthMode = Vector4::ZERO;
-    if (camera->IsOrthographic())
+    if (camera.IsOrthographic())
     {
         depthMode.x_ = 1.0f;
 #ifdef URHO3D_OPENGL
@@ -62,29 +62,29 @@ Vector4 GetCameraDepthModeParameter(const Camera* camera)
 #endif
     }
     else
-        depthMode.w_ = 1.0f / camera->GetFarClip();
+        depthMode.w_ = 1.0f / camera.GetFarClip();
     return depthMode;
 }
 
 /// Return shader parameter for camera depth reconstruction.
-Vector4 GetCameraDepthReconstructParameter(const Camera* camera)
+Vector4 GetCameraDepthReconstructParameter(const Camera& camera)
 {
-    const float nearClip = camera->GetNearClip();
-    const float farClip = camera->GetFarClip();
+    const float nearClip = camera.GetNearClip();
+    const float farClip = camera.GetFarClip();
     return {
         farClip / (farClip - nearClip),
         -nearClip / (farClip - nearClip),
-        camera->IsOrthographic() ? 1.0f : 0.0f,
-        camera->IsOrthographic() ? 0.0f : 1.0f
+        camera.IsOrthographic() ? 1.0f : 0.0f,
+        camera.IsOrthographic() ? 0.0f : 1.0f
     };
 }
 
 /// Return shader parameter for zone fog.
-Vector4 GetFogParameter(const Camera* camera)
+Vector4 GetFogParameter(const Camera& camera)
 {
-    const float farClip = camera->GetFarClip();
-    float fogStart = Min(camera->GetEffectiveFogStart(), farClip);
-    float fogEnd = Min(camera->GetEffectiveFogStart(), farClip);
+    const float farClip = camera.GetFarClip();
+    float fogStart = Min(camera.GetEffectiveFogStart(), farClip);
+    float fogEnd = Min(camera.GetEffectiveFogStart(), farClip);
     if (fogStart >= fogEnd * (1.0f - M_LARGE_EPSILON))
         fogStart = fogEnd * (1.0f - M_LARGE_EPSILON);
     const float fogRange = Max(fogEnd - fogStart, M_EPSILON);
@@ -101,484 +101,575 @@ Vector4 GetFogParameter(const Camera* camera)
 class DrawCommandCompositor : public NonCopyable
 {
 public:
-    /// Construct.
+    /// Initialized
+    /// @{
     DrawCommandCompositor(DrawCommandQueue& drawQueue, const BatchRendererSettings& settings,
         const DrawableProcessor& drawableProcessor, InstancingBufferCompositor& instancingBuffer,
-        const Camera* renderCamera, BatchRenderFlags flags, const ShadowSplitProcessor* destinationShadowSplit)
+        const Camera* renderCamera, BatchRenderFlags flags, const ShadowSplitProcessor* outputShadowSplit)
         : drawQueue_(drawQueue)
-        , enableAmbientLight_(flags.Test(BatchRenderFlag::AmbientLight))
-        , enableVertexLights_(flags.Test(BatchRenderFlag::VertexLights))
-        , enablePixelLights_(flags.Test(BatchRenderFlag::PixelLight))
-        , enableLight_(enableAmbientLight_ || enableVertexLights_ || enablePixelLights_)
-        , enableStaticInstancing_(flags.Test(BatchRenderFlag::InstantiateStaticGeometry))
         , settings_(settings)
         , drawableProcessor_(drawableProcessor)
         , instancingBuffer_(instancingBuffer)
-        , destinationShadowSplit_(destinationShadowSplit)
         , frameInfo_(drawableProcessor_.GetFrameInfo())
-        , scene_(frameInfo_.scene_)
+        , scene_(*frameInfo_.scene_)
         , lights_(drawableProcessor_.GetLightProcessors())
-        , camera_(renderCamera)
-        , cameraNode_(camera_->GetNode())
+        , camera_(*renderCamera)
+        , cameraNode_(*camera_.GetNode())
+        , outputShadowSplit_(outputShadowSplit)
+        , enabled_(flags)
     {
-        lightVolumeSourceBatch_.worldTransform_ = &lightVolumeTransform_;
     }
 
-    /// Set GBuffer parameters.
     void SetGBufferParameters(const Vector4& offsetAndScale, const Vector2& invSize)
     {
         geometryBufferOffsetAndScale_ = offsetAndScale;
         geometryBufferInvSize_ = invSize;
     }
 
-    /// Set global resources.
     void SetGlobalResources(ea::span<const ShaderResourceDesc> globalResources)
     {
         globalResources_ = globalResources;
     }
+    /// @}
 
-    /// Convert scene batch to DrawCommandQueue commands.
+    /// Process batches
+    /// @{
     void ProcessSceneBatch(const PipelineBatch& pipelineBatch)
     {
         ProcessBatch(pipelineBatch, pipelineBatch.GetSourceBatch());
     }
 
-    /// Convert light batch to DrawCommandQueue commands.
     void ProcessLightVolumeBatch(const PipelineBatch& pipelineBatch)
     {
         Light* light = lights_[pipelineBatch.lightIndex_]->GetLight();
-        lightVolumeTransform_ = light->GetVolumeTransform(camera_);
-        ProcessBatch(pipelineBatch, lightVolumeSourceBatch_);
+        lightVolumeHelpers_.transform_ = light->GetVolumeTransform(&camera_);
+        lightVolumeHelpers_.sourceBatch_.worldTransform_ = &lightVolumeHelpers_.transform_;
+        ProcessBatch(pipelineBatch, lightVolumeHelpers_.sourceBatch_);
     }
 
-    /// Flush pending draw queue commands.
     void FlushDrawCommands()
     {
-        if (instanceCount_ > 0)
+        if (instancingGroup_.count_ > 0)
+            DrawObjectInstanced();
+    }
+    /// @}
+
+private:
+    /// Extract and process batch state w/o any changes in DrawQueue
+    /// @{
+    void CheckDirtyCommonState(const PipelineBatch& pipelineBatch)
+    {
+        dirty_.pipelineState_ = current_.pipelineState_ != pipelineBatch.pipelineState_;
+        current_.pipelineState_ = pipelineBatch.pipelineState_;
+
+        const float constantDepthBias = current_.pipelineState_->GetDesc().constantDepthBias_;
+        if (current_.constantDepthBias_ != constantDepthBias)
         {
-            drawQueue_.SetBuffers({ lastGeometry_->GetVertexBuffers(), lastGeometry_->GetIndexBuffer(),
-                instancingBuffer_.GetVertexBuffer() });
-            drawQueue_.DrawIndexedInstanced(lastGeometry_->GetIndexStart(), lastGeometry_->GetIndexCount(),
-                startInstance_, instanceCount_);
-            instanceCount_ = 0;
+            current_.constantDepthBias_ = constantDepthBias;
+            dirty_.cameraConstants_ = true;
+        }
+
+        dirty_.material_ = current_.material_ != pipelineBatch.material_;
+        current_.material_ = pipelineBatch.material_;
+
+        dirty_.geometry_ = current_.geometry_ != pipelineBatch.geometry_;
+        current_.geometry_ = pipelineBatch.geometry_;
+    }
+
+    void CheckDirtyPixelLight(const PipelineBatch& pipelineBatch)
+    {
+        dirty_.pixelLightConstants_ = current_.pixelLightIndex_ != pipelineBatch.lightIndex_;
+        if (!dirty_.pixelLightConstants_)
+            return;
+
+        current_.pixelLightIndex_ = pipelineBatch.lightIndex_;
+        current_.pixelLightEnabled_ = current_.pixelLightIndex_ != M_MAX_UNSIGNED;
+        if (current_.pixelLightEnabled_)
+        {
+            current_.pixelLightParams_ = &lights_[current_.pixelLightIndex_]->GetShaderParams();
+            dirty_.pixelLightTextures_ = current_.pixelLightRamp_ != current_.pixelLightParams_->lightRamp_
+                || current_.pixelLightShape_ != current_.pixelLightParams_->lightShape_
+                || current_.pixelLightShadowMap_ != current_.pixelLightParams_->shadowMap_;
+            if (dirty_.pixelLightTextures_)
+            {
+                current_.pixelLightRamp_ = current_.pixelLightParams_->lightRamp_;
+                current_.pixelLightShape_ = current_.pixelLightParams_->lightShape_;
+                current_.pixelLightShadowMap_ = current_.pixelLightParams_->shadowMap_;
+            }
         }
     }
 
-private:
-    /// TODO(renderer): Refactor me
-    Vector3 AdjustSHAmbient(const Vector3& x) const { return settings_.gammaCorrection_ ? x : Color(x).LinearToGamma().ToVector3(); };
-
-    /// Add Frame shader parameters.
-    void AddFrameShaderParameters()
+    void CheckDirtyVertexLight(const LightAccumulator& lightAccumulator)
     {
-        drawQueue_.AddShaderParameter(VSP_DELTATIME, frameInfo_.timeStep_);
-        drawQueue_.AddShaderParameter(VSP_ELAPSEDTIME, scene_->GetElapsedTime());
+        const auto previousVertexLights = current_.vertexLights_;
+        current_.vertexLights_ = lightAccumulator.GetVertexLights();
+        dirty_.vertexLightConstants_ = previousVertexLights != current_.vertexLights_;
+        if (!dirty_.vertexLightConstants_)
+            return;
+
+        static const LightShaderParameters nullVertexLight{};
+        for (unsigned i = 0; i < MAX_VERTEX_LIGHTS; ++i)
+        {
+            const LightShaderParameters& params = current_.vertexLights_[i] != M_MAX_UNSIGNED
+                ? lights_[current_.vertexLights_[i]]->GetShaderParams() : nullVertexLight;
+            const Vector3& color = params.GetColor(settings_.gammaCorrection_);
+
+            current_.vertexLightsData_[i * 3] = { color, params.invRange_ };
+            current_.vertexLightsData_[i * 3 + 1] = { params.direction_, params.cutoff_ };
+            current_.vertexLightsData_[i * 3 + 2] = { params.position_, params.invCutoff_ };
+        }
     }
 
-    /// Add Camera shader parameters.
-    void AddCameraShaderParameters(float constantDepthBias)
+    void CheckDirtyLightmap(const SourceBatch& sourceBatch)
+    {
+        dirty_.lightmapConstants_ = current_.lightmapScaleOffset_ != sourceBatch.lightmapScaleOffset_;
+        if (!dirty_.lightmapConstants_)
+            return;
+
+        current_.lightmapScaleOffset_ = sourceBatch.lightmapScaleOffset_;
+
+        Texture2D* lightmapTexture = current_.lightmapScaleOffset_
+            ? scene_.GetLightmapTexture(sourceBatch.lightmapIndex_)
+            : nullptr;
+
+        dirty_.lightmapTextures_ = current_.lightmapTexture_ != lightmapTexture;
+        current_.lightmapTexture_ = lightmapTexture;
+    }
+
+    void ExtractObjectConstants(const SourceBatch& sourceBatch, const LightAccumulator* lightAccumulator)
+    {
+        if (enabled_.ambientLighting_)
+        {
+            if (settings_.ambientMode_ == AmbientMode::Flat)
+            {
+                const Vector3 ambient = lightAccumulator->sphericalHarmonics_.EvaluateAverage();
+                if (settings_.gammaCorrection_)
+                    object_.ambient_ = Vector4(ambient, 1.0f);
+                else
+                    object_.ambient_ = Color(ambient).LinearToGamma().ToVector4();
+            }
+            else if (settings_.ambientMode_ == AmbientMode::Directional)
+            {
+                object_.sh_ = &lightAccumulator->sphericalHarmonics_;
+            }
+        }
+
+        object_.geometryType_ = sourceBatch.geometryType_;
+        object_.worldTransform_ = sourceBatch.worldTransform_;
+        object_.numWorldTransforms_ = sourceBatch.numWorldTransforms_;
+    }
+    /// @}
+
+    /// Commit changes to DrawQueue
+    /// @{
+    void UpdateDirtyConstants()
+    {
+        if (dirty_.pipelineState_)
+        {
+            drawQueue_.SetPipelineState(current_.pipelineState_);
+            dirty_.pipelineState_ = false;
+        }
+
+        if (drawQueue_.BeginShaderParameterGroup(SP_FRAME, dirty_.frameConstants_))
+        {
+            AddFrameConstants();
+            drawQueue_.CommitShaderParameterGroup(SP_FRAME);
+            dirty_.frameConstants_ = false;
+        }
+
+        if (drawQueue_.BeginShaderParameterGroup(SP_CAMERA, dirty_.cameraConstants_))
+        {
+            AddCameraConstants(current_.constantDepthBias_);
+            drawQueue_.CommitShaderParameterGroup(SP_CAMERA);
+            dirty_.cameraConstants_ = false;
+        }
+
+        // Commit pixel light constants once during shadow map rendering to support normal bias
+        if (outputShadowSplit_ != nullptr)
+        {
+            if (drawQueue_.BeginShaderParameterGroup(SP_LIGHT, false))
+            {
+                const LightShaderParameters& params = outputShadowSplit_->GetLightProcessor()->GetShaderParams();
+                AddPixelLightConstants(params);
+                drawQueue_.CommitShaderParameterGroup(SP_LIGHT);
+            }
+        }
+        else if (enabled_.anyLighting_)
+        {
+            const bool lightConstantsDirty = dirty_.pixelLightConstants_ || dirty_.vertexLightConstants_;
+            if (drawQueue_.BeginShaderParameterGroup(SP_LIGHT, lightConstantsDirty))
+            {
+                if (enabled_.vertexLighting_)
+                    AddVertexLightConstants();
+                if (current_.pixelLightEnabled_)
+                    AddPixelLightConstants(*current_.pixelLightParams_);
+                drawQueue_.CommitShaderParameterGroup(SP_LIGHT);
+            }
+        }
+
+        if (drawQueue_.BeginShaderParameterGroup(SP_MATERIAL, dirty_.material_ || dirty_.lightmapConstants_))
+        {
+            const auto& materialParameters = current_.material_->GetShaderParameters();
+            for (const auto& parameter : materialParameters)
+                drawQueue_.AddShaderParameter(parameter.first, parameter.second.value_);
+
+            if (enabled_.ambientLighting_ && current_.lightmapScaleOffset_)
+                drawQueue_.AddShaderParameter(VSP_LMOFFSET, *current_.lightmapScaleOffset_);
+
+            drawQueue_.CommitShaderParameterGroup(SP_MATERIAL);
+        }
+    }
+
+    void UpdateDirtyResources()
+    {
+        const bool resourcesDirty = dirty_.material_ || dirty_.lightmapTextures_ || dirty_.pixelLightTextures_;
+        if (resourcesDirty)
+        {
+            for (const ShaderResourceDesc& desc : globalResources_)
+                drawQueue_.AddShaderResource(desc.unit_, desc.texture_);
+
+            const auto& materialTextures = current_.material_->GetTextures();
+            for (const auto& texture : materialTextures)
+            {
+                if (!current_.lightmapTexture_ || texture.first != TU_EMISSIVE)
+                    drawQueue_.AddShaderResource(texture.first, texture.second);
+            }
+
+            if (current_.lightmapTexture_)
+                drawQueue_.AddShaderResource(TU_EMISSIVE, current_.lightmapTexture_);
+            if (current_.pixelLightRamp_)
+                drawQueue_.AddShaderResource(TU_LIGHTRAMP, current_.pixelLightRamp_);
+            if (current_.pixelLightShape_)
+                drawQueue_.AddShaderResource(TU_LIGHTSHAPE, current_.pixelLightShape_);
+            if (current_.pixelLightShadowMap_)
+                drawQueue_.AddShaderResource(TU_SHADOWMAP, current_.pixelLightShadowMap_);
+
+            drawQueue_.CommitShaderResources();
+        }
+    }
+
+    void AddFrameConstants()
+    {
+        drawQueue_.AddShaderParameter(VSP_DELTATIME, frameInfo_.timeStep_);
+        drawQueue_.AddShaderParameter(VSP_ELAPSEDTIME, scene_.GetElapsedTime());
+    }
+
+    void AddCameraConstants(float constantDepthBias)
     {
         drawQueue_.AddShaderParameter(VSP_GBUFFEROFFSETS, geometryBufferOffsetAndScale_);
 
-        const Matrix3x4 cameraEffectiveTransform = camera_->GetEffectiveWorldTransform();
+        const Matrix3x4 cameraEffectiveTransform = camera_.GetEffectiveWorldTransform();
         drawQueue_.AddShaderParameter(VSP_CAMERAPOS, cameraEffectiveTransform.Translation());
         drawQueue_.AddShaderParameter(VSP_VIEWINV, cameraEffectiveTransform);
-        drawQueue_.AddShaderParameter(VSP_VIEW, camera_->GetView());
+        drawQueue_.AddShaderParameter(VSP_VIEW, camera_.GetView());
 
-        const float nearClip = camera_->GetNearClip();
-        const float farClip = camera_->GetFarClip();
+        const float nearClip = camera_.GetNearClip();
+        const float farClip = camera_.GetFarClip();
         drawQueue_.AddShaderParameter(VSP_NEARCLIP, nearClip);
         drawQueue_.AddShaderParameter(VSP_FARCLIP, farClip);
 
-        if (destinationShadowSplit_)
+        if (outputShadowSplit_)
         {
-            const LightShaderParameters& lightParams = destinationShadowSplit_->GetLightProcessor()->GetShaderParams();
+            const LightShaderParameters& lightParams = outputShadowSplit_->GetLightProcessor()->GetShaderParams();
             drawQueue_.AddShaderParameter(VSP_NORMALOFFSETSCALE,
-                lightParams.shadowNormalBias_[destinationShadowSplit_->GetSplitIndex()]);
+                lightParams.shadowNormalBias_[outputShadowSplit_->GetSplitIndex()]);
         }
 
         drawQueue_.AddShaderParameter(VSP_DEPTHMODE, GetCameraDepthModeParameter(camera_));
         drawQueue_.AddShaderParameter(PSP_DEPTHRECONSTRUCT, GetCameraDepthReconstructParameter(camera_));
 
         Vector3 nearVector, farVector;
-        camera_->GetFrustumSize(nearVector, farVector);
+        camera_.GetFrustumSize(nearVector, farVector);
         drawQueue_.AddShaderParameter(VSP_FRUSTUMSIZE, farVector);
 
-        drawQueue_.AddShaderParameter(VSP_VIEWPROJ, camera_->GetEffectiveGPUViewProjection(constantDepthBias));
+        drawQueue_.AddShaderParameter(VSP_VIEWPROJ, camera_.GetEffectiveGPUViewProjection(constantDepthBias));
 
-        const Color ambientColorGamma = camera_->GetEffectiveAmbientColor() * camera_->GetEffectiveAmbientBrightness();
+        const Color ambientColorGamma = camera_.GetEffectiveAmbientColor() * camera_.GetEffectiveAmbientBrightness();
         drawQueue_.AddShaderParameter(PSP_AMBIENTCOLOR,
             settings_.gammaCorrection_ ? ambientColorGamma.GammaToLinear() : ambientColorGamma);
-        drawQueue_.AddShaderParameter(PSP_FOGCOLOR, camera_->GetEffectiveFogColor());
+        drawQueue_.AddShaderParameter(PSP_FOGCOLOR, camera_.GetEffectiveFogColor());
         drawQueue_.AddShaderParameter(PSP_FOGPARAMS, GetFogParameter(camera_));
     }
 
-    /// Cache vertex lights data.
-    void CacheVertexLights(const LightAccumulator::VertexLightContainer& vertexLights)
+    void AddVertexLightConstants()
     {
-        for (unsigned i = 0; i < MAX_VERTEX_LIGHTS; ++i)
-        {
-            if (vertexLights[i] == M_MAX_UNSIGNED)
-            {
-                vertexLightsData_[i * 3] = {};
-                vertexLightsData_[i * 3 + 1] = {};
-                vertexLightsData_[i * 3 + 2] = {};
-            }
-            else
-            {
-                const LightShaderParameters& vertexLightParams = lights_[vertexLights[i]]->GetShaderParams();
-                vertexLightsData_[i * 3] = { vertexLightParams.GetColor(settings_.gammaCorrection_), vertexLightParams.invRange_ };
-                vertexLightsData_[i * 3 + 1] = { vertexLightParams.direction_, vertexLightParams.cutoff_ };
-                vertexLightsData_[i * 3 + 2] = { vertexLightParams.position_, vertexLightParams.invCutoff_ };
-            }
-        }
+        drawQueue_.AddShaderParameter(VSP_VERTEXLIGHTS, ea::span<const Vector4>{ current_.vertexLightsData_ });
     }
 
-    /// Cache pixel light.
-    void CachePixelLight(unsigned lightIndex)
+    void AddPixelLightConstants(const LightShaderParameters& params)
     {
-        hasPixelLight_ = lightIndex != M_MAX_UNSIGNED;
-        lightParams_ = hasPixelLight_ ? &lights_[lightIndex]->GetShaderParams() : nullptr;
-    }
-
-    /// Add Light shader parameters.
-    void AddLightShaderParameters()
-    {
-        // Add vertex lights parameters
-        drawQueue_.AddShaderParameter(VSP_VERTEXLIGHTS, ea::span<const Vector4>{ vertexLightsData_ });
-
-        // Add pixel light parameters
-        if (!hasPixelLight_)
-            return;
-
-        drawQueue_.AddShaderParameter(VSP_LIGHTDIR, lightParams_->direction_);
+        drawQueue_.AddShaderParameter(VSP_LIGHTDIR, params.direction_);
         drawQueue_.AddShaderParameter(VSP_LIGHTPOS,
-            Vector4{ lightParams_->position_, lightParams_->invRange_ });
+            Vector4{ params.position_, params.invRange_ });
         drawQueue_.AddShaderParameter(PSP_LIGHTCOLOR,
-            Vector4{ lightParams_->GetColor(settings_.gammaCorrection_), lightParams_->specularIntensity_ });
+            Vector4{ params.GetColor(settings_.gammaCorrection_), params.specularIntensity_ });
 
-        drawQueue_.AddShaderParameter(PSP_LIGHTRAD, lightParams_->radius_);
-        drawQueue_.AddShaderParameter(PSP_LIGHTLENGTH, lightParams_->length_);
+        drawQueue_.AddShaderParameter(PSP_LIGHTRAD, params.radius_);
+        drawQueue_.AddShaderParameter(PSP_LIGHTLENGTH, params.length_);
 
-        if (lightParams_->numLightMatrices_ > 0)
+        if (params.numLightMatrices_ > 0)
         {
-            ea::span<const Matrix4> shadowMatricesSpan{ lightParams_->lightMatrices_, lightParams_->numLightMatrices_ };
+            ea::span<const Matrix4> shadowMatricesSpan{ params.lightMatrices_, params.numLightMatrices_ };
             drawQueue_.AddShaderParameter(VSP_LIGHTMATRICES, shadowMatricesSpan);
         }
 
-        if (lightParams_->shadowMap_)
+        if (params.shadowMap_)
         {
-            drawQueue_.AddShaderParameter(PSP_SHADOWDEPTHFADE, lightParams_->shadowDepthFade_);
-            drawQueue_.AddShaderParameter(PSP_SHADOWINTENSITY, lightParams_->shadowIntensity_);
-            drawQueue_.AddShaderParameter(PSP_SHADOWMAPINVSIZE, lightParams_->shadowMapInvSize_);
-            drawQueue_.AddShaderParameter(PSP_SHADOWSPLITS, lightParams_->shadowSplits_);
-            drawQueue_.AddShaderParameter(PSP_SHADOWCUBEUVBIAS, lightParams_->shadowCubeUVBias_);
-            drawQueue_.AddShaderParameter(PSP_SHADOWCUBEADJUST, lightParams_->shadowCubeAdjust_);
+            drawQueue_.AddShaderParameter(PSP_SHADOWDEPTHFADE, params.shadowDepthFade_);
+            drawQueue_.AddShaderParameter(PSP_SHADOWINTENSITY, params.shadowIntensity_);
+            drawQueue_.AddShaderParameter(PSP_SHADOWMAPINVSIZE, params.shadowMapInvSize_);
+            drawQueue_.AddShaderParameter(PSP_SHADOWSPLITS, params.shadowSplits_);
+            drawQueue_.AddShaderParameter(PSP_SHADOWCUBEUVBIAS, params.shadowCubeUVBias_);
+            drawQueue_.AddShaderParameter(PSP_SHADOWCUBEADJUST, params.shadowCubeAdjust_);
             drawQueue_.AddShaderParameter(PSP_VSMSHADOWPARAMS, settings_.vsmShadowParams_);
         }
     }
 
-    /// Convert PipelineBatch to DrawCommandQueue commands.
+    void AddObjectConstants()
+    {
+        if (enabled_.ambientLighting_)
+        {
+            if (settings_.ambientMode_ == AmbientMode::Flat)
+                drawQueue_.AddShaderParameter(VSP_AMBIENT, object_.ambient_);
+            else if (settings_.ambientMode_ == AmbientMode::Directional)
+            {
+                const SphericalHarmonicsDot9& sh = *object_.sh_;
+                drawQueue_.AddShaderParameter(VSP_SHAR, sh.Ar_);
+                drawQueue_.AddShaderParameter(VSP_SHAG, sh.Ag_);
+                drawQueue_.AddShaderParameter(VSP_SHAB, sh.Ab_);
+                drawQueue_.AddShaderParameter(VSP_SHBR, sh.Br_);
+                drawQueue_.AddShaderParameter(VSP_SHBG, sh.Bg_);
+                drawQueue_.AddShaderParameter(VSP_SHBB, sh.Bb_);
+                drawQueue_.AddShaderParameter(VSP_SHC, sh.C_);
+            }
+        }
+
+        switch (object_.geometryType_)
+        {
+        case GEOM_SKINNED:
+            drawQueue_.AddShaderParameter(VSP_SKINMATRICES,
+                ea::span<const Matrix3x4>(object_.worldTransform_, object_.numWorldTransforms_));
+            break;
+
+        case GEOM_BILLBOARD:
+            drawQueue_.AddShaderParameter(VSP_MODEL, *object_.worldTransform_);
+            if (object_.numWorldTransforms_ > 1)
+                drawQueue_.AddShaderParameter(VSP_BILLBOARDROT, object_.worldTransform_[1].RotationMatrix());
+            else
+                drawQueue_.AddShaderParameter(VSP_BILLBOARDROT, cameraNode_.GetWorldRotation().RotationMatrix());
+            break;
+
+        default:
+            drawQueue_.AddShaderParameter(VSP_MODEL, *object_.worldTransform_);
+            break;
+        }
+    }
+
+    void AddObjectInstanceData()
+    {
+        instancingBuffer_.SetElements(object_.worldTransform_, 0, 3);
+        if (enabled_.ambientLighting_)
+        {
+            if (settings_.ambientMode_ == AmbientMode::Flat)
+                instancingBuffer_.SetElements(&object_.ambient_, 3, 1);
+            else if (settings_.ambientMode_ == AmbientMode::Directional)
+                instancingBuffer_.SetElements(object_.sh_, 3, 7);
+        }
+    }
+    /// @}
+
+    /// Draw ops
+    /// @{
+    void DrawObject()
+    {
+        IndexBuffer* indexBuffer = current_.geometry_->GetIndexBuffer();
+        if (dirty_.geometry_)
+        {
+            drawQueue_.SetBuffers({ current_.geometry_->GetVertexBuffers(), indexBuffer, nullptr });
+            dirty_.geometry_ = false;
+        }
+
+        if (indexBuffer != nullptr)
+            drawQueue_.DrawIndexed(current_.geometry_->GetIndexStart(), current_.geometry_->GetIndexCount());
+        else
+            drawQueue_.Draw(current_.geometry_->GetVertexStart(), current_.geometry_->GetVertexCount());
+    }
+
+    void DrawObjectInstanced()
+    {
+        assert(instancingGroup_.count_ > 0);
+        Geometry* geometry = instancingGroup_.geometry_;
+        drawQueue_.SetBuffers({ geometry->GetVertexBuffers(), geometry->GetIndexBuffer(),
+            instancingBuffer_.GetVertexBuffer() });
+        drawQueue_.DrawIndexedInstanced(geometry->GetIndexStart(), geometry->GetIndexCount(),
+            instancingGroup_.start_, instancingGroup_.count_);
+        instancingGroup_.count_ = 0;
+    }
+    /// @}
+
     void ProcessBatch(const PipelineBatch& pipelineBatch, const SourceBatch& sourceBatch)
     {
-        const LightAccumulator* lightAccumulator = enableAmbientLight_ || enableVertexLights_
+        const LightAccumulator* lightAccumulator = enabled_.ambientLighting_ || enabled_.vertexLighting_
             ? &drawableProcessor_.GetGeometryLighting(pipelineBatch.drawableIndex_)
             : nullptr;
 
-        // Check if pipeline state changed
-        const bool pipelineStateDirty = pipelineBatch.pipelineState_ != lastPipelineState_;
-        if (pipelineStateDirty)
-            lastPipelineState_ = pipelineBatch.pipelineState_;
+        ExtractObjectConstants(sourceBatch, lightAccumulator);
 
-        // Check if camera parameters changed
-        const float constantDepthBias = pipelineBatch.pipelineState_->GetDesc().constantDepthBias_;
-        if (lastConstantDepthBias_ != constantDepthBias)
+        // Update dirty flags and cached state
+        CheckDirtyCommonState(pipelineBatch);
+        if (enabled_.pixelLighting_)
+            CheckDirtyPixelLight(pipelineBatch);
+        if (enabled_.vertexLighting_)
+            CheckDirtyVertexLight(*lightAccumulator);
+        if (enabled_.ambientLighting_)
+            CheckDirtyLightmap(sourceBatch);
+
+        const bool resetInstancingGroup = instancingGroup_.count_ == 0 || dirty_.IsAnyStateDirty();
+        if (resetInstancingGroup)
         {
-            lastConstantDepthBias_ = constantDepthBias;
-            cameraDirty_ = true;
-        }
+            if (instancingGroup_.count_ > 0)
+                DrawObjectInstanced();
 
-        // Check if pixel lights changed
-        bool pixelLightDirty = false;
-        if (enablePixelLights_)
-        {
-            pixelLightDirty = pipelineBatch.lightIndex_ != lastLightIndex_;
+            UpdateDirtyConstants();
+            UpdateDirtyResources();
 
-            if (pixelLightDirty)
-            {
-                CachePixelLight(pipelineBatch.lightIndex_);
-                lastLightIndex_ = pipelineBatch.lightIndex_;
-            }
-        }
-
-        // Check if vertex lights changed
-        bool vertexLightsDirty = false;
-        if (enableVertexLights_)
-        {
-            vertexLights_ = lightAccumulator->GetVertexLights();
-            vertexLightsDirty = lastVertexLights_ != vertexLights_;
-
-            if (vertexLightsDirty)
-            {
-                CacheVertexLights(vertexLights_);
-                lastVertexLights_ = vertexLights_;
-            }
-        }
-
-        // Check if material is dirty
-        const bool materialDirty = lastMaterial_ != pipelineBatch.material_;
-        if (materialDirty)
-            lastMaterial_ = pipelineBatch.material_;
-
-        // Check if geometry is dirty
-        const bool geometryDirty = lastGeometry_ != pipelineBatch.geometry_;
-
-        // Check if batch should be appended to ongoing instanced draw operation
-        const bool appendInstancedBatch = instanceCount_ > 0
-            && !pipelineStateDirty && !pixelLightDirty && !vertexLightsDirty && !materialDirty && !geometryDirty;
-
-        // Update state if not instanced batch
-        if (!appendInstancedBatch)
-        {
-            // Flush draw commands if instancing draw was in progress
-            FlushDrawCommands();
-
-            // TODO(renderer): Cleanup me
-            if (geometryDirty)
-                lastGeometry_ = pipelineBatch.geometry_;
-
-            // Initialize pipeline state
-            if (pipelineStateDirty)
-                drawQueue_.SetPipelineState(pipelineBatch.pipelineState_);
-
-            // Add frame shader parameters
-            if (drawQueue_.BeginShaderParameterGroup(SP_FRAME, frameDirty_))
-            {
-                AddFrameShaderParameters();
-                drawQueue_.CommitShaderParameterGroup(SP_FRAME);
-                frameDirty_ = false;
-            }
-
-            // Add camera shader parameters
-            if (drawQueue_.BeginShaderParameterGroup(SP_CAMERA, cameraDirty_))
-            {
-                AddCameraShaderParameters(constantDepthBias);
-                drawQueue_.CommitShaderParameterGroup(SP_CAMERA);
-                cameraDirty_ = false;
-            }
-
-            // Add light shader parameters
-            // TODO(renderer): Check for shadow map
-            if (drawQueue_.BeginShaderParameterGroup(SP_LIGHT, pixelLightDirty || vertexLightsDirty))
-            //if (enableLight_ && drawQueue_.BeginShaderParameterGroup(SP_LIGHT, pixelLightDirty || vertexLightsDirty))
-            {
-                AddLightShaderParameters();
-                drawQueue_.CommitShaderParameterGroup(SP_LIGHT);
-            }
-
-            // Add material shader parameters
-            // TODO(renderer): Check for sourceBatch.lightmapScaleOffset_ dirty?
-            if (drawQueue_.BeginShaderParameterGroup(SP_MATERIAL, materialDirty || sourceBatch.lightmapScaleOffset_))
-            {
-                const auto& materialParameters = pipelineBatch.material_->GetShaderParameters();
-                for (const auto& parameter : materialParameters)
-                    drawQueue_.AddShaderParameter(parameter.first, parameter.second.value_);
-                if (enableAmbientLight_ && sourceBatch.lightmapScaleOffset_)
-                    drawQueue_.AddShaderParameter(VSP_LMOFFSET, *sourceBatch.lightmapScaleOffset_);
-                drawQueue_.CommitShaderParameterGroup(SP_MATERIAL);
-            }
-
-            // Add resources
-            // TODO(renderer): Don't check for pixelLightDirty, check for shadow map and ramp/shape only
-            if (materialDirty || pixelLightDirty || sourceBatch.lightmapScaleOffset_)
-            {
-                // Add global resources
-                for (const ShaderResourceDesc& desc : globalResources_)
-                    drawQueue_.AddShaderResource(desc.unit_, desc.texture_);
-
-                // Add material resources
-                const auto& materialTextures = pipelineBatch.material_->GetTextures();
-                for (const auto& texture : materialTextures)
-                    drawQueue_.AddShaderResource(texture.first, texture.second);
-
-                // Add lightmap
-                if (enableAmbientLight_)
-                    drawQueue_.AddShaderResource(TU_EMISSIVE, scene_->GetLightmapTexture(sourceBatch.lightmapIndex_));
-
-                // Add light resources
-                if (hasPixelLight_)
-                {
-                    drawQueue_.AddShaderResource(TU_LIGHTRAMP, lightParams_->lightRamp_);
-                    drawQueue_.AddShaderResource(TU_LIGHTSHAPE, lightParams_->lightShape_);
-                    if (lightParams_->shadowMap_)
-                        drawQueue_.AddShaderResource(TU_SHADOWMAP, lightParams_->shadowMap_);
-                }
-
-                drawQueue_.CommitShaderResources();
-            }
-
-            // Add object shader parameters
-            const bool useInstancingBuffer = enableStaticInstancing_
+            const bool beginInstancingGroup = enabled_.staticInstancing_
                 && pipelineBatch.geometryType_ == GEOM_STATIC
-                && !!pipelineBatch.geometry_->GetIndexBuffer();
-            if (useInstancingBuffer)
+                && pipelineBatch.geometry_->GetIndexBuffer() != nullptr;
+            if (beginInstancingGroup)
             {
-                // TODO(renderer): Refactor me
-                instanceCount_ = 1;
-                startInstance_ = instancingBuffer_.AddInstance();
-                instancingBuffer_.SetElements(sourceBatch.worldTransform_, 0, 3);
-                if (enableAmbientLight_)
-                {
-                    const SphericalHarmonicsDot9& sh = lightAccumulator->sphericalHarmonics_;
-                    const Vector4 ambient(AdjustSHAmbient(sh.EvaluateAverage()), 1.0f);
-                    if (settings_.ambientMode_ == AmbientMode::Flat)
-                        instancingBuffer_.SetElements(&ambient, 3, 1);
-                    else if (settings_.ambientMode_ == AmbientMode::Directional)
-                        instancingBuffer_.SetElements(&sh, 3, 7);
-                }
+                instancingGroup_.count_ = 1;
+                instancingGroup_.start_ = instancingBuffer_.AddInstance();
+                instancingGroup_.geometry_ = current_.geometry_;
+                AddObjectInstanceData();
             }
-            else if (drawQueue_.BeginShaderParameterGroup(SP_OBJECT, true))
+            else
             {
-                // Add ambient light parameters
-                if (enableAmbientLight_)
-                {
-                    const SphericalHarmonicsDot9& sh = lightAccumulator->sphericalHarmonics_;
-                    drawQueue_.AddShaderParameter(VSP_SHAR, sh.Ar_);
-                    drawQueue_.AddShaderParameter(VSP_SHAG, sh.Ag_);
-                    drawQueue_.AddShaderParameter(VSP_SHAB, sh.Ab_);
-                    drawQueue_.AddShaderParameter(VSP_SHBR, sh.Br_);
-                    drawQueue_.AddShaderParameter(VSP_SHBG, sh.Bg_);
-                    drawQueue_.AddShaderParameter(VSP_SHBB, sh.Bb_);
-                    drawQueue_.AddShaderParameter(VSP_SHC, sh.C_);
-                    drawQueue_.AddShaderParameter(VSP_AMBIENT, Vector4(AdjustSHAmbient(sh.EvaluateAverage()), 1.0f));
-                }
-
-                // Add transform parameters
-                switch (pipelineBatch.geometryType_)
-                {
-                case GEOM_INSTANCED:
-                    // TODO(renderer): Do something with this branch
-                    assert(0);
-                    break;
-                case GEOM_SKINNED:
-                    drawQueue_.AddShaderParameter(VSP_SKINMATRICES,
-                        ea::span<const Matrix3x4>(sourceBatch.worldTransform_, sourceBatch.numWorldTransforms_));
-                    break;
-                case GEOM_BILLBOARD:
-                    drawQueue_.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
-                    if (sourceBatch.numWorldTransforms_ > 1)
-                        drawQueue_.AddShaderParameter(VSP_BILLBOARDROT, sourceBatch.worldTransform_[1].RotationMatrix());
-                    else
-                        drawQueue_.AddShaderParameter(VSP_BILLBOARDROT, cameraNode_->GetWorldRotation().RotationMatrix());
-                    break;
-                default:
-                    drawQueue_.AddShaderParameter(VSP_MODEL, *sourceBatch.worldTransform_);
-                    break;
-                }
+                drawQueue_.BeginShaderParameterGroup(SP_OBJECT, true);
+                AddObjectConstants();
                 drawQueue_.CommitShaderParameterGroup(SP_OBJECT);
 
-                // Set buffers and draw
-                drawQueue_.SetBuffers({ pipelineBatch.geometry_->GetVertexBuffers(), pipelineBatch.geometry_->GetIndexBuffer(), nullptr });
-                drawQueue_.DrawIndexed(pipelineBatch.geometry_->GetIndexStart(), pipelineBatch.geometry_->GetIndexCount());
+                DrawObject();
             }
         }
         else
         {
-            // TODO(renderer): Refactor me
-            instanceCount_ += 1;
+            ++instancingGroup_.count_;
             instancingBuffer_.AddInstance();
-            instancingBuffer_.SetElements(sourceBatch.worldTransform_, 0, 3);
-            if (enableAmbientLight_)
-            {
-                const SphericalHarmonicsDot9& sh = lightAccumulator->sphericalHarmonics_;
-                const Vector4 ambient(AdjustSHAmbient(sh.EvaluateAverage()), 1.0f);
-                if (settings_.ambientMode_ == AmbientMode::Flat)
-                    instancingBuffer_.SetElements(&ambient, 3, 1);
-                else if (settings_.ambientMode_ == AmbientMode::Directional)
-                    instancingBuffer_.SetElements(&sh, 3, 7);
-            }
+            AddObjectInstanceData();
         }
     }
 
     /// Destination draw queue.
     DrawCommandQueue& drawQueue_;
 
-    /// Export ambient light and vertex lights.
-    const bool enableAmbientLight_;
-    /// Export ambient light and vertex lights.
-    const bool enableVertexLights_;
-    /// Export pixel light.
-    const bool enablePixelLights_;
-    /// Export light of any kind.
-    const bool enableLight_;
-    /// Use instancing buffer for object parameters of static geometry.
-    const bool enableStaticInstancing_;
-
-    /// Settings.
+    /// External state (required)
+    /// @{
     const BatchRendererSettings& settings_;
-
-    /// Drawable processor.
     const DrawableProcessor& drawableProcessor_;
-    /// Instancing buffer.
     InstancingBufferCompositor& instancingBuffer_;
-    const ShadowSplitProcessor* const destinationShadowSplit_{};
-    /// Frame info.
     const FrameInfo& frameInfo_;
-    /// Scene.
-    Scene* const scene_{};
-    /// Light array for indexing.
+    // TODO(renderer): Make it immutable so we can safely execute this code in multiple threads
+    Scene& scene_;
     const ea::vector<LightProcessor*>& lights_;
-    /// Render camera.
-    const Camera* const camera_{};
-    /// Render camera node.
-    const Node* const cameraNode_{};
+    const Camera& camera_;
+    const Node& cameraNode_;
+    /// @}
 
-    /// Offset and scale of GBuffer.
+    /// External state (optional)
+    /// @{
+    const ShadowSplitProcessor* const outputShadowSplit_{};
     Vector4 geometryBufferOffsetAndScale_;
-    /// Inverse size of GBuffer.
     Vector2 geometryBufferInvSize_;
-
-    /// Global resources.
     ea::span<const ShaderResourceDesc> globalResources_;
+    /// @}
 
-    /// Last used pipeline state.
-    PipelineState* lastPipelineState_{};
+    struct EnabledFeatureFlags
+    {
+        EnabledFeatureFlags(BatchRenderFlags flags)
+            : ambientLighting_(flags.Test(BatchRenderFlag::AmbientLight))
+            , vertexLighting_(flags.Test(BatchRenderFlag::VertexLights))
+            , pixelLighting_(flags.Test(BatchRenderFlag::PixelLight))
+            , anyLighting_(ambientLighting_ || vertexLighting_ || pixelLighting_)
+            , staticInstancing_(flags.Test(BatchRenderFlag::InstantiateStaticGeometry))
+        {
+        }
 
-    /// Whether frame shader parameters are dirty.
-    bool frameDirty_{ true };
-    /// Whether camera shader parameters are dirty.
-    bool cameraDirty_{ true };
-    /// Last used constant depth bias. Ignored on first frame.
-    float lastConstantDepthBias_{ 0.0f };
+        const bool ambientLighting_;
+        const bool vertexLighting_;
+        const bool pixelLighting_;
+        const bool anyLighting_;
+        const bool staticInstancing_;
+    } const enabled_;
 
-    /// Last used pixel light.
-    unsigned lastLightIndex_{ M_MAX_UNSIGNED };
-    /// Whether pixel light is active.
-    bool hasPixelLight_{};
-    /// Pixel light paramters.
-    const LightShaderParameters* lightParams_{};
+    struct DirtyStateFlags
+    {
+        bool pipelineState_{};
+        bool frameConstants_{ true };
+        bool cameraConstants_{ true };
 
-    /// Last used vertex lights.
-    LightAccumulator::VertexLightContainer lastVertexLights_{};
-    /// Current vertex lights.
-    LightAccumulator::VertexLightContainer vertexLights_{};
-    /// Cached vertex lights data.
-    Vector4 vertexLightsData_[MAX_VERTEX_LIGHTS * 3]{};
+        bool pixelLightConstants_{};
+        bool pixelLightTextures_{};
 
-    /// Last used material.
-    Material* lastMaterial_{};
-    /// Last used geometry.
-    Geometry* lastGeometry_{};
+        bool vertexLightConstants_{};
 
-    /// Temporary world transform for light volumes.
-    Matrix3x4 lightVolumeTransform_;
-    /// Temporary source batch for light volumes.
-    SourceBatch lightVolumeSourceBatch_;
+        bool lightmapConstants_{};
+        bool lightmapTextures_{};
 
-    /// Start instance for pending call.
-    unsigned startInstance_{};
-    /// Number of instances in call.
-    unsigned instanceCount_{};
+        bool material_{};
+        bool geometry_{};
+
+        bool IsAnyStateDirty() const
+        {
+            return pipelineState_ || frameConstants_ || cameraConstants_
+                || pixelLightConstants_ || pixelLightTextures_ || vertexLightConstants_
+                || lightmapConstants_ || lightmapTextures_ || material_ || geometry_;
+        }
+    } dirty_;
+
+    struct CachedSharedState
+    {
+        PipelineState* pipelineState_{};
+        float constantDepthBias_{};
+
+        unsigned pixelLightIndex_{ M_MAX_UNSIGNED };
+        bool pixelLightEnabled_{};
+        const LightShaderParameters* pixelLightParams_{};
+        Texture* pixelLightRamp_{};
+        Texture* pixelLightShape_{};
+        Texture* pixelLightShadowMap_{};
+
+        LightAccumulator::VertexLightContainer vertexLights_{};
+        Vector4 vertexLightsData_[MAX_VERTEX_LIGHTS * 3]{};
+
+        Texture* lightmapTexture_{};
+        const Vector4* lightmapScaleOffset_{};
+
+        Material* material_{};
+        Geometry* geometry_{};
+    } current_;
+
+    struct ObjectState
+    {
+        const SphericalHarmonicsDot9* sh_{};
+        Vector4 ambient_;
+        GeometryType geometryType_{};
+        const Matrix3x4* worldTransform_{};
+        unsigned numWorldTransforms_{};
+    } object_;
+
+    struct InstancingGroupState
+    {
+        Geometry* geometry_{};
+        unsigned start_{};
+        unsigned count_{};
+    } instancingGroup_;
+
+    struct LightVolumeBatchHelpers
+    {
+        Matrix3x4 transform_;
+        SourceBatch sourceBatch_;
+    } lightVolumeHelpers_;
 };
 
 }
@@ -598,10 +689,10 @@ void BatchRenderer::SetSettings(const BatchRendererSettings& settings)
 }
 
 void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
-    ea::span<const PipelineBatchByState> batches, const ShadowSplitProcessor* destinationShadowSplit)
+    ea::span<const PipelineBatchByState> batches, const ShadowSplitProcessor* outputShadowSplit)
 {
     DrawCommandCompositor compositor(drawQueue, settings_,
-        *drawableProcessor_, *instancingBuffer_, camera, flags, destinationShadowSplit);
+        *drawableProcessor_, *instancingBuffer_, camera, flags, outputShadowSplit);
 
     for (const auto& sortedBatch : batches)
         compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
@@ -609,10 +700,10 @@ void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* cam
 }
 
 void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
-    ea::span<const PipelineBatchBackToFront> batches, const ShadowSplitProcessor* destinationShadowSplit)
+    ea::span<const PipelineBatchBackToFront> batches, const ShadowSplitProcessor* outputShadowSplit)
 {
     DrawCommandCompositor compositor(drawQueue, settings_,
-        *drawableProcessor_, *instancingBuffer_, camera, flags, destinationShadowSplit);
+        *drawableProcessor_, *instancingBuffer_, camera, flags, outputShadowSplit);
 
     for (const auto& sortedBatch : batches)
         compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);

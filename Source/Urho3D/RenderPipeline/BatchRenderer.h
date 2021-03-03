@@ -122,24 +122,23 @@ public:
 
     /// Render batches (sorted by state).
     void RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
-        ea::span<const PipelineBatchByState> batches, const ShadowSplitProcessor* destinationShadowSplit = nullptr);
+        ea::span<const PipelineBatchByState> batches, const ShadowSplitProcessor* outputShadowSplit = nullptr);
     /// Render batches (sorted by distance).
     void RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
-        ea::span<const PipelineBatchBackToFront> batches, const ShadowSplitProcessor* destinationShadowSplit = nullptr);
+        ea::span<const PipelineBatchBackToFront> batches, const ShadowSplitProcessor* outputShadowSplit = nullptr);
 
     /// Render light volume batches for deferred rendering.
     void RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera* camera,
         const LightVolumeRenderContext& ctx, ea::span<const PipelineBatchByState> batches);
 
 private:
-    /// Renderer subsystem.
+    /// External dependencies
+    /// @{
     Renderer* renderer_{};
-    /// Drawable processor.
     const DrawableProcessor* drawableProcessor_{};
-    /// Instancing buffer.
     InstancingBufferCompositor* instancingBuffer_{};
+    /// @}
 
-    /// Settings.
     BatchRendererSettings settings_;
 };
 
