@@ -129,8 +129,8 @@ SceneProcessor::SceneProcessor(RenderPipelineInterface* renderPipeline, const ea
     , drawableProcessor_(MakeShared<DrawableProcessor>(renderPipeline))
     , batchCompositor_(MakeShared<BatchCompositor>(renderPipeline, drawableProcessor_, Technique::GetPassIndex("shadow")))
     , shadowMapAllocator_(MakeShared<ShadowMapAllocator>(context_))
-    , instancingBufferCompositor_(MakeShared<InstancingBufferCompositor>(context_))
-    , batchRenderer_(MakeShared<BatchRenderer>(context_, drawableProcessor_, instancingBufferCompositor_))
+    , instancingBuffer_(MakeShared<InstancingBuffer>(context_))
+    , batchRenderer_(MakeShared<BatchRenderer>(context_, drawableProcessor_, instancingBuffer_))
     , drawQueue_(renderPipeline->GetDefaultDrawQueue())
 {
     renderPipeline->OnUpdateBegin.Subscribe(this, &SceneProcessor::OnUpdateBegin);
@@ -176,7 +176,7 @@ void SceneProcessor::SetSettings(const SceneProcessorSettings& settings)
         settings_ = settings;
         drawableProcessor_->SetSettings(settings_.drawableProcessing_);
         shadowMapAllocator_->SetSettings(settings_.shadowMap_);
-        instancingBufferCompositor_->SetSettings(settings_.instancing_);
+        instancingBuffer_->SetSettings(settings_.instancing_);
         batchRenderer_->SetSettings(settings_.rendering_);
     }
 }
@@ -266,9 +266,9 @@ void SceneProcessor::RenderShadowMaps()
 
             drawQueue_->Reset();
 
-            instancingBufferCompositor_->Begin();
+            instancingBuffer_->Begin();
             batchRenderer_->RenderBatches(*drawQueue_, split.GetShadowCamera(), flags, sortedShadowBatches_, &split);
-            instancingBufferCompositor_->End();
+            instancingBuffer_->End();
 
             shadowMapAllocator_->BeginShadowMap(split.GetShadowMap());
             drawQueue_->Execute();

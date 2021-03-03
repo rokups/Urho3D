@@ -26,6 +26,7 @@
 #include "../Core/WorkQueue.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Math/NumericRange.h"
+#include "../RenderPipeline/CommonSettings.h"
 #include "../RenderPipeline/LightAccumulator.h"
 
 #include <atomic>
@@ -141,31 +142,6 @@ protected:
 
     /// Geometry batches.
     WorkQueueVector<GeometryBatch> geometryBatches_;
-};
-
-/// Drawable processor settings.
-struct DrawableProcessorSettings
-{
-    /// Material quality.
-    MaterialQuality materialQuality_{ QUALITY_HIGH };
-    /// Max number of vertex lights.
-    unsigned maxVertexLights_{ 4 };
-    /// Max number of pixel lights.
-    unsigned maxPixelLights_{ 4 };
-
-    /// Calculate pipeline state hash.
-    unsigned CalculatePipelineStateHash() const { return 0; }
-
-    /// Compare settings.
-    bool operator==(const DrawableProcessorSettings& rhs) const
-    {
-        return materialQuality_ == rhs.materialQuality_
-            && maxVertexLights_ == rhs.maxVertexLights_
-            && maxPixelLights_ == rhs.maxPixelLights_;
-    }
-
-    /// Compare settings.
-    bool operator!=(const DrawableProcessorSettings& rhs) const { return !(*this == rhs); }
 };
 
 /// Drawable processing utility.

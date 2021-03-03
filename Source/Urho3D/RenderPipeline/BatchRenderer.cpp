@@ -32,7 +32,7 @@
 #include "../IO/Log.h"
 #include "../RenderPipeline/BatchRenderer.h"
 #include "../RenderPipeline/DrawableProcessor.h"
-#include "../RenderPipeline/InstancingBufferCompositor.h"
+#include "../RenderPipeline/InstancingBuffer.h"
 #include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/PipelineBatchSortKey.h"
 #include "../Scene/Scene.h"
@@ -104,7 +104,7 @@ public:
     /// Initialized
     /// @{
     DrawCommandCompositor(DrawCommandQueue& drawQueue, const BatchRendererSettings& settings,
-        const DrawableProcessor& drawableProcessor, InstancingBufferCompositor& instancingBuffer,
+        const DrawableProcessor& drawableProcessor, InstancingBuffer& instancingBuffer,
         const Camera* renderCamera, BatchRenderFlags flags, const ShadowSplitProcessor* outputShadowSplit)
         : drawQueue_(drawQueue)
         , settings_(settings)
@@ -357,6 +357,7 @@ private:
     void AddCameraConstants(float constantDepthBias)
     {
         drawQueue_.AddShaderParameter(VSP_GBUFFEROFFSETS, geometryBufferOffsetAndScale_);
+        drawQueue_.AddShaderParameter(PSP_GBUFFERINVSIZE, geometryBufferInvSize_);
 
         const Matrix3x4 cameraEffectiveTransform = camera_.GetEffectiveWorldTransform();
         drawQueue_.AddShaderParameter(VSP_CAMERAPOS, cameraEffectiveTransform.Translation());
@@ -567,7 +568,7 @@ private:
     /// @{
     const BatchRendererSettings& settings_;
     const DrawableProcessor& drawableProcessor_;
-    InstancingBufferCompositor& instancingBuffer_;
+    InstancingBuffer& instancingBuffer_;
     const FrameInfo& frameInfo_;
     // TODO(renderer): Make it immutable so we can safely execute this code in multiple threads
     Scene& scene_;
@@ -675,7 +676,7 @@ private:
 }
 
 BatchRenderer::BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor,
-    InstancingBufferCompositor* instancingBuffer)
+    InstancingBuffer* instancingBuffer)
     : Object(context)
     , renderer_(context_->GetSubsystem<Renderer>())
     , drawableProcessor_(drawableProcessor)

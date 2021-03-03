@@ -25,6 +25,7 @@
 #include "../Core/Object.h"
 #include "../Graphics/DrawCommandQueue.h"
 #include "../Graphics/GraphicsDefs.h"
+#include "../RenderPipeline/CommonSettings.h"
 
 #include <EASTL/span.h>
 
@@ -33,51 +34,11 @@ namespace Urho3D
 
 class Camera;
 class DrawableProcessor;
-class InstancingBufferCompositor;
+class InstancingBuffer;
 class ShadowSplitProcessor;
 class Texture;
 struct PipelineBatchBackToFront;
 struct PipelineBatchByState;
-
-/// Ambient lighting mode.
-enum class AmbientMode
-{
-    Constant,
-    Flat,
-    Directional,
-};
-
-/// Batch renderer settings.
-struct BatchRendererSettings
-{
-    /// Whether to apply gamma correction.
-    bool gammaCorrection_{};
-
-    /// Ambient mode.
-    AmbientMode ambientMode_{ AmbientMode::Directional };
-    /// Variance shadow map parameters.
-    Vector2 vsmShadowParams_{ 0.0000001f, 0.9f };
-
-    /// Calculate pipeline state hash.
-    unsigned CalculatePipelineStateHash() const
-    {
-        unsigned hash = 0;
-        CombineHash(hash, gammaCorrection_);
-        CombineHash(hash, MakeHash(ambientMode_));
-        return hash;
-    }
-
-    /// Compare settings.
-    bool operator==(const BatchRendererSettings& rhs) const
-    {
-        return gammaCorrection_ == rhs.gammaCorrection_
-            && ambientMode_ == rhs.ambientMode_
-            && vsmShadowParams_ == rhs.vsmShadowParams_;
-    }
-
-    /// Compare settings.
-    bool operator!=(const BatchRendererSettings& rhs) const { return !(*this == rhs); }
-};
 
 /// Batch rendering flags.
 enum class BatchRenderFlag
@@ -115,7 +76,7 @@ class URHO3D_API BatchRenderer : public Object
 public:
     /// Construct.
     BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor,
-        InstancingBufferCompositor* instancingBuffer);
+        InstancingBuffer* instancingBuffer);
 
     /// Set settings.
     void SetSettings(const BatchRendererSettings& settings);
@@ -136,7 +97,7 @@ private:
     /// @{
     Renderer* renderer_{};
     const DrawableProcessor* drawableProcessor_{};
-    InstancingBufferCompositor* instancingBuffer_{};
+    InstancingBuffer* instancingBuffer_{};
     /// @}
 
     BatchRendererSettings settings_;

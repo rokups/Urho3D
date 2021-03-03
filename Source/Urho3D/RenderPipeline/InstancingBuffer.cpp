@@ -23,19 +23,19 @@
 #include "../Precompiled.h"
 
 #include "../IO/Log.h"
-#include "../RenderPipeline/InstancingBufferCompositor.h"
+#include "../RenderPipeline/InstancingBuffer.h"
 
 #include "../DebugNew.h"
 
 namespace Urho3D
 {
 
-InstancingBufferCompositor::InstancingBufferCompositor(Context* context)
+InstancingBuffer::InstancingBuffer(Context* context)
     : Object(context)
 {
 }
 
-void InstancingBufferCompositor::SetSettings(const InstancingBufferCompositorSettings& settings)
+void InstancingBuffer::SetSettings(const InstancingBufferSettings& settings)
 {
     if (settings_ != settings)
     {
@@ -44,12 +44,12 @@ void InstancingBufferCompositor::SetSettings(const InstancingBufferCompositorSet
     }
 }
 
-void InstancingBufferCompositor::Begin()
+void InstancingBuffer::Begin()
 {
     nextVertex_ = 0;
 }
 
-void InstancingBufferCompositor::End()
+void InstancingBuffer::End()
 {
     if (nextVertex_ == 0 || !settings_.enable_)
         return;
@@ -67,7 +67,7 @@ void InstancingBufferCompositor::End()
     vertexBuffer_->SetData(data_.data());
 }
 
-void InstancingBufferCompositor::Initialize()
+void InstancingBuffer::Initialize()
 {
     nextVertex_ = 0;
     vertexElements_.clear();
@@ -90,7 +90,7 @@ void InstancingBufferCompositor::Initialize()
     }
 }
 
-void InstancingBufferCompositor::GrowBuffer()
+void InstancingBuffer::GrowBuffer()
 {
     numVertices_ = numVertices_ > 0 ? 2 * numVertices_ : 128;
     data_.resize(numVertices_ * vertexStride_);

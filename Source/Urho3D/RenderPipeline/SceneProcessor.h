@@ -25,8 +25,9 @@
 #include "../Graphics/Drawable.h"
 #include "../RenderPipeline/BatchCompositor.h"
 #include "../RenderPipeline/BatchRenderer.h"
+#include "../RenderPipeline/CommonSettings.h"
 #include "../RenderPipeline/DrawableProcessor.h"
-#include "../RenderPipeline/InstancingBufferCompositor.h"
+#include "../RenderPipeline/InstancingBuffer.h"
 #include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
 
@@ -37,67 +38,6 @@ class DrawCommandQueue;
 class RenderPipelineInterface;
 class RenderSurface;
 class Viewport;
-
-/// Scene processor settings.
-struct URHO3D_API SceneProcessorSettings
-{
-    /// Default VSM shadow params.
-    static const Vector2 DefaultVSMShadowParams;
-
-    /// Drawable processor settings.
-    DrawableProcessorSettings drawableProcessing_;
-    /// Shadow map allocator settings.
-    ShadowMapAllocatorSettings shadowMap_;
-    /// Instancing buffer settings.
-    InstancingBufferCompositorSettings instancing_;
-    /// Batch rendering settings.
-    BatchRendererSettings rendering_;
-
-    /// Whether to render shadows.
-    bool enableShadows_{ true };
-    /// Whether to enable deferred rendering.
-    bool deferred_{ false };
-
-    /// Whether to render occlusion triangles in multiple threads.
-    bool threadedOcclusion_{};
-    /// Max number of occluder triangles.
-    unsigned maxOccluderTriangles_{ 5000 };
-    /// Occlusion buffer width.
-    unsigned occlusionBufferSize_{ 256 };
-    /// Occluder screen size threshold.
-    float occluderSizeThreshold_{ 0.025f };
-
-    /// Calculate pipeline state hash.
-    unsigned CalculatePipelineStateHash() const
-    {
-        unsigned hash = 0;
-        CombineHash(hash, drawableProcessing_.CalculatePipelineStateHash());
-        CombineHash(hash, shadowMap_.CalculatePipelineStateHash());
-        CombineHash(hash, instancing_.CalculatePipelineStateHash());
-        CombineHash(hash, rendering_.CalculatePipelineStateHash());
-        CombineHash(hash, enableShadows_);
-        CombineHash(hash, deferred_);
-        return hash;
-    }
-
-    /// Compare settings.
-    bool operator==(const SceneProcessorSettings& rhs) const
-    {
-        return drawableProcessing_ == rhs.drawableProcessing_
-            && shadowMap_ == rhs.shadowMap_
-            && instancing_ == rhs.instancing_
-            && rendering_ == rhs.rendering_
-            && enableShadows_ == rhs.enableShadows_
-            && deferred_ == rhs.deferred_
-            && threadedOcclusion_ == rhs.threadedOcclusion_
-            && maxOccluderTriangles_ == rhs.maxOccluderTriangles_
-            && occlusionBufferSize_ == rhs.occlusionBufferSize_
-            && occluderSizeThreshold_ == rhs.occluderSizeThreshold_;
-    }
-
-    /// Compare settings.
-    bool operator!=(const SceneProcessorSettings& rhs) const { return !(*this == rhs); }
-};
 
 /// Scene processor for RenderPipeline
 class URHO3D_API SceneProcessor : public Object, public LightProcessorCallback
@@ -141,7 +81,7 @@ public:
     /// Return transient shadow map allocator.
     ShadowMapAllocator* GetShadowMapAllocator() const { return shadowMapAllocator_; }
     /// Return instancing buffer.
-    InstancingBufferCompositor* GetInstancingBuffer() const { return instancingBufferCompositor_; }
+    InstancingBuffer* GetInstancingBuffer() const { return instancingBuffer_; }
     /// Return batch renderer.
     BatchRenderer* GetBatchRenderer() const { return batchRenderer_; }
 
@@ -164,7 +104,7 @@ private:
     /// Transient shadow map allocator.
     SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
     /// Instancing buffer compositor.
-    SharedPtr<InstancingBufferCompositor> instancingBufferCompositor_;
+    SharedPtr<InstancingBuffer> instancingBuffer_;
     /// Batch renderer.
     SharedPtr<BatchRenderer> batchRenderer_;
     /// Draw queue for main thread.

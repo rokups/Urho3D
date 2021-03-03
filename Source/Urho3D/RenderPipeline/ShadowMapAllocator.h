@@ -28,6 +28,7 @@
 #include "../Graphics/PipelineState.h"
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Light.h"
+#include "../RenderPipeline/CommonSettings.h"
 
 #include <EASTL/vector.h>
 
@@ -50,40 +51,6 @@ struct ShadowMap
     operator bool() const { return !!texture_; }
     /// Return shadow map split.
     ShadowMap GetSplit(unsigned split, const IntVector2& numSplits) const;
-};
-
-/// Shadow map allocator settings.
-struct ShadowMapAllocatorSettings
-{
-    /// Whether to use Variance Shadow Maps
-    bool varianceShadowMap_{};
-    /// Multisampling level of Variance Shadow Maps.
-    int varianceShadowMapMultiSample_{ 1 };
-    /// Whether to use low precision 16-bit depth maps.
-    bool lowPrecisionShadowMaps_{};
-    /// Size of shadow map atlas page.
-    unsigned shadowMapPageSize_{ 2048 };
-
-    /// Calculate pipeline state hash.
-    unsigned CalculatePipelineStateHash() const
-    {
-        unsigned hash = 0;
-        CombineHash(hash, varianceShadowMap_);
-        CombineHash(hash, lowPrecisionShadowMaps_);
-        return hash;
-    }
-
-    /// Compare settings.
-    bool operator==(const ShadowMapAllocatorSettings& rhs) const
-    {
-        return varianceShadowMap_ == rhs.varianceShadowMap_
-            && varianceShadowMapMultiSample_ == rhs.varianceShadowMapMultiSample_
-            && lowPrecisionShadowMaps_ == rhs.lowPrecisionShadowMaps_
-            && shadowMapPageSize_ == rhs.shadowMapPageSize_;
-    }
-
-    /// Compare settings.
-    bool operator!=(const ShadowMapAllocatorSettings& rhs) const { return !(*this == rhs); }
 };
 
 /// Utility to allocate shadow maps in texture pool.
