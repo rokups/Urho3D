@@ -32,7 +32,7 @@
 #include "../IO/Log.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/LightProcessor.h"
-#include "../RenderPipeline/RenderPipelineInterface.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../Scene/Scene.h"
 
 #include <EASTL/sort.h>
@@ -137,9 +137,9 @@ DrawableProcessorPass::AddBatchResult DrawableProcessorPass::AddBatch(unsigned t
     return { true, !!lightPass };
 }
 
-void DrawableProcessorPass::OnUpdateBegin(const FrameInfo& frameInfo)
+void DrawableProcessorPass::OnUpdateBegin(const CommonFrameInfo& frameInfo)
 {
-    geometryBatches_.Clear(frameInfo.numThreads_);
+    geometryBatches_.Clear();
 }
 
 DrawableProcessor::DrawableProcessor(RenderPipelineInterface* renderPipeline)
@@ -148,7 +148,6 @@ DrawableProcessor::DrawableProcessor(RenderPipelineInterface* renderPipeline)
     , defaultMaterial_(GetSubsystem<Renderer>()->GetDefaultMaterial())
     , lightProcessorCache_(ea::make_unique<LightProcessorCache>())
 {
-    renderPipeline->OnUpdateBegin.Subscribe(this, &DrawableProcessor::OnUpdateBegin);
 }
 
 DrawableProcessor::~DrawableProcessor()
@@ -165,19 +164,19 @@ void DrawableProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
     // Initialize frame constants
     frameInfo_ = frameInfo;
     numDrawables_ = frameInfo_.octree_->GetAllDrawables().size();
-    cullCameraViewMatrix_ = frameInfo_.cullCamera_->GetView();
+    cullCameraViewMatrix_ = frameInfo_.camera_->GetView();
     cullCameraZAxis_ = { cullCameraViewMatrix_.m20_, cullCameraViewMatrix_.m21_, cullCameraViewMatrix_.m22_ };
     cullCameraZAxisAbs_ = cullCameraZAxis_.Abs();
 
     materialQuality_ = settings_.materialQuality_;
-    if (frameInfo_.cullCamera_->GetViewOverrideFlags() & VO_LOW_MATERIAL_QUALITY)
+    if (frameInfo_.camera_->GetViewOverrideFlags() & VO_LOW_MATERIAL_QUALITY)
         materialQuality_ = QUALITY_LOW;
 
     gi_ = frameInfo_.scene_->GetComponent<GlobalIllumination>();
 
     // Clean temporary containers
     sceneZRangeTemp_.clear();
-    sceneZRangeTemp_.resize(frameInfo.numThreads_);
+    sceneZRangeTemp_.resize(WorkQueue::GetMaxThreadIndex());
     sceneZRange_ = {};
 
     isDrawableUpdated_.resize(numDrawables_);
@@ -191,18 +190,18 @@ void DrawableProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
     geometryLighting_.resize(numDrawables_);
 
     sortedOccluders_.clear();
-    visibleGeometries_.Clear(frameInfo_.numThreads_);
-    threadedGeometryUpdates_.Clear(frameInfo_.numThreads_);
-    nonThreadedGeometryUpdates_.Clear(frameInfo_.numThreads_);
+    visibleGeometries_.Clear();
+    threadedGeometryUpdates_.Clear();
+    nonThreadedGeometryUpdates_.Clear();
 
-    visibleLightsTemp_.Clear(frameInfo_.numThreads_);
+    visibleLightsTemp_.Clear();
 
-    queuedDrawableUpdates_.Clear(frameInfo_.numThreads_);
+    queuedDrawableUpdates_.Clear();
 }
 
 void DrawableProcessor::ProcessOccluders(const ea::vector<Drawable*>& occluders, float sizeThreshold)
 {
-    Camera* cullCamera = frameInfo_.cullCamera_;
+    Camera* cullCamera = frameInfo_.camera_;
     const float halfViewSize = cullCamera->GetHalfViewSize();
     const float invOrthoSize = 1.0f / cullCamera->GetOrthoSize();
 
@@ -298,7 +297,7 @@ void DrawableProcessor::QueueDrawableGeometryUpdate(unsigned threadIndex, Drawab
 void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
 {
     const unsigned drawableIndex = drawable->GetDrawableIndex();
-    const unsigned threadIndex = WorkQueue::GetWorkerThreadIndex();
+    const unsigned threadIndex = WorkQueue::GetThreadIndex();
 
     drawable->UpdateBatches(frameInfo_);
     drawable->MarkInView(frameInfo_);
@@ -471,7 +470,7 @@ void DrawableProcessor::PreprocessShadowCasters(ea::vector<Drawable*>& shadowCas
 
     // Convert frustum (or sub-frustum) to shadow camera space
     const FloatRange splitZRange = lightType != LIGHT_DIRECTIONAL ? sceneZRange_ : (sceneZRange_ & frustumSubRange);
-    const Frustum frustum = frameInfo_.cullCamera_->GetSplitFrustum(splitZRange.first, splitZRange.second);
+    const Frustum frustum = frameInfo_.camera_->GetSplitFrustum(splitZRange.first, splitZRange.second);
     const Frustum lightSpaceFrustum = frustum.Transformed(worldToLightSpace);
     const BoundingBox lightSpaceFrustumBoundingBox(lightSpaceFrustum);
 
@@ -512,7 +511,7 @@ void DrawableProcessor::ProcessShadowCasters()
     {
         ProcessQueuedDrawable(drawable);
     });
-    queuedDrawableUpdates_.Clear(frameInfo_.numThreads_);
+    queuedDrawableUpdates_.Clear();
 }
 
 void DrawableProcessor::ProcessQueuedDrawable(Drawable* drawable)
@@ -522,7 +521,7 @@ void DrawableProcessor::ProcessQueuedDrawable(Drawable* drawable)
 
     const BoundingBox& boundingBox = drawable->GetWorldBoundingBox();
     UpdateDrawableZone(boundingBox, drawable);
-    QueueDrawableGeometryUpdate(WorkQueue::GetWorkerThreadIndex(), drawable);
+    QueueDrawableGeometryUpdate(WorkQueue::GetThreadIndex(), drawable);
 }
 
 void DrawableProcessor::SortLightProcessorsByShadowMap()

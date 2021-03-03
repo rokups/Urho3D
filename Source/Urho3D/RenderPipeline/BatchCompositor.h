@@ -84,7 +84,7 @@ public:
 protected:
     /// Callbacks from RenderPipeline
     /// @{
-    void OnUpdateBegin(const FrameInfo& frameInfo) override;
+    void OnUpdateBegin(const CommonFrameInfo& frameInfo) override;
     virtual void OnPipelineStatesInvalidated();
     /// @}
 
@@ -181,7 +181,7 @@ public:
 protected:
     /// Callbacks from RenderPipeline
     /// @{
-    virtual void OnUpdateBegin(const FrameInfo& frameInfo);
+    virtual void OnUpdateBegin(const CommonFrameInfo& frameInfo);
     virtual void OnPipelineStatesInvalidated();
     /// @}
 

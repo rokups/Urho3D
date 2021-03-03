@@ -29,7 +29,7 @@
 #include "../RenderPipeline/CameraProcessor.h"
 #include "../RenderPipeline/RenderBuffer.h"
 #include "../RenderPipeline/RenderBufferManager.h"
-#include "../RenderPipeline/RenderPipelineInterface.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../RenderPipeline/PostProcessPass.h"
 #include "../RenderPipeline/ScenePass.h"
 #include "../Scene/Serializable.h"
@@ -73,7 +73,7 @@ struct PostProcessSettings
 };
 
 ///
-struct RenderPipelineSettings : public SceneProcessorSettings
+struct RenderPipelineSettings : public BaseRenderPipelineSettings
 {
     PostProcessSettings postProcess_;
 };
@@ -131,14 +131,13 @@ private:
     /// Previous pipeline state hash.
     unsigned oldPipelineStateHash_{};
 
-    /// Default draw queue.
+    CommonFrameInfo frameInfo_;
+
     SharedPtr<DrawCommandQueue> drawQueue_;
-    /// Render buffer manager.
     SharedPtr<RenderBufferManager> renderBufferManager_;
-    /// Scene processor.
+    SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
+    SharedPtr<InstancingBuffer> instancingBuffer_;
     SharedPtr<SceneProcessor> sceneProcessor_;
-    /// Main camera of render pipeline.
-    SharedPtr<CameraProcessor> cameraProcessor_;
 
     SharedPtr<OpaqueForwardLightingScenePass> basePass_;
     SharedPtr<AlphaForwardLightingScenePass> alphaPass_;

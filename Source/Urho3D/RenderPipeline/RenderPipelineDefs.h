@@ -23,13 +23,67 @@
 #pragma once
 
 #include "../Container/Hash.h"
+#include "../Core/Signal.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Math/Vector2.h"
+#include "../Scene/Serializable.h"
 
 namespace Urho3D
 {
 
+class DrawCommandQueue;
+class PipelineState;
+class RenderSurface;
 class Texture2D;
+class Viewport;
+struct BatchStateCreateKey;
+struct BatchStateCreateContext;
+
+/// Common parameters of rendered frame.
+struct CommonFrameInfo
+{
+    unsigned frameNumber_{};
+    float timeStep_{};
+
+    IntVector2 viewportSize_;
+    IntRect viewportRect_;
+
+    Viewport* viewport_{};
+    RenderSurface* renderTarget_{};
+};
+
+/// Pipeline state cache callback used to create actual pipeline state.
+class BatchStateCacheCallback
+{
+public:
+    /// Create pipeline state given context and key.
+    /// Only attributes that constribute to pipeline state hashes are safe to use.
+    virtual SharedPtr<PipelineState> CreateBatchPipelineState(
+        const BatchStateCreateKey& key, const BatchStateCreateContext& ctx) = 0;
+};
+
+/// Base interface of render pipeline required by Render Pipeline classes.
+class URHO3D_API RenderPipelineInterface
+    : public Serializable
+    , public BatchStateCacheCallback
+{
+    URHO3D_OBJECT(RenderPipelineInterface, Serializable);
+
+public:
+    using Serializable::Serializable;
+
+    /// Return default draw queue that can be reused.
+    virtual DrawCommandQueue* GetDefaultDrawQueue() = 0;
+
+    /// Callbacks
+    /// @{
+    Signal<void(const CommonFrameInfo& frameInfo)> OnUpdateBegin;
+    Signal<void(const CommonFrameInfo& frameInfo)> OnUpdateEnd;
+    Signal<void(const CommonFrameInfo& frameInfo)> OnRenderBegin;
+    Signal<void(const CommonFrameInfo& frameInfo)> OnRenderEnd;
+    Signal<void()> OnPipelineStatesInvalidated;
+    /// @}
+};
 
 /// Region of shadow map that contains one or more shadow split.
 struct ShadowMapRegion
@@ -191,8 +245,6 @@ struct OcclusionBufferSettings
 struct SceneProcessorSettings
     : public DrawableProcessorSettings
     , public OcclusionBufferSettings
-    , public ShadowMapAllocatorSettings
-    , public InstancingBufferSettings
     , public BatchRendererSettings
 {
     bool enableShadows_{ true };
@@ -205,8 +257,6 @@ struct SceneProcessorSettings
         unsigned hash = 0;
         CombineHash(hash, DrawableProcessorSettings::CalculatePipelineStateHash());
         CombineHash(hash, OcclusionBufferSettings::CalculatePipelineStateHash());
-        CombineHash(hash, ShadowMapAllocatorSettings::CalculatePipelineStateHash());
-        CombineHash(hash, InstancingBufferSettings::CalculatePipelineStateHash());
         CombineHash(hash, BatchRendererSettings::CalculatePipelineStateHash());
         CombineHash(hash, enableShadows_);
         CombineHash(hash, deferredLighting_);
@@ -217,14 +267,39 @@ struct SceneProcessorSettings
     {
         return DrawableProcessorSettings::operator==(rhs)
             && OcclusionBufferSettings::operator==(rhs)
-            && ShadowMapAllocatorSettings::operator==(rhs)
-            && InstancingBufferSettings::operator==(rhs)
             && BatchRendererSettings::operator==(rhs)
             && enableShadows_ == rhs.enableShadows_
             && deferredLighting_ == rhs.deferredLighting_;
     }
 
     bool operator!=(const SceneProcessorSettings& rhs) const { return !(*this == rhs); }
+    /// @}
+};
+
+struct BaseRenderPipelineSettings
+    : public SceneProcessorSettings
+    , public ShadowMapAllocatorSettings
+    , public InstancingBufferSettings
+{
+    /// Utility operators
+    /// @{
+    unsigned CalculatePipelineStateHash() const
+    {
+        unsigned hash = 0;
+        CombineHash(hash, SceneProcessorSettings::CalculatePipelineStateHash());
+        CombineHash(hash, ShadowMapAllocatorSettings::CalculatePipelineStateHash());
+        CombineHash(hash, InstancingBufferSettings::CalculatePipelineStateHash());
+        return hash;
+    }
+
+    bool operator==(const BaseRenderPipelineSettings& rhs) const
+    {
+        return SceneProcessorSettings::operator==(rhs)
+            && ShadowMapAllocatorSettings::operator==(rhs)
+            && InstancingBufferSettings::operator==(rhs);
+    }
+
+    bool operator!=(const BaseRenderPipelineSettings& rhs) const { return !(*this == rhs); }
     /// @}
 };
 

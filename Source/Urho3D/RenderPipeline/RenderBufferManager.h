@@ -168,8 +168,8 @@ private:
     /// RenderPipeline callbacks
     /// @{
     void OnPipelineStatesInvalidated();
-    void OnRenderBegin(const FrameInfo& frameInfo);
-    void OnRenderEnd(const FrameInfo& frameInfo);
+    void OnRenderBegin(const CommonFrameInfo& frameInfo);
+    void OnRenderEnd(const CommonFrameInfo& frameInfo);
     /// @}
 
     void InitializeCopyTexturePipelineState();

@@ -26,7 +26,7 @@
 #include "../Graphics/Renderer.h"
 #include "../RenderPipeline/BatchCompositor.h"
 #include "../RenderPipeline/LightProcessor.h"
-#include "../RenderPipeline/RenderPipelineInterface.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../Scene/Node.h"
 
 #include "../DebugNew.h"
@@ -105,16 +105,16 @@ void BatchCompositorPass::ComposeBatches()
     OnBatchesReady();
 }
 
-void BatchCompositorPass::OnUpdateBegin(const FrameInfo& frameInfo)
+void BatchCompositorPass::OnUpdateBegin(const CommonFrameInfo& frameInfo)
 {
     BaseClassName::OnUpdateBegin(frameInfo);
 
-    baseBatches_.Clear(frameInfo.numThreads_);
-    lightBatches_.Clear(frameInfo.numThreads_);
+    baseBatches_.Clear();
+    lightBatches_.Clear();
 
-    delayedUnlitBaseBatches_.Clear(frameInfo.numThreads_);
-    delayedLitBaseBatches_.Clear(frameInfo.numThreads_);
-    delayedLightBatches_.Clear(frameInfo.numThreads_);
+    delayedUnlitBaseBatches_.Clear();
+    delayedLitBaseBatches_.Clear();
+    delayedLightBatches_.Clear();
 }
 
 void BatchCompositorPass::OnPipelineStatesInvalidated()
@@ -315,9 +315,9 @@ void BatchCompositor::ComposeLightVolumeBatches()
     SortBatches(sortedLightVolumeBatches_, lightVolumeBatches_);
 }
 
-void BatchCompositor::OnUpdateBegin(const FrameInfo& frameInfo)
+void BatchCompositor::OnUpdateBegin(const CommonFrameInfo& frameInfo)
 {
-    delayedShadowBatches_.Clear(frameInfo.numThreads_);
+    delayedShadowBatches_.Clear();
     lightVolumeBatches_.clear();
     sortedLightVolumeBatches_.clear();
 }
@@ -333,7 +333,7 @@ void BatchCompositor::BeginShadowBatchesComposition(unsigned lightIndex, ShadowS
     LightProcessor* lightProcessor = splitProcessor->GetLightProcessor();
     const unsigned lightHash = lightProcessor->GetShadowHash(splitProcessor->GetSplitIndex());
 
-    const unsigned threadIndex = WorkQueue::GetWorkerThreadIndex();
+    const unsigned threadIndex = WorkQueue::GetThreadIndex();
     const auto& shadowCasters = splitProcessor->GetShadowCasters();
     auto& shadowBatches = splitProcessor->GetMutableShadowBatches();
     const unsigned lightMask = splitProcessor->GetLight()->GetLightMask();

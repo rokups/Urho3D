@@ -387,7 +387,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     const CullMode passCullMode = pass->GetCullMode();
     const CullMode materialCullMode = isShadowPass ? material->GetShadowCullMode() : material->GetCullMode();
     const CullMode cullMode = passCullMode != MAX_CULLMODES ? passCullMode : materialCullMode;
-    desc.cullMode_ = isShadowPass ? cullMode : GetEffectiveCullMode(cullMode, sceneProcessor_->GetFrameInfo().cullCamera_);
+    desc.cullMode_ = isShadowPass ? cullMode : GetEffectiveCullMode(cullMode, sceneProcessor_->GetFrameInfo().camera_);
 
     if (ctx.pass_ == deferredPass_)
     {
@@ -526,6 +526,8 @@ void RenderPipeline::ValidateSettings()
 void RenderPipeline::ApplySettings()
 {
     sceneProcessor_->SetSettings(settings_);
+    instancingBuffer_->SetSettings(settings_);
+    shadowMapAllocator_->SetSettings(settings_);
 
     // Initialize or reset deferred rendering
     // TODO(renderer): Make it more clean
@@ -629,15 +631,20 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
     {
         drawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
         renderBufferManager_ = MakeShared<RenderBufferManager>(this);
-        sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow");
-        cameraProcessor_ = MakeShared<CameraProcessor>(this);
+        shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
+        instancingBuffer_ = MakeShared<InstancingBuffer>(context_);
+        sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow", shadowMapAllocator_, instancingBuffer_);
     }
 
-    sceneProcessor_->Define(renderTarget, viewport);
-    if (!sceneProcessor_->IsValid())
+    frameInfo_.viewport_ = viewport;
+    frameInfo_.renderTarget_ = renderTarget;
+    frameInfo_.viewportRect_ = viewport->GetEffectiveRect(renderTarget);
+    frameInfo_.viewportSize_ = frameInfo_.viewportRect_.Size();
+
+    if (!sceneProcessor_->Define(frameInfo_))
         return false;
 
-    cameraProcessor_->Initialize(viewport->GetCamera());
+    sceneProcessor_->SetRenderCamera(viewport->GetCamera());
 
     //settings_.deferredLighting_ = true;
     //settings_.enableInstancing_ = GetSubsystem<Renderer>()->GetDynamicInstancing();
@@ -656,8 +663,8 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 void RenderPipeline::Update(const FrameInfo& frameInfo)
 {
     // Begin update. Should happen before pipeline state hash check.
-    sceneProcessor_->UpdateFrameInfo(frameInfo);
-    OnUpdateBegin(this, sceneProcessor_->GetFrameInfo());
+    shadowMapAllocator_->ResetAllShadowMaps();
+    OnUpdateBegin(this, frameInfo_);
 
     // Invalidate pipeline states if necessary
     MarkPipelineStateHashDirty();
@@ -670,7 +677,7 @@ void RenderPipeline::Update(const FrameInfo& frameInfo)
 
     sceneProcessor_->Update();
 
-    OnUpdateEnd(this, sceneProcessor_->GetFrameInfo());
+    OnUpdateEnd(this, frameInfo_);
 }
 
 void RenderPipeline::Render()
@@ -700,7 +707,7 @@ void RenderPipeline::Render()
     }
     renderBufferManager_->RequestViewport(viewportFlags, viewportParams);
 
-    OnRenderBegin(this, sceneProcessor_->GetFrameInfo());
+    OnRenderBegin(this, frameInfo_);
 
     // TODO(renderer): Do something about this hack
     graphics_->SetVertexBuffer(nullptr);
@@ -708,8 +715,6 @@ void RenderPipeline::Render()
     sceneProcessor_->RenderShadowMaps();
 
     auto sceneBatchRenderer_ = sceneProcessor_->GetBatchRenderer();
-    auto instancingBuffer = sceneProcessor_->GetInstancingBuffer();
-    auto flag = settings_.enableInstancing_ ? BatchRenderFlag::EnableInstancingForStaticGeometry : BatchRenderFlag::None;
     const Color fogColor = sceneProcessor_->GetFrameInfo().camera_->GetEffectiveFogColor();
 
     // TODO(renderer): Remove this guard
@@ -731,10 +736,11 @@ void RenderPipeline::Render()
 
         drawQueue_->Reset();
 
-        instancingBuffer->Begin();
+        instancingBuffer_->Begin();
         sceneBatchRenderer_->RenderBatches({ *drawQueue_, *sceneProcessor_->GetFrameInfo().camera_ },
-            BatchRenderFlag::EnableAmbientLighting | flag, deferredPass_->GetBatches());
-        instancingBuffer->End();
+            BatchRenderFlag::EnableAmbientLighting | BatchRenderFlag::EnableInstancingForStaticGeometry,
+            deferredPass_->GetBatches());
+        instancingBuffer_->End();
 
         drawQueue_->Execute();
 
@@ -769,15 +775,15 @@ void RenderPipeline::Render()
         renderBufferManager_->SetOutputRenderTargers();
 
         drawQueue_->Reset();
-        instancingBuffer->Begin();
+        instancingBuffer_->Begin();
         BatchRenderingContext ctx{ *drawQueue_, *sceneProcessor_->GetFrameInfo().camera_ };
         sceneBatchRenderer_->RenderBatches(ctx,
-            BatchRenderFlag::EnableAmbientLighting | BatchRenderFlag::EnableVertexLights | BatchRenderFlag::EnablePixelLights | flag, basePass_->GetSortedBaseBatches());
+            BatchRenderFlag::EnableAmbientLighting | BatchRenderFlag::EnableVertexLights | BatchRenderFlag::EnablePixelLights | BatchRenderFlag::EnableInstancingForStaticGeometry, basePass_->GetSortedBaseBatches());
         sceneBatchRenderer_->RenderBatches(ctx,
-            BatchRenderFlag::EnablePixelLights | flag, basePass_->GetSortedLightBatches());
+            BatchRenderFlag::EnablePixelLights | BatchRenderFlag::EnableInstancingForStaticGeometry, basePass_->GetSortedLightBatches());
         sceneBatchRenderer_->RenderBatches(ctx,
-            BatchRenderFlag::EnableAmbientLighting | BatchRenderFlag::EnableVertexLights | BatchRenderFlag::EnablePixelLights | flag, alphaPass_->GetSortedBatches());
-        instancingBuffer->End();
+            BatchRenderFlag::EnableAmbientLighting | BatchRenderFlag::EnableVertexLights | BatchRenderFlag::EnablePixelLights | BatchRenderFlag::EnableInstancingForStaticGeometry, alphaPass_->GetSortedBatches());
+        instancingBuffer_->End();
         drawQueue_->Execute();
     }
 
@@ -815,14 +821,14 @@ void RenderPipeline::Render()
     for (PostProcessPass* postProcessPass : postProcessPasses_)
         postProcessPass->Execute();
 
-    OnRenderEnd(this, sceneProcessor_->GetFrameInfo());
+    OnRenderEnd(this, frameInfo_);
 }
 
 unsigned RenderPipeline::RecalculatePipelineStateHash() const
 {
     unsigned hash = 0;
     CombineHash(hash, graphics_->GetConstantBuffersEnabled());
-    CombineHash(hash, cameraProcessor_->GetPipelineStateHash());
+    CombineHash(hash, sceneProcessor_->GetCameraProcessor()->GetPipelineStateHash());
     CombineHash(hash, settings_.CalculatePipelineStateHash());
     return hash;
 }

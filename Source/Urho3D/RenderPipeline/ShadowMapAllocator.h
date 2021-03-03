@@ -27,7 +27,7 @@
 #include "../Math/Rect.h"
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Light.h"
-#include "../RenderPipeline/CommonTypes.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 
 #include <EASTL/vector.h>
 

@@ -34,7 +34,8 @@ namespace Urho3D
 {
 
 /// Thread index.
-static thread_local unsigned workerThreadIndex_ = M_MAX_UNSIGNED;
+static thread_local unsigned currentThreadIndex = M_MAX_UNSIGNED;
+static unsigned maxThreadIndex = 1;
 
 /// Worker thread managed by the work queue.
 class WorkerThread : public Thread, public RefCounted
@@ -51,7 +52,7 @@ public:
     void ThreadFunction() override
     {
         URHO3D_PROFILE_THREAD(Format("WorkerThread {}", (uint64_t)GetCurrentThreadID()).c_str());
-        workerThreadIndex_ = index_;
+        currentThreadIndex = index_;
         // Init FPU state first
         InitFPU();
         owner_->ProcessItems(index_);
@@ -77,7 +78,7 @@ WorkQueue::WorkQueue(Context* context) :
     lastSize_(0),
     maxNonThreadedWorkMs_(5)
 {
-    workerThreadIndex_ = 0;
+    currentThreadIndex = 0;
     SubscribeToEvent(E_BEGINFRAME, URHO3D_HANDLER(WorkQueue, HandleBeginFrame));
 }
 
@@ -102,6 +103,7 @@ void WorkQueue::CreateThreads(unsigned numThreads)
     // Start threads in paused mode
     Pause();
 
+    maxThreadIndex = numThreads + 1;
     for (unsigned i = 0; i < numThreads; ++i)
     {
         SharedPtr<WorkerThread> thread(new WorkerThread(this, i + 1));
@@ -452,9 +454,14 @@ void WorkQueue::HandleBeginFrame(StringHash eventType, VariantMap& eventData)
     PurgePool();
 }
 
-unsigned WorkQueue::GetWorkerThreadIndex()
+unsigned WorkQueue::GetThreadIndex()
 {
-    return workerThreadIndex_;
+    return currentThreadIndex;
+}
+
+unsigned WorkQueue::GetMaxThreadIndex()
+{
+    return maxThreadIndex;
 }
 
 }

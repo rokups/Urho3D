@@ -24,7 +24,7 @@
 
 #include "../Graphics/Camera.h"
 #include "../Math/NumericRange.h"
-#include "../RenderPipeline/CommonTypes.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../RenderPipeline/PipelineBatchSortKey.h"
 #include "../Scene/Node.h"
 

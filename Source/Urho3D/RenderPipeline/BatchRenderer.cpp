@@ -112,7 +112,7 @@ public:
         , scene_(*frameInfo_.scene_)
         , lights_(drawableProcessor_.GetLightProcessors())
         , cameraNode_(*camera_.GetNode())
-        , enabled_(flags)
+        , enabled_(flags, instancingBuffer)
     {
     }
 
@@ -562,20 +562,21 @@ private:
 
     struct EnabledFeatureFlags
     {
-        EnabledFeatureFlags(BatchRenderFlags flags)
+        EnabledFeatureFlags(BatchRenderFlags flags, InstancingBuffer& instancingBuffer)
             : ambientLighting_(flags.Test(BatchRenderFlag::EnableAmbientLighting))
             , vertexLighting_(flags.Test(BatchRenderFlag::EnableVertexLights))
             , pixelLighting_(flags.Test(BatchRenderFlag::EnablePixelLights))
             , anyLighting_(ambientLighting_ || vertexLighting_ || pixelLighting_)
-            , staticInstancing_(flags.Test(BatchRenderFlag::EnableInstancingForStaticGeometry))
+            , staticInstancing_(instancingBuffer.IsEnabled()
+                && flags.Test(BatchRenderFlag::EnableInstancingForStaticGeometry))
         {
         }
 
-        const bool ambientLighting_;
-        const bool vertexLighting_;
-        const bool pixelLighting_;
-        const bool anyLighting_;
-        const bool staticInstancing_;
+        bool ambientLighting_;
+        bool vertexLighting_;
+        bool pixelLighting_;
+        bool anyLighting_;
+        bool staticInstancing_;
     } const enabled_;
 
     struct DirtyStateFlags

@@ -25,7 +25,7 @@
 #include "../Core/NonCopyable.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/PipelineState.h"
-//#include "../RenderPipeline/PipelineBatchSortKey.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 
 namespace Urho3D
 {
@@ -112,16 +112,6 @@ struct BatchStateCreateContext
     /// Index of subpass.
     unsigned subpassIndex_{};
     unsigned shadowSplitIndex_{};
-};
-
-/// Pipeline state cache callback used to create actual pipeline state.
-class BatchStateCacheCallback
-{
-public:
-    /// Create pipeline state given context and key.
-    /// Only attributes that constribute to pipeline state hashes are safe to use.
-    virtual SharedPtr<PipelineState> CreateBatchPipelineState(
-        const BatchStateCreateKey& key, const BatchStateCreateContext& ctx) = 0;
 };
 
 /// Pipeline state cache for RenderPipeline batches.

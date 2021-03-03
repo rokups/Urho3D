@@ -123,8 +123,10 @@ public:
     /// Return how many milliseconds maximum to spend on non-threaded low-priority work.
     int GetNonThreadedWorkMs() const { return maxNonThreadedWorkMs_; }
 
-    /// Return current worker thread.
-    static unsigned GetWorkerThreadIndex();
+    /// Return current thread index.
+    static unsigned GetThreadIndex();
+    /// Return number of threads used by WorkQueue, including main thread. Current thread index is always lower.
+    static unsigned GetMaxThreadIndex();
 
 private:
     /// Process work items until shut down. Called by the worker threads.
@@ -169,10 +171,16 @@ template <class T>
 class WorkQueueVector : public MultiVector<T>
 {
 public:
+    /// Clear collection, considering number of threads in WorkQueue.
+    void Clear()
+    {
+        MultiVector<T>::Clear(WorkQueue::GetMaxThreadIndex());
+    }
+
     /// Insert new element. Thread-safe as long as called from WorkQueue threads (or main thread).
     auto Insert(const T& value)
     {
-        const unsigned threadIndex = WorkQueue::GetWorkerThreadIndex();
+        const unsigned threadIndex = WorkQueue::GetThreadIndex();
         return this->PushBack(threadIndex, value);
     }
 };

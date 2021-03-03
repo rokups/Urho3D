@@ -24,8 +24,9 @@
 
 #include "../Graphics/Drawable.h"
 #include "../Graphics/Octree.h"
-#include "../RenderPipeline/RenderPipelineInterface.h"
+#include "../IO/Log.h"
 #include "../RenderPipeline/CameraProcessor.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../Scene/Node.h"
 
 #include "../DebugNew.h"
@@ -33,55 +34,76 @@
 namespace Urho3D
 {
 
-CameraProcessor::CameraProcessor(RenderPipelineInterface* renderPipeline)
-    : Object(renderPipeline->GetContext())
+CameraProcessor::CameraProcessor(Context* context)
+    : Object(context)
 {
-    renderPipeline->OnUpdateBegin.Subscribe(this, &CameraProcessor::OnUpdateBegin);
-    renderPipeline->OnRenderEnd.Subscribe(this, &CameraProcessor::OnRenderEnd);
 }
 
-void CameraProcessor::Initialize(Camera* camera)
+void CameraProcessor::SetCameras(ea::span<Camera* const> cameras)
 {
-    camera_ = camera;
+    const unsigned numCameras = cameras.size();
+    cameras_.resize(numCameras);
+    ea::copy(cameras.begin(), cameras.end(), cameras_.begin());
+
+    if (numCameras > 0)
+    {
+        isCameraFlippedByUser_ = cameras[0]->GetFlipVertical();
+        for (unsigned i = 1; i < numCameras; ++i)
+        {
+            if (isCameraFlippedByUser_ != cameras[i]->GetFlipVertical())
+            {
+                URHO3D_LOGERROR("All Cameras used in RenderPipeline should have the same Flip Vertical flag value");
+                assert(0);
+            }
+        }
+    }
+}
+
+void CameraProcessor::UpdateCamera(const FrameInfo& frameInfo, Camera* camera)
+{
+    const Vector3 cameraPosition = camera->GetNode()->GetWorldPosition();
+    Zone* cameraZone = frameInfo.octree_->QueryZone(cameraPosition, camera->GetZoneMask()).zone_;
+    camera->SetZone(cameraZone);
+
+    if (flipCameraForRendering_)
+        camera->SetFlipVertical(!camera->GetFlipVertical());
+
+    if (camera->GetAutoAspectRatio())
+        camera->SetAspectRatioInternal(static_cast<float>(frameInfo.viewSize_.x_) / frameInfo.viewSize_.y_);
 }
 
 void CameraProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
 {
-    flipCamera_ = false;
+    flipCameraForRendering_ = false;
 
 #ifdef URHO3D_OPENGL
     // On OpenGL, flip the projection if rendering to a texture so that the texture can be addressed in the same way
     // as a render texture produced on Direct3D
     if (frameInfo.renderTarget_)
-        flipCamera_ = true;
+        flipCameraForRendering_ = true;
 #endif
 
-    // Update current camera zone
-    const Vector3 cameraPosition = camera_->GetNode()->GetWorldPosition();
-    Zone* cameraZone = frameInfo.octree_->QueryZone(cameraPosition, camera_->GetZoneMask()).zone_;
-    camera_->SetZone(cameraZone);
-
-    if (camera_)
+    for (Camera* camera : cameras_)
     {
-        if (flipCamera_)
-            camera_->SetFlipVertical(!camera_->GetFlipVertical());
-
-        if (camera_->GetAutoAspectRatio())
-            camera_->SetAspectRatioInternal(static_cast<float>(frameInfo.viewSize_.x_) / frameInfo.viewSize_.y_);
+        if (camera)
+            UpdateCamera(frameInfo, camera);
     }
 }
 
 void CameraProcessor::OnRenderEnd(const FrameInfo& frameInfo)
 {
-    if (flipCamera_ && camera_)
-        camera_->SetFlipVertical(!camera_->GetFlipVertical());
+    for (Camera* camera : cameras_)
+    {
+        if (flipCameraForRendering_ && camera)
+            camera->SetFlipVertical(!camera->GetFlipVertical());
+    }
 }
 
 unsigned CameraProcessor::GetPipelineStateHash() const
 {
     unsigned hash = 0;
-    if (camera_)
-        CombineHash(hash, camera_->GetFlipVertical());
+    CombineHash(hash, isCameraFlippedByUser_);
+    CombineHash(hash, flipCameraForRendering_);
     return hash;
 }
 

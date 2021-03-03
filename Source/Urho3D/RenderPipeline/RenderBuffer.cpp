@@ -33,8 +33,8 @@
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/TextureCube.h"
 #include "../Graphics/Viewport.h"
-#include "../RenderPipeline/RenderPipelineInterface.h"
 #include "../RenderPipeline/RenderBuffer.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../IO/Log.h"
 
 #include <EASTL/unordered_set.h>
@@ -119,9 +119,9 @@ TextureRenderBuffer::~TextureRenderBuffer()
 {
 }
 
-void TextureRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
+void TextureRenderBuffer::OnRenderBegin(const CommonFrameInfo& frameInfo)
 {
-    currentSize_ = CalculateRenderTargetSize(frameInfo.viewRect_, sizeMultiplier_, fixedSize_);
+    currentSize_ = CalculateRenderTargetSize(frameInfo.viewportRect_, sizeMultiplier_, fixedSize_);
     const bool autoResolve = !params_.flags_.Test(RenderBufferFlag::NoMultiSampledAutoResolve);
     const bool isCubemap = params_.flags_.Test(RenderBufferFlag::CubeMap);
     const bool isFiltered = params_.flags_.Test(RenderBufferFlag::BilinearFiltering);
@@ -133,7 +133,7 @@ void TextureRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
     bufferIsReady_ = true;
 }
 
-void TextureRenderBuffer::OnRenderEnd(const FrameInfo& frameInfo)
+void TextureRenderBuffer::OnRenderEnd(const CommonFrameInfo& frameInfo)
 {
     currentTexture_ = nullptr;
     bufferIsReady_ = false;
@@ -169,14 +169,14 @@ RenderSurface* ViewportColorRenderBuffer::GetRenderSurface(CubeMapFace face) con
     return CheckIfBufferIsReady() ? renderTarget_ : nullptr;
 }
 
-void ViewportColorRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
+void ViewportColorRenderBuffer::OnRenderBegin(const CommonFrameInfo& frameInfo)
 {
     renderTarget_ = frameInfo.renderTarget_;
-    viewportRect_ = frameInfo.viewRect_;
+    viewportRect_ = frameInfo.viewportRect_;
     bufferIsReady_ = true;
 }
 
-void ViewportColorRenderBuffer::OnRenderEnd(const FrameInfo& frameInfo)
+void ViewportColorRenderBuffer::OnRenderEnd(const CommonFrameInfo& frameInfo)
 {
     bufferIsReady_ = false;
 }
@@ -196,9 +196,9 @@ RenderSurface* ViewportDepthStencilRenderBuffer::GetRenderSurface(CubeMapFace fa
     return CheckIfBufferIsReady() ? depthStencil_ : nullptr;
 }
 
-void ViewportDepthStencilRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
+void ViewportDepthStencilRenderBuffer::OnRenderBegin(const CommonFrameInfo& frameInfo)
 {
-    viewportRect_ = frameInfo.viewRect_;
+    viewportRect_ = frameInfo.viewportRect_;
 
     if (!frameInfo.renderTarget_)
     {
@@ -218,7 +218,7 @@ void ViewportDepthStencilRenderBuffer::OnRenderBegin(const FrameInfo& frameInfo)
     }
 }
 
-void ViewportDepthStencilRenderBuffer::OnRenderEnd(const FrameInfo& frameInfo)
+void ViewportDepthStencilRenderBuffer::OnRenderEnd(const CommonFrameInfo& frameInfo)
 {
     bufferIsReady_ = false;
 }

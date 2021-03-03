@@ -24,7 +24,7 @@
 
 #include "../Core/NonCopyable.h"
 #include "../Graphics/Light.h"
-#include "../RenderPipeline/CommonTypes.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../RenderPipeline/ShadowSplitProcessor.h"
 
 #include <EASTL/array.h>

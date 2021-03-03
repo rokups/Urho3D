@@ -27,7 +27,7 @@
 #include "../Graphics/RenderSurface.h"
 #include "../Graphics/Texture2D.h"
 #include "../RenderPipeline/RenderBufferManager.h"
-#include "../RenderPipeline/RenderPipelineInterface.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 
 #include <EASTL/optional.h>
 
@@ -462,9 +462,9 @@ void RenderBufferManager::OnPipelineStatesInvalidated()
     copyTexturePipelineState_ = nullptr;
 }
 
-void RenderBufferManager::OnRenderBegin(const FrameInfo& frameInfo)
+void RenderBufferManager::OnRenderBegin(const CommonFrameInfo& frameInfo)
 {
-    viewportRect_ = frameInfo.viewRect_;
+    viewportRect_ = frameInfo.viewportRect_;
 
     // Get parameters of output render surface
     const unsigned outputFormat = RenderSurface::GetFormat(graphics_, frameInfo.renderTarget_);
@@ -476,8 +476,8 @@ void RenderBufferManager::OnRenderBegin(const FrameInfo& frameInfo)
     const bool outputHasReadableDepth = outputDepthStencil && HasReadableDepth(*outputDepthStencil);
 
     Texture2D* outputTexture = GetParentTexture2D(frameInfo.renderTarget_);
-    const bool isFullRectOutput = frameInfo.viewRect_ == IntRect::ZERO
-        || frameInfo.viewRect_ == RenderSurface::GetRect(graphics_, frameInfo.renderTarget_);
+    const bool isFullRectOutput = frameInfo.viewportRect_ == IntRect::ZERO
+        || frameInfo.viewportRect_ == RenderSurface::GetRect(graphics_, frameInfo.renderTarget_);
     const bool isSimpleTextureOutput = outputTexture != nullptr && isFullRectOutput;
     const bool isBilinearFilteredOutput = outputTexture && outputTexture->GetFilterMode() != FILTER_NEAREST;
 
@@ -514,6 +514,7 @@ void RenderBufferManager::OnRenderBegin(const FrameInfo& frameInfo)
         || ((needReadableColor || needReadableDepth || needSimultaneousReadAndWrite) && !isSimpleTextureOutput)
         || (needViewportMRT && !isSimpleTextureOutput);
     const bool needSubstituteDepthBuffer = !isMultiSampleMatching || !outputDepthStencil.has_value()
+        || ((needSecondaryBuffer || needSubstitutePrimaryBuffer) && outputDepthStencil.value() == nullptr)
         || (needReadableDepth && (!outputHasReadableDepth || !isSimpleTextureOutput))
         || (needStencilBuffer && !outputHasStencil);
 
@@ -548,7 +549,7 @@ void RenderBufferManager::OnRenderBegin(const FrameInfo& frameInfo)
     readableColorBuffer_ = needSecondaryBuffer ? substituteRenderBuffers_[1].Get() : nullptr;
 }
 
-void RenderBufferManager::OnRenderEnd(const FrameInfo& frameInfo)
+void RenderBufferManager::OnRenderEnd(const CommonFrameInfo& frameInfo)
 {
     if (writeableColorBuffer_ != viewportColorBuffer_.Get())
     {

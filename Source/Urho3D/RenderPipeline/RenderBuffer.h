@@ -32,6 +32,7 @@
 namespace Urho3D
 {
 
+class CommonFrameInfo;
 class RenderSurface;
 class RenderPipelineInterface;
 class Texture;
@@ -93,8 +94,8 @@ protected:
 
     /// RenderPipeline callbacks
     /// @{
-    virtual void OnRenderBegin(const FrameInfo& frameInfo) = 0;
-    virtual void OnRenderEnd(const FrameInfo& frameInfo) = 0;
+    virtual void OnRenderBegin(const CommonFrameInfo& frameInfo) = 0;
+    virtual void OnRenderEnd(const CommonFrameInfo& frameInfo) = 0;
     /// @}
 
     Renderer* renderer_{};
@@ -119,8 +120,8 @@ public:
     /// @}
 
 private:
-    void OnRenderBegin(const FrameInfo& frameInfo) override;
-    void OnRenderEnd(const FrameInfo& frameInfo) override;
+    void OnRenderBegin(const CommonFrameInfo& frameInfo) override;
+    void OnRenderEnd(const CommonFrameInfo& frameInfo) override;
 
     /// Immutable properties
     /// @{
@@ -155,8 +156,8 @@ public:
     /// @}
 
 private:
-    void OnRenderBegin(const FrameInfo& frameInfo) override;
-    void OnRenderEnd(const FrameInfo& frameInfo) override;
+    void OnRenderBegin(const CommonFrameInfo& frameInfo) override;
+    void OnRenderEnd(const CommonFrameInfo& frameInfo) override;
 
     IntRect viewportRect_{};
     /// Null if rendering to backbuffer.
@@ -180,8 +181,8 @@ public:
     /// @}
 
 private:
-    void OnRenderBegin(const FrameInfo& frameInfo) override;
-    void OnRenderEnd(const FrameInfo& frameInfo) override;
+    void OnRenderBegin(const CommonFrameInfo& frameInfo) override;
+    void OnRenderEnd(const CommonFrameInfo& frameInfo) override;
 
     IntRect viewportRect_{};
     /// Null if rendering to backbuffer or invalid.

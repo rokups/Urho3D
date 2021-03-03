@@ -26,7 +26,7 @@
 #include "../Core/WorkQueue.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Math/NumericRange.h"
-#include "../RenderPipeline/CommonTypes.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../RenderPipeline/LightAccumulator.h"
 
 #include <atomic>
@@ -118,7 +118,7 @@ private:
 protected:
     /// RenderPipeline callbacks
     /// @{
-    virtual void OnUpdateBegin(const FrameInfo& frameInfo);
+    virtual void OnUpdateBegin(const CommonFrameInfo& frameInfo);
     /// @}
 
     WorkQueueVector<GeometryBatch> geometryBatches_;
@@ -132,11 +132,12 @@ class URHO3D_API DrawableProcessor : public Object
 public:
     explicit DrawableProcessor(RenderPipelineInterface* renderPipeline);
     ~DrawableProcessor() override;
-
-    /// Configure
-    /// @{
     void SetPasses(ea::vector<SharedPtr<DrawableProcessorPass>> passes);
     void SetSettings(const DrawableProcessorSettings& settings) { settings_ = settings; }
+
+    /// RenderPipeline callbacks
+    /// @{
+    void OnUpdateBegin(const FrameInfo& frameInfo);
     /// @}
 
     /// Return current frame info.
@@ -188,11 +189,6 @@ public:
     void UpdateGeometries();
 
 protected:
-    /// RenderPipeline callbacks
-    /// @{
-    void OnUpdateBegin(const FrameInfo& frameInfo);
-    /// @}
-
     void ProcessVisibleDrawable(Drawable* drawable);
     void ProcessQueuedDrawable(Drawable* drawable);
     void UpdateDrawableZone(const BoundingBox& boundingBox, Drawable* drawable) const;

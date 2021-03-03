@@ -26,38 +26,36 @@
 #include "../Graphics/Camera.h"
 #include "../Graphics/GraphicsDefs.h"
 
+#include <EASTL/span.h>
+
 namespace Urho3D
 {
 
-class RenderPipelineInterface;
-class RenderSurface;
-class Viewport;
 struct FrameInfo;
 
-/// Utility to process camera(s) rendering to viewport (not cull camera!).
+/// Utility to process render camera (not cull camera!).
 class URHO3D_API CameraProcessor : public Object
 {
     URHO3D_OBJECT(CameraProcessor, Object);
 
 public:
-    /// Construct.
-    explicit CameraProcessor(RenderPipelineInterface* renderPipeline);
-    /// Initialize camera.
-    void Initialize(Camera* camera);
-    /// Return pipeline state hash.
+    explicit CameraProcessor(Context* context);
+    void SetCameras(ea::span<Camera* const> cameras);
+
     unsigned GetPipelineStateHash() const;
 
-protected:
-    /// Called when update begins.
+    /// Callbacks from SceneProcessor
+    /// @{
     void OnUpdateBegin(const FrameInfo& frameInfo);
-    /// Called when render ends.
     void OnRenderEnd(const FrameInfo& frameInfo);
+    /// @}
 
 private:
-    /// Whether to flip camera.
-    bool flipCamera_{};
-    /// Camera.
-    WeakPtr<Camera> camera_{};
+    void UpdateCamera(const FrameInfo& frameInfo, Camera* camera);
+
+    bool isCameraFlippedByUser_{};
+    bool flipCameraForRendering_{};
+    ea::vector<WeakPtr<Camera>> cameras_{};
 };
 
 }

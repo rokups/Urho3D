@@ -191,7 +191,7 @@ void LightProcessor::Update(DrawableProcessor* drawableProcessor)
 {
     const FrameInfo& frameInfo = drawableProcessor->GetFrameInfo();
     Octree* octree = frameInfo.octree_;
-    Camera* cullCamera = frameInfo.cullCamera_;
+    Camera* cullCamera = frameInfo.camera_;
     const LightType lightType = light_->GetLightType();
 
     // Check if light volume contains camera
@@ -297,7 +297,7 @@ void LightProcessor::EndUpdate(DrawableProcessor* drawableProcessor, LightProces
     }
 
     // TODO(renderer): Fill second parameter
-    Camera* cullCamera = drawableProcessor->GetFrameInfo().cullCamera_;
+    Camera* cullCamera = drawableProcessor->GetFrameInfo().camera_;
     CookShaderParameters(cullCamera, 0.0f);
     UpdateHashes();
 }
@@ -310,7 +310,7 @@ void LightProcessor::InitializeShadowSplits(DrawableProcessor* drawableProcessor
     case LIGHT_DIRECTIONAL:
     {
         const FrameInfo& frameInfo = drawableProcessor->GetFrameInfo();
-        Camera* cullCamera = frameInfo.cullCamera_;
+        Camera* cullCamera = frameInfo.camera_;
         const auto activeSplits = GetActiveSplits(light_, cullCamera->GetNearClip(), cullCamera->GetFarClip());
 
         numActiveSplits_ = activeSplits.size();

@@ -25,7 +25,8 @@
 #include "../Graphics/Drawable.h"
 #include "../RenderPipeline/BatchCompositor.h"
 #include "../RenderPipeline/BatchRenderer.h"
-#include "../RenderPipeline/CommonTypes.h"
+#include "../RenderPipeline/CameraProcessor.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/InstancingBuffer.h"
 #include "../RenderPipeline/LightProcessor.h"
@@ -45,87 +46,81 @@ class URHO3D_API SceneProcessor : public Object, public LightProcessorCallback
     URHO3D_OBJECT(SceneProcessor, Object);
 
 public:
-    /// Construct.
-    SceneProcessor(RenderPipelineInterface* renderPipeline, const ea::string& shadowTechnique);
-    /// Destruct.
+    SceneProcessor(RenderPipelineInterface* renderPipeline, const ea::string& shadowTechnique,
+        ShadowMapAllocator* shadowMapAllocator, InstancingBuffer* instancingBuffer);
     ~SceneProcessor() override;
 
-    /// Set passes.
+    /// Setup. Slow, called rarely.
+    /// @{
     void SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes);
-    /// Set settings.
     void SetSettings(const SceneProcessorSettings& settings);
+    /// @}
 
-    /// Define before RenderPipeline update.
-    void Define(RenderSurface* renderTarget, Viewport* viewport);
-    /// Update frame info.
-    void UpdateFrameInfo(const FrameInfo& frameInfo);
-    /// Update drawables and batches.
+    /// Called on every frame.
+    /// @{
+    bool Define(const CommonFrameInfo& frameInfo);
+    void SetRenderCamera(Camera* camera);
+    void SetRenderCameras(ea::span<Camera* const> cameras);
+
     void Update();
-
-    /// Render shadow maps.
     void RenderShadowMaps();
+    /// @}
 
-    /// Return whether is valid.
-    bool IsValid() const { return frameInfo_.camera_ && frameInfo_.octree_; }
-    /// Return frame info.
+    /// Getters
+    /// @{
     const FrameInfo& GetFrameInfo() const { return frameInfo_; }
     /// Return whether the pass object in callback corresponds to internal pass.
     bool IsInternalPass(Object* pass) const { return batchCompositor_ == pass; }
-    /// Return light volume batches.
     const auto& GetLightVolumeBatches() const { return batchCompositor_->GetLightVolumeBatches(); }
-
-    /// Return drawable processor.
+    CameraProcessor* GetCameraProcessor() const { return cameraProcessor_; }
     DrawableProcessor* GetDrawableProcessor() const { return drawableProcessor_; }
-    /// Return batch compositor.
     BatchCompositor* GetBatchCompositor() const { return batchCompositor_; }
-    /// Return transient shadow map allocator.
-    ShadowMapAllocator* GetShadowMapAllocator() const { return shadowMapAllocator_; }
-    /// Return instancing buffer.
-    InstancingBuffer* GetInstancingBuffer() const { return instancingBuffer_; }
-    /// Return batch renderer.
     BatchRenderer* GetBatchRenderer() const { return batchRenderer_; }
+    /// @}
 
 private:
-    /// Called when update begins.
-    void OnUpdateBegin(const FrameInfo& frameInfo);
-    /// Return whether light needs shadow.
+    /// Callbacks from RenderPipeline
+    /// @{
+    void OnUpdateBegin(const CommonFrameInfo& frameInfo);
+    void OnRenderEnd(const CommonFrameInfo& frameInfo);
+    /// @}
+
+    /// LightProcessorCallback implementation
+    /// @{
     bool IsLightShadowed(Light* light) override;
-    /// Allocate shadow map for one frame.
     ShadowMapRegion AllocateTransientShadowMap(const IntVector2& size) override;
-    /// Draw occluders.
+    /// @}
+
     void DrawOccluders();
 
-    /// Drawable processor.
-    SharedPtr<DrawableProcessor> drawableProcessor_;
-    /// Batch compositor.
-    SharedPtr<BatchCompositor> batchCompositor_;
+    RenderPipelineInterface* renderPipeline_{};
 
-    // TODO(renderer): Consider sharing these with another SceneProcessor
-    /// Transient shadow map allocator.
+    /// Shared objects
+    /// @{
     SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
-    /// Instancing buffer compositor.
     SharedPtr<InstancingBuffer> instancingBuffer_;
-    /// Batch renderer.
-    SharedPtr<BatchRenderer> batchRenderer_;
-    /// Draw queue for main thread.
     SharedPtr<DrawCommandQueue> drawQueue_;
+    /// @}
 
-    /// Settings.
-    SceneProcessorSettings settings_;
-    /// Frame info.
-    FrameInfo frameInfo_;
-
-    /// Occlusion buffer.
+    /// Owned objects
+    /// @{
+    SharedPtr<CameraProcessor> cameraProcessor_;
+    SharedPtr<DrawableProcessor> drawableProcessor_;
+    SharedPtr<BatchCompositor> batchCompositor_;
+    SharedPtr<BatchRenderer> batchRenderer_;
     SharedPtr<OcclusionBuffer> occlusionBuffer_;
-    /// Currently active and filled occlusion buffer.
-    OcclusionBuffer* activeOcclusionBuffer_{};
-    /// Occluders in current frame.
+    /// @}
+
+    SceneProcessorSettings settings_;
+
+    FrameInfo frameInfo_;
+    bool flipCameraForRendering_{};
+
+    OcclusionBuffer* currentOcclusionBuffer_{};
     ea::vector<Drawable*> occluders_;
-    /// Drawables in current frame.
     ea::vector<Drawable*> drawables_;
 
-    /// Sorted shadow batches.
-    ea::vector<PipelineBatchByState> sortedShadowBatches_;
+    ea::vector<PipelineBatchByState> tempSortedShadowBatches_;
 };
 
 }

@@ -89,8 +89,6 @@ struct FrameInfo
     unsigned frameNumber_{};
     /// Time elapsed since last frame.
     float timeStep_{};
-    /// Number of threads used by WorkQueue.
-    unsigned numThreads_{};
     /// Viewport size.
     IntVector2 viewSize_;
     /// Viewport rectangle.
@@ -103,10 +101,8 @@ struct FrameInfo
 
     /// Scene being rendered.
     Scene* scene_{};
-    /// Camera being used for rendering.
-    Camera* camera_{};
     /// Camera being used for drawable culling.
-    Camera* cullCamera_{};
+    Camera* camera_{};
     /// Octree being used for queries.
     Octree* octree_{};
 };

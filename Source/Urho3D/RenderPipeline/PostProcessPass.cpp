@@ -37,7 +37,7 @@
 #include "../RenderPipeline/RenderPipeline.h"*/
 #include "../Graphics/DrawCommandQueue.h"
 #include "../RenderPipeline/RenderBufferManager.h"
-#include "../RenderPipeline/RenderPipelineInterface.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../RenderPipeline/PostProcessPass.h"
 
 #include "../DebugNew.h"

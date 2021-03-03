@@ -25,7 +25,7 @@
 #include "../Core/Object.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/VertexBuffer.h"
-#include "../RenderPipeline/CommonTypes.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 
 namespace Urho3D
 {
@@ -39,9 +39,7 @@ public:
     /// Stride of one element in bytes.
     static const unsigned ElementStride = 4 * sizeof(float);
 
-    /// Construct.
     explicit InstancingBuffer(Context* context);
-    /// Set settings.
     void SetSettings(const InstancingBufferSettings& settings);
 
     /// Begin buffer composition.
@@ -67,8 +65,11 @@ public:
         memcpy(currentVertexData_ + index * ElementStride, data, count * ElementStride);
     }
 
-    /// Return vertex buffer.
+    /// Getters
+    /// @{
     VertexBuffer* GetVertexBuffer() const { return vertexBuffer_; }
+    bool IsEnabled() const { return settings_.enableInstancing_; }
+    /// @}
 
 private:
     /// Initialize instancing buffer.

@@ -89,7 +89,7 @@ ShadowSplitProcessor::~ShadowSplitProcessor()
 void ShadowSplitProcessor::InitializeDirectional(DrawableProcessor* drawableProcessor,
     const FloatRange& splitRange, const ea::vector<Drawable*>& litGeometries)
 {
-    Camera* cullCamera = drawableProcessor->GetFrameInfo().cullCamera_;
+    Camera* cullCamera = drawableProcessor->GetFrameInfo().camera_;
     const FocusParameters& focusParameters = light_->GetShadowFocus();
 
     // Initialize split Z ranges
@@ -153,7 +153,7 @@ void ShadowSplitProcessor::ProcessDirectionalShadowCasters(
 
     // Query shadow casters
     const FrameInfo& frameInfo = drawableProcessor->GetFrameInfo();
-    Camera* cullCamera = frameInfo.cullCamera_;
+    Camera* cullCamera = frameInfo.camera_;
     Octree* octree = frameInfo.octree_;
 
     DirectionalLightShadowCasterQuery query(
@@ -181,7 +181,7 @@ void ShadowSplitProcessor::ProcessPointShadowCasters(
     shadowCasterBatches_.clear();
 
     // Check that the face is visible: if not, can skip the split
-    Camera* cullCamera = drawableProcessor->GetFrameInfo().cullCamera_;
+    Camera* cullCamera = drawableProcessor->GetFrameInfo().camera_;
     const Frustum& cullCameraFrustum = cullCamera->GetFrustum();
     const Frustum& shadowCameraFrustum = shadowCamera_->GetFrustum();
 
@@ -257,7 +257,7 @@ BoundingBox ShadowSplitProcessor::GetLitGeometriesBoundingBox(
 BoundingBox ShadowSplitProcessor::GetSplitShadowBoundingBoxInLightSpace(
     DrawableProcessor* drawableProcessor, const ea::vector<Drawable*>& litGeometries) const
 {
-    Camera* cullCamera = drawableProcessor->GetFrameInfo().cullCamera_;
+    Camera* cullCamera = drawableProcessor->GetFrameInfo().camera_;
     const FocusParameters& focusParameters = light_->GetShadowFocus();
     const Frustum splitFrustum = cullCamera->GetSplitFrustum(focusedCascadeZRange_.first, focusedCascadeZRange_.second);
 

@@ -32,7 +32,7 @@
 #include "../Graphics/Technique.h"
 #include "../Graphics/Viewport.h"
 #include "../RenderPipeline/DrawableProcessor.h"
-#include "../RenderPipeline/RenderPipelineInterface.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../RenderPipeline/SceneProcessor.h"
 #include "../Scene/Scene.h"
 
@@ -122,16 +122,20 @@ IntVector2 CalculateOcclusionBufferSize(unsigned size, Camera* cullCamera)
 
 }
 
-SceneProcessor::SceneProcessor(RenderPipelineInterface* renderPipeline, const ea::string& shadowTechnique)
+SceneProcessor::SceneProcessor(RenderPipelineInterface* renderPipeline, const ea::string& shadowTechnique,
+    ShadowMapAllocator* shadowMapAllocator, InstancingBuffer* instancingBuffer)
     : Object(renderPipeline->GetContext())
-    , drawableProcessor_(MakeShared<DrawableProcessor>(renderPipeline))
-    , batchCompositor_(MakeShared<BatchCompositor>(renderPipeline, drawableProcessor_, Technique::GetPassIndex("shadow")))
-    , shadowMapAllocator_(MakeShared<ShadowMapAllocator>(context_))
-    , instancingBuffer_(MakeShared<InstancingBuffer>(context_))
+    , renderPipeline_(renderPipeline)
+    , shadowMapAllocator_(shadowMapAllocator)
+    , instancingBuffer_(instancingBuffer)
+    , drawQueue_(renderPipeline_->GetDefaultDrawQueue())
+    , cameraProcessor_(MakeShared<CameraProcessor>(context_))
+    , drawableProcessor_(MakeShared<DrawableProcessor>(renderPipeline_))
+    , batchCompositor_(MakeShared<BatchCompositor>(renderPipeline_, drawableProcessor_, Technique::GetPassIndex("shadow")))
     , batchRenderer_(MakeShared<BatchRenderer>(context_, drawableProcessor_, instancingBuffer_))
-    , drawQueue_(renderPipeline->GetDefaultDrawQueue())
 {
-    renderPipeline->OnUpdateBegin.Subscribe(this, &SceneProcessor::OnUpdateBegin);
+    renderPipeline_->OnUpdateBegin.Subscribe(this, &SceneProcessor::OnUpdateBegin);
+    renderPipeline_->OnRenderEnd.Subscribe(this, &SceneProcessor::OnRenderEnd);
 }
 
 SceneProcessor::~SceneProcessor()
@@ -139,25 +143,34 @@ SceneProcessor::~SceneProcessor()
 
 }
 
-void SceneProcessor::Define(RenderSurface* renderTarget, Viewport* viewport)
+bool SceneProcessor::Define(const CommonFrameInfo& frameInfo)
 {
-    Camera* camera = viewport->GetCamera();
-    auto workQueue = context_->GetSubsystem<WorkQueue>();
-
-    frameInfo_.numThreads_ = workQueue->GetNumThreads() + 1;
     frameInfo_.frameNumber_ = 0;
     frameInfo_.timeStep_ = 0.0f;
 
-    frameInfo_.viewport_ = viewport;
-    frameInfo_.renderTarget_ = renderTarget;
+    frameInfo_.viewport_ = frameInfo.viewport_;
+    frameInfo_.renderTarget_ = frameInfo.renderTarget_;
+    frameInfo_.viewRect_ = frameInfo.viewportRect_;
+    frameInfo_.viewSize_ = frameInfo.viewportSize_;
 
-    frameInfo_.scene_ = viewport->GetScene();
-    frameInfo_.camera_ = viewport->GetCamera();
-    frameInfo_.cullCamera_ = viewport->GetCullCamera() ? viewport->GetCullCamera() : frameInfo_.camera_;
+    frameInfo_.scene_ = frameInfo_.viewport_->GetScene();
+    frameInfo_.camera_ = frameInfo_.viewport_->GetCullCamera()
+        ? frameInfo_.viewport_->GetCullCamera()
+        : frameInfo_.viewport_->GetCamera();
     frameInfo_.octree_ = frameInfo_.scene_ ? frameInfo_.scene_->GetComponent<Octree>() : nullptr;
 
-    frameInfo_.viewRect_ = viewport->GetEffectiveRect(renderTarget);
-    frameInfo_.viewSize_ = frameInfo_.viewRect_.Size();
+    return frameInfo_.octree_ && frameInfo_.camera_;
+}
+
+void SceneProcessor::SetRenderCameras(ea::span<Camera* const> cameras)
+{
+    cameraProcessor_->SetCameras(cameras);
+}
+
+void SceneProcessor::SetRenderCamera(Camera* camera)
+{
+    Camera* cameras[] = { camera };
+    cameraProcessor_->SetCameras(cameras);
 }
 
 void SceneProcessor::SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes)
@@ -173,28 +186,20 @@ void SceneProcessor::SetSettings(const SceneProcessorSettings& settings)
     {
         settings_ = settings;
         drawableProcessor_->SetSettings(settings_);
-        shadowMapAllocator_->SetSettings(settings_);
-        instancingBuffer_->SetSettings(settings_);
         batchRenderer_->SetSettings(settings_);
         batchCompositor_->SetShadowMaterialQuality(settings_.materialQuality_);
     }
-}
-
-void SceneProcessor::UpdateFrameInfo(const FrameInfo& frameInfo)
-{
-    frameInfo_.frameNumber_ = frameInfo.frameNumber_;
-    frameInfo_.timeStep_ = frameInfo.timeStep_;
 }
 
 void SceneProcessor::Update()
 {
     // Collect occluders
     // TODO(renderer): Make optional
-    activeOcclusionBuffer_ = nullptr;
+    currentOcclusionBuffer_ = nullptr;
     if (settings_.maxOccluderTriangles_ > 0)
     {
         OccluderOctreeQuery occluderQuery(occluders_,
-            frameInfo_.cullCamera_->GetFrustum(), frameInfo_.cullCamera_->GetViewMask());
+            frameInfo_.camera_->GetFrustum(), frameInfo_.camera_->GetViewMask());
         frameInfo_.octree_->GetDrawables(occluderQuery);
         drawableProcessor_->ProcessOccluders(occluders_, settings_.occluderSizeThreshold_);
 
@@ -202,32 +207,32 @@ void SceneProcessor::Update()
         {
             if (!occlusionBuffer_)
                 occlusionBuffer_ = MakeShared<OcclusionBuffer>(context_);
-            const IntVector2 bufferSize = CalculateOcclusionBufferSize(settings_.occlusionBufferSize_, frameInfo_.cullCamera_);
+            const IntVector2 bufferSize = CalculateOcclusionBufferSize(settings_.occlusionBufferSize_, frameInfo_.camera_);
             occlusionBuffer_->SetSize(bufferSize.x_, bufferSize.y_, settings_.threadedOcclusion_);
-            occlusionBuffer_->SetView(frameInfo_.cullCamera_);
+            occlusionBuffer_->SetView(frameInfo_.camera_);
 
             DrawOccluders();
             if (occlusionBuffer_->GetNumTriangles() > 0)
-                activeOcclusionBuffer_ = occlusionBuffer_;
+                currentOcclusionBuffer_ = occlusionBuffer_;
         }
     }
 
     // Collect visible drawables
-    if (activeOcclusionBuffer_)
+    if (currentOcclusionBuffer_)
     {
-        OccludedFrustumOctreeQuery query(drawables_, frameInfo_.cullCamera_->GetFrustum(),
-            activeOcclusionBuffer_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, frameInfo_.cullCamera_->GetViewMask());
+        OccludedFrustumOctreeQuery query(drawables_, frameInfo_.camera_->GetFrustum(),
+            currentOcclusionBuffer_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, frameInfo_.camera_->GetViewMask());
         frameInfo_.octree_->GetDrawables(query);
     }
     else
     {
-        FrustumOctreeQuery drawableQuery(drawables_, frameInfo_.cullCamera_->GetFrustum(),
-            DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, frameInfo_.cullCamera_->GetViewMask());
+        FrustumOctreeQuery drawableQuery(drawables_, frameInfo_.camera_->GetFrustum(),
+            DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, frameInfo_.camera_->GetViewMask());
         frameInfo_.octree_->GetDrawables(drawableQuery);
     }
 
     // Process drawables
-    drawableProcessor_->ProcessVisibleDrawables(drawables_, activeOcclusionBuffer_);
+    drawableProcessor_->ProcessVisibleDrawables(drawables_, currentOcclusionBuffer_);
     drawableProcessor_->ProcessLights(this);
 
     const auto& lightProcessors = drawableProcessor_->GetLightProcessors();
@@ -252,21 +257,18 @@ void SceneProcessor::RenderShadowMaps()
     if (!settings_.enableShadows_)
         return;
 
-    BatchRenderFlags flags = BatchRenderFlag::None;
-    if (settings_.enableInstancing_)
-        flags |= BatchRenderFlag::EnableInstancingForStaticGeometry;
-
     const auto& visibleLights = drawableProcessor_->GetLightProcessors();
     for (LightProcessor* sceneLight : visibleLights)
     {
         for (const ShadowSplitProcessor& split : sceneLight->GetSplits())
         {
-            split.SortShadowBatches(sortedShadowBatches_);
+            split.SortShadowBatches(tempSortedShadowBatches_);
 
             drawQueue_->Reset();
 
             instancingBuffer_->Begin();
-            batchRenderer_->RenderBatches({ *drawQueue_, split }, flags, sortedShadowBatches_);
+            batchRenderer_->RenderBatches({ *drawQueue_, split },
+                BatchRenderFlag::EnableInstancingForStaticGeometry, tempSortedShadowBatches_);
             instancingBuffer_->End();
 
             shadowMapAllocator_->BeginShadowMapRendering(split.GetShadowMap());
@@ -275,11 +277,21 @@ void SceneProcessor::RenderShadowMaps()
     }
 }
 
-void SceneProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
+void SceneProcessor::OnUpdateBegin(const CommonFrameInfo& frameInfo)
 {
-    shadowMapAllocator_->ResetAllShadowMaps();
+    frameInfo_.frameNumber_ = frameInfo.frameNumber_;
+    frameInfo_.timeStep_ = frameInfo.timeStep_;
+
     occluders_.clear();
     drawables_.clear();
+
+    cameraProcessor_->OnUpdateBegin(frameInfo_);
+    drawableProcessor_->OnUpdateBegin(frameInfo_);
+}
+
+void SceneProcessor::OnRenderEnd(const CommonFrameInfo& frameInfo)
+{
+    cameraProcessor_->OnRenderEnd(frameInfo_);
 }
 
 bool SceneProcessor::IsLightShadowed(Light* light)
