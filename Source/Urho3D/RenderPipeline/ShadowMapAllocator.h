@@ -106,7 +106,7 @@ private:
     /// Shadow map texture format.
     unsigned shadowMapFormat_{};
     /// Shadow map texture size.
-    IntVector2 shadowMapPageSize_;
+    IntVector2 shadowAtlasPageSize_;
 
     /// Dummy color map, if needed.
     SharedPtr<Texture2D> dummyColorTexture_;

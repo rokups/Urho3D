@@ -122,8 +122,6 @@ IntVector2 CalculateOcclusionBufferSize(unsigned size, Camera* cullCamera)
 
 }
 
-const Vector2 SceneProcessorSettings::DefaultVSMShadowParams{ 0.0000001f, 0.9f };
-
 SceneProcessor::SceneProcessor(RenderPipelineInterface* renderPipeline, const ea::string& shadowTechnique)
     : Object(renderPipeline->GetContext())
     , drawableProcessor_(MakeShared<DrawableProcessor>(renderPipeline))
@@ -174,10 +172,10 @@ void SceneProcessor::SetSettings(const SceneProcessorSettings& settings)
     if (settings_ != settings)
     {
         settings_ = settings;
-        drawableProcessor_->SetSettings(settings_.drawableProcessing_);
-        shadowMapAllocator_->SetSettings(settings_.shadowMap_);
-        instancingBuffer_->SetSettings(settings_.instancing_);
-        batchRenderer_->SetSettings(settings_.rendering_);
+        drawableProcessor_->SetSettings(settings_);
+        shadowMapAllocator_->SetSettings(settings_);
+        instancingBuffer_->SetSettings(settings_);
+        batchRenderer_->SetSettings(settings_);
     }
 }
 
@@ -244,7 +242,7 @@ void SceneProcessor::Update()
     batchCompositor_->ComposeSceneBatches();
     if (settings_.enableShadows_)
         batchCompositor_->ComposeShadowBatches();
-    if (settings_.deferred_)
+    if (settings_.deferredLighting_)
         batchCompositor_->ComposeLightVolumeBatches();
 }
 
@@ -254,7 +252,7 @@ void SceneProcessor::RenderShadowMaps()
         return;
 
     BatchRenderFlags flags = BatchRenderFlag::None;
-    if (settings_.instancing_.enable_)
+    if (settings_.enableInstancing_)
         flags |= BatchRenderFlag::InstantiateStaticGeometry;
 
     const auto& visibleLights = drawableProcessor_->GetLightProcessors();

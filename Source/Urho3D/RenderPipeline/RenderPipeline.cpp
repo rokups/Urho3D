@@ -135,14 +135,14 @@ void RenderPipeline::RegisterObject(Context* context)
 {
     context->RegisterFactory<RenderPipeline>();
 
-    URHO3D_ENUM_ATTRIBUTE_EX("Ambient Mode", settings_.rendering_.ambientMode_, MarkSettingsDirty, ambientModeNames, AmbientMode::Directional, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Enable Instancing", bool, settings_.instancing_.enable_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Ambient Mode", settings_.ambientMode_, MarkSettingsDirty, ambientModeNames, DrawableAmbientMode::Directional, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Enable Instancing", bool, settings_.enableInstancing_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Enable Shadow", bool, settings_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Deferred Rendering", bool, settings_.deferred_, MarkSettingsDirty, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Use Variance Shadow Maps", bool, settings_.shadowMap_.varianceShadowMap_, MarkSettingsDirty, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, settings_.rendering_.vsmShadowParams_, MarkSettingsDirty, BatchRendererSettings{}.vsmShadowParams_, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("VSM Multi Sample", int, settings_.shadowMap_.varianceShadowMapMultiSample_, MarkSettingsDirty, 1, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Gamma Correction", bool, settings_.rendering_.gammaCorrection_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Deferred Lighting", bool, settings_.deferredLighting_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Use Variance Shadow Maps", bool, settings_.enableVarianceShadowMaps_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, settings_.varianceShadowMapParams_, MarkSettingsDirty, BatchRendererSettings{}.varianceShadowMapParams_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("VSM Multi Sample", int, settings_.varianceShadowMapMultiSample_, MarkSettingsDirty, 1, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Gamma Correction", bool, settings_.gammaCorrection_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Post Process Antialiasing", settings_.postProcess_.antialiasing_, MarkSettingsDirty, postProcessAntialiasingNames, PostProcessAntialiasing::None, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Post Process Tonemapping", settings_.postProcess_.tonemapping_, MarkSettingsDirty, postProcessTonemappingNames, PostProcessTonemapping::None, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Post Process Grey Scale", bool, settings_.postProcess_.greyScale_, MarkSettingsDirty, false, AM_DEFAULT);
@@ -214,7 +214,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         "URHO3D_AMBIENT_FLAT ",
         "URHO3D_AMBIENT_DIRECTIONAL ",
     };
-    vertexShaderDefines += ambientModeDefines[static_cast<int>(settings_.rendering_.ambientMode_)];
+    vertexShaderDefines += ambientModeDefines[static_cast<int>(settings_.ambientMode_)];
 
     // Add vertex defines: geometry
     static const ea::string geometryTypeDefines[] = {
@@ -278,7 +278,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         pixelShaderDefines += "URHO3D_MATERIAL_HAS_EMISSIVE ";
 
     // Add geometry type defines
-    if (key.geometryType_ == GEOM_STATIC && settings_.instancing_.enable_)
+    if (key.geometryType_ == GEOM_STATIC && settings_.enableInstancing_)
         vertexShaderDefines += "URHO3D_INSTANCING ";
 
     if (isShadowPass)
@@ -320,7 +320,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         commonDefines += "PERPIXEL ";
         if (key.pixelLight_->HasShadow())
         {
-            if (settings_.shadowMap_.varianceShadowMap_)
+            if (settings_.enableVarianceShadowMaps_)
                 commonDefines += "SHADOW VSM_SHADOW ";
             else
                 commonDefines += "SHADOW SIMPLE_SHADOW ";
@@ -341,7 +341,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     if (graphics_->GetConstantBuffersEnabled())
         commonDefines += "URHO3D_USE_CBUFFERS ";
 
-    if (settings_.rendering_.gammaCorrection_)
+    if (settings_.gammaCorrection_)
         commonDefines += "URHO3D_GAMMA_CORRECTION ";
 
     vertexShaderDefines += commonDefines;
@@ -388,7 +388,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
         pixelDefiles += "URHO3D_USE_CBUFFERS ";
     }
 
-    if (settings_.rendering_.gammaCorrection_)
+    if (settings_.gammaCorrection_)
     {
         vertexDefines += "URHO3D_GAMMA_CORRECTION ";
         pixelDefiles += "URHO3D_GAMMA_CORRECTION ";
@@ -416,7 +416,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
 
     if (sceneLight->GetNumSplits() > 0)
     {
-        if (settings_.shadowMap_.varianceShadowMap_)
+        if (settings_.enableVarianceShadowMaps_)
             pixelDefiles += "SHADOW VSM_SHADOW ";
         else
             pixelDefiles += "SHADOW SIMPLE_SHADOW ";
@@ -478,23 +478,23 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
 
 void RenderPipeline::ValidateSettings()
 {
-    if (settings_.deferred_ && !graphics_->GetDeferredSupport()
+    if (settings_.deferredLighting_ && !graphics_->GetDeferredSupport()
         && !Graphics::GetReadableDepthStencilFormat())
-        settings_.deferred_ = false;
+        settings_.deferredLighting_ = false;
 
-    if (!settings_.shadowMap_.lowPrecisionShadowMaps_ && !graphics_->GetHiresShadowMapFormat())
-        settings_.shadowMap_.lowPrecisionShadowMaps_ = true;
+    if (!settings_.use16bitShadowMaps_ && !graphics_->GetHiresShadowMapFormat())
+        settings_.use16bitShadowMaps_ = true;
 
-    if (settings_.instancing_.enable_ && !graphics_->GetInstancingSupport())
-        settings_.instancing_.enable_ = false;
+    if (settings_.enableInstancing_ && !graphics_->GetInstancingSupport())
+        settings_.enableInstancing_ = false;
 
-    if (settings_.instancing_.enable_)
+    if (settings_.enableInstancing_)
     {
-        settings_.instancing_.firstUnusedTexCoord_ = 4;
-        settings_.instancing_.numReservedElems_ = 3 +
-            (settings_.rendering_.ambientMode_ == AmbientMode::Constant
+        settings_.firstInstancingTexCoord_ = 4;
+        settings_.numInstancingTexCoords_ = 3 +
+            (settings_.ambientMode_ == DrawableAmbientMode::Constant
             ? 0
-            : settings_.rendering_.ambientMode_ == AmbientMode::Flat
+            : settings_.ambientMode_ == DrawableAmbientMode::Flat
             ? 1
             : 7);
     }
@@ -506,7 +506,7 @@ void RenderPipeline::ApplySettings()
 
     // Initialize or reset deferred rendering
     // TODO(renderer): Make it more clean
-    if (settings_.deferred_ && !deferredPass_)
+    if (settings_.deferredLighting_ && !deferredPass_)
     {
         basePass_ = nullptr;
         alphaPass_ = nullptr;
@@ -518,7 +518,7 @@ void RenderPipeline::ApplySettings()
         sceneProcessor_->SetPasses({ deferredPass_ });
     }
 
-    if (!settings_.deferred_ && !basePass_)
+    if (!settings_.deferredLighting_ && !basePass_)
     {
         basePass_ = MakeShared<OpaqueForwardLightingScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "base", "litbase", "light");
         alphaPass_ = MakeShared<AlphaForwardLightingScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "alpha", "alpha", "litalpha");
@@ -616,9 +616,9 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
     cameraProcessor_->Initialize(viewport->GetCamera());
 
-    //settings_.deferred_ = true;
+    //settings_.deferredLighting_ = true;
     //settings_.enableInstancing_ = GetSubsystem<Renderer>()->GetDynamicInstancing();
-    //settings_.ambientMode_ = AmbientMode::Directional;
+    //settings_.ambientMode_ = DrawableAmbientMode::Directional;
 
     if (settingsDirty_)
     {
@@ -665,7 +665,7 @@ void RenderPipeline::Render()
     viewportFlags.Assign(ViewportRenderBufferFlag::InheritBilinearFiltering, !needColorOutputBilinear);
     viewportParams.flags_.Assign(RenderBufferFlag::BilinearFiltering, needColorOutputBilinear);
 
-    if (settings_.deferred_)
+    if (settings_.deferredLighting_)
     {
         viewportFlags |= ViewportRenderBufferFlag::UsableWithMultipleRenderTargets;
         viewportFlags |= ViewportRenderBufferFlag::IsReadableDepth;
@@ -686,12 +686,12 @@ void RenderPipeline::Render()
 
     auto sceneBatchRenderer_ = sceneProcessor_->GetBatchRenderer();
     auto instancingBuffer = sceneProcessor_->GetInstancingBuffer();
-    auto flag = settings_.instancing_.enable_ ? BatchRenderFlag::InstantiateStaticGeometry : BatchRenderFlag::None;
+    auto flag = settings_.enableInstancing_ ? BatchRenderFlag::InstantiateStaticGeometry : BatchRenderFlag::None;
     const Color fogColor = sceneProcessor_->GetFrameInfo().camera_->GetEffectiveFogColor();
 
     // TODO(renderer): Remove this guard
 #ifdef DESKTOP_GRAPHICS
-    if (settings_.deferred_)
+    if (settings_.deferredLighting_)
     {
         //deferredFinal_ = renderBufferManager_->GetColorOutput();
 

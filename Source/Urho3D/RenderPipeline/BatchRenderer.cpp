@@ -240,7 +240,7 @@ private:
     {
         if (enabled_.ambientLighting_)
         {
-            if (settings_.ambientMode_ == AmbientMode::Flat)
+            if (settings_.ambientMode_ == DrawableAmbientMode::Flat)
             {
                 const Vector3 ambient = lightAccumulator->sphericalHarmonics_.EvaluateAverage();
                 if (settings_.gammaCorrection_)
@@ -248,7 +248,7 @@ private:
                 else
                     object_.ambient_ = Color(ambient).LinearToGamma().ToVector4();
             }
-            else if (settings_.ambientMode_ == AmbientMode::Directional)
+            else if (settings_.ambientMode_ == DrawableAmbientMode::Directional)
             {
                 object_.sh_ = &lightAccumulator->sphericalHarmonics_;
             }
@@ -422,7 +422,7 @@ private:
             drawQueue_.AddShaderParameter(PSP_SHADOWSPLITS, params.shadowSplits_);
             drawQueue_.AddShaderParameter(PSP_SHADOWCUBEUVBIAS, params.shadowCubeUVBias_);
             drawQueue_.AddShaderParameter(PSP_SHADOWCUBEADJUST, params.shadowCubeAdjust_);
-            drawQueue_.AddShaderParameter(PSP_VSMSHADOWPARAMS, settings_.vsmShadowParams_);
+            drawQueue_.AddShaderParameter(PSP_VSMSHADOWPARAMS, settings_.varianceShadowMapParams_);
         }
     }
 
@@ -430,9 +430,9 @@ private:
     {
         if (enabled_.ambientLighting_)
         {
-            if (settings_.ambientMode_ == AmbientMode::Flat)
+            if (settings_.ambientMode_ == DrawableAmbientMode::Flat)
                 drawQueue_.AddShaderParameter(VSP_AMBIENT, object_.ambient_);
-            else if (settings_.ambientMode_ == AmbientMode::Directional)
+            else if (settings_.ambientMode_ == DrawableAmbientMode::Directional)
             {
                 const SphericalHarmonicsDot9& sh = *object_.sh_;
                 drawQueue_.AddShaderParameter(VSP_SHAR, sh.Ar_);
@@ -471,9 +471,9 @@ private:
         instancingBuffer_.SetElements(object_.worldTransform_, 0, 3);
         if (enabled_.ambientLighting_)
         {
-            if (settings_.ambientMode_ == AmbientMode::Flat)
+            if (settings_.ambientMode_ == DrawableAmbientMode::Flat)
                 instancingBuffer_.SetElements(&object_.ambient_, 3, 1);
-            else if (settings_.ambientMode_ == AmbientMode::Directional)
+            else if (settings_.ambientMode_ == DrawableAmbientMode::Directional)
                 instancingBuffer_.SetElements(object_.sh_, 3, 7);
         }
     }

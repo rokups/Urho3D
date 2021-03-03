@@ -51,7 +51,7 @@ void InstancingBuffer::Begin()
 
 void InstancingBuffer::End()
 {
-    if (nextVertex_ == 0 || !settings_.enable_)
+    if (nextVertex_ == 0 || !settings_.enableInstancing_)
         return;
 
     if (vertexBufferDirty_)
@@ -74,14 +74,14 @@ void InstancingBuffer::Initialize()
     data_.clear();
     vertexBuffer_ = nullptr;
 
-    if (settings_.enable_)
+    if (settings_.enableInstancing_)
     {
-        for (unsigned i = 0; i < settings_.numReservedElems_; ++i)
+        for (unsigned i = 0; i < settings_.numInstancingTexCoords_; ++i)
         {
-            const unsigned index = settings_.firstUnusedTexCoord_ + i;
+            const unsigned index = settings_.firstInstancingTexCoord_ + i;
             vertexElements_.push_back(VertexElement(TYPE_VECTOR4, SEM_TEXCOORD, index, true));
         }
-        vertexStride_ = settings_.numReservedElems_ * ElementStride;
+        vertexStride_ = settings_.numInstancingTexCoords_ * ElementStride;
         vertexBufferDirty_ = true;
 
         // Always pre-initialize buffer so it has valid layout

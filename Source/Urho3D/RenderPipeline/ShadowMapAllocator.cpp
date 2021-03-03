@@ -68,33 +68,33 @@ void ShadowMapAllocator::SetSettings(const ShadowMapAllocatorSettings& settings)
 
 void ShadowMapAllocator::CacheSettings()
 {
-    if (settings_.varianceShadowMap_)
+    if (settings_.enableVarianceShadowMaps_)
         shadowMapFormat_ = graphics_->GetRGFloat32Format();
     else
     {
-        shadowMapFormat_ = settings_.lowPrecisionShadowMaps_
+        shadowMapFormat_ = settings_.use16bitShadowMaps_
             ? graphics_->GetShadowMapFormat()
             : graphics_->GetHiresShadowMapFormat();
     }
 
-    shadowMapPageSize_ = static_cast<int>(settings_.shadowMapPageSize_) * IntVector2::ONE;
+    shadowAtlasPageSize_ = static_cast<int>(settings_.shadowAtlasPageSize_) * IntVector2::ONE;
 }
 
 void ShadowMapAllocator::Reset()
 {
     for (PoolElement& element : pool_)
     {
-        element.allocator_.Reset(shadowMapPageSize_.x_, shadowMapPageSize_.y_, shadowMapPageSize_.x_, shadowMapPageSize_.y_);
+        element.allocator_.Reset(shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_, shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_);
         element.needClear_ = false;
     }
 }
 
 ShadowMap ShadowMapAllocator::AllocateShadowMap(const IntVector2& size)
 {
-    if (!settings_.shadowMapPageSize_ || !shadowMapFormat_)
+    if (!settings_.shadowAtlasPageSize_ || !shadowMapFormat_)
         return {};
 
-    const IntVector2 clampedSize = VectorMin(size, shadowMapPageSize_);
+    const IntVector2 clampedSize = VectorMin(size, shadowAtlasPageSize_);
 
     for (PoolElement& element : pool_)
     {
@@ -165,7 +165,7 @@ void ShadowMapAllocator::ExportPipelineState(PipelineStateDesc& desc, const Bias
 {
     desc.fillMode_ = FILL_SOLID;
     desc.stencilTestEnabled_ = false;
-    if (!settings_.varianceShadowMap_)
+    if (!settings_.enableVarianceShadowMaps_)
     {
         desc.colorWriteEnabled_ = false;
         desc.constantDepthBias_ = scale * biasParameters.constantBias_;
@@ -207,7 +207,7 @@ ShadowMap ShadowMapAllocator::PoolElement::Allocate(const IntVector2& size)
 
 void ShadowMapAllocator::AllocateNewTexture()
 {
-    const bool isDepthTexture = !settings_.varianceShadowMap_;
+    const bool isDepthTexture = !settings_.enableVarianceShadowMaps_;
     const TextureUsage textureUsage = isDepthTexture ? TEXTURE_DEPTHSTENCIL : TEXTURE_RENDERTARGET;
     const int multiSample = isDepthTexture ? 1 : settings_.varianceShadowMapMultiSample_;
 
@@ -216,7 +216,7 @@ void ShadowMapAllocator::AllocateNewTexture()
 
     // Disable mipmaps from the shadow map
     newShadowMap->SetNumLevels(1);
-    newShadowMap->SetSize(shadowMapPageSize_.x_, shadowMapPageSize_.y_, shadowMapFormat_, textureUsage, multiSample);
+    newShadowMap->SetSize(shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_, shadowMapFormat_, textureUsage, multiSample);
 
 #ifndef GL_ES_VERSION_2_0
     // OpenGL (desktop) and D3D11: shadow compare mode needs to be specifically enabled for the shadow map
@@ -237,7 +237,7 @@ void ShadowMapAllocator::AllocateNewTexture()
         {
             dummyColorTexture_ = MakeShared<Texture2D>(context_);
             dummyColorTexture_->SetNumLevels(1);
-            dummyColorTexture_->SetSize(shadowMapPageSize_.x_, shadowMapPageSize_.y_,
+            dummyColorTexture_->SetSize(shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_,
                 dummyColorFormat, TEXTURE_RENDERTARGET);
         }
         // Link the color rendertarget to the shadow map
@@ -248,7 +248,7 @@ void ShadowMapAllocator::AllocateNewTexture()
     PoolElement& element = pool_.emplace_back();
     element.index_ = pool_.size() - 1;
     element.texture_ = newShadowMap;
-    element.allocator_.Reset(shadowMapPageSize_.x_, shadowMapPageSize_.y_, shadowMapPageSize_.x_, shadowMapPageSize_.y_);
+    element.allocator_.Reset(shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_, shadowAtlasPageSize_.x_, shadowAtlasPageSize_.y_);
 }
 
 }
