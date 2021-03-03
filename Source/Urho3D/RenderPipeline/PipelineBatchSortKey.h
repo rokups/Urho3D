@@ -100,11 +100,7 @@ struct PipelineBatchByState
         if (!batch->pipelineState_)
             return;
 
-        // TODO(renderer): Fix me?
-        static const SourceBatch defaultSourceBatch;
-        const SourceBatch& sourceBatch = batch->sourceBatchIndex_ != M_MAX_UNSIGNED
-            ? batch->GetSourceBatch()
-            : defaultSourceBatch;
+        const SourceBatch& sourceBatch = batch->GetSourceBatch();
 
         // Calculate primary key
         primaryKey_ |= (batch->material_->GetRenderOrder() & RenderOrderMask) << RenderOrderOffset;
@@ -112,7 +108,7 @@ struct PipelineBatchByState
         primaryKey_ |= (batch->pipelineState_->GetObjectID() & PipelineStateMask) << PipelineStateOffset;
         primaryKey_ |= (batch->material_->GetObjectID() & MaterialMask) << MaterialOffset;
         primaryKey_ |= (sourceBatch.lightmapIndex_ & LightmapMask) << LightmapOffset;
-        primaryKey_ |= (batch->lightIndex_ & PixelLightMask) << PixelLightOffset;
+        primaryKey_ |= (batch->pixelLightIndex_ & PixelLightMask) << PixelLightOffset;
 
         // Calculate secondary key
         secondaryKey_ |= (batch->geometry_->GetObjectID() & GeometryMask) << GeometryOffset;

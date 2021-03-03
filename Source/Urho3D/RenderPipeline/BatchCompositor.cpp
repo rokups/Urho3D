@@ -51,7 +51,7 @@ PipelineBatch CreatePipelineBatch(const BatchStateCreateKey& key,
     PipelineState* pipelineState, CreateBatchTag tag = CreateBatchTag::Default)
 {
     PipelineBatch batch;
-    batch.lightIndex_ = tag == CreateBatchTag::Unlit ? M_MAX_UNSIGNED : key.pixelLightIndex_;
+    batch.pixelLightIndex_ = tag == CreateBatchTag::Unlit ? M_MAX_UNSIGNED : key.pixelLightIndex_;
     batch.vertexLightsHash_ = tag == CreateBatchTag::Unlit ? 0 : key.vertexLightsHash_;
     batch.drawableIndex_ = key.drawable_->GetDrawableIndex();
     batch.sourceBatchIndex_ = key.sourceBatchIndex_;
@@ -241,7 +241,7 @@ BatchCompositor::BatchCompositor(RenderPipelineInterface* renderPipeline, const 
     , renderer_(GetSubsystem<Renderer>())
     , drawableProcessor_(drawableProcessor)
     , defaultMaterial_(renderer_->GetDefaultMaterial())
-    , nullPass_(MakeShared<Pass>(""))
+    , nullPassForLightVolumes_(MakeShared<Pass>(""))
     , batchStateCacheCallback_(renderPipeline)
 {
     renderPipeline->OnUpdateBegin.Subscribe(this, &BatchCompositor::OnUpdateBegin);
@@ -301,7 +301,7 @@ void BatchCompositor::ComposeLightVolumeBatches()
         key.geometryType_ = GEOM_STATIC_NOINSTANCING;
         key.geometry_ = renderer_->GetLightGeometry(lightProcessor->GetLight());
         key.material_ = defaultMaterial_;
-        key.pass_ = nullPass_;
+        key.pass_ = nullPassForLightVolumes_;
         key.drawable_ = lightProcessor->GetLight();
         key.pixelLight_ = lightProcessor;
         key.pixelLightIndex_ = lightIndex;
@@ -317,7 +317,6 @@ void BatchCompositor::ComposeLightVolumeBatches()
 
 void BatchCompositor::OnUpdateBegin(const FrameInfo& frameInfo)
 {
-    materialQuality_ = GetSubsystem<Renderer>()->GetMaterialQuality();
     delayedShadowBatches_.Clear(frameInfo.numThreads_);
     lightVolumeBatches_.clear();
     sortedLightVolumeBatches_.clear();
@@ -359,7 +358,7 @@ void BatchCompositor::BeginShadowBatchesComposition(unsigned lightIndex, ShadowS
         {
             const SourceBatch& sourceBatch = sourceBatches[j];
             Material* material = sourceBatch.material_ ? sourceBatch.material_ : defaultMaterial_;
-            Technique* tech = material->FindTechnique(drawable, materialQuality_);
+            Technique* tech = material->FindTechnique(drawable, shadowMaterialQuality_);
             Pass* pass = tech->GetSupportedPass(shadowPassIndex_);
             if (!pass)
                 continue;

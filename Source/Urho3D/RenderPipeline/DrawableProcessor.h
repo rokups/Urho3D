@@ -247,8 +247,6 @@ private:
     ea::vector<LightAccumulator> geometryLighting_;
     /// @}
 
-    /// Processing results
-    /// @{
     ea::vector<FloatRange> sceneZRangeTemp_;
     FloatRange sceneZRange_;
 
@@ -264,7 +262,6 @@ private:
     ea::vector<LightProcessor*> lightProcessorsByShadowMapSize_;
 
     WorkQueueVector<Drawable*> queuedDrawableUpdates_{};
-    /// @}
 };
 
 }

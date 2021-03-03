@@ -99,39 +99,22 @@ Vector4 GetFogParameter(const Camera& camera)
 
 /// Batch renderer to command queue.
 // TODO(renderer): Add template parameter to avoid branching?
-class DrawCommandCompositor : public NonCopyable
+class DrawCommandCompositor : public NonCopyable, private BatchRenderingContext
 {
 public:
-    /// Initialized
-    /// @{
-    DrawCommandCompositor(DrawCommandQueue& drawQueue, const BatchRendererSettings& settings,
-        const DrawableProcessor& drawableProcessor, InstancingBuffer& instancingBuffer,
-        const Camera* renderCamera, BatchRenderFlags flags, const ShadowSplitProcessor* outputShadowSplit)
-        : drawQueue_(drawQueue)
+    DrawCommandCompositor(const BatchRenderingContext& ctx, const BatchRendererSettings& settings,
+        const DrawableProcessor& drawableProcessor, InstancingBuffer& instancingBuffer, BatchRenderFlags flags)
+        : BatchRenderingContext(ctx)
         , settings_(settings)
         , drawableProcessor_(drawableProcessor)
         , instancingBuffer_(instancingBuffer)
         , frameInfo_(drawableProcessor_.GetFrameInfo())
         , scene_(*frameInfo_.scene_)
         , lights_(drawableProcessor_.GetLightProcessors())
-        , camera_(*renderCamera)
         , cameraNode_(*camera_.GetNode())
-        , outputShadowSplit_(outputShadowSplit)
         , enabled_(flags)
     {
     }
-
-    void SetGBufferParameters(const Vector4& offsetAndScale, const Vector2& invSize)
-    {
-        geometryBufferOffsetAndScale_ = offsetAndScale;
-        geometryBufferInvSize_ = invSize;
-    }
-
-    void SetGlobalResources(ea::span<const ShaderResourceDesc> globalResources)
-    {
-        globalResources_ = globalResources;
-    }
-    /// @}
 
     /// Process batches
     /// @{
@@ -142,7 +125,7 @@ public:
 
     void ProcessLightVolumeBatch(const PipelineBatch& pipelineBatch)
     {
-        Light* light = lights_[pipelineBatch.lightIndex_]->GetLight();
+        Light* light = lights_[pipelineBatch.pixelLightIndex_]->GetLight();
         lightVolumeHelpers_.transform_ = light->GetVolumeTransform(&camera_);
         lightVolumeHelpers_.sourceBatch_.worldTransform_ = &lightVolumeHelpers_.transform_;
         ProcessBatch(pipelineBatch, lightVolumeHelpers_.sourceBatch_);
@@ -179,11 +162,11 @@ private:
 
     void CheckDirtyPixelLight(const PipelineBatch& pipelineBatch)
     {
-        dirty_.pixelLightConstants_ = current_.pixelLightIndex_ != pipelineBatch.lightIndex_;
+        dirty_.pixelLightConstants_ = current_.pixelLightIndex_ != pipelineBatch.pixelLightIndex_;
         if (!dirty_.pixelLightConstants_)
             return;
 
-        current_.pixelLightIndex_ = pipelineBatch.lightIndex_;
+        current_.pixelLightIndex_ = pipelineBatch.pixelLightIndex_;
         current_.pixelLightEnabled_ = current_.pixelLightIndex_ != M_MAX_UNSIGNED;
         if (current_.pixelLightEnabled_)
         {
@@ -351,14 +334,17 @@ private:
 
     void AddFrameConstants()
     {
+        for (const ShaderParameterDesc& shaderParameter : frameParameters_)
+            drawQueue_.AddShaderParameter(shaderParameter.name_, shaderParameter.value_);
+
         drawQueue_.AddShaderParameter(VSP_DELTATIME, frameInfo_.timeStep_);
         drawQueue_.AddShaderParameter(VSP_ELAPSEDTIME, scene_.GetElapsedTime());
     }
 
     void AddCameraConstants(float constantDepthBias)
     {
-        drawQueue_.AddShaderParameter(VSP_GBUFFEROFFSETS, geometryBufferOffsetAndScale_);
-        drawQueue_.AddShaderParameter(PSP_GBUFFERINVSIZE, geometryBufferInvSize_);
+        for (const ShaderParameterDesc& shaderParameter : cameraParameters_)
+            drawQueue_.AddShaderParameter(shaderParameter.name_, shaderParameter.value_);
 
         const Matrix3x4 cameraEffectiveTransform = camera_.GetEffectiveWorldTransform();
         drawQueue_.AddShaderParameter(VSP_CAMERAPOS, cameraEffectiveTransform.Translation());
@@ -562,9 +548,6 @@ private:
         }
     }
 
-    /// Destination draw queue.
-    DrawCommandQueue& drawQueue_;
-
     /// External state (required)
     /// @{
     const BatchRendererSettings& settings_;
@@ -574,26 +557,17 @@ private:
     // TODO(renderer): Make it immutable so we can safely execute this code in multiple threads
     Scene& scene_;
     const ea::vector<LightProcessor*>& lights_;
-    const Camera& camera_;
     const Node& cameraNode_;
-    /// @}
-
-    /// External state (optional)
-    /// @{
-    const ShadowSplitProcessor* const outputShadowSplit_{};
-    Vector4 geometryBufferOffsetAndScale_;
-    Vector2 geometryBufferInvSize_;
-    ea::span<const ShaderResourceDesc> globalResources_;
     /// @}
 
     struct EnabledFeatureFlags
     {
         EnabledFeatureFlags(BatchRenderFlags flags)
-            : ambientLighting_(flags.Test(BatchRenderFlag::AmbientLight))
-            , vertexLighting_(flags.Test(BatchRenderFlag::VertexLights))
-            , pixelLighting_(flags.Test(BatchRenderFlag::PixelLight))
+            : ambientLighting_(flags.Test(BatchRenderFlag::EnableAmbientLighting))
+            , vertexLighting_(flags.Test(BatchRenderFlag::EnableVertexLights))
+            , pixelLighting_(flags.Test(BatchRenderFlag::EnablePixelLights))
             , anyLighting_(ambientLighting_ || vertexLighting_ || pixelLighting_)
-            , staticInstancing_(flags.Test(BatchRenderFlag::InstantiateStaticGeometry))
+            , staticInstancing_(flags.Test(BatchRenderFlag::EnableInstancingForStaticGeometry))
         {
         }
 
@@ -676,6 +650,19 @@ private:
 
 }
 
+BatchRenderingContext::BatchRenderingContext(DrawCommandQueue& drawQueue, const Camera& camera)
+    : drawQueue_(drawQueue)
+    , camera_(camera)
+{
+}
+
+BatchRenderingContext::BatchRenderingContext(DrawCommandQueue& drawQueue, const ShadowSplitProcessor& outputShadowSplit)
+    : drawQueue_(drawQueue)
+    , camera_(*outputShadowSplit.GetShadowCamera())
+    , outputShadowSplit_(&outputShadowSplit)
+{
+}
+
 BatchRenderer::BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor,
     InstancingBuffer* instancingBuffer)
     : Object(context)
@@ -690,36 +677,31 @@ void BatchRenderer::SetSettings(const BatchRendererSettings& settings)
     settings_ = settings;
 }
 
-void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
-    ea::span<const PipelineBatchByState> batches, const ShadowSplitProcessor* outputShadowSplit)
+void BatchRenderer::RenderBatches(const BatchRenderingContext& ctx,
+    BatchRenderFlags flags, ea::span<const PipelineBatchByState> batches)
 {
-    DrawCommandCompositor compositor(drawQueue, settings_,
-        *drawableProcessor_, *instancingBuffer_, camera, flags, outputShadowSplit);
+    DrawCommandCompositor compositor(ctx, settings_, *drawableProcessor_, *instancingBuffer_, flags);
 
     for (const auto& sortedBatch : batches)
         compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
     compositor.FlushDrawCommands();
 }
 
-void BatchRenderer::RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
-    ea::span<const PipelineBatchBackToFront> batches, const ShadowSplitProcessor* outputShadowSplit)
+void BatchRenderer::RenderBatches(const BatchRenderingContext& ctx,
+    BatchRenderFlags flags, ea::span<const PipelineBatchBackToFront> batches)
 {
-    DrawCommandCompositor compositor(drawQueue, settings_,
-        *drawableProcessor_, *instancingBuffer_, camera, flags, outputShadowSplit);
+    DrawCommandCompositor compositor(ctx, settings_, *drawableProcessor_, *instancingBuffer_, flags);
 
     for (const auto& sortedBatch : batches)
         compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
     compositor.FlushDrawCommands();
 }
 
-void BatchRenderer::RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera* camera,
-    const LightVolumeRenderContext& ctx, ea::span<const PipelineBatchByState> batches)
+void BatchRenderer::RenderLightVolumeBatches(const BatchRenderingContext& ctx,
+    ea::span<const PipelineBatchByState> batches)
 {
-    DrawCommandCompositor compositor(drawQueue, settings_,
-        *drawableProcessor_, *instancingBuffer_, camera, BatchRenderFlag::PixelLight, nullptr);
-
-    compositor.SetGBufferParameters(ctx.geometryBufferOffsetAndScale_, ctx.geometryBufferInvSize_);
-    compositor.SetGlobalResources(ctx.geometryBuffer_);
+    DrawCommandCompositor compositor(ctx, settings_, *drawableProcessor_, *instancingBuffer_,
+        BatchRenderFlag::EnablePixelLights);
 
     for (const auto& sortedBatch : batches)
         compositor.ProcessLightVolumeBatch(*sortedBatch.pipelineBatch_);

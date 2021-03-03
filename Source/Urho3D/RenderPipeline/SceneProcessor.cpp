@@ -176,6 +176,7 @@ void SceneProcessor::SetSettings(const SceneProcessorSettings& settings)
         shadowMapAllocator_->SetSettings(settings_);
         instancingBuffer_->SetSettings(settings_);
         batchRenderer_->SetSettings(settings_);
+        batchCompositor_->SetShadowMaterialQuality(settings_.materialQuality_);
     }
 }
 
@@ -253,7 +254,7 @@ void SceneProcessor::RenderShadowMaps()
 
     BatchRenderFlags flags = BatchRenderFlag::None;
     if (settings_.enableInstancing_)
-        flags |= BatchRenderFlag::InstantiateStaticGeometry;
+        flags |= BatchRenderFlag::EnableInstancingForStaticGeometry;
 
     const auto& visibleLights = drawableProcessor_->GetLightProcessors();
     for (LightProcessor* sceneLight : visibleLights)
@@ -265,7 +266,7 @@ void SceneProcessor::RenderShadowMaps()
             drawQueue_->Reset();
 
             instancingBuffer_->Begin();
-            batchRenderer_->RenderBatches(*drawQueue_, split.GetShadowCamera(), flags, sortedShadowBatches_, &split);
+            batchRenderer_->RenderBatches({ *drawQueue_, split }, flags, sortedShadowBatches_);
             instancingBuffer_->End();
 
             shadowMapAllocator_->BeginShadowMapRendering(split.GetShadowMap());

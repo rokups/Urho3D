@@ -709,7 +709,7 @@ void RenderPipeline::Render()
 
     auto sceneBatchRenderer_ = sceneProcessor_->GetBatchRenderer();
     auto instancingBuffer = sceneProcessor_->GetInstancingBuffer();
-    auto flag = settings_.enableInstancing_ ? BatchRenderFlag::InstantiateStaticGeometry : BatchRenderFlag::None;
+    auto flag = settings_.enableInstancing_ ? BatchRenderFlag::EnableInstancingForStaticGeometry : BatchRenderFlag::None;
     const Color fogColor = sceneProcessor_->GetFrameInfo().camera_->GetEffectiveFogColor();
 
     // TODO(renderer): Remove this guard
@@ -732,27 +732,30 @@ void RenderPipeline::Render()
         drawQueue_->Reset();
 
         instancingBuffer->Begin();
-        sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            BatchRenderFlag::AmbientLight | flag, deferredPass_->GetBatches());
+        sceneBatchRenderer_->RenderBatches({ *drawQueue_, *sceneProcessor_->GetFrameInfo().camera_ },
+            BatchRenderFlag::EnableAmbientLighting | flag, deferredPass_->GetBatches());
         instancingBuffer->End();
 
         drawQueue_->Execute();
 
         // Draw deferred lights
-        ShaderResourceDesc geometryBuffer[] = {
+        const ShaderResourceDesc geometryBuffer[] = {
             { TU_ALBEDOBUFFER, deferredAlbedo_->GetTexture() },
             { TU_NORMALBUFFER, deferredNormal_->GetTexture() },
             { TU_DEPTHBUFFER, renderBufferManager_->GetDepthStencilTexture() }
         };
 
-        LightVolumeRenderContext lightVolumeRenderContext;
-        lightVolumeRenderContext.geometryBuffer_ = geometryBuffer;
-        lightVolumeRenderContext.geometryBufferOffsetAndScale_ = renderBufferManager_->GetOutputClipToUVSpaceOffsetAndScale();
-        lightVolumeRenderContext.geometryBufferInvSize_ = renderBufferManager_->GetInvOutputSize();
+        const ShaderParameterDesc cameraParameters[] = {
+            { VSP_GBUFFEROFFSETS, renderBufferManager_->GetOutputClipToUVSpaceOffsetAndScale() },
+            { PSP_GBUFFERINVSIZE, renderBufferManager_->GetInvOutputSize() },
+        };
+
+        BatchRenderingContext ctx{ *drawQueue_, *sceneProcessor_->GetFrameInfo().camera_ };
+        ctx.globalResources_ = geometryBuffer;
+        ctx.cameraParameters_ = cameraParameters;
 
         drawQueue_->Reset();
-        sceneBatchRenderer_->RenderLightVolumeBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            lightVolumeRenderContext, sceneProcessor_->GetLightVolumeBatches());
+        sceneBatchRenderer_->RenderLightVolumeBatches(ctx, sceneProcessor_->GetLightVolumeBatches());
 
         renderBufferManager_->SetOutputRenderTargers();
         drawQueue_->Execute();
@@ -767,12 +770,13 @@ void RenderPipeline::Render()
 
         drawQueue_->Reset();
         instancingBuffer->Begin();
-        sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            BatchRenderFlag::AmbientLight | BatchRenderFlag::VertexLights | BatchRenderFlag::PixelLight | flag, basePass_->GetSortedBaseBatches());
-        sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            BatchRenderFlag::PixelLight | flag, basePass_->GetSortedLightBatches());
-        sceneBatchRenderer_->RenderBatches(*drawQueue_, sceneProcessor_->GetFrameInfo().camera_,
-            BatchRenderFlag::AmbientLight | BatchRenderFlag::VertexLights | BatchRenderFlag::PixelLight | flag, alphaPass_->GetSortedBatches());
+        BatchRenderingContext ctx{ *drawQueue_, *sceneProcessor_->GetFrameInfo().camera_ };
+        sceneBatchRenderer_->RenderBatches(ctx,
+            BatchRenderFlag::EnableAmbientLighting | BatchRenderFlag::EnableVertexLights | BatchRenderFlag::EnablePixelLights | flag, basePass_->GetSortedBaseBatches());
+        sceneBatchRenderer_->RenderBatches(ctx,
+            BatchRenderFlag::EnablePixelLights | flag, basePass_->GetSortedLightBatches());
+        sceneBatchRenderer_->RenderBatches(ctx,
+            BatchRenderFlag::EnableAmbientLighting | BatchRenderFlag::EnableVertexLights | BatchRenderFlag::EnablePixelLights | flag, alphaPass_->GetSortedBatches());
         instancingBuffer->End();
         drawQueue_->Execute();
     }

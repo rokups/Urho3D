@@ -41,30 +41,25 @@ class ShadowSplitProcessor;
 class WorkQueue;
 struct PipelineBatchByState;
 
-/// Self-sufficient batch that can be rendered by RenderPipeline.
+/// Self-sufficient batch that can be sorted and rendered by RenderPipeline.
 struct PipelineBatch
 {
-    /// Pointer to Drawable.
     Drawable* drawable_{};
-    /// Pointer to Geometry.
     Geometry* geometry_{};
-    /// Pointer to Material.
     Material* material_{};
-    /// Pipeline state used for rendering.
     PipelineState* pipelineState_{};
-    /// Drawable index.
     unsigned drawableIndex_{};
-    /// Index of per-pixel forward light in DrawableProcessor.
-    unsigned lightIndex_{ M_MAX_UNSIGNED };
-    /// Order-independent hash of vertex lights.
+    unsigned pixelLightIndex_{ M_MAX_UNSIGNED };
     unsigned vertexLightsHash_{};
-    /// Index of source batch within Drawable.
     unsigned sourceBatchIndex_{};
-    /// Geometry type used.
     GeometryType geometryType_{};
 
     /// Return source batch.
-    const SourceBatch& GetSourceBatch() const { return drawable_->GetBatches()[sourceBatchIndex_]; }
+    const SourceBatch& GetSourceBatch() const
+    {
+        static const SourceBatch defaultSourceBatch;
+        return sourceBatchIndex_ != M_MAX_UNSIGNED ? drawable_->GetBatches()[sourceBatchIndex_] : defaultSourceBatch;
+    }
 };
 
 /// Batch compositor for single scene pass.
@@ -81,59 +76,53 @@ public:
         LightSubpass,
     };
 
-    /// Construct.
     BatchCompositorPass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
         bool needAmbient, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
-    /// Compose batches.
     void ComposeBatches();
 
 protected:
-    /// Called when update begins.
+    /// Callbacks from RenderPipeline
+    /// @{
     void OnUpdateBegin(const FrameInfo& frameInfo) override;
-    /// Called when pipeline states are invalidated.
     virtual void OnPipelineStatesInvalidated();
+    /// @}
+
     /// Called when batches are ready.
     virtual void OnBatchesReady() {}
 
-    /// Work queue.
+    /// External dependencies
+    /// @{
     WorkQueue* workQueue_{};
-    /// Default material.
     Material* defaultMaterial_{};
-    /// Drawable processor.
     DrawableProcessor* drawableProcessor_{};
-    /// Batch state creation callback.
     BatchStateCacheCallback* batchStateCacheCallback_{};
+    /// @}
 
-    /// Unlit and lit base batches.
     WorkQueueVector<PipelineBatch> baseBatches_;
-    /// Light batches.
     WorkQueueVector<PipelineBatch> lightBatches_;
 
 private:
-    /// Initialize common members of BatchStateCreateKey.
     bool InitializeKey(BatchStateCreateKey& key, const GeometryBatch& geometryBatch) const;
-    /// Initialize light-related members of BatchStateCreateKey.
     void InitializeKeyLight(BatchStateCreateKey& key, unsigned lightIndex, unsigned vertexLightsHash) const;
-    /// Process geometry batch (threaded).
+
     void ProcessGeometryBatch(const GeometryBatch& geometryBatch);
-    /// Resolve delayed batches.
     void ResolveDelayedBatches(unsigned index, const WorkQueueVector<BatchStateCreateKey>& delayedBatches,
         BatchStateCache& cache, WorkQueueVector<PipelineBatch>& batches);
 
-    /// Cache for unlit base batches.
+    /// Pipeline state caches
+    /// @{
     BatchStateCache unlitBaseCache_;
-    /// Cache for lit base batches.
     BatchStateCache litBaseCache_;
-    /// Cache for light batches.
     BatchStateCache lightCache_;
+    /// @}
 
-    /// Delayed unlit base batches.
+    /// Batches whose processing is delayed due to missing pipeline state
+    /// @{
     WorkQueueVector<BatchStateCreateKey> delayedUnlitBaseBatches_;
-    /// Delayed lit base batches.
     WorkQueueVector<BatchStateCreateKey> delayedLitBaseBatches_;
-    /// Delayed light batches.
     WorkQueueVector<BatchStateCreateKey> delayedLightBatches_;
+    /// @}
 };
 
 /// Batch composition manager.
@@ -149,23 +138,22 @@ public:
         LitVolumeSubpass
     };
 
-    /// Construct.
     BatchCompositor(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
         unsigned shadowPassIndex);
-    /// Set passes.
     void SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes);
+    void SetShadowMaterialQuality(MaterialQuality materialQuality) { shadowMaterialQuality_ = materialQuality; }
 
-    /// Compose shadow batches.
+    /// Compose batches
+    /// @{
     void ComposeShadowBatches();
-    /// Compose scene batches.
     void ComposeSceneBatches();
-    /// Compose light volume batches.
     void ComposeLightVolumeBatches();
+    /// @}
 
     /// Return sorted light volume batches.
     const auto& GetLightVolumeBatches() const { return sortedLightVolumeBatches_; }
 
-    /// Sort batches (from vector).
+    /// Sort batches and store result in vector.
     template <class T, class ... U>
     static void SortBatches(ea::vector<T>& sortedBatches, const U& ... pipelineBatches)
     {
@@ -191,50 +179,41 @@ public:
     }
 
 protected:
-    /// Called when update begins.
+    /// Callbacks from RenderPipeline
+    /// @{
     virtual void OnUpdateBegin(const FrameInfo& frameInfo);
-    /// Called when pipeline states are invalidated.
     virtual void OnPipelineStatesInvalidated();
+    /// @}
 
-    /// Begin shadow batches composition. Safe to call from worker thread.
+    /// Safe to call from worker thread.
     void BeginShadowBatchesComposition(unsigned lightIndex, ShadowSplitProcessor* splitProcessor);
-    /// Finalize shadow batches composition. Should be called from main thread.
+    /// Should be called from main thread.
     void FinalizeShadowBatchesComposition();
 
 private:
-    /// Index of shadow technique pass.
     const unsigned shadowPassIndex_;
 
-    /// Work queue.
+    /// External dependencies
+    /// @{
     WorkQueue* workQueue_{};
-    /// Renderer.
     Renderer* renderer_{};
-
-    /// Drawable processor.
     const DrawableProcessor* drawableProcessor_{};
-    /// Default material.
     Material* defaultMaterial_{};
-    /// Null pass (for light volumes).
-    SharedPtr<Pass> nullPass_{};
-    /// Batch state creation callback.
     BatchStateCacheCallback* batchStateCacheCallback_{};
+    /// @}
 
-    /// Passes.
+    /// Cached between frames
+    /// @{
     ea::vector<SharedPtr<BatchCompositorPass>> passes_;
+    MaterialQuality shadowMaterialQuality_{};
+    SharedPtr<Pass> nullPassForLightVolumes_{};
 
-    /// Material quality.
-    MaterialQuality materialQuality_{};
-
-    /// Cache for shadow batches.
     BatchStateCache shadowCache_;
-    /// Delayed shadow batches.
-    WorkQueueVector<ea::pair<ShadowSplitProcessor*, BatchStateCreateKey>> delayedShadowBatches_;
-
-    /// Cache for light volume batches.
     BatchStateCache lightVolumeCache_;
-    /// Light volume batches.
+    /// @}
+
+    WorkQueueVector<ea::pair<ShadowSplitProcessor*, BatchStateCreateKey>> delayedShadowBatches_;
     ea::vector<PipelineBatch> lightVolumeBatches_;
-    /// Sorted light volume batches.
     ea::vector<PipelineBatchByState> sortedLightVolumeBatches_;
 };
 

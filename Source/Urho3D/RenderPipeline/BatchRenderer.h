@@ -40,32 +40,31 @@ class Texture;
 struct PipelineBatchBackToFront;
 struct PipelineBatchByState;
 
-/// Batch rendering flags.
+/// Flags that control how exactly batches are rendered.
 enum class BatchRenderFlag
 {
-    /// Default null flag.
     None = 0,
-    /// Export ambient light.
-    AmbientLight = 1 << 0,
-    /// Export vertex lights.
-    VertexLights = 1 << 1,
-    /// Export pixel light.
-    PixelLight = 1 << 2,
-    /// Use instancing for static geometry.
-    InstantiateStaticGeometry = 1 << 3,
+    EnableAmbientLighting = 1 << 0,
+    EnableVertexLights = 1 << 1,
+    EnablePixelLights = 1 << 2,
+    EnableInstancingForStaticGeometry = 1 << 3,
 };
 
 URHO3D_FLAGSET(BatchRenderFlag, BatchRenderFlags);
 
-/// Light volume batch rendering context.
-struct LightVolumeRenderContext
+/// Common parameters of batch rendering
+struct BatchRenderingContext
 {
-    /// Geometry buffer resources.
-    ea::span<const ShaderResourceDesc> geometryBuffer_;
-    /// Geometry buffer offset and scale.
-    Vector4 geometryBufferOffsetAndScale_;
-    /// Geometry buffer inverse scale.
-    Vector2 geometryBufferInvSize_;
+    DrawCommandQueue& drawQueue_;
+    const Camera& camera_;
+    const ShadowSplitProcessor* outputShadowSplit_{};
+
+    ea::span<const ShaderResourceDesc> globalResources_;
+    ea::span<const ShaderParameterDesc> frameParameters_;
+    ea::span<const ShaderParameterDesc> cameraParameters_;
+
+    BatchRenderingContext(DrawCommandQueue& drawQueue, const Camera& camera);
+    BatchRenderingContext(DrawCommandQueue& drawQueue, const ShadowSplitProcessor& outputShadowSplit);
 };
 
 /// Utility class to convert pipeline batches into sequence of draw commands.
@@ -74,23 +73,19 @@ class URHO3D_API BatchRenderer : public Object
     URHO3D_OBJECT(BatchRenderer, Object);
 
 public:
-    /// Construct.
     BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor,
         InstancingBuffer* instancingBuffer);
-
-    /// Set settings.
     void SetSettings(const BatchRendererSettings& settings);
 
-    /// Render batches (sorted by state).
-    void RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
-        ea::span<const PipelineBatchByState> batches, const ShadowSplitProcessor* outputShadowSplit = nullptr);
-    /// Render batches (sorted by distance).
-    void RenderBatches(DrawCommandQueue& drawQueue, const Camera* camera, BatchRenderFlags flags,
-        ea::span<const PipelineBatchBackToFront> batches, const ShadowSplitProcessor* outputShadowSplit = nullptr);
-
-    /// Render light volume batches for deferred rendering.
-    void RenderLightVolumeBatches(DrawCommandQueue& drawQueue, Camera* camera,
-        const LightVolumeRenderContext& ctx, ea::span<const PipelineBatchByState> batches);
+    /// Render batches
+    /// @{
+    void RenderBatches(const BatchRenderingContext& ctx,
+        BatchRenderFlags flags, ea::span<const PipelineBatchByState> batches);
+    void RenderBatches(const BatchRenderingContext& ctx,
+        BatchRenderFlags flags, ea::span<const PipelineBatchBackToFront> batches);
+    void RenderLightVolumeBatches(const BatchRenderingContext& ctx,
+        ea::span<const PipelineBatchByState> batches);
+    /// @}
 
 private:
     /// External dependencies
