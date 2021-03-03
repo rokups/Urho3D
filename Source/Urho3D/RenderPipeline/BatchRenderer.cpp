@@ -28,6 +28,7 @@
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/Renderer.h"
+#include "../Graphics/Texture2D.h"
 #include "../Graphics/Zone.h"
 #include "../IO/Log.h"
 #include "../RenderPipeline/BatchRenderer.h"
@@ -186,7 +187,7 @@ private:
         current_.pixelLightEnabled_ = current_.pixelLightIndex_ != M_MAX_UNSIGNED;
         if (current_.pixelLightEnabled_)
         {
-            current_.pixelLightParams_ = &lights_[current_.pixelLightIndex_]->GetShaderParams();
+            current_.pixelLightParams_ = &lights_[current_.pixelLightIndex_]->GetParams();
             dirty_.pixelLightTextures_ = current_.pixelLightRamp_ != current_.pixelLightParams_->lightRamp_
                 || current_.pixelLightShape_ != current_.pixelLightParams_->lightShape_
                 || current_.pixelLightShadowMap_ != current_.pixelLightParams_->shadowMap_;
@@ -207,16 +208,16 @@ private:
         if (!dirty_.vertexLightConstants_)
             return;
 
-        static const LightShaderParameters nullVertexLight{};
+        static const CookedLightParams nullVertexLight{};
         for (unsigned i = 0; i < MAX_VERTEX_LIGHTS; ++i)
         {
-            const LightShaderParameters& params = current_.vertexLights_[i] != M_MAX_UNSIGNED
-                ? lights_[current_.vertexLights_[i]]->GetShaderParams() : nullVertexLight;
+            const CookedLightParams& params = current_.vertexLights_[i] != M_MAX_UNSIGNED
+                ? lights_[current_.vertexLights_[i]]->GetParams() : nullVertexLight;
             const Vector3& color = params.GetColor(settings_.gammaCorrection_);
 
-            current_.vertexLightsData_[i * 3] = { color, params.invRange_ };
-            current_.vertexLightsData_[i * 3 + 1] = { params.direction_, params.cutoff_ };
-            current_.vertexLightsData_[i * 3 + 2] = { params.position_, params.invCutoff_ };
+            current_.vertexLightsData_[i * 3] = { color, params.inverseRange_ };
+            current_.vertexLightsData_[i * 3 + 1] = { params.direction_, params.spotCutoff_ };
+            current_.vertexLightsData_[i * 3 + 2] = { params.position_, params.inverseSpotCutoff_ };
         }
     }
 
@@ -289,7 +290,7 @@ private:
         {
             if (drawQueue_.BeginShaderParameterGroup(SP_LIGHT, false))
             {
-                const LightShaderParameters& params = outputShadowSplit_->GetLightProcessor()->GetShaderParams();
+                const CookedLightParams& params = outputShadowSplit_->GetLightProcessor()->GetParams();
                 AddPixelLightConstants(params);
                 drawQueue_.CommitShaderParameterGroup(SP_LIGHT);
             }
@@ -371,7 +372,7 @@ private:
 
         if (outputShadowSplit_)
         {
-            const LightShaderParameters& lightParams = outputShadowSplit_->GetLightProcessor()->GetShaderParams();
+            const CookedLightParams& lightParams = outputShadowSplit_->GetLightProcessor()->GetParams();
             drawQueue_.AddShaderParameter(VSP_NORMALOFFSETSCALE,
                 lightParams.shadowNormalBias_[outputShadowSplit_->GetSplitIndex()]);
         }
@@ -397,20 +398,20 @@ private:
         drawQueue_.AddShaderParameter(VSP_VERTEXLIGHTS, ea::span<const Vector4>{ current_.vertexLightsData_ });
     }
 
-    void AddPixelLightConstants(const LightShaderParameters& params)
+    void AddPixelLightConstants(const CookedLightParams& params)
     {
         drawQueue_.AddShaderParameter(VSP_LIGHTDIR, params.direction_);
         drawQueue_.AddShaderParameter(VSP_LIGHTPOS,
-            Vector4{ params.position_, params.invRange_ });
+            Vector4{ params.position_, params.inverseRange_ });
         drawQueue_.AddShaderParameter(PSP_LIGHTCOLOR,
-            Vector4{ params.GetColor(settings_.gammaCorrection_), params.specularIntensity_ });
+            Vector4{ params.GetColor(settings_.gammaCorrection_), params.effectiveSpecularIntensity_ });
 
-        drawQueue_.AddShaderParameter(PSP_LIGHTRAD, params.radius_);
-        drawQueue_.AddShaderParameter(PSP_LIGHTLENGTH, params.length_);
+        drawQueue_.AddShaderParameter(PSP_LIGHTRAD, params.volumetricRadius_);
+        drawQueue_.AddShaderParameter(PSP_LIGHTLENGTH, params.volumetricLength_);
 
         if (params.numLightMatrices_ > 0)
         {
-            ea::span<const Matrix4> shadowMatricesSpan{ params.lightMatrices_, params.numLightMatrices_ };
+            ea::span<const Matrix4> shadowMatricesSpan{ params.lightMatrices_.data(), params.numLightMatrices_ };
             drawQueue_.AddShaderParameter(VSP_LIGHTMATRICES, shadowMatricesSpan);
         }
 
@@ -419,7 +420,7 @@ private:
             drawQueue_.AddShaderParameter(PSP_SHADOWDEPTHFADE, params.shadowDepthFade_);
             drawQueue_.AddShaderParameter(PSP_SHADOWINTENSITY, params.shadowIntensity_);
             drawQueue_.AddShaderParameter(PSP_SHADOWMAPINVSIZE, params.shadowMapInvSize_);
-            drawQueue_.AddShaderParameter(PSP_SHADOWSPLITS, params.shadowSplits_);
+            drawQueue_.AddShaderParameter(PSP_SHADOWSPLITS, params.shadowSplitDistances_);
             drawQueue_.AddShaderParameter(PSP_SHADOWCUBEUVBIAS, params.shadowCubeUVBias_);
             drawQueue_.AddShaderParameter(PSP_SHADOWCUBEADJUST, params.shadowCubeAdjust_);
             drawQueue_.AddShaderParameter(PSP_VSMSHADOWPARAMS, settings_.varianceShadowMapParams_);
@@ -635,7 +636,7 @@ private:
 
         unsigned pixelLightIndex_{ M_MAX_UNSIGNED };
         bool pixelLightEnabled_{};
-        const LightShaderParameters* pixelLightParams_{};
+        const CookedLightParams* pixelLightParams_{};
         Texture* pixelLightRamp_{};
         Texture* pixelLightShape_{};
         Texture* pixelLightShadowMap_{};

@@ -28,9 +28,10 @@
 #include "../Math/NumericRange.h"
 #include "../Math/Polyhedron.h"
 #include "../Graphics/Camera.h"
-#include "../Graphics/Renderer.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/OctreeQuery.h"
+#include "../Graphics/Renderer.h"
+#include "../Graphics/Texture2D.h"
 #include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/LightProcessorQuery.h"
 #include "../Scene/Node.h"
@@ -170,15 +171,15 @@ void LightProcessor::BeginUpdate(DrawableProcessor* drawableProcessor, LightProc
     if (splits_.size() <= numSplitsRequested_)
     {
         // Allocate splits and reset timer immediately
-        splitTimeToLive_ = NumSplitFramesToLive;
+        splitRemainingTimeToLive_ = NumSplitFramesToLive;
         while (splits_.size() < numSplitsRequested_)
             splits_.emplace_back(this, splits_.size());
     }
     else
     {
         // Deallocate splits by timeout
-        --splitTimeToLive_;
-        if (splitTimeToLive_ == 0)
+        --splitRemainingTimeToLive_;
+        if (splitRemainingTimeToLive_ == 0)
         {
             while (splits_.size() > numSplitsRequested_)
                 splits_.pop_back();
@@ -194,7 +195,7 @@ void LightProcessor::Update(DrawableProcessor* drawableProcessor)
     const LightType lightType = light_->GetLightType();
 
     // Check if light volume contains camera
-    overlapsCamera_ = EstimateDistanceToCamera(cullCamera, light_) < cullCamera->GetNearClip() * 2.0f;
+    cameraIsInsideLightVolume_ = EstimateDistanceToCamera(cullCamera, light_) < cullCamera->GetNearClip() * 2.0f;
 
     // Query lit geometries (and shadow casters for spot and point lights)
     switch (lightType)
@@ -219,7 +220,7 @@ void LightProcessor::Update(DrawableProcessor* drawableProcessor)
     }
     case LIGHT_DIRECTIONAL:
     {
-        overlapsCamera_ = true;
+        cameraIsInsideLightVolume_ = true;
         hasLitGeometries_ = false;
         hasForwardLitGeometries_ = false;
         const unsigned lightMask = light_->GetLightMask();
@@ -277,7 +278,7 @@ void LightProcessor::Update(DrawableProcessor* drawableProcessor)
     // Evaluate split shadow map size
     // TODO(renderer): Implement me
     shadowMapSplitSize_ = light_->GetLightType() != LIGHT_POINT ? 512 : 256;
-    shadowMapSize_ = IntVector2{ shadowMapSplitSize_, shadowMapSplitSize_ } * GetSplitsGridSize();
+    shadowMapSize_ = IntVector2{ shadowMapSplitSize_, shadowMapSplitSize_ } * GetNumSplitsInGrid();
 }
 
 void LightProcessor::EndUpdate(DrawableProcessor* drawableProcessor, LightProcessorCallback* callback)
@@ -291,7 +292,7 @@ void LightProcessor::EndUpdate(DrawableProcessor* drawableProcessor, LightProces
         else
         {
             for (unsigned i = 0; i < numActiveSplits_; ++i)
-                splits_[i].FinalizeShadow(shadowMap_.GetSplit(i, GetSplitsGridSize()));
+                splits_[i].FinalizeShadow(shadowMap_.GetSplit(i, GetNumSplitsInGrid()));
         }
     }
 
@@ -341,48 +342,48 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
 
     // Setup resources
     auto renderer = light_->GetSubsystem<Renderer>();
-    shaderParams_.shadowMap_ = shadowMap_.texture_;
-    shaderParams_.lightRamp_ = light_->GetRampTexture() ? light_->GetRampTexture() : renderer->GetDefaultLightRamp();
-    shaderParams_.lightShape_ = light_->GetShapeTexture() ? light_->GetShapeTexture() : renderer->GetDefaultLightSpot();
+    cookedParams_.shadowMap_ = shadowMap_.texture_;
+    cookedParams_.lightRamp_ = light_->GetRampTexture() ? light_->GetRampTexture() : renderer->GetDefaultLightRamp();
+    cookedParams_.lightShape_ = light_->GetShapeTexture() ? light_->GetShapeTexture() : renderer->GetDefaultLightSpot();
 
     // Setup common shader parameters
-    shaderParams_.position_ = lightNode->GetWorldPosition();
-    shaderParams_.direction_ = lightNode->GetWorldRotation() * Vector3::BACK;
-    shaderParams_.invRange_ = lightType == LIGHT_DIRECTIONAL ? 0.0f : 1.0f / Max(light_->GetRange(), M_EPSILON);
-    shaderParams_.radius_ = light_->GetRadius();
-    shaderParams_.length_ = light_->GetLength();
+    cookedParams_.position_ = lightNode->GetWorldPosition();
+    cookedParams_.direction_ = lightNode->GetWorldRotation() * Vector3::BACK;
+    cookedParams_.inverseRange_ = lightType == LIGHT_DIRECTIONAL ? 0.0f : 1.0f / Max(light_->GetRange(), M_EPSILON);
+    cookedParams_.volumetricRadius_ = light_->GetRadius();
+    cookedParams_.volumetricLength_ = light_->GetLength();
 
     // Negative lights will use subtract blending, so use absolute RGB values
     const float fade = GetLightFade(light_);
-    shaderParams_.colorGamma_ = fade * light_->GetEffectiveColor().Abs().ToVector3();
-    shaderParams_.colorLinear_ = fade * light_->GetEffectiveColor().Abs().GammaToLinear().ToVector3();
-    shaderParams_.specularIntensity_ = fade * light_->GetEffectiveSpecularIntensity();
+    cookedParams_.effectiveColorInGammaSpace_ = fade * light_->GetEffectiveColor().Abs().ToVector3();
+    cookedParams_.effectiveColorInLinearSpace_ = fade * light_->GetEffectiveColor().Abs().GammaToLinear().ToVector3();
+    cookedParams_.effectiveSpecularIntensity_ = fade * light_->GetEffectiveSpecularIntensity();
 
     // Setup vertex light parameters
     if (lightType == LIGHT_SPOT)
     {
-        shaderParams_.cutoff_ = Cos(light_->GetFov() * 0.5f);
-        shaderParams_.invCutoff_ = 1.0f / (1.0f - shaderParams_.cutoff_);
+        cookedParams_.spotCutoff_ = Cos(light_->GetFov() * 0.5f);
+        cookedParams_.inverseSpotCutoff_ = 1.0f / (1.0f - cookedParams_.spotCutoff_);
     }
     else
     {
-        shaderParams_.cutoff_ = -2.0f;
-        shaderParams_.invCutoff_ = 1.0f;
+        cookedParams_.spotCutoff_ = -2.0f;
+        cookedParams_.inverseSpotCutoff_ = 1.0f;
     }
 
     // TODO(renderer): Skip this step if there's no cookies
     switch (lightType)
     {
     case LIGHT_DIRECTIONAL:
-        shaderParams_.numLightMatrices_ = 0;
+        cookedParams_.numLightMatrices_ = 0;
         break;
     case LIGHT_SPOT:
-        shaderParams_.lightMatrices_[0] = CalculateSpotMatrix(light_);
-        shaderParams_.numLightMatrices_ = 1;
+        cookedParams_.lightMatrices_[0] = CalculateSpotMatrix(light_);
+        cookedParams_.numLightMatrices_ = 1;
         break;
     case LIGHT_POINT:
-        shaderParams_.lightMatrices_[0] = lightNode->GetWorldRotation().RotationMatrix();
-        shaderParams_.numLightMatrices_ = 1;
+        cookedParams_.lightMatrices_[0] = lightNode->GetWorldRotation().RotationMatrix();
+        cookedParams_.numLightMatrices_ = 1;
         break;
     default:
         break;
@@ -395,21 +396,21 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
     // Initialize size of shadow map
     const float textureSizeX = static_cast<float>(shadowMap_.texture_->GetWidth());
     const float textureSizeY = static_cast<float>(shadowMap_.texture_->GetHeight());
-    shaderParams_.shadowMapInvSize_ = { 1.0f / textureSizeX, 1.0f / textureSizeY };
+    cookedParams_.shadowMapInvSize_ = { 1.0f / textureSizeX, 1.0f / textureSizeY };
 
-    shaderParams_.shadowCubeUVBias_ = Vector2::ZERO;
-    shaderParams_.shadowCubeAdjust_ = Vector4::ZERO;
+    cookedParams_.shadowCubeUVBias_ = Vector2::ZERO;
+    cookedParams_.shadowCubeAdjust_ = Vector4::ZERO;
     switch (lightType)
     {
     case LIGHT_DIRECTIONAL:
-        shaderParams_.numLightMatrices_ = MAX_CASCADE_SPLITS;
+        cookedParams_.numLightMatrices_ = MAX_CASCADE_SPLITS;
         for (unsigned splitIndex = 0; splitIndex < numActiveSplits_; ++splitIndex)
-            shaderParams_.lightMatrices_[splitIndex] = splits_[splitIndex].GetWorldToShadowSpaceMatrix(subPixelOffset);
+            cookedParams_.lightMatrices_[splitIndex] = splits_[splitIndex].GetWorldToShadowSpaceMatrix(subPixelOffset);
         break;
 
     case LIGHT_SPOT:
-        shaderParams_.numLightMatrices_ = 2;
-        shaderParams_.lightMatrices_[1] = splits_[0].GetWorldToShadowSpaceMatrix(subPixelOffset);
+        cookedParams_.numLightMatrices_ = 2;
+        cookedParams_.lightMatrices_[1] = splits_[0].GetWorldToShadowSpaceMatrix(subPixelOffset);
         break;
 
     case LIGHT_POINT:
@@ -421,8 +422,8 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
         const float viewportOffsetY = static_cast<float>(splitViewport.Top());
         const Vector2 relativeViewportSize{ viewportSizeX / textureSizeX, viewportSizeY / textureSizeY };
         const Vector2 relativeViewportOffset{ viewportOffsetX / textureSizeX, viewportOffsetY / textureSizeY };
-        shaderParams_.shadowCubeUVBias_ =
-            Vector2::ONE - 2.0f * cubeShadowMapPadding * shaderParams_.shadowMapInvSize_ / relativeViewportSize;
+        cookedParams_.shadowCubeUVBias_ =
+            Vector2::ONE - 2.0f * cubeShadowMapPadding * cookedParams_.shadowMapInvSize_ / relativeViewportSize;
 #ifdef URHO3D_OPENGL
         const Vector2 scale = relativeViewportSize * Vector2(1, -1);
         const Vector2 offset = Vector2(0, 1) + relativeViewportOffset * Vector2(1, -1);
@@ -430,7 +431,7 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
         const Vector2 scale = relativeViewportSize;
         const Vector2 offset = relativeViewportOffset;
 #endif
-        shaderParams_.shadowCubeAdjust_ = { scale, offset };
+        cookedParams_.shadowCubeAdjust_ = { scale, offset };
         break;
     }
     default:
@@ -453,7 +454,7 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
         const float fadeEnd = shadowRange / viewFarClip;
         const float fadeRange = fadeEnd - fadeStart;
 
-        shaderParams_.shadowDepthFade_ = { q, r, fadeStart, 1.0f / fadeRange };
+        cookedParams_.shadowDepthFade_ = { q, r, fadeStart, 1.0f / fadeRange };
     }
 
     {
@@ -468,20 +469,20 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
         // TODO(renderer): Support me
         //if (renderer->GetShadowQuality() == SHADOWQUALITY_PCF_16BIT || renderer->GetShadowQuality() == SHADOWQUALITY_PCF_24BIT)
         //    samples = 4.0f;
-        shaderParams_.shadowIntensity_ = { pcfValues / samples, intensity, 0.0f, 0.0f };
+        cookedParams_.shadowIntensity_ = { pcfValues / samples, intensity, 0.0f, 0.0f };
     }
 
-    shaderParams_.shadowSplits_ = { M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE };
+    cookedParams_.shadowSplitDistances_ = { M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE };
     if (numActiveSplits_ > 1)
-        shaderParams_.shadowSplits_.x_ = splits_[0].GetCascadeZRange().second / cullCamera->GetFarClip();
+        cookedParams_.shadowSplitDistances_.x_ = splits_[0].GetCascadeZRange().second / cullCamera->GetFarClip();
     if (numActiveSplits_ > 2)
-        shaderParams_.shadowSplits_.y_ = splits_[1].GetCascadeZRange().second / cullCamera->GetFarClip();
+        cookedParams_.shadowSplitDistances_.y_ = splits_[1].GetCascadeZRange().second / cullCamera->GetFarClip();
     if (numActiveSplits_ > 3)
-        shaderParams_.shadowSplits_.z_ = splits_[2].GetCascadeZRange().second / cullCamera->GetFarClip();
+        cookedParams_.shadowSplitDistances_.z_ = splits_[2].GetCascadeZRange().second / cullCamera->GetFarClip();
 
     // TODO(renderer): Implement me
-    //shaderParams_.shadowNormalBias_ = light_->GetShadowBias().normalOffset_;
-    //shaderParams_.shadowNormalBias_ = Vector4::ZERO;
+    //cookedParams_.shadowNormalBias_ = light_->GetShadowBias().normalOffset_;
+    //cookedParams_.shadowNormalBias_ = Vector4::ZERO;
     /*if (light->GetShadowBias().normalOffset_ > 0.0f)
     {
         Vector4 normalOffsetScale(Vector4::ZERO);
@@ -509,7 +510,7 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
 #endif
     }*/
 
-    shaderParams_.shadowDepthBiasMultiplier_.fill(1.0f);
+    cookedParams_.shadowDepthBiasMultiplier_.fill(1.0f);
     if (light_->GetLightType() == LIGHT_DIRECTIONAL)
     {
         const float biasAutoAdjust = light_->GetShadowCascade().biasAutoAdjust_;
@@ -517,13 +518,13 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
         {
             const float splitScale = ea::max(1.0f, splits_[i].GetCascadeZRange().second / splits_[0].GetCascadeZRange().second);
             const float multiplier = 1.0f + (splitScale - 1.0f) * biasAutoAdjust;
-            shaderParams_.shadowDepthBiasMultiplier_[i] = SnapRound(multiplier, 0.1f);
+            cookedParams_.shadowDepthBiasMultiplier_[i] = SnapRound(multiplier, 0.1f);
         }
     }
 
     const float normalOffset = light_->GetShadowBias().normalOffset_;
     for (unsigned i = 0; i < numActiveSplits_; ++i)
-        shaderParams_.shadowNormalBias_[i] = splits_[i].GetShadowMapTexelSizeInWorldSpace() * normalOffset;
+        cookedParams_.shadowNormalBias_[i] = splits_[i].GetShadowMapTexelSizeInWorldSpace() * normalOffset;
 }
 
 void LightProcessor::UpdateHashes()
@@ -540,10 +541,10 @@ void LightProcessor::UpdateHashes()
     CombineHash(commonHash, MakeHash(biasParameters.slopeScaledBias_ * 1000.0f));
     CombineHash(commonHash, light_->GetLightMaskEffective() & PORTABLE_LIGHTMASK);
 
-    forwardHash_ = commonHash;
+    forwardLitBatchHash_ = commonHash;
 
-    lightVolumeHash_ = commonHash;
-    CombineHash(lightVolumeHash_, overlapsCamera_);
+    lightVolumeBatchHash_ = commonHash;
+    CombineHash(lightVolumeBatchHash_, cameraIsInsideLightVolume_);
 
     if (light_->GetLightType() != LIGHT_DIRECTIONAL)
         shadowBatchStateHashes_.fill(commonHash);
@@ -552,12 +553,12 @@ void LightProcessor::UpdateHashes()
         for (unsigned i = 0; i < numActiveSplits_; ++i)
         {
             shadowBatchStateHashes_[i] = commonHash;
-            CombineHash(shadowBatchStateHashes_[i], MakeHash(100.0f * shaderParams_.shadowDepthBiasMultiplier_[i]));
+            CombineHash(shadowBatchStateHashes_[i], MakeHash(100.0f * cookedParams_.shadowDepthBiasMultiplier_[i]));
         }
     }
 }
 
-IntVector2 LightProcessor::GetSplitsGridSize() const
+IntVector2 LightProcessor::GetNumSplitsInGrid() const
 {
     if (numActiveSplits_ == 1)
         return { 1, 1 };

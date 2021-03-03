@@ -186,7 +186,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     // TODO(renderer): Don't use ShadowMapAllocator for this
     if (isShadowPass)
     {
-        const LightShaderParameters& lightParams = key.pixelLight_->GetShaderParams();
+        const CookedLightParams& lightParams = key.pixelLight_->GetParams();
         const float biasMultiplier = lightParams.shadowDepthBiasMultiplier_[ctx.shadowSplitIndex_];
         const BiasParameters& biasParameters = light->GetShadowBias();
         desc.fillMode_ = FILL_SOLID;

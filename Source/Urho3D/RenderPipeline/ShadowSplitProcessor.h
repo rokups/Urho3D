@@ -26,6 +26,7 @@
 #include "../Math/NumericRange.h"
 #include "../RenderPipeline/CommonTypes.h"
 #include "../RenderPipeline/PipelineBatchSortKey.h"
+#include "../Scene/Node.h"
 
 #include <EASTL/vector.h>
 
@@ -37,9 +38,11 @@ class Drawable;
 class DrawableProcessor;
 class Light;
 class LightProcessor;
-class Node;
 
-/// Class that manages single shadow split processing.
+/// Manages single shadow split parameters and shadow casters.
+/// Spot lights always have one split.
+/// Directions lights have one split per cascade.
+/// Point lights always have six splits.
 class URHO3D_API ShadowSplitProcessor
 {
 public:

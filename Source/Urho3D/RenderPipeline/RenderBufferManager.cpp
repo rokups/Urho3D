@@ -25,6 +25,7 @@
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Renderer.h"
 #include "../Graphics/RenderSurface.h"
+#include "../Graphics/Texture2D.h"
 #include "../RenderPipeline/RenderBufferManager.h"
 #include "../RenderPipeline/RenderPipelineInterface.h"
 

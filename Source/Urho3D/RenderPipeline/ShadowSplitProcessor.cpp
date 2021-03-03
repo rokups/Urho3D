@@ -33,7 +33,6 @@
 #include "../RenderPipeline/LightProcessorQuery.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
 #include "../RenderPipeline/ShadowSplitProcessor.h"
-#include "../Scene/Node.h"
 
 #include <EASTL/sort.h>
 
