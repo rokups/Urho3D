@@ -51,149 +51,127 @@ struct GeometryRenderFlag
 {
     enum Type : unsigned char
     {
-        /// Whether the geometry is visible in the cull camera.
-        Visible = 1 << 0,
-        /// Whether the geometry is lit in any way.
+        VisibleInCullCamera = 1 << 0,
         Lit = 1 << 1,
-        /// Whether the geometry is lit using forward rendering.
         ForwardLit = 1 << 2,
     };
 };
 
-/// Sorted occluder type.
 struct SortedOccluder
 {
-    /// Sorting penalty.
-    float penalty_{};
-    /// Occluder drawable.
+    float sortValue_{};
     Drawable* drawable_{};
-    /// Compare.
-    bool operator<(const SortedOccluder& rhs) const { return penalty_ < rhs.penalty_; }
+
+    bool operator<(const SortedOccluder& rhs) const { return sortValue_ < rhs.sortValue_; }
 };
 
 /// Reference to SourceBatch of Drawable geometry, with resolved material passes.
 struct GeometryBatch
 {
-    /// Geometry.
     Drawable* geometry_{};
-    /// Index of source batch within geometry.
     unsigned sourceBatchIndex_{};
-    /// Unlit base pass (no direct lighting).
+
+    /// Unlit base pass (no per-pixel lighting, optional ambient lighting).
     Pass* unlitBasePass_{};
-    /// Lit base pass (direct lighting from one light source).
+    /// Lit base pass (per-pixel lighting from one light source and ambient lighting).
     Pass* litBasePass_{};
-    /// Additive light pass (direct lighting from one light source).
+    /// Additive light pass (per-pixel lighting from one light source).
     Pass* lightPass_{};
 };
 
 /// Interface of scene pass used by drawable processor.
-///
-/// Consists of 3 sub-passes:
-/// 1) Unlit Base: Render geometry without any specific light source. Ambient lighting may or may not be applied.
-/// 2) Lit Base: Render geometry with single light source and ambient lighting.
-/// 3) Light: Render geometry in additive mode with single light source.
 ///
 /// There are 3 types of batches:
 /// 1) Unlit Base + Lit Base + Light:
 ///    Batch is rendered in N passes if the first per-pixel light can be rendered together with ambient.
 ///    Batch is rendered in N + 1 passes otherwise.
 ///    N is equal to the number per-pixel lights affecting object.
-/// 2) Unlit Base + Light: batch is rendered with forward lighting in N + 1 passes.
-/// 3) Unlit Base: batch is rendered once.
+/// 2) Unlit Base + Light: batch is rendered with per-pixel forward lighting in N + 1 passes.
+/// 3) Unlit Base: batch is rendered once, per-pixel lighting is not applied.
 ///
-/// Other combinations are invalid.
+/// Other pass combinations are invalid.
 class URHO3D_API DrawableProcessorPass : public Object
 {
     URHO3D_OBJECT(DrawableProcessorPass, Object);
 
 public:
-    /// Add batch result.
-    struct AddResult
+    struct AddBatchResult
     {
-        /// Whether the batch was added.
         bool added_{};
-        /// Whether lit batch was added.
         bool litAdded_{};
     };
 
-    /// Construct.
     DrawableProcessorPass(RenderPipelineInterface* renderPipeline, bool needAmbient,
         unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
-    /// Add source batch of drawable. Return whether forward lit batch was added.
-    AddResult AddBatch(unsigned threadIndex, Drawable* drawable, unsigned sourceBatchIndex, Technique* technique);
+    AddBatchResult AddBatch(unsigned threadIndex, Drawable* drawable, unsigned sourceBatchIndex, Technique* technique);
 
-    /// Return whether the pass needs ambient light.
     bool NeedAmbient() const { return needAmbient_; }
 
 private:
-    /// Whether the pass is lit.
     const bool needAmbient_{};
-    /// Unlit base pass index.
+
     const unsigned unlitBasePassIndex_{};
-    /// Lit base pass index.
     const unsigned litBasePassIndex_{};
-    /// Additional light pass index.
     const unsigned lightPassIndex_{};
 
 protected:
-    /// Called when update begins.
+    /// RenderPipeline callbacks
+    /// @{
     virtual void OnUpdateBegin(const FrameInfo& frameInfo);
+    /// @}
 
-    /// Geometry batches.
     WorkQueueVector<GeometryBatch> geometryBatches_;
 };
 
-/// Drawable processing utility.
+/// Utility used to update and process visible or shadow caster Drawables.
 class URHO3D_API DrawableProcessor : public Object
 {
     URHO3D_OBJECT(DrawableProcessor, Object);
 
 public:
-    /// Construct.
     explicit DrawableProcessor(RenderPipelineInterface* renderPipeline);
-    /// Destruct.
     ~DrawableProcessor() override;
 
-    /// Set passes.
+    /// Configure
+    /// @{
     void SetPasses(ea::vector<SharedPtr<DrawableProcessorPass>> passes);
-    /// Set settings.
     void SetSettings(const DrawableProcessorSettings& settings) { settings_ = settings; }
+    /// @}
 
     /// Return current frame info.
     const FrameInfo& GetFrameInfo() const { return frameInfo_; }
 
-    /// Process and filter occluders.
+    /// Process occluders. UpdateBatches for occluders may be called twice, but never reentrantly.
     void ProcessOccluders(const ea::vector<Drawable*>& occluders, float sizeThreshold);
-    /// Return whether there are active occluders.
-    bool HasOccluders() const { return !sortedOccluders_.empty(); }
-    /// Return active occluders.
-    const auto& GetOccluders() const { return sortedOccluders_; }
 
-    /// Process visible geometries and lights.
+    /// Return information about visible occluders
+    /// @{
+    bool HasOccluders() const { return !sortedOccluders_.empty(); }
+    const auto& GetOccluders() const { return sortedOccluders_; }
+    /// @}
+
     void ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables, OcclusionBuffer* occlusionBuffer);
 
-    // TODO(renderer): Get rid of redundant "visible"
-    /// Return visible geometries.
-    const auto& GetVisibleGeometries() const { return visibleGeometries_; }
-    /// Return visible lights.
-    const auto& GetVisibleLights() const { return visibleLights_; }
-    /// Return light processors for visible lights.
-    const auto& GetLightProcessors() const { return lightProcessors_; }
-    /// Return scene Z range.
+    /// Return information about visible geometries and lights
+    /// @{
+    const auto& GetGeometries() const { return visibleGeometries_; }
     const FloatRange& GetSceneZRange() const { return sceneZRange_; }
-    /// Return geometry render flags.
-    unsigned char GetGeometryRenderFlags(unsigned drawableIndex) const { return geometryFlags_[drawableIndex]; }
-    /// Return geometry Z range.
-    const FloatRange& GetGeometryZRange(unsigned drawableIndex) const { return geometryZRanges_[drawableIndex]; }
-    /// Return geometry forward lighting.
-    const LightAccumulator& GetGeometryLighting(unsigned drawableIndex) const { return geometryLighting_[drawableIndex]; }
-    /// Return geometry forward lighting (mutable).
-    LightAccumulator& GetMutableGeometryLighting(unsigned drawableIndex) { return geometryLighting_[drawableIndex]; }
-    /// Return visible light by index.
+
+    const auto& GetLights() const { return visibleLights_; }
     Light* GetLight(unsigned lightIndex) const { return visibleLights_[lightIndex]; }
-    /// Return light processor by index.
+
+    const auto& GetLightProcessors() const { return lightProcessors_; }
     LightProcessor* GetLightProcessor(unsigned lightIndex) const { return lightProcessors_[lightIndex]; }
+    /// @}
+
+    /// Return information from global drawable index. May be invalid for invisible drawables.
+    /// @{
+    unsigned char GetGeometryRenderFlags(unsigned drawableIndex) const { return geometryFlags_[drawableIndex]; }
+    const FloatRange& GetGeometryZRange(unsigned drawableIndex) const { return geometryZRanges_[drawableIndex]; }
+    const LightAccumulator& GetGeometryLighting(unsigned drawableIndex) const { return geometryLighting_[drawableIndex]; }
+    LightAccumulator& GetMutableGeometryLighting(unsigned drawableIndex) { return geometryLighting_[drawableIndex]; }
+    /// @}
 
     /// Internal. Pre-process shadow caster candidates. Safe to call from worker thread.
     void PreprocessShadowCasters(ea::vector<Drawable*>& shadowCasters,
@@ -210,21 +188,19 @@ public:
     void UpdateGeometries();
 
 protected:
-    /// Called when update begins.
+    /// RenderPipeline callbacks
+    /// @{
     void OnUpdateBegin(const FrameInfo& frameInfo);
-    /// Process visible drawable.
+    /// @}
+
     void ProcessVisibleDrawable(Drawable* drawable);
-    /// Process queued invisible drawable.
     void ProcessQueuedDrawable(Drawable* drawable);
-    /// Update zone of drawable.
     void UpdateDrawableZone(const BoundingBox& boundingBox, Drawable* drawable) const;
-    /// Queue drawable update. Ignored if already updated or queued. Safe to call from worker thread.
     void QueueDrawableUpdate(Drawable* drawable);
-    /// Queue drawable geometry update. Safe to call from worker thread.
     void QueueDrawableGeometryUpdate(unsigned threadIndex, Drawable* drawable);
-    /// Calculate Z range of bounding box.
+
     FloatRange CalculateBoundingBoxZRange(const BoundingBox& boundingBox) const;
-    /// Return light processors sorted by shadow map sizes.
+
     void SortLightProcessorsByShadowMap();
 
 private:
@@ -237,69 +213,58 @@ private:
         UpdateFlag(UpdateFlag&& other) {}
     };
 
-    /// Work queue.
+    /// External dependencies
+    /// @{
     WorkQueue* workQueue_{};
-    /// Default material.
     Material* defaultMaterial_{};
+    /// @}
 
-    /// Scene passes sinks.
+    /// Cached between frames
+    /// @{
     ea::vector<SharedPtr<DrawableProcessorPass>> passes_;
-    /// Settings.
     DrawableProcessorSettings settings_;
+    ea::unique_ptr<LightProcessorCache> lightProcessorCache_;
+    /// @}
 
-    /// Frame info.
+    /// Constant within frame, changes between frames
+    /// @{
     FrameInfo frameInfo_;
-    /// Total number of drawables in scene.
     unsigned numDrawables_{};
-    /// View matrix for cull camera.
-    Matrix3x4 viewMatrix_;
-    /// Z axis direction.
-    Vector3 viewZ_;
-    /// Adjusted Z axis direction for bounding box size evaluation.
-    Vector3 absViewZ_;
-    /// Material quality.
-    MaterialQuality materialQuality_{};
-    /// Global illumination.
-    GlobalIllumination* gi_{};
 
-    /// Z-range of scene (temporary collection for threading).
+    Matrix3x4 cullCameraViewMatrix_;
+    Vector3 cullCameraZAxis_;
+    Vector3 cullCameraZAxisAbs_;
+
+    MaterialQuality materialQuality_{};
+    GlobalIllumination* gi_{};
+    /// @}
+
+    /// Arrays indexed with drawable index
+    /// @{
+    ea::vector<UpdateFlag> isDrawableUpdated_;
+    ea::vector<unsigned char> geometryFlags_;
+    ea::vector<FloatRange> geometryZRanges_;
+    ea::vector<LightAccumulator> geometryLighting_;
+    /// @}
+
+    /// Processing results
+    /// @{
     ea::vector<FloatRange> sceneZRangeTemp_;
-    /// Z-range of scene.
     FloatRange sceneZRange_;
 
-    /// Updated drawables.
-    ea::vector<UpdateFlag> isDrawableUpdated_;
-    /// Geometry flags. Unspecified for other drawables.
-    ea::vector<unsigned char> geometryFlags_;
-    /// Z-ranges of drawables. Unspecified for invisible drawables.
-    ea::vector<FloatRange> geometryZRanges_;
-    /// Accumulated drawable lighting. Unspecified for invisible or unlit drawables.
-    ea::vector<LightAccumulator> geometryLighting_;
-
-    /// Sorted occluders.
     ea::vector<SortedOccluder> sortedOccluders_;
 
-    /// Visible geometries.
     WorkQueueVector<Drawable*> visibleGeometries_;
-    /// Geometries to be updated from worker threads.
     WorkQueueVector<Drawable*> threadedGeometryUpdates_;
-    /// Geometries to be updated from main thread.
     WorkQueueVector<Drawable*> nonThreadedGeometryUpdates_;
 
-    /// Visible lights (temporary collection for threading).
     WorkQueueVector<Light*> visibleLightsTemp_;
-    /// Visible lights.
     ea::vector<Light*> visibleLights_;
-    /// Light processors for visible lights.
     ea::vector<LightProcessor*> lightProcessors_;
-    /// Light processor cache.
-    ea::unique_ptr<LightProcessorCache> lightProcessorCache_;
-
-    /// Delayed drawable updates.
-    WorkQueueVector<Drawable*> queuedDrawableUpdates_{};
-
-    /// Light processors for visible lights sorted by shadow map sizes.
     ea::vector<LightProcessor*> lightProcessorsByShadowMapSize_;
+
+    WorkQueueVector<Drawable*> queuedDrawableUpdates_{};
+    /// @}
 };
 
 }

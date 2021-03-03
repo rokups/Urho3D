@@ -25,8 +25,6 @@
 #include "../Core/Object.h"
 #include "../Math/AreaAllocator.h"
 #include "../Math/Rect.h"
-// TODO(renderer): Remove this dependency
-#include "../Graphics/PipelineState.h"
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Light.h"
 #include "../RenderPipeline/CommonTypes.h"

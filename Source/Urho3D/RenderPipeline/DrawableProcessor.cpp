@@ -123,7 +123,7 @@ DrawableProcessorPass::DrawableProcessorPass(RenderPipelineInterface* renderPipe
     renderPipeline->OnUpdateBegin.Subscribe(this, &DrawableProcessorPass::OnUpdateBegin);
 }
 
-DrawableProcessorPass::AddResult DrawableProcessorPass::AddBatch(unsigned threadIndex,
+DrawableProcessorPass::AddBatchResult DrawableProcessorPass::AddBatch(unsigned threadIndex,
     Drawable* drawable, unsigned sourceBatchIndex, Technique* technique)
 {
     Pass* unlitBasePass = technique->GetPass(unlitBasePassIndex_);
@@ -165,9 +165,9 @@ void DrawableProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
     // Initialize frame constants
     frameInfo_ = frameInfo;
     numDrawables_ = frameInfo_.octree_->GetAllDrawables().size();
-    viewMatrix_ = frameInfo_.cullCamera_->GetView();
-    viewZ_ = { viewMatrix_.m20_, viewMatrix_.m21_, viewMatrix_.m22_ };
-    absViewZ_ = viewZ_.Abs();
+    cullCameraViewMatrix_ = frameInfo_.cullCamera_->GetView();
+    cullCameraZAxis_ = { cullCameraViewMatrix_.m20_, cullCameraViewMatrix_.m21_, cullCameraViewMatrix_.m22_ };
+    cullCameraZAxisAbs_ = cullCameraZAxis_.Abs();
 
     materialQuality_ = settings_.materialQuality_;
     if (frameInfo_.cullCamera_->GetViewOverrideFlags() & VO_LOW_MATERIAL_QUALITY)
@@ -346,7 +346,7 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
             // Update scene passes
             for (DrawableProcessorPass* pass : passes_)
             {
-                const DrawableProcessorPass::AddResult result = pass->AddBatch(threadIndex, drawable, i, technique);
+                const DrawableProcessorPass::AddBatchResult result = pass->AddBatch(threadIndex, drawable, i, technique);
                 if (result.litAdded_)
                     isForwardLit = true;
                 if (result.litAdded_ || (result.added_ && pass->NeedAmbient()))
@@ -384,7 +384,7 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
 
         // Update flags
         unsigned char& flag = geometryFlags_[drawableIndex];
-        flag = GeometryRenderFlag::Visible;
+        flag = GeometryRenderFlag::VisibleInCullCamera;
         if (needAmbient)
             flag |= GeometryRenderFlag::Lit;
         if (isForwardLit)
@@ -487,7 +487,7 @@ void DrawableProcessor::PreprocessShadowCasters(ea::vector<Drawable*>& shadowCas
 
         // Queue shadow caster if it's visible
         const BoundingBox lightSpaceBoundingBox = drawable->GetWorldBoundingBox().Transformed(worldToLightSpace);
-        const bool isDrawableVisible = !!(geometryFlags_[drawable->GetDrawableIndex()] & GeometryRenderFlag::Visible);
+        const bool isDrawableVisible = !!(geometryFlags_[drawable->GetDrawableIndex()] & GeometryRenderFlag::VisibleInCullCamera);
         if (isDrawableVisible
             || IsShadowCasterVisible(lightSpaceBoundingBox, shadowCamera, lightSpaceFrustum, lightSpaceFrustumBoundingBox))
         {
@@ -568,8 +568,8 @@ FloatRange DrawableProcessor::CalculateBoundingBoxZRange(const BoundingBox& boun
     if (edge.LengthSquared() >= M_LARGE_VALUE * M_LARGE_VALUE)
         return {};
 
-    const float viewCenterZ = viewZ_.DotProduct(center) + viewMatrix_.m23_;
-    const float viewEdgeZ = absViewZ_.DotProduct(edge);
+    const float viewCenterZ = cullCameraZAxis_.DotProduct(center) + cullCameraViewMatrix_.m23_;
+    const float viewEdgeZ = cullCameraZAxisAbs_.DotProduct(edge);
     const float minZ = viewCenterZ - viewEdgeZ;
     const float maxZ = viewCenterZ + viewEdgeZ;
 

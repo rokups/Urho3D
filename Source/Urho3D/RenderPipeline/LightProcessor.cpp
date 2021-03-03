@@ -224,7 +224,7 @@ void LightProcessor::Update(DrawableProcessor* drawableProcessor)
         hasLitGeometries_ = false;
         hasForwardLitGeometries_ = false;
         const unsigned lightMask = light_->GetLightMask();
-        for (Drawable* drawable : drawableProcessor->GetVisibleGeometries())
+        for (Drawable* drawable : drawableProcessor->GetGeometries())
         {
             const unsigned drawableIndex = drawable->GetDrawableIndex();
             const unsigned char flags = drawableProcessor->GetGeometryRenderFlags(drawableIndex);
