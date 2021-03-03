@@ -29,6 +29,22 @@
 namespace Urho3D
 {
 
+class Texture2D;
+
+/// Region of shadow map that contains one or more shadow split.
+struct ShadowMapRegion
+{
+    unsigned pageIndex_{};
+    Texture2D* texture_;
+    IntRect rect_;
+
+    /// Return whether the shadow map region is not empty.
+    operator bool() const { return !!texture_; }
+    /// Return sub-region for split.
+    /// Splits are indexed as elements in rectangle grid, from left to right, top to bottom, row-major.
+    ShadowMapRegion GetSplit(unsigned split, const IntVector2& numSplits) const;
+};
+
 struct DrawableProcessorSettings
 {
     MaterialQuality materialQuality_{ QUALITY_HIGH };

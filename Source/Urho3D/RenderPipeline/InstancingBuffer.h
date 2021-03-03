@@ -25,7 +25,7 @@
 #include "../Core/Object.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/VertexBuffer.h"
-#include "../RenderPipeline/CommonSettings.h"
+#include "../RenderPipeline/CommonTypes.h"
 
 namespace Urho3D
 {

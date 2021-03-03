@@ -291,7 +291,7 @@ void LightProcessor::EndUpdate(DrawableProcessor* drawableProcessor, LightProces
         else
         {
             for (unsigned i = 0; i < numActiveSplits_; ++i)
-                splits_[i].Finalize(shadowMap_.GetSplit(i, GetSplitsGridSize()));
+                splits_[i].FinalizeShadow(shadowMap_.GetSplit(i, GetSplitsGridSize()));
         }
     }
 
@@ -404,12 +404,12 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
     case LIGHT_DIRECTIONAL:
         shaderParams_.numLightMatrices_ = MAX_CASCADE_SPLITS;
         for (unsigned splitIndex = 0; splitIndex < numActiveSplits_; ++splitIndex)
-            shaderParams_.lightMatrices_[splitIndex] = splits_[splitIndex].CalculateShadowMatrix(subPixelOffset);
+            shaderParams_.lightMatrices_[splitIndex] = splits_[splitIndex].GetWorldToShadowSpaceMatrix(subPixelOffset);
         break;
 
     case LIGHT_SPOT:
         shaderParams_.numLightMatrices_ = 2;
-        shaderParams_.lightMatrices_[1] = splits_[0].CalculateShadowMatrix(subPixelOffset);
+        shaderParams_.lightMatrices_[1] = splits_[0].GetWorldToShadowSpaceMatrix(subPixelOffset);
         break;
 
     case LIGHT_POINT:
@@ -473,11 +473,11 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
 
     shaderParams_.shadowSplits_ = { M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE };
     if (numActiveSplits_ > 1)
-        shaderParams_.shadowSplits_.x_ = splits_[0].GetSplitZRange().second / cullCamera->GetFarClip();
+        shaderParams_.shadowSplits_.x_ = splits_[0].GetCascadeZRange().second / cullCamera->GetFarClip();
     if (numActiveSplits_ > 2)
-        shaderParams_.shadowSplits_.y_ = splits_[1].GetSplitZRange().second / cullCamera->GetFarClip();
+        shaderParams_.shadowSplits_.y_ = splits_[1].GetCascadeZRange().second / cullCamera->GetFarClip();
     if (numActiveSplits_ > 3)
-        shaderParams_.shadowSplits_.z_ = splits_[2].GetSplitZRange().second / cullCamera->GetFarClip();
+        shaderParams_.shadowSplits_.z_ = splits_[2].GetCascadeZRange().second / cullCamera->GetFarClip();
 
     // TODO(renderer): Implement me
     //shaderParams_.shadowNormalBias_ = light_->GetShadowBias().normalOffset_;
@@ -515,7 +515,7 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
         const float biasAutoAdjust = light_->GetShadowCascade().biasAutoAdjust_;
         for (unsigned i = 1; i < numActiveSplits_; ++i)
         {
-            const float splitScale = ea::max(1.0f, splits_[i].GetSplitZRange().second / splits_[0].GetSplitZRange().second);
+            const float splitScale = ea::max(1.0f, splits_[i].GetCascadeZRange().second / splits_[0].GetCascadeZRange().second);
             const float multiplier = 1.0f + (splitScale - 1.0f) * biasAutoAdjust;
             shaderParams_.shadowDepthBiasMultiplier_[i] = SnapRound(multiplier, 0.1f);
         }

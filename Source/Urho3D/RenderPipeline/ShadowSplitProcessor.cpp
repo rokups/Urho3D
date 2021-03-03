@@ -75,9 +75,9 @@ Vector2 CalculateViewSize(const Vector2& minViewSize, const FocusParameters& par
 }
 
 ShadowSplitProcessor::ShadowSplitProcessor(LightProcessor* owner, unsigned splitIndex)
-    : owner_(owner)
+    : lightProcessor_(owner)
+    , light_(lightProcessor_->GetLight())
     , splitIndex_(splitIndex)
-    , light_(owner_->GetLight())
     , shadowCameraNode_(MakeShared<Node>(light_->GetContext()))
     , shadowCamera_(shadowCameraNode_->CreateComponent<Camera>())
 {
@@ -94,16 +94,17 @@ void ShadowSplitProcessor::InitializeDirectional(DrawableProcessor* drawableProc
     const FocusParameters& focusParameters = light_->GetShadowFocus();
 
     // Initialize split Z ranges
-    splitRange_ = splitRange;
-    focusedSplitRange_ = focusParameters.focus_ ? (drawableProcessor->GetSceneZRange() & splitRange_) : splitRange_;
+    cascadeZRange_ = splitRange;
+    focusedCascadeZRange_ = focusParameters.focus_
+        ? (drawableProcessor->GetSceneZRange() & cascadeZRange_) : cascadeZRange_;
 
     // Initialize shadow camera
     InitializeBaseDirectionalCamera(cullCamera);
 
-    const BoundingBox lightSpaceBoundingBox = GetSplitBoundingBox(drawableProcessor, litGeometries);
+    const BoundingBox lightSpaceBoundingBox = GetSplitShadowBoundingBoxInLightSpace(drawableProcessor, litGeometries);
     shadowCamera_->SetFarClip(lightSpaceBoundingBox.max_.z_);
 
-    AdjustDirectionalCamera(lightSpaceBoundingBox, 0.0f);
+    AdjustDirectionalLightCamera(lightSpaceBoundingBox, 0.0f);
 }
 
 void ShadowSplitProcessor::InitializeSpot()
@@ -148,7 +149,7 @@ void ShadowSplitProcessor::ProcessDirectionalShadowCasters(
     shadowCasterBatches_.clear();
 
     // Skip split if outside of the scene
-    if (!drawableProcessor->GetSceneZRange().Interset(splitRange_))
+    if (!drawableProcessor->GetSceneZRange().Interset(cascadeZRange_))
         return;
 
     // Query shadow casters
@@ -161,7 +162,7 @@ void ShadowSplitProcessor::ProcessDirectionalShadowCasters(
     octree->GetDrawables(query);
 
     // Preprocess shadow casters
-    drawableProcessor->PreprocessShadowCasters(shadowCasters_, shadowCastersBuffer, splitRange_, light_, shadowCamera_);
+    drawableProcessor->PreprocessShadowCasters(shadowCasters_, shadowCastersBuffer, cascadeZRange_, light_, shadowCamera_);
 }
 
 void ShadowSplitProcessor::ProcessSpotShadowCasters(
@@ -192,7 +193,7 @@ void ShadowSplitProcessor::ProcessPointShadowCasters(
     drawableProcessor->PreprocessShadowCasters(shadowCasters_, shadowCasterCandidates, {}, light_, shadowCamera_);
 }
 
-void ShadowSplitProcessor::Finalize(const ShadowMapRegion& shadowMap)
+void ShadowSplitProcessor::FinalizeShadow(const ShadowMapRegion& shadowMap)
 {
     shadowMap_ = shadowMap;
 
@@ -207,7 +208,7 @@ void ShadowSplitProcessor::Finalize(const ShadowMapRegion& shadowMap)
         shadowBox.min_.x_ = -shadowBox.max_.x_;
 
         // Requantize and snap to shadow map texels
-        AdjustDirectionalCamera(shadowBox, shadowMapWidth);
+        AdjustDirectionalLightCamera(shadowBox, shadowMapWidth);
     }
 
     // Perform a finalization step for all lights: ensure zoom out of 2 pixels to eliminate border filtering issues
@@ -241,25 +242,25 @@ void ShadowSplitProcessor::InitializeBaseDirectionalCamera(Camera* cullCamera)
     shadowCamera_->SetZoom(1.0f);
 }
 
-BoundingBox ShadowSplitProcessor::GetLitBoundingBox(
+BoundingBox ShadowSplitProcessor::GetLitGeometriesBoundingBox(
     DrawableProcessor* drawableProcessor, const ea::vector<Drawable*>& litGeometries) const
 {
     BoundingBox litGeometriesBox;
     for (Drawable* drawable : litGeometries)
     {
         const FloatRange& geometryZRange = drawableProcessor->GetGeometryZRange(drawable->GetDrawableIndex());
-        if (geometryZRange.Interset(splitRange_))
+        if (geometryZRange.Interset(cascadeZRange_))
             litGeometriesBox.Merge(drawable->GetWorldBoundingBox());
     }
     return litGeometriesBox;
 }
 
-BoundingBox ShadowSplitProcessor::GetSplitBoundingBox(
+BoundingBox ShadowSplitProcessor::GetSplitShadowBoundingBoxInLightSpace(
     DrawableProcessor* drawableProcessor, const ea::vector<Drawable*>& litGeometries) const
 {
     Camera* cullCamera = drawableProcessor->GetFrameInfo().cullCamera_;
     const FocusParameters& focusParameters = light_->GetShadowFocus();
-    const Frustum splitFrustum = cullCamera->GetSplitFrustum(focusedSplitRange_.first, focusedSplitRange_.second);
+    const Frustum splitFrustum = cullCamera->GetSplitFrustum(focusedCascadeZRange_.first, focusedCascadeZRange_.second);
 
     Polyhedron frustumVolume;
     frustumVolume.Define(splitFrustum);
@@ -268,7 +269,7 @@ BoundingBox ShadowSplitProcessor::GetSplitBoundingBox(
     // If volume became empty, restore it to avoid zero size
     if (focusParameters.focus_)
     {
-        const BoundingBox litGeometriesBox = GetLitBoundingBox(drawableProcessor, litGeometries);
+        const BoundingBox litGeometriesBox = GetLitGeometriesBoundingBox(drawableProcessor, litGeometries);
 
         if (litGeometriesBox.Defined())
         {
@@ -291,7 +292,7 @@ BoundingBox ShadowSplitProcessor::GetSplitBoundingBox(
     return shadowBox;
 }
 
-void ShadowSplitProcessor::AdjustDirectionalCamera(const BoundingBox& lightSpaceBoundingBox, float shadowMapSize)
+void ShadowSplitProcessor::AdjustDirectionalLightCamera(const BoundingBox& lightSpaceBoundingBox, float shadowMapSize)
 {
     const FocusParameters& focusParameters = light_->GetShadowFocus();
 
@@ -318,7 +319,7 @@ void ShadowSplitProcessor::AdjustDirectionalCamera(const BoundingBox& lightSpace
     }
 }
 
-Matrix4 ShadowSplitProcessor::CalculateShadowMatrix(float subPixelOffset) const
+Matrix4 ShadowSplitProcessor::GetWorldToShadowSpaceMatrix(float subPixelOffset) const
 {
     if (!shadowMap_)
         return Matrix4::IDENTITY;

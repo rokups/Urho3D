@@ -29,7 +29,7 @@
 #include "../Graphics/PipelineState.h"
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Light.h"
-#include "../RenderPipeline/CommonSettings.h"
+#include "../RenderPipeline/CommonTypes.h"
 
 #include <EASTL/vector.h>
 
@@ -37,20 +37,6 @@ namespace Urho3D
 {
 
 class Renderer;
-
-/// Region of shadow map that contains one or more shadow split.
-struct ShadowMapRegion
-{
-    unsigned pageIndex_{};
-    SharedPtr<Texture2D> texture_;
-    IntRect rect_;
-
-    /// Return whether the shadow map region is not empty.
-    operator bool() const { return !!texture_; }
-    /// Return sub-region for split.
-    /// Splits are indexed as elements in rectangle grid, from left to right, top to bottom, row-major.
-    ShadowMapRegion GetSplit(unsigned split, const IntVector2& numSplits) const;
-};
 
 /// Utility to allocate shadow maps in texture atlas.
 class URHO3D_API ShadowMapAllocator : public Object

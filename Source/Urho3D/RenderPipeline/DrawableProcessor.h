@@ -26,7 +26,7 @@
 #include "../Core/WorkQueue.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Math/NumericRange.h"
-#include "../RenderPipeline/CommonSettings.h"
+#include "../RenderPipeline/CommonTypes.h"
 #include "../RenderPipeline/LightAccumulator.h"
 
 #include <atomic>

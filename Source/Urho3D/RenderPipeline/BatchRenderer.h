@@ -25,7 +25,7 @@
 #include "../Core/Object.h"
 #include "../Graphics/DrawCommandQueue.h"
 #include "../Graphics/GraphicsDefs.h"
-#include "../RenderPipeline/CommonSettings.h"
+#include "../RenderPipeline/CommonTypes.h"
 
 #include <EASTL/span.h>
 

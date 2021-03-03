@@ -25,7 +25,7 @@
 #include "../Graphics/Drawable.h"
 #include "../RenderPipeline/BatchCompositor.h"
 #include "../RenderPipeline/BatchRenderer.h"
-#include "../RenderPipeline/CommonSettings.h"
+#include "../RenderPipeline/CommonTypes.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/InstancingBuffer.h"
 #include "../RenderPipeline/LightProcessor.h"
