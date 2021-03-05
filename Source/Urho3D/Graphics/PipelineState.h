@@ -130,6 +130,7 @@ struct PipelineStateDesc
     CullMode cullMode_{};
     float constantDepthBias_{};
     float slopeScaledDepthBias_{};
+    bool scissorTestEnabled_{};
     /// @}
 
     /// Blend state
@@ -174,7 +175,8 @@ struct PipelineStateDesc
             && fillMode_ == rhs.fillMode_
             && cullMode_ == rhs.cullMode_
             && constantDepthBias_ == rhs.constantDepthBias_
-            && slopeScaledDepthBias_ == rhs.slopeScaledDepthBias_;
+            && slopeScaledDepthBias_ == rhs.slopeScaledDepthBias_
+            && scissorTestEnabled_ == rhs.scissorTestEnabled_;
     }
 
     /// Return whether the description structure is properly initialized.
@@ -213,8 +215,9 @@ struct PipelineStateDesc
 
         CombineHash(hash, fillMode_);
         CombineHash(hash, cullMode_);
-        CombineHash(hash, constantDepthBias_);
-        CombineHash(hash, slopeScaledDepthBias_);
+        CombineHash(hash, MakeHash(constantDepthBias_));
+        CombineHash(hash, MakeHash(slopeScaledDepthBias_));
+        CombineHash(hash, scissorTestEnabled_);
 
         // Consider 0-hash invalid
         hash_ = ea::max(1u, hash);

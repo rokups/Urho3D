@@ -24,7 +24,6 @@
 
 #include "../Container/FlagSet.h"
 #include "../Core/Object.h"
-#include "../Graphics/DrawCommandQueue.h"
 
 namespace Urho3D
 {

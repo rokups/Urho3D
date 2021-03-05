@@ -214,8 +214,6 @@ public:
     /// Set allowed screen orientations as a space-separated list of "LandscapeLeft", "LandscapeRight", "Portrait" and "PortraitUpsideDown". Affects currently only iOS platform.
     /// @property
     void SetOrientations(const ea::string& orientations);
-    /// Set whether constant buffers are enabled. Ignored if constant buffers are not supported.
-    void SetEnableConstantBuffers(bool enable);
     /// Toggle between full screen and windowed mode. Return true if successful.
     bool ToggleFullscreen();
     /// Close the window.
@@ -516,9 +514,6 @@ public:
 
     /// Return whether constant buffers are support.
     bool GetConstantBuffersSupport() const { return constantBuffersSupport_; }
-
-    /// Return whether constant buffers are enabled.
-    bool GetConstantBuffersEnabled() const { return constantBuffersEnabled_; }
 
     /// Return whether constant buffers are required.
     bool GetConstantBuffersRequired() const { return constantBuffersRequired_; }
@@ -878,8 +873,6 @@ private:
     unsigned maxPixelShaderUniforms_{};
 	/// Constant buffers support flag.
     bool constantBuffersSupport_{};
-    /// Whether the constant buffers are enabled.
-    bool constantBuffersEnabled_{};
     /// Whether the constant buffers are required.
     bool constantBuffersRequired_{};
     /// Constant buffer offset alignment.

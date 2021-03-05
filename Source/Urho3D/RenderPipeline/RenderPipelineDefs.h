@@ -31,13 +31,14 @@
 namespace Urho3D
 {
 
-class DrawCommandQueue;
 class PipelineState;
 class RenderSurface;
 class Texture2D;
 class Viewport;
 struct BatchStateCreateKey;
 struct BatchStateCreateContext;
+struct UIBatchStateKey;
+struct UIBatchStateCreateContext;
 
 /// Common parameters of rendered frame.
 struct CommonFrameInfo
@@ -56,10 +57,19 @@ struct CommonFrameInfo
 class BatchStateCacheCallback
 {
 public:
-    /// Create pipeline state given context and key.
+    /// Create pipeline state for given context and key.
     /// Only attributes that constribute to pipeline state hashes are safe to use.
     virtual SharedPtr<PipelineState> CreateBatchPipelineState(
         const BatchStateCreateKey& key, const BatchStateCreateContext& ctx) = 0;
+};
+
+/// Pipeline state cache callback used to create actual pipeline state for UI batches.
+class UIBatchStateCacheCallback
+{
+public:
+    /// Create pipeline state for given key.
+    /// Only attributes that constribute to pipeline state hashes are safe to use.
+    virtual SharedPtr<PipelineState> CreateUIBatchPipelineState(const UIBatchStateKey& key, const UIBatchStateCreateContext& ctx) = 0;
 };
 
 /// Base interface of render pipeline required by Render Pipeline classes.
@@ -71,9 +81,6 @@ class URHO3D_API RenderPipelineInterface
 
 public:
     using Serializable::Serializable;
-
-    /// Return default draw queue that can be reused.
-    virtual DrawCommandQueue* GetDefaultDrawQueue() = 0;
 
     /// Callbacks
     /// @{

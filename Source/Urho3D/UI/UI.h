@@ -27,6 +27,7 @@
 #include "../Core/Object.h"
 #include "../Graphics/DrawCommandQueue.h"
 #include "../Graphics/VertexBuffer.h"
+#include "../RenderPipeline/BatchStateCache.h"
 #include "../UI/Cursor.h"
 #include "../UI/UIBatch.h"
 
@@ -382,47 +383,8 @@ private:
     IntVector2 GetEffectiveRootElementSize(bool applyScale = true) const;
     /// Return true when subsystem should not process any mouse/keyboard input.
     bool IsHandlingInput() const;
-
-    /// UIBatch shader type.
-    enum class UIBatchShaderType
-    {
-        NoTexture,
-        DiffTexture,
-        DiffMaskTexture,
-        AlphaTexture,
-    };
-    /// Key of UIBatch pipeline state cache.
-    struct UIBatchPipelineStateKey
-    {
-        /// Type of shader used. Custom material may override actual shader.
-        UIBatchShaderType shaderType_{};
-        /// Blend mode.
-        BlendMode blendMode_{};
-        /// Custom material.
-        Material* customMaterial_{};
-
-        /// Compare.
-        bool operator ==(const UIBatchPipelineStateKey& rhs) const
-        {
-            return shaderType_ == rhs.shaderType_
-                && blendMode_ == rhs.blendMode_
-                && customMaterial_ == rhs.customMaterial_;
-        }
-
-        /// Return hash.
-        unsigned ToHash() const
-        {
-            unsigned hash = 0;
-            CombineHash(hash, MakeHash(shaderType_));
-            CombineHash(hash, MakeHash(blendMode_));
-            CombineHash(hash, MakeHash(customMaterial_));
-            return hash;
-        }
-    };
-    /// Return UIBatch shader type.
-    UIBatchShaderType GetShaderType(const UIBatch& batch) const;
-    /// Return pipeline state for given batch.
-    PipelineState* GetPipelineState(const UIBatch& batch, bool renderToTexture);
+    /// Return material corresponding to UIBatch.
+    Material* GetBatchMaterial(const UIBatch& batch) const;
 
     /// Graphics subsystem.
     WeakPtr<Graphics> graphics_;
@@ -436,10 +398,8 @@ private:
     SharedPtr<Cursor> cursor_;
     /// Currently focused element.
     WeakPtr<UIElement> focusElement_;
-    /// Draw queue used for rendering.
-    SharedPtr<DrawCommandQueue> drawQueue_;
     /// Cached pipeline states.
-    ea::unordered_map<UIBatchPipelineStateKey, SharedPtr<PipelineState>> pipelineStateCache_;
+    SharedPtr<DefaultUIBatchStateCache> batchStateCache_;
     /// UI rendering batches.
     ea::vector<UIBatch> batches_;
     /// UI rendering vertex data.
@@ -524,6 +484,15 @@ private:
     WeakPtr<Texture2D> texture_;
     /// Color which will be used to clear target texture.
     Color clearColor_ = Color::TRANSPARENT_BLACK;
+
+    /// Default materials
+    /// @{
+    /// TODO(renderer): Move it to Renderer
+    SharedPtr<Material> noTextureMaterial_;
+    SharedPtr<Material> alphaMapMaterial_;
+    SharedPtr<Material> diffMapMaterial_;
+    SharedPtr<Material> diffMapAlphaMaskMaterial_;
+    /// @}
 };
 
 /// Register UI library objects.

@@ -537,8 +537,8 @@ void LightProcessor::UpdateHashes()
     CombineHash(commonHash, !!light_->GetShapeTexture());
     CombineHash(commonHash, light_->GetSpecularIntensity() > 0.0f);
     CombineHash(commonHash, biasParameters.normalOffset_ > 0.0f);
-    CombineHash(commonHash, MakeHash(biasParameters.constantBias_ * 1000000.0f));
-    CombineHash(commonHash, MakeHash(biasParameters.slopeScaledBias_ * 1000.0f));
+    CombineHash(commonHash, MakeHash(biasParameters.constantBias_));
+    CombineHash(commonHash, MakeHash(biasParameters.slopeScaledBias_));
     CombineHash(commonHash, light_->GetLightMaskEffective() & PORTABLE_LIGHTMASK);
 
     forwardLitBatchHash_ = commonHash;

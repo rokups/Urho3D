@@ -361,7 +361,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
             break;
         }
     }
-    if (graphics_->GetConstantBuffersEnabled())
+    if (graphics_->GetConstantBuffersSupport())
         commonDefines += "URHO3D_USE_CBUFFERS ";
 
     if (settings_.gammaCorrection_)
@@ -405,7 +405,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
     ea::string vertexDefines;
     ea::string pixelDefiles = "HWDEPTH ";
 
-    if (graphics_->GetConstantBuffersEnabled())
+    if (graphics_->GetConstantBuffersSupport())
     {
         vertexDefines += "URHO3D_USE_CBUFFERS ";
         pixelDefiles += "URHO3D_USE_CBUFFERS ";
@@ -627,9 +627,8 @@ void RenderPipeline::ApplySettings()
 bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 {
     // Lazy initialize heavy objects
-    if (!drawQueue_)
+    if (!sceneProcessor_)
     {
-        drawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
         renderBufferManager_ = MakeShared<RenderBufferManager>(this);
         shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
         instancingBuffer_ = MakeShared<InstancingBuffer>(context_);
@@ -716,6 +715,7 @@ void RenderPipeline::Render()
 
     auto sceneBatchRenderer_ = sceneProcessor_->GetBatchRenderer();
     const Color fogColor = sceneProcessor_->GetFrameInfo().camera_->GetEffectiveFogColor();
+    auto drawQueue = renderer_->GetDefaultDrawQueue();
 
     // TODO(renderer): Remove this guard
 #ifdef DESKTOP_GRAPHICS
@@ -734,15 +734,15 @@ void RenderPipeline::Render()
         };
         renderBufferManager_->SetRenderTargets(renderBufferManager_->GetDepthStencilOutput(), gBuffer);
 
-        drawQueue_->Reset();
+        drawQueue->Reset();
 
         instancingBuffer_->Begin();
-        sceneBatchRenderer_->RenderBatches({ *drawQueue_, *sceneProcessor_->GetFrameInfo().camera_ },
+        sceneBatchRenderer_->RenderBatches({ *drawQueue, *sceneProcessor_->GetFrameInfo().camera_ },
             BatchRenderFlag::EnableAmbientLighting | BatchRenderFlag::EnableInstancingForStaticGeometry,
             deferredPass_->GetBatches());
         instancingBuffer_->End();
 
-        drawQueue_->Execute();
+        drawQueue->Execute();
 
         // Draw deferred lights
         const ShaderResourceDesc geometryBuffer[] = {
@@ -756,15 +756,15 @@ void RenderPipeline::Render()
             { PSP_GBUFFERINVSIZE, renderBufferManager_->GetInvOutputSize() },
         };
 
-        BatchRenderingContext ctx{ *drawQueue_, *sceneProcessor_->GetFrameInfo().camera_ };
+        BatchRenderingContext ctx{ *drawQueue, *sceneProcessor_->GetFrameInfo().camera_ };
         ctx.globalResources_ = geometryBuffer;
         ctx.cameraParameters_ = cameraParameters;
 
-        drawQueue_->Reset();
+        drawQueue->Reset();
         sceneBatchRenderer_->RenderLightVolumeBatches(ctx, sceneProcessor_->GetLightVolumeBatches());
 
         renderBufferManager_->SetOutputRenderTargers();
-        drawQueue_->Execute();
+        drawQueue->Execute();
 
         graphics_->SetDepthWrite(true);
     }
@@ -774,9 +774,9 @@ void RenderPipeline::Render()
         renderBufferManager_->ClearOutput(fogColor, 1.0f, 0);
         renderBufferManager_->SetOutputRenderTargers();
 
-        drawQueue_->Reset();
+        drawQueue->Reset();
         instancingBuffer_->Begin();
-        BatchRenderingContext ctx{ *drawQueue_, *sceneProcessor_->GetFrameInfo().camera_ };
+        BatchRenderingContext ctx{ *drawQueue, *sceneProcessor_->GetFrameInfo().camera_ };
         sceneBatchRenderer_->RenderBatches(ctx,
             BatchRenderFlag::EnableAmbientLighting | BatchRenderFlag::EnableVertexLights | BatchRenderFlag::EnablePixelLights | BatchRenderFlag::EnableInstancingForStaticGeometry, basePass_->GetSortedBaseBatches());
         sceneBatchRenderer_->RenderBatches(ctx,
@@ -784,7 +784,7 @@ void RenderPipeline::Render()
         sceneBatchRenderer_->RenderBatches(ctx,
             BatchRenderFlag::EnableAmbientLighting | BatchRenderFlag::EnableVertexLights | BatchRenderFlag::EnablePixelLights | BatchRenderFlag::EnableInstancingForStaticGeometry, alphaPass_->GetSortedBatches());
         instancingBuffer_->End();
-        drawQueue_->Execute();
+        drawQueue->Execute();
     }
 
     // Draw debug geometry if enabled
@@ -827,7 +827,6 @@ void RenderPipeline::Render()
 unsigned RenderPipeline::RecalculatePipelineStateHash() const
 {
     unsigned hash = 0;
-    CombineHash(hash, graphics_->GetConstantBuffersEnabled());
     CombineHash(hash, sceneProcessor_->GetCameraProcessor()->GetPipelineStateHash());
     CombineHash(hash, settings_.CalculatePipelineStateHash());
     return hash;

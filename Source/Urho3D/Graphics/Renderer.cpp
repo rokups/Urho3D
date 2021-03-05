@@ -277,7 +277,7 @@ inline ea::vector<VertexElement> CreateInstancingBufferElements(unsigned numExtr
 Renderer::Renderer(Context* context) :
     Object(context),
     defaultZone_(context->CreateObject<Zone>()),
-    pipelineStateCache_(context)
+    pipelineStateCache_(MakeShared<PipelineStateCache>(context))
 {
     SubscribeToEvent(E_SCREENMODE, URHO3D_HANDLER(Renderer, HandleScreenMode));
 
@@ -599,7 +599,7 @@ void Renderer::ApplyShadowMapFilter(View* view, Texture2D* shadowMap, float blur
 
 SharedPtr<PipelineState> Renderer::GetOrCreatePipelineState(const PipelineStateDesc& desc)
 {
-    return pipelineStateCache_.GetPipelineState(desc);
+    return pipelineStateCache_->GetPipelineState(desc);
 }
 
 Viewport* Renderer::GetViewport(unsigned index) const
@@ -1687,6 +1687,8 @@ void Renderer::Initialize()
 
     graphics_ = graphics;
     graphics_->SetGlobalShaderDefines(globalShaderDefinesString_);
+
+    defaultDrawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
 
     hardwareSkinningSupported_ = graphics_->GetMaxVertexShaderUniforms() >= 256;
 

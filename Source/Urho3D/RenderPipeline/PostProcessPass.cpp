@@ -22,20 +22,6 @@
 
 #include "../Precompiled.h"
 
-/*#include "../Core/Context.h"
-#include "../Core/IteratorRange.h"
-#include "../Graphics/Camera.h"
-#include "../Graphics/ConstantBuffer.h"
-#include "../Graphics/ShaderProgramLayout.h"
-#include "../Graphics/DebugRenderer.h"
-#include "../Graphics/DrawCommandQueue.h"
-#include "../Graphics/IndexBuffer.h"
-#include "../Graphics/OcclusionBuffer.h"
-#include "../Graphics/Graphics.h"
-#include "../Graphics/Texture2D.h"
-#include "../Graphics/Viewport.h"
-#include "../RenderPipeline/RenderPipeline.h"*/
-#include "../Graphics/DrawCommandQueue.h"
 #include "../RenderPipeline/RenderBufferManager.h"
 #include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../RenderPipeline/PostProcessPass.h"

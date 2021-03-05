@@ -92,24 +92,24 @@ struct BatchStateCreateKey : public BatchStateLookupKey
 /// Pipeline state cache entry. May be invalid.
 struct CachedBatchState
 {
-    /// Hashes of corresponding objects at the moment of caching
+    /// Whether the PipelineState is invalidated and should be recreated.
+    mutable std::atomic_bool invalidated_{ true };
+    SharedPtr<PipelineState> pipelineState_;
+
+    /// Hashes of corresponding objects at the moment of pipeline state creation
     /// @{
     unsigned geometryHash_{};
     unsigned materialHash_{};
     unsigned passHash_{};
     /// @}
-
-    SharedPtr<PipelineState> pipelineState_;
-    /// Whether the PipelineState is invalidated and should be recreated.
-    mutable std::atomic_bool invalidated_{ true };
 };
 
 /// External context that is not present in the key but is necessary to create new pipeline state.
 struct BatchStateCreateContext
 {
-    /// Pointer to the pass.
+    /// Object that owns BatchStateCache that invoked the callback.
     Object* pass_{};
-    /// Index of subpass.
+    /// Index of subpass. Exact meaning depends on actual type of owner pass.
     unsigned subpassIndex_{};
     unsigned shadowSplitIndex_{};
 };
@@ -121,16 +121,112 @@ public:
     /// Invalidate cache.
     void Invalidate();
     /// Return existing pipeline state or nullptr if not found. Thread-safe.
-    /// Resulting state is always valid.
+    /// Resulting state may be invalid.
     PipelineState* GetPipelineState(const BatchStateLookupKey& key) const;
     /// Return existing or create new pipeline state. Not thread safe.
     /// Resulting state may be invalid.
     PipelineState* GetOrCreatePipelineState(const BatchStateCreateKey& key,
-        BatchStateCreateContext& ctx, BatchStateCacheCallback* callback);
+        const BatchStateCreateContext& ctx, BatchStateCacheCallback* callback);
 
 private:
     /// Cached states, possibly invalid.
     ea::unordered_map<BatchStateLookupKey, CachedBatchState> cache_;
+};
+
+/// Stencil mode for UI batch.
+enum class UIBatchStencilMode
+{
+    Ignore,
+    MarkToStencil,
+    CheckStencil
+};
+
+/// Key used to lookup cached pipeline states for UI batches.
+/// It's assumed that all UI batches use the same vertex and index buffer formats and material pass.
+struct UIBatchStateKey
+{
+    Material* material_{};
+    Pass* pass_{};
+    UIBatchStencilMode stencilMode_{};
+    BlendMode blendMode_{};
+
+    bool operator ==(const UIBatchStateKey& rhs) const
+    {
+        return material_ == rhs.material_
+            && pass_ == rhs.pass_
+            && stencilMode_ == rhs.stencilMode_
+            && blendMode_ == rhs.blendMode_;
+    }
+
+    unsigned ToHash() const
+    {
+        unsigned hash = 0;
+        CombineHash(hash, MakeHash(material_));
+        CombineHash(hash, MakeHash(pass_));
+        CombineHash(hash, MakeHash(stencilMode_));
+        CombineHash(hash, MakeHash(blendMode_));
+        return hash;
+    }
+};
+
+/// Pipeline state UI batch cache entry. May be invalid.
+struct CachedUIBatchState
+{
+    /// Whether the PipelineState is invalidated and should be recreated.
+    SharedPtr<PipelineState> pipelineState_;
+    mutable std::atomic_bool invalidated_{ true };
+
+    /// Hashes of corresponding objects at the moment of pipeline state creation
+    /// @{
+    unsigned materialHash_{};
+    unsigned passHash_{};
+    /// @}
+};
+
+/// External context that is not present in the key but is necessary to create new pipeline state for UI batch.
+struct UIBatchStateCreateContext
+{
+    VertexBuffer* vertexBuffer_{};
+    IndexBuffer* indexBuffer_{};
+};
+
+/// Pipeline state cache for UI batches.
+class URHO3D_API UIBatchStateCache : public NonCopyable
+{
+public:
+    /// Invalidate cache.
+    void Invalidate();
+    /// Return existing pipeline state or nullptr if not found. Thread-safe.
+    /// Resulting state may be invalid.
+    PipelineState* GetPipelineState(const UIBatchStateKey& key) const;
+    /// Return existing or create new pipeline state. Not thread safe.
+    /// Resulting state may be invalid.
+    PipelineState* GetOrCreatePipelineState(const UIBatchStateKey& key,
+        const UIBatchStateCreateContext& ctx, UIBatchStateCacheCallback* callback);
+
+private:
+    /// Cached states, possibly invalid.
+    ea::unordered_map<UIBatchStateKey, CachedUIBatchState> cache_;
+};
+
+/// Default implementation of UIBatchStateCache.
+class DefaultUIBatchStateCache
+    : public Object
+    , public UIBatchStateCache
+    , public UIBatchStateCacheCallback
+{
+    URHO3D_OBJECT(DefaultUIBatchStateCache, Object);
+
+public:
+    DefaultUIBatchStateCache(Context* context) : Object(context) {}
+
+    PipelineState* GetOrCreatePipelineState(const UIBatchStateKey& key, const UIBatchStateCreateContext& ctx);
+
+private:
+    /// Implement UIBatchStateCacheCallback
+    /// @{
+    SharedPtr<PipelineState> CreateUIBatchPipelineState(const UIBatchStateKey& key, const UIBatchStateCreateContext& ctx) override;
+    /// @}
 };
 
 }

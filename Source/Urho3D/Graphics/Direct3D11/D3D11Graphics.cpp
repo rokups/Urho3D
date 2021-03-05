@@ -2282,7 +2282,6 @@ void Graphics::CheckFeatureSupport()
     maxVertexShaderUniforms_ = 4096;
     maxPixelShaderUniforms_ = 4096;
     constantBuffersSupport_ = true;
-    constantBuffersEnabled_ = true;
     constantBuffersRequired_ = true;
     constantBufferOffsetAlignment_ = 256;
 }

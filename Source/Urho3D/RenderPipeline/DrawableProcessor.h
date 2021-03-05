@@ -156,11 +156,11 @@ public:
 
     /// Return information about visible geometries and lights
     /// @{
-    const auto& GetGeometries() const { return visibleGeometries_; }
+    const auto& GetGeometries() const { return geometries_; }
     const FloatRange& GetSceneZRange() const { return sceneZRange_; }
 
-    const auto& GetLights() const { return visibleLights_; }
-    Light* GetLight(unsigned lightIndex) const { return visibleLights_[lightIndex]; }
+    const auto& GetLights() const { return lights_; }
+    Light* GetLight(unsigned lightIndex) const { return lights_[lightIndex]; }
 
     const auto& GetLightProcessors() const { return lightProcessors_; }
     LightProcessor* GetLightProcessor(unsigned lightIndex) const { return lightProcessors_[lightIndex]; }
@@ -248,12 +248,12 @@ private:
 
     ea::vector<SortedOccluder> sortedOccluders_;
 
-    WorkQueueVector<Drawable*> visibleGeometries_;
+    WorkQueueVector<Drawable*> geometries_;
     WorkQueueVector<Drawable*> threadedGeometryUpdates_;
     WorkQueueVector<Drawable*> nonThreadedGeometryUpdates_;
 
-    WorkQueueVector<Light*> visibleLightsTemp_;
-    ea::vector<Light*> visibleLights_;
+    WorkQueueVector<Light*> lightsTemp_;
+    ea::vector<Light*> lights_;
     ea::vector<LightProcessor*> lightProcessors_;
     ea::vector<LightProcessor*> lightProcessorsByShadowMapSize_;
 

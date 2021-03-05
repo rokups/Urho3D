@@ -39,7 +39,7 @@ DrawCommandQueue::DrawCommandQueue(Graphics* graphics)
 void DrawCommandQueue::Reset(bool preferConstantBuffers)
 {
     useConstantBuffers_ = preferConstantBuffers
-        ? graphics_->GetConstantBuffersEnabled()
+        ? graphics_->GetConstantBuffersSupport()
         : graphics_->GetConstantBuffersRequired();
 
     // Reset state accumulators
@@ -109,20 +109,20 @@ void DrawCommandQueue::Execute()
 
     for (const DrawCommandDescription& cmd : drawCommands_)
     {
-        // Set scissor
-        if (cmd.scissorRect_ != currentScissorRect)
-        {
-            const bool scissorEnabled = cmd.scissorRect_ != 0;
-            graphics_->SetScissorTest(scissorEnabled, scissorRects_[cmd.scissorRect_]);
-            currentScissorRect = cmd.scissorRect_;
-        }
-
         // Set pipeline state
         if (cmd.pipelineState_ != currentPipelineState)
         {
             cmd.pipelineState_->Apply(graphics_);
             currentPipelineState = cmd.pipelineState_;
             currentPrimitiveType = currentPipelineState->GetDesc().primitiveType_;
+        }
+
+        // Set scissor
+        if (cmd.scissorRect_ != currentScissorRect)
+        {
+            const bool scissorEnabled = currentPipelineState->GetDesc().scissorTestEnabled_;
+            graphics_->SetScissorTest(scissorEnabled, scissorRects_[cmd.scissorRect_]);
+            currentScissorRect = cmd.scissorRect_;
         }
 
         // Set index buffer

@@ -190,11 +190,11 @@ void DrawableProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
     geometryLighting_.resize(numDrawables_);
 
     sortedOccluders_.clear();
-    visibleGeometries_.Clear();
+    geometries_.Clear();
     threadedGeometryUpdates_.Clear();
     nonThreadedGeometryUpdates_.Clear();
 
-    visibleLightsTemp_.Clear();
+    lightsTemp_.Clear();
 
     queuedDrawableUpdates_.Clear();
 }
@@ -256,18 +256,22 @@ void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& dra
     });
 
     // Sort lights by component ID for stability
-    visibleLights_.resize(visibleLightsTemp_.Size());
-    ea::copy(visibleLightsTemp_.Begin(), visibleLightsTemp_.End(), visibleLights_.begin());
+    lights_.resize(lightsTemp_.Size());
+    ea::copy(lightsTemp_.Begin(), lightsTemp_.End(), lights_.begin());
     const auto compareID = [](Light* lhs, Light* rhs) { return lhs->GetID() < rhs->GetID(); };
-    ea::sort(visibleLights_.begin(), visibleLights_.end(), compareID);
+    ea::sort(lights_.begin(), lights_.end(), compareID);
 
     lightProcessors_.clear();
-    for (Light* light : visibleLights_)
+    for (Light* light : lights_)
         lightProcessors_.push_back(lightProcessorCache_->GetLightProcessor(light));
 
-    // Compute scene Z range
+    // Expand scene Z range so it's never too small
     for (const FloatRange& range : sceneZRangeTemp_)
         sceneZRange_ |= range;
+
+    static const float minSceneZRange = 1.0f;
+    if (sceneZRange_.IsValid() && sceneZRange_.second - sceneZRange_.first < minSceneZRange)
+        sceneZRange_.second = sceneZRange_.first + minSceneZRange;
 }
 
 void DrawableProcessor::UpdateDrawableZone(const BoundingBox& boundingBox, Drawable* drawable) const
@@ -379,7 +383,7 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
         }
 
         // Store geometry
-        visibleGeometries_.PushBack(threadIndex, drawable);
+        geometries_.PushBack(threadIndex, drawable);
 
         // Update flags
         unsigned char& flag = geometryFlags_[drawableIndex];
@@ -399,7 +403,7 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
 
         // Skip lights with zero brightness or black color, skip baked lights too
         if (!lightColor.Equals(Color::BLACK) && light->GetLightMaskEffective() != 0)
-            visibleLightsTemp_.PushBack(threadIndex, light);
+            lightsTemp_.PushBack(threadIndex, light);
     }
 }
 
@@ -423,13 +427,13 @@ void DrawableProcessor::ProcessLights(LightProcessorCallback* callback)
 
 void DrawableProcessor::ProcessForwardLighting(unsigned lightIndex, const ea::vector<Drawable*>& litGeometries)
 {
-    if (lightIndex >= visibleLights_.size())
+    if (lightIndex >= lights_.size())
     {
         URHO3D_LOGERROR("Invalid light index {}", lightIndex);
         return;
     }
 
-    Light* light = visibleLights_[lightIndex];
+    Light* light = lights_[lightIndex];
     const LightType lightType = light->GetLightType();
     const float lightIntensityPenalty = 1.0f / light->GetIntensityDivisor();
 
@@ -438,7 +442,7 @@ void DrawableProcessor::ProcessForwardLighting(unsigned lightIndex, const ea::ve
     ctx.maxPixelLights_ = settings_.maxPixelLights_;
     ctx.lightImportance_ = light->GetLightImportance();
     ctx.lightIndex_ = lightIndex;
-    ctx.lights_ = &visibleLights_;
+    ctx.lights_ = &lights_;
 
     ForEachParallel(workQueue_, litGeometries,
         [&](unsigned /*index*/, Drawable* geometry)

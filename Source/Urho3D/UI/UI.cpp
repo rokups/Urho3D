@@ -77,6 +77,22 @@ static MouseButton MakeTouchIDMask(int id)
     return static_cast<MouseButton>(1u << static_cast<MouseButtonFlags::Integer>(id)); // NOLINT(misc-misplaced-widening-cast)
 }
 
+SharedPtr<Material> CreateUIMaterial(Context* context,
+    const ea::string& shaderName, const ea::string& vsDefines, const ea::string& psDefines)
+{
+    auto technique = MakeShared<Technique>(context);
+    Pass* pass = technique->CreatePass("base");
+    pass->SetVertexShader(shaderName);
+    pass->SetVertexShaderDefines(vsDefines);
+    pass->SetPixelShader(shaderName);
+    pass->SetPixelShaderDefines(psDefines);
+
+    auto material = MakeShared<Material>(context);
+    material->SetTechnique(0, technique);
+
+    return material;
+}
+
 StringHash VAR_ORIGIN("Origin");
 const StringHash VAR_ORIGINAL_PARENT("OriginalParent");
 const StringHash VAR_ORIGINAL_CHILD_INDEX("OriginalChildIndex");
@@ -849,7 +865,6 @@ void UI::Initialize()
 
     graphics_ = graphics;
     renderer_ = GetSubsystem<Renderer>();
-    drawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
     UIBatch::posAdjust = Vector3(Graphics::GetPixelUVOffset(), 0.0f);
 
     // Set initial root element size
@@ -857,6 +872,13 @@ void UI::Initialize()
 
     vertexBuffer_ = context_->CreateObject<VertexBuffer>();
     debugVertexBuffer_ = context_->CreateObject<VertexBuffer>();
+
+    batchStateCache_ = MakeShared<DefaultUIBatchStateCache>(context_);
+
+    noTextureMaterial_ = CreateUIMaterial(context_, "UIBasic", "VERTEXCOLOR", "VERTEXCOLOR");
+    alphaMapMaterial_ = CreateUIMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "ALPHAMAP VERTEXCOLOR");
+    diffMapMaterial_ = CreateUIMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "DIFFMAP VERTEXCOLOR");
+    diffMapAlphaMaskMaterial_ = CreateUIMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "DIFFMAP ALPHAMASK VERTEXCOLOR");
 
     initialized_ = true;
 
@@ -894,94 +916,19 @@ void UI::SetVertexData(VertexBuffer* dest, const ea::vector<float>& vertexData)
     dest->SetData(&vertexData[0]);
 }
 
-UI::UIBatchShaderType UI::GetShaderType(const UIBatch& batch) const
+Material* UI::GetBatchMaterial(const UIBatch& batch) const
 {
     if (batch.customMaterial_)
-        return UIBatchShaderType::DiffTexture;
+        return batch.customMaterial_;
 
     if (!batch.texture_)
-        return UIBatchShaderType::NoTexture;
+        return noTextureMaterial_;
+    else if (batch.texture_->GetFormat() == Graphics::GetAlphaFormat())
+        return alphaMapMaterial_;
+    else if (batch.blendMode_ != BLEND_ALPHA && batch.blendMode_ != BLEND_ADDALPHA && batch.blendMode_ != BLEND_PREMULALPHA)
+        return diffMapAlphaMaskMaterial_;
     else
-    {
-        // If texture contains only an alpha channel, use alpha shader (for fonts)
-        if (batch.texture_->GetFormat() == Graphics::GetAlphaFormat())
-            return UIBatchShaderType::AlphaTexture;
-        else if (batch.blendMode_ != BLEND_ALPHA && batch.blendMode_ != BLEND_ADDALPHA && batch.blendMode_ != BLEND_PREMULALPHA)
-            return UIBatchShaderType::DiffMaskTexture;
-        else
-            return UIBatchShaderType::DiffTexture;
-    }
-}
-
-PipelineState* UI::GetPipelineState(const UIBatch& batch, bool renderToTexture)
-{
-    const UIBatchPipelineStateKey key{ GetShaderType(batch), batch.blendMode_, batch.customMaterial_ };
-    SharedPtr<PipelineState>& pipelineState = pipelineStateCache_[key];
-    if (!pipelineState)
-    {
-        PipelineStateDesc desc;
-        desc.InitializeInputLayout(GeometryBufferArray{ { vertexBuffer_ }, nullptr, nullptr });
-        desc.primitiveType_ = TRIANGLE_LIST;
-        desc.colorWriteEnabled_ = true;
-        desc.cullMode_ = CULL_CCW;
-#ifdef URHO3D_OPENGL
-        // Reverse winding if rendering to texture on OpenGL
-        if (renderToTexture)
-            desc.cullMode_ = CULL_CW;
-#endif
-        desc.depthCompareFunction_ = CMP_ALWAYS;
-        desc.depthWriteEnabled_ = false;
-        desc.fillMode_ = FILL_SOLID;
-        desc.stencilTestEnabled_ = false;
-        desc.blendMode_ = batch.blendMode_;
-
-        // Set vertex shader
-        if (key.shaderType_ == UIBatchShaderType::NoTexture)
-            desc.vertexShader_ = graphics_->GetShader(VS, "UIBasic", "VERTEXCOLOR");
-        else
-            desc.vertexShader_ = graphics_->GetShader(VS, "UIBasic", "DIFFMAP VERTEXCOLOR");
-
-        // Set pixel shader
-        switch (key.shaderType_)
-        {
-        case UIBatchShaderType::NoTexture:
-            desc.pixelShader_ = graphics_->GetShader(PS, "UIBasic", "VERTEXCOLOR");
-            break;
-
-        case UIBatchShaderType::AlphaTexture:
-            desc.pixelShader_ = graphics_->GetShader(PS, "UIBasic", "ALPHAMAP VERTEXCOLOR");
-            break;
-
-        case UIBatchShaderType::DiffMaskTexture:
-            desc.pixelShader_ = graphics_->GetShader(PS, "UIBasic", "DIFFMAP ALPHAMASK VERTEXCOLOR");
-            break;
-
-        case UIBatchShaderType::DiffTexture:
-            desc.pixelShader_ = graphics_->GetShader(PS, "UIBasic", "DIFFMAP VERTEXCOLOR");
-            break;
-
-        default:
-            break;
-        }
-
-        // Override pixel and vertex shaders by custom material
-        if (key.customMaterial_)
-        {
-            if (Technique* technique = key.customMaterial_->GetTechnique(0))
-            {
-                for (Pass* pass : technique->GetPasses())
-                {
-                    desc.vertexShader_ = graphics_->GetShader(VS, pass->GetVertexShader(), batch.customMaterial_->GetVertexShaderDefines());
-                    desc.pixelShader_ = graphics_->GetShader(PS, pass->GetPixelShader(), batch.customMaterial_->GetPixelShaderDefines());
-                    break;
-                }
-            }
-        }
-
-        pipelineState = renderer_->GetOrCreatePipelineState(desc);
-    }
-
-    return pipelineState;
+        return diffMapMaterial_;
 }
 
 void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsigned batchStart, unsigned batchEnd)
@@ -991,6 +938,8 @@ void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsign
 
     if (batches.empty())
         return;
+
+    DrawCommandQueue* drawQueue = renderer_->GetDefaultDrawQueue();
 
     unsigned alphaFormat = Graphics::GetAlphaFormat();
     RenderSurface* surface = graphics_->GetRenderTarget(0);
@@ -1018,53 +967,56 @@ void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsign
     projection.m23_ = 0.0f;
     projection.m33_ = 1.0f;
 
-    drawQueue_->Reset(false /* prefer uniforms for compatibility with old shaders */);
+    drawQueue->Reset(false /* prefer uniforms for compatibility with old shaders */);
 
     const float elapsedTime = GetSubsystem<Time>()->GetElapsedTime();
+    UIBatchStateCreateContext batchStateCreateContext{ vertexBuffer_, nullptr };
     for (unsigned i = batchStart; i < batchEnd; ++i)
     {
         const UIBatch& batch = batches[i];
         if (batch.vertexStart_ == batch.vertexEnd_)
             continue;
 
-        PipelineState* pipelineState = GetPipelineState(batch, !!surface);
+        Material* material = GetBatchMaterial(batch);
+        const UIBatchStateKey key{ material, material->GetDefaultPass(), UIBatchStencilMode::Ignore, batch.blendMode_ };
+        PipelineState* pipelineState = batchStateCache_->GetOrCreatePipelineState(key, batchStateCreateContext);
         if (!pipelineState)
             continue;
 
-        drawQueue_->SetPipelineState(pipelineState);
+        drawQueue->SetPipelineState(pipelineState);
 
-        if (drawQueue_->BeginShaderParameterGroup(SP_FRAME))
+        if (drawQueue->BeginShaderParameterGroup(SP_FRAME))
         {
-            drawQueue_->AddShaderParameter(VSP_ELAPSEDTIME, elapsedTime);
-            drawQueue_->AddShaderParameter(PSP_ELAPSEDTIME, elapsedTime);
-            drawQueue_->CommitShaderParameterGroup(SP_FRAME);
+            drawQueue->AddShaderParameter(VSP_ELAPSEDTIME, elapsedTime);
+            drawQueue->AddShaderParameter(PSP_ELAPSEDTIME, elapsedTime);
+            drawQueue->CommitShaderParameterGroup(SP_FRAME);
         }
 
-        if (drawQueue_->BeginShaderParameterGroup(SP_OBJECT))
+        if (drawQueue->BeginShaderParameterGroup(SP_OBJECT))
         {
-            drawQueue_->AddShaderParameter(VSP_MODEL, Matrix3x4::IDENTITY);
-            drawQueue_->CommitShaderParameterGroup(SP_OBJECT);
+            drawQueue->AddShaderParameter(VSP_MODEL, Matrix3x4::IDENTITY);
+            drawQueue->CommitShaderParameterGroup(SP_OBJECT);
         }
 
-        if (drawQueue_->BeginShaderParameterGroup(SP_CAMERA))
+        if (drawQueue->BeginShaderParameterGroup(SP_CAMERA))
         {
-            drawQueue_->AddShaderParameter(VSP_VIEWPROJ, projection);
-            drawQueue_->CommitShaderParameterGroup(SP_CAMERA);
+            drawQueue->AddShaderParameter(VSP_VIEWPROJ, projection);
+            drawQueue->CommitShaderParameterGroup(SP_CAMERA);
         }
 
-        if (drawQueue_->BeginShaderParameterGroup(SP_MATERIAL))
+        if (drawQueue->BeginShaderParameterGroup(SP_MATERIAL))
         {
             if (!batch.customMaterial_)
-                drawQueue_->AddShaderParameter(PSP_MATDIFFCOLOR, Color(1.0f, 1.0f, 1.0f, 1.0f));
+                drawQueue->AddShaderParameter(PSP_MATDIFFCOLOR, Color(1.0f, 1.0f, 1.0f, 1.0f));
             else
             {
                 for (const auto& param : batch.customMaterial_->GetShaderParameters())
-                    drawQueue_->AddShaderParameter(param.first, param.second.value_);
+                    drawQueue->AddShaderParameter(param.first, param.second.value_);
             }
-            drawQueue_->CommitShaderParameterGroup(SP_MATERIAL);
+            drawQueue->CommitShaderParameterGroup(SP_MATERIAL);
         }
 
-        drawQueue_->SetBuffers({ { vertexBuffer_ }, nullptr, nullptr });
+        drawQueue->SetBuffers({ { vertexBuffer_ }, nullptr, nullptr });
 
         IntRect scissor = batch.scissor_;
         scissor.left_ = (int)(scissor.left_ * uiScale_);
@@ -1082,21 +1034,21 @@ void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsign
             scissor.bottom_ = viewSize.y_ - top;
         }
 #endif
-        drawQueue_->SetScissorRect(scissor);
+        drawQueue->SetScissorRect(scissor);
 
         if (!batch.customMaterial_)
-            drawQueue_->AddShaderResource(TU_DIFFUSE, batch.texture_);
+            drawQueue->AddShaderResource(TU_DIFFUSE, batch.texture_);
         else
         {
             for (const auto& texture : batch.customMaterial_->GetTextures())
-                drawQueue_->AddShaderResource(texture.first, texture.second);
+                drawQueue->AddShaderResource(texture.first, texture.second);
         }
-        drawQueue_->CommitShaderResources();
+        drawQueue->CommitShaderResources();
 
-        drawQueue_->Draw(batch.vertexStart_ / UI_VERTEX_SIZE, (batch.vertexEnd_ - batch.vertexStart_) / UI_VERTEX_SIZE);
+        drawQueue->Draw(batch.vertexStart_ / UI_VERTEX_SIZE, (batch.vertexEnd_ - batch.vertexStart_) / UI_VERTEX_SIZE);
     }
 
-    drawQueue_->Execute();
+    drawQueue->Execute();
 }
 
 void UI::GetBatches(ea::vector<UIBatch>& batches, ea::vector<float>& vertexData, UIElement* element, IntRect currentScissor)

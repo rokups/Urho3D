@@ -1173,7 +1173,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 
 void Graphics::SetShaderConstantBuffers(ea::span<const ConstantBufferRange, MAX_SHADER_PARAMETER_GROUPS> constantBuffers)
 {
-    if (!constantBuffersEnabled_)
+    if (!constantBuffersSupport_)
     {
         URHO3D_LOGERROR("Constant buffers are disabled, SetShaderConstantBuffers call is ignored");
         return;
@@ -2871,9 +2871,6 @@ void Graphics::CheckFeatureSupport()
 #endif
     }
 #endif
-
-    // Enable constant buffers if supported
-    constantBuffersEnabled_ = constantBuffersSupport_;
 
     // Consider OpenGL shadows always hardware sampled, if supported at all
     hardwareShadowSupport_ = shadowMapFormat_ != 0;

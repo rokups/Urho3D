@@ -201,7 +201,7 @@ RenderBufferManager::RenderBufferManager(RenderPipelineInterface* renderPipeline
     , renderPipeline_(renderPipeline)
     , graphics_(GetSubsystem<Graphics>())
     , renderer_(GetSubsystem<Renderer>())
-    , drawQueue_(renderPipeline_->GetDefaultDrawQueue())
+    , drawQueue_(renderer_->GetDefaultDrawQueue())
 {
     // Order is important. RenderBufferManager should receive callbacks before any of render buffers
     renderPipeline_->OnPipelineStatesInvalidated.Subscribe(this, &RenderBufferManager::OnPipelineStatesInvalidated);
@@ -366,7 +366,7 @@ SharedPtr<PipelineState> RenderBufferManager::CreateQuadPipelineState(BlendMode 
     const ea::string& shaderName, const ea::string& shaderDefines)
 {
     ea::string defines = shaderDefines;
-    if (graphics_->GetConstantBuffersEnabled())
+    if (graphics_->GetConstantBuffersSupport())
         defines += " URHO3D_USE_CBUFFERS";
 
     PipelineStateDesc desc;
@@ -551,6 +551,7 @@ void RenderBufferManager::OnRenderBegin(const CommonFrameInfo& frameInfo)
 
 void RenderBufferManager::OnRenderEnd(const CommonFrameInfo& frameInfo)
 {
+    // TODO(renderer): Try to optimize it
     if (writeableColorBuffer_ != viewportColorBuffer_.Get())
     {
         Texture* colorTexture = writeableColorBuffer_->GetTexture();

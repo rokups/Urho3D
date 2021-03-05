@@ -45,7 +45,6 @@ class XMLFile;
 class View;
 class Viewport;
 class ShadowMapAllocator;
-class DrawCommandQueue;
 class DrawableProcessor;
 class SceneBatchCollector;
 class BatchRenderer;
@@ -105,9 +104,6 @@ public:
     /// Render.
     void Render();
 
-    /// Return default draw queue. Is not automatically executed.
-    DrawCommandQueue* GetDefaultDrawQueue() override { return drawQueue_; }
-
 protected:
     /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
     unsigned RecalculatePipelineStateHash() const override;
@@ -133,7 +129,6 @@ private:
 
     CommonFrameInfo frameInfo_;
 
-    SharedPtr<DrawCommandQueue> drawQueue_;
     SharedPtr<RenderBufferManager> renderBufferManager_;
     SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
     SharedPtr<InstancingBuffer> instancingBuffer_;

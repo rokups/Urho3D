@@ -28,6 +28,7 @@
 #include "../Graphics/OcclusionBuffer.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/OctreeQuery.h"
+#include "../Graphics/Renderer.h"
 #include "../Graphics/RenderSurface.h"
 #include "../Graphics/Technique.h"
 #include "../Graphics/Viewport.h"
@@ -128,7 +129,7 @@ SceneProcessor::SceneProcessor(RenderPipelineInterface* renderPipeline, const ea
     , renderPipeline_(renderPipeline)
     , shadowMapAllocator_(shadowMapAllocator)
     , instancingBuffer_(instancingBuffer)
-    , drawQueue_(renderPipeline_->GetDefaultDrawQueue())
+    , drawQueue_(GetSubsystem<Renderer>()->GetDefaultDrawQueue())
     , cameraProcessor_(MakeShared<CameraProcessor>(context_))
     , drawableProcessor_(MakeShared<DrawableProcessor>(renderPipeline_))
     , batchCompositor_(MakeShared<BatchCompositor>(renderPipeline_, drawableProcessor_, Technique::GetPassIndex("shadow")))

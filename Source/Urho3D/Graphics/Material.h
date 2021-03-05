@@ -268,6 +268,8 @@ public:
     Technique* FindTechnique(Drawable* drawable, MaterialQuality materialQuality) const;
     /// Return pass by technique index and pass name.
     Pass* GetPass(unsigned index, const ea::string& passName) const;
+    /// Return default pass. Used by UI materials. It's base pass of 0-th technique assigned to Material.
+    Pass* GetDefaultPass() const;
     /// Return texture by unit.
     /// @property{get_textures}
     Texture* GetTexture(TextureUnit unit) const;

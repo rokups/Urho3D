@@ -1201,6 +1201,14 @@ Pass* Material::GetPass(unsigned index, const ea::string& passName) const
     return tech ? tech->GetPass(passName) : nullptr;
 }
 
+Pass* Material::GetDefaultPass() const
+{
+    static const unsigned basePassIndex = Technique::GetPassIndex("base");
+    if (Technique* tech = GetTechnique(0))
+        return tech->GetSupportedPass(basePassIndex);
+    return nullptr;
+}
+
 Texture* Material::GetTexture(TextureUnit unit) const
 {
     auto i = textures_.find(unit);
