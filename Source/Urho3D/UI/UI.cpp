@@ -77,22 +77,6 @@ static MouseButton MakeTouchIDMask(int id)
     return static_cast<MouseButton>(1u << static_cast<MouseButtonFlags::Integer>(id)); // NOLINT(misc-misplaced-widening-cast)
 }
 
-SharedPtr<Material> CreateUIMaterial(Context* context,
-    const ea::string& shaderName, const ea::string& vsDefines, const ea::string& psDefines)
-{
-    auto technique = MakeShared<Technique>(context);
-    Pass* pass = technique->CreatePass("base");
-    pass->SetVertexShader(shaderName);
-    pass->SetVertexShaderDefines(vsDefines);
-    pass->SetPixelShader(shaderName);
-    pass->SetPixelShaderDefines(psDefines);
-
-    auto material = MakeShared<Material>(context);
-    material->SetTechnique(0, technique);
-
-    return material;
-}
-
 StringHash VAR_ORIGIN("Origin");
 const StringHash VAR_ORIGINAL_PARENT("OriginalParent");
 const StringHash VAR_ORIGINAL_CHILD_INDEX("OriginalChildIndex");
@@ -875,10 +859,10 @@ void UI::Initialize()
 
     batchStateCache_ = MakeShared<DefaultUIBatchStateCache>(context_);
 
-    noTextureMaterial_ = CreateUIMaterial(context_, "UIBasic", "VERTEXCOLOR", "VERTEXCOLOR");
-    alphaMapMaterial_ = CreateUIMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "ALPHAMAP VERTEXCOLOR");
-    diffMapMaterial_ = CreateUIMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "DIFFMAP VERTEXCOLOR");
-    diffMapAlphaMaskMaterial_ = CreateUIMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "DIFFMAP ALPHAMASK VERTEXCOLOR");
+    noTextureMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "VERTEXCOLOR", "VERTEXCOLOR");
+    alphaMapMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "ALPHAMAP VERTEXCOLOR");
+    diffMapMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "DIFFMAP VERTEXCOLOR");
+    diffMapAlphaMaskMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "DIFFMAP ALPHAMASK VERTEXCOLOR");
 
     initialized_ = true;
 
@@ -980,7 +964,7 @@ void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsign
         Material* material = GetBatchMaterial(batch);
         const UIBatchStateKey key{ material, material->GetDefaultPass(), UIBatchStencilMode::Ignore, batch.blendMode_ };
         PipelineState* pipelineState = batchStateCache_->GetOrCreatePipelineState(key, batchStateCreateContext);
-        if (!pipelineState)
+        if (!pipelineState || !pipelineState->IsValid())
             continue;
 
         drawQueue->SetPipelineState(pipelineState);

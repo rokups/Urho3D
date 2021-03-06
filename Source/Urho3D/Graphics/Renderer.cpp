@@ -1179,6 +1179,19 @@ RenderSurface* Renderer::GetDepthStencil(int width, int height, int multiSample,
     }
 }
 
+RenderSurface* Renderer::GetDepthStencil(RenderSurface* renderSurface)
+{
+    // If using the backbuffer, return the backbuffer depth-stencil
+    if (!renderSurface)
+        return nullptr;
+
+    if (RenderSurface* linkedDepthStencil = renderSurface->GetLinkedDepthStencil())
+        return linkedDepthStencil;
+
+    return GetDepthStencil(renderSurface->GetWidth(), renderSurface->GetHeight(),
+        renderSurface->GetMultiSample(), renderSurface->GetAutoResolve());
+}
+
 OcclusionBuffer* Renderer::GetOcclusionBuffer(Camera* camera)
 {
     assert(numOcclusionBuffers_ <= occlusionBuffers_.size());

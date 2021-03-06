@@ -24,6 +24,7 @@
 
 #include <EASTL/shared_array.h>
 
+#include "../Container/ByteVector.h"
 #include "../Core/Object.h"
 #include "../Graphics/GPUObject.h"
 #include "../Graphics/GraphicsDefs.h"
@@ -203,6 +204,54 @@ private:
     bool shadowed_{};
     /// Discard lock flag. Used by OpenGL only.
     bool discardLock_{};
+};
+
+/// Vertex Buffer of dynamic size. Resize policy is similar to standard vector.
+class URHO3D_API DynamicVertexBuffer : public Object
+{
+    URHO3D_OBJECT(DynamicVertexBuffer, Object);
+
+public:
+    DynamicVertexBuffer(Context* context);
+    bool Initialize(unsigned vertexCount, const ea::vector<VertexElement>& elements);
+
+    /// Discard existing content of the buffer.
+    void Discard();
+    /// Commit all added data to GPU.
+    void Commit();
+
+    /// Allocate vertices. Returns index of first vertex and writeable buffer of sufficient size.
+    ea::pair<unsigned, unsigned char*> AddVertices(unsigned count)
+    {
+        const unsigned startVertex = numVertices_;
+        if (startVertex + count > maxNumVertices_)
+            GrowBuffer();
+
+        numVertices_ += count;
+        unsigned char* data = shadowData_.data() + startVertex * vertexSize_;
+        return { startVertex, data };
+    }
+
+    /// Store vertices. Returns index of first vertex.
+    unsigned AddVertices(unsigned count, const void* data)
+    {
+        const auto indexAndData = AddVertices(count);
+        memcpy(indexAndData.second, data, count * vertexSize_);
+        return indexAndData.first;
+    }
+
+    VertexBuffer* GetVertexBuffer() { return vertexBuffer_; }
+
+private:
+    void GrowBuffer();
+
+    SharedPtr<VertexBuffer> vertexBuffer_;
+    ByteVector shadowData_;
+    bool vertexBufferNeedResize_{};
+
+    unsigned vertexSize_{};
+    unsigned numVertices_{};
+    unsigned maxNumVertices_{};
 };
 
 }

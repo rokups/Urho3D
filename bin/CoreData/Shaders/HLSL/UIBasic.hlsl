@@ -10,15 +10,15 @@ cbuffer CameraVS : register(b1)
     float4x4 cViewProj;
 }
 
+cbuffer ObjectVS : register(b5)
+{
+    float4x3 cModel;
+}
+
 Texture2D tDiffMap : register(t0);
 SamplerState sDiffMap : register(s0);
 
 #define Sample2D(tex, uv) t##tex.Sample(s##tex, uv)
-
-float4 GetClipPos(float3 worldPos)
-{
-    return mul(float4(worldPos, 1.0), cViewProj);
-}
 
 #define OUTPOSITION SV_POSITION
 #define OUTCOLOR0 SV_TARGET
@@ -39,8 +39,8 @@ void VS(float4 iPos : POSITION,
     #endif
     out float4 oPos : OUTPOSITION)
 {
-    float3 worldPos = iPos.xyz;
-    oPos = GetClipPos(worldPos);
+    float3 worldPos = mul(iPos, cModel);
+    oPos = mul(float4(worldPos, 1.0), cViewProj);
 
     #ifdef VERTEXCOLOR
         oColor = iColor;

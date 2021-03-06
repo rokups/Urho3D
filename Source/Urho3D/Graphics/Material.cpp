@@ -171,6 +171,22 @@ void Material::RegisterObject(Context* context)
     context->RegisterFactory<Material>();
 }
 
+SharedPtr<Material> Material::CreateBaseMaterial(Context* context,
+    const ea::string& shaderName, const ea::string& vsDefines, const ea::string& psDefines)
+{
+    auto technique = MakeShared<Technique>(context);
+    Pass* pass = technique->CreatePass("base");
+    pass->SetVertexShader(shaderName);
+    pass->SetVertexShaderDefines(vsDefines);
+    pass->SetPixelShader(shaderName);
+    pass->SetPixelShaderDefines(psDefines);
+
+    auto material = MakeShared<Material>(context);
+    material->SetTechnique(0, technique);
+
+    return material;
+}
+
 bool Material::BeginLoad(Deserializer& source)
 {
     // In headless mode, do not actually load the material, just return success

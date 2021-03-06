@@ -25,6 +25,7 @@
 #include "../Precompiled.h"
 
 #include "../Core/Context.h"
+#include "../IO/Log.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/GraphicsEvents.h"
 #include "../Graphics/VertexBuffer.h"
@@ -433,6 +434,59 @@ unsigned VertexBuffer::RecalculatePipelineStateHash() const
     for (const VertexElement& element : elements_)
         CombineHash(hash, element.ToHash());
     return ea::max(1u, hash);
+}
+
+DynamicVertexBuffer::DynamicVertexBuffer(Context* context)
+    : Object(context)
+    , vertexBuffer_(MakeShared<VertexBuffer>(context))
+{
+}
+
+bool DynamicVertexBuffer::Initialize(unsigned vertexCount, const ea::vector<VertexElement>& elements)
+{
+    numVertices_ = 0;
+    maxNumVertices_ = vertexCount;
+
+    if (!vertexBuffer_->SetSize(vertexCount, elements, true))
+    {
+        URHO3D_LOGERROR("Failed to create DynamicVertexBuffer");
+        return false;
+    }
+
+    vertexSize_ = vertexBuffer_->GetVertexSize();
+    shadowData_.resize(vertexSize_ * maxNumVertices_);
+    return true;
+}
+
+void DynamicVertexBuffer::Discard()
+{
+    numVertices_ = 0;
+}
+
+void DynamicVertexBuffer::Commit()
+{
+    if (numVertices_ == 0)
+        return;
+
+    if (vertexBufferNeedResize_)
+    {
+        vertexBufferNeedResize_ = false;
+        if (!vertexBuffer_->SetSize(maxNumVertices_, vertexBuffer_->GetElements(), true))
+        {
+            URHO3D_LOGERROR("Failed to grow DynamicVertexBuffer to {} vertices with stride {}",
+                maxNumVertices_, vertexSize_);
+            return;
+        }
+    }
+
+    vertexBuffer_->SetData(shadowData_.data());
+}
+
+void DynamicVertexBuffer::GrowBuffer()
+{
+    maxNumVertices_ = maxNumVertices_ > 0 ? 2 * maxNumVertices_ : 128;
+    shadowData_.resize(maxNumVertices_ * vertexSize_);
+    vertexBufferNeedResize_ = true;
 }
 
 }

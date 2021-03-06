@@ -20,11 +20,13 @@
 // THE SOFTWARE.
 //
 #include "../Core/Context.h"
+#include "../IO/Log.h"
 #include "../Graphics/Graphics.h"
 #include "../Graphics/VertexBuffer.h"
 #include "../Graphics/IndexBuffer.h"
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/GraphicsEvents.h"
+#include "../Graphics/Renderer.h"
 #include "../Resource/ResourceCache.h"
 #include "../Math/Matrix4.h"
 #include "../RmlUI/RmlRenderer.h"
@@ -39,6 +41,14 @@ namespace Detail
 
 namespace
 {
+
+/// Internal vertex type used to render RmlUI geometry.
+struct RmlVertex
+{
+    Vector3 position_;
+    unsigned color_;
+    Vector2 texCoord_;
+};
 
 /// Internal RmlUI texture holder.
 struct CachedRmlTexture
@@ -57,129 +67,120 @@ CachedRmlTexture* UnwrapTextureHandle(Rml::TextureHandle texture) { return reint
 
 RmlRenderer::RmlRenderer(Context* context)
     : Object(context)
-    , vertexBuffer_(context->CreateObject<VertexBuffer>())
-    , indexBuffer_(context->CreateObject<IndexBuffer>())
 {
     InitializeGraphics();
     SubscribeToEvent(E_SCREENMODE, [this](StringHash, VariantMap&) { InitializeGraphics(); });
 }
 
+void RmlRenderer::BeginRendering()
+{
+    auto graphics = GetSubsystem<Graphics>();
+
+    drawQueue_ = GetSubsystem<Renderer>()->GetDefaultDrawQueue();
+    vertexBuffer_->Discard();
+    indexBuffer_->Discard();
+    drawQueue_->Reset(false);
+
+    VertexBuffer* vertexBuffer = vertexBuffer_->GetVertexBuffer();
+    IndexBuffer* indexBuffer = indexBuffer_->GetIndexBuffer();
+    drawQueue_->SetBuffers({ { vertexBuffer }, indexBuffer, nullptr });
+
+    batchStateCreateContext_.vertexBuffer_ = vertexBuffer;
+    batchStateCreateContext_.indexBuffer_ = indexBuffer;
+
+    renderSurface_ = graphics->GetRenderTarget(0);
+    viewportSize_ = graphics->GetViewport().Size();
+
+    const Vector2 invScreenSize = Vector2::ONE / static_cast<Vector2>(viewportSize_);
+    Vector2 scale(2.0f * invScreenSize.x_, -2.0f * invScreenSize.y_);
+    Vector2 offset(-1.0f, 1.0f);
+    if (renderSurface_)
+    {
+#ifdef URHO3D_OPENGL
+        // On OpenGL, flip the projection if rendering to a texture so that the texture can be addressed in the
+        // same way as a render texture produced on Direct3D.
+        offset.y_ = -offset.y_;
+        scale.y_ = -scale.y_;
+#endif
+    }
+
+    const float farClip_ = 1000.0f;
+    projection_ = Matrix4::IDENTITY;
+    projection_.m00_ = scale.x_;
+    projection_.m03_ = offset.x_;
+    projection_.m11_ = scale.y_;
+    projection_.m13_ = offset.y_;
+    projection_.m22_ = 1.0f / farClip_;
+    projection_.m23_ = 0.0f;
+    projection_.m33_ = 1.0f;
+}
+
+void RmlRenderer::EndRendering()
+{
+    vertexBuffer_->Commit();
+    indexBuffer_->Commit();
+    drawQueue_->Execute();
+    drawQueue_ = nullptr;
+}
+
 void RmlRenderer::InitializeGraphics()
 {
-    graphics_ = context_->GetSubsystem<Graphics>();
-
-    if (graphics_.Null() || !graphics_->IsInitialized())
+    auto graphics = GetSubsystem<Graphics>();
+    if (!graphics || !graphics->IsInitialized())
         return;
 
-    stencilPS_ = graphics_->GetShader(PS, "Stencil");
-    stencilVS_ = graphics_->GetShader(VS, "Stencil");
-    noTexturePS_ = graphics_->GetShader(PS, "Basic", "VERTEXCOLOR");
-    noTextureVS_ = graphics_->GetShader(VS, "Basic", "VERTEXCOLOR");
-    textureVS_ = graphics_->GetShader(VS, "Basic", "DIFFMAP VERTEXCOLOR");
-    textureOpaquePS_ = graphics_->GetShader(PS, "Basic", "DIFFMAP VERTEXCOLOR");
-    textureAlphaPS_ = graphics_->GetShader(PS, "Basic", "ALPHAMAP VERTEXCOLOR");
+    batchStateCache_ = MakeShared<DefaultUIBatchStateCache>(context_);
+
+    vertexBuffer_ = MakeShared<DynamicVertexBuffer>(context_);
+    vertexBuffer_->Initialize(1024, VertexBuffer::GetElements(MASK_POSITION | MASK_COLOR | MASK_TEXCOORD1));
+    indexBuffer_ = MakeShared<DynamicIndexBuffer>(context_);
+    indexBuffer_->Initialize(1024, true);
+
+    noTextureMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "VERTEXCOLOR", "VERTEXCOLOR");
+    alphaMapMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "ALPHAMAP VERTEXCOLOR");
+    diffMapMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "DIFFMAP VERTEXCOLOR");
 }
 
-void RmlRenderer::CompileGeometry(CompiledGeometryForRml& compiledGeometryOut, Rml::Vertex* vertices, int numVertices, int* indices, int numIndices, const Rml::TextureHandle texture)
+Material* RmlRenderer::GetBatchMaterial(Texture2D* texture)
 {
-    VertexBuffer* vertexBuffer;
-    IndexBuffer* indexBuffer;
-    compiledGeometryOut.texture_ = texture;
-    if (compiledGeometryOut.vertexBuffer_.Null())
-        compiledGeometryOut.vertexBuffer_ = vertexBuffer = context_->CreateObject<VertexBuffer>().Detach();
+    if (!texture)
+        return noTextureMaterial_;
+    else if (texture->GetFormat() == Graphics::GetAlphaFormat())
+        return alphaMapMaterial_;
     else
-        vertexBuffer = compiledGeometryOut.vertexBuffer_.Get();
-
-    if (compiledGeometryOut.indexBuffer_.Null())
-        compiledGeometryOut.indexBuffer_ = indexBuffer = context_->CreateObject<IndexBuffer>().Detach();
-    else
-        indexBuffer = compiledGeometryOut.indexBuffer_.Get();
-
-    vertexBuffer->SetSize(numVertices, MASK_POSITION | MASK_COLOR | (texture ? MASK_TEXCOORD1 : MASK_NONE), true);
-    vertexBuffer->SetShadowed(true);
-    indexBuffer->SetSize(numIndices, true);
-    indexBuffer->SetShadowed(true);
-
-    float* vertexData = static_cast<float*>(vertexBuffer->Lock(0, numVertices, true));
-    assert(vertexData != nullptr);
-    for (int i = 0; i < numVertices; ++i)
-    {
-        *vertexData++ = vertices[i].position.x;
-        *vertexData++ = vertices[i].position.y;
-        *vertexData++ = 0.f;
-        *((unsigned*)vertexData++) = (vertices[i].colour.alpha << 24u) | (vertices[i].colour.blue << 16u) | (vertices[i].colour.green << 8u) | vertices[i].colour.red;
-        if (texture)
-        {
-            *vertexData++ = vertices[i].tex_coord.x;
-            *vertexData++ = vertices[i].tex_coord.y;
-        }
-    }
-    vertexBuffer->Unlock();
-    indexBuffer->SetDataRange(indices, 0, numIndices);
+        return diffMapMaterial_;
 }
 
-Rml::CompiledGeometryHandle RmlRenderer::CompileGeometry(Rml::Vertex* vertices, int numVertices, int* indices, int numIndices, const Rml::TextureHandle texture)
+void RmlRenderer::RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices,
+    Rml::TextureHandle textureHandle, const Rml::Vector2f& translation)
 {
-    CompiledGeometryForRml* geom = new CompiledGeometryForRml();
-    CompileGeometry(*geom, vertices, numVertices, indices, numIndices, texture);
-    return reinterpret_cast<Rml::CompiledGeometryHandle>(geom);
-}
-
-void RmlRenderer::RenderCompiledGeometry(Rml::CompiledGeometryHandle geometryHandle, const Rml::Vector2f& translation)
-{
-    CompiledGeometryForRml* geometry = reinterpret_cast<CompiledGeometryForRml*>(geometryHandle);
-
-    // Engine does not render when window is closed or device is lost
-    assert(graphics_ && graphics_->IsInitialized() && !graphics_->IsDeviceLost());
-
-    RenderSurface* surface = graphics_->GetRenderTarget(0);
-    IntVector2 viewSize = graphics_->GetViewport().Size();
-    if (viewSize != lastViewportSize_ || lastViewportHadRenderTarget_ != (surface != nullptr))
+    if (scissorEnabled_ && transformEnabled_)
     {
-        lastViewportSize_ = viewSize;
-        lastViewportHadRenderTarget_ = (surface != nullptr);
-
-        Vector2 invScreenSize(1.0f / (float)viewSize.x_, 1.0f / (float)viewSize.y_);
-        Vector2 scale(2.0f * invScreenSize.x_, -2.0f * invScreenSize.y_);
-        Vector2 offset(-1.0f, 1.0f);
-        if (surface)
-        {
-    #ifdef URHO3D_OPENGL
-            // On OpenGL, flip the projection if rendering to a texture so that the texture can be addressed in the
-            // same way as a render texture produced on Direct3D.
-            offset.y_ = -offset.y_;
-            scale.y_ = -scale.y_;
-    #endif
-        }
-
-        const float farClip_ = 1000.0f;
-        projection_ = Matrix4::IDENTITY;
-        projection_.m00_ = scale.x_;
-        projection_.m03_ = offset.x_;
-        projection_.m11_ = scale.y_;
-        projection_.m13_ = offset.y_;
-        projection_.m22_ = 1.0f / farClip_;
-        projection_.m23_ = 0.0f;
-        projection_.m33_ = 1.0f;
+        URHO3D_LOGERROR("Scissor test is not supported for transformed geometry");
+        return;
     }
 
-    graphics_->ClearParameterSources();
-    graphics_->SetBlendMode(BLEND_ALPHA);
-    graphics_->SetColorWrite(true);
-    graphics_->SetCullMode(CULL_NONE);
-    graphics_->SetDepthTest(CMP_ALWAYS);
-    graphics_->SetDepthWrite(false);
-    graphics_->SetFillMode(FILL_SOLID);
-    graphics_->SetStencilTest(false);
-    graphics_->SetTexture(0, nullptr);
+    const auto [firstVertex, vertexData] = vertexBuffer_->AddVertices(num_vertices);
+    const auto [firstIndex, indexData] = indexBuffer_->AddIndices(num_indices);
 
-    ApplyScissorRegion(surface, viewSize);
+    RmlVertex* destVertices = reinterpret_cast<RmlVertex*>(vertexData);
+    for (unsigned i = 0; i < num_vertices; ++i)
+    {
+        destVertices[i].position_.x_ = vertices[i].position.x + translation.x;
+        destVertices[i].position_.y_ = vertices[i].position.y + translation.y;
+        destVertices[i].position_.z_ = 0.0f;
+        const Rml::Colourb& color = vertices[i].colour;
+        destVertices[i].color_ = (color.alpha << 24u) | (color.blue << 16u) | (color.green << 8u) | color.red;
+        destVertices[i].texCoord_.x_ = vertices[i].tex_coord.x;
+        destVertices[i].texCoord_.y_ = vertices[i].tex_coord.y;
+    }
 
-    ShaderVariation* ps;
-    ShaderVariation* vs;
+    unsigned* destIndices = reinterpret_cast<unsigned*>(indexData);
+    for (unsigned i = 0; i < num_indices; ++i)
+        destIndices[i] = indices[i] + firstVertex;
 
     // Restore texture data if lost
-    CachedRmlTexture* cachedTexture = UnwrapTextureHandle(geometry->texture_);
+    CachedRmlTexture* cachedTexture = UnwrapTextureHandle(textureHandle);
     Texture2D* texture = cachedTexture ? cachedTexture->texture_ : nullptr;
     if (texture && texture->IsDataLost())
     {
@@ -187,59 +188,39 @@ void RmlRenderer::RenderCompiledGeometry(Rml::CompiledGeometryHandle geometryHan
         texture->ClearDataLost();
     }
 
-    if (!texture)
+    Material* material = GetBatchMaterial(texture);
+    Pass* pass = material->GetDefaultPass();
+    const UIBatchStateKey batchStateKey{ material, pass, UIBatchStencilMode::Ignore, BLEND_ALPHA };
+    PipelineState* pipelineState = batchStateCache_->GetOrCreatePipelineState(batchStateKey, batchStateCreateContext_);
+
+    const IntRect scissor = scissorEnabled_ ? scissor_ : IntRect{ IntVector2::ZERO, viewportSize_ };
+
+    drawQueue_->SetScissorRect(scissor);
+    drawQueue_->SetPipelineState(pipelineState);
+
+    if (texture)
+        drawQueue_->AddShaderResource(TU_DIFFUSE, texture);
+    drawQueue_->CommitShaderResources();
+
+    if (drawQueue_->BeginShaderParameterGroup(SP_CAMERA, false))
     {
-        ps = noTexturePS_;
-        vs = noTextureVS_;
+        drawQueue_->AddShaderParameter(VSP_VIEWPROJ, projection_);
+        drawQueue_->CommitShaderParameterGroup(SP_CAMERA);
     }
-    else
+
+    if (drawQueue_->BeginShaderParameterGroup(SP_MATERIAL, false))
     {
-        // If texture contains only an alpha channel, use alpha shader (for fonts)
-        vs = textureVS_;
-        if (texture->GetFormat() == Graphics::GetAlphaFormat())
-            ps = textureAlphaPS_;
-        else
-            ps = textureOpaquePS_;
+        drawQueue_->AddShaderParameter(PSP_MATDIFFCOLOR, Color::WHITE.ToVector4());
+        drawQueue_->CommitShaderParameterGroup(SP_MATERIAL);
     }
 
-    graphics_->SetTexture(0, texture);
-    graphics_->SetVertexBuffer(geometry->vertexBuffer_);
-    graphics_->SetIndexBuffer(geometry->indexBuffer_);
-    graphics_->SetShaders(vs, ps);
-    graphics_->SetLineAntiAlias(true);
+    if (drawQueue_->BeginShaderParameterGroup(SP_OBJECT, true))
+    {
+        drawQueue_->AddShaderParameter(VSP_MODEL, transform_);
+        drawQueue_->CommitShaderParameterGroup(SP_OBJECT);
+    }
 
-    // Apply translation
-    Matrix4 translate = Matrix4::IDENTITY;
-    translate.SetTranslation(Vector3(translation.x, translation.y, 0.f));
-    Matrix4 model = (matrix_ ? Matrix4(matrix_) : Matrix4::IDENTITY) * translate;
-
-    if (graphics_->NeedParameterUpdate(SP_OBJECT, this))
-        graphics_->SetShaderParameter(VSP_MODEL, model);
-    if (graphics_->NeedParameterUpdate(SP_CAMERA, this))
-        graphics_->SetShaderParameter(VSP_VIEWPROJ, projection_);
-    if (graphics_->NeedParameterUpdate(SP_MATERIAL, this))
-        graphics_->SetShaderParameter(PSP_MATDIFFCOLOR, Color(1.0f, 1.0f, 1.0f, 1.0f));
-
-    float elapsedTime = context_->GetSubsystem<Time>()->GetElapsedTime();
-    graphics_->SetShaderParameter(VSP_ELAPSEDTIME, elapsedTime);
-    graphics_->SetShaderParameter(PSP_ELAPSEDTIME, elapsedTime);
-
-    graphics_->Draw(TRIANGLE_LIST, 0, geometry->indexBuffer_->GetIndexCount(), 0, geometry->vertexBuffer_->GetVertexCount());
-}
-
-void RmlRenderer::RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices, Rml::TextureHandle texture, const Rml::Vector2f& translation)
-{
-    // Could this be optimized?
-    CompiledGeometryForRml geometry;
-    geometry.vertexBuffer_ = vertexBuffer_;
-    geometry.indexBuffer_ = indexBuffer_;
-    CompileGeometry(geometry, vertices, num_vertices, indices, num_indices, texture);
-    RenderCompiledGeometry(reinterpret_cast<Rml::CompiledGeometryHandle>(&geometry), translation);
-}
-
-void RmlRenderer::ReleaseCompiledGeometry(Rml::CompiledGeometryHandle geometry)
-{
-    delete reinterpret_cast<CompiledGeometryForRml*>(geometry);
+    drawQueue_->DrawIndexedLegacy(firstIndex, num_indices, firstVertex, num_vertices);
 }
 
 void RmlRenderer::EnableScissorRegion(bool enable)
@@ -253,28 +234,21 @@ void RmlRenderer::SetScissorRegion(int x, int y, int width, int height)
     scissor_.top_ = y;
     scissor_.bottom_ = y + height;
     scissor_.right_ = x + width;
-}
 
-void RmlRenderer::ApplyScissorRegion(RenderSurface* surface, const IntVector2& viewSize)
-{
-    if (!scissorEnabled_)
-    {
-        graphics_->SetScissorTest(false);
-        return;
-    }
-
-    IntRect scissor = scissor_;
 #ifdef URHO3D_OPENGL
     // Flip scissor vertically if using OpenGL texture rendering
-    if (surface)
+    if (renderSurface_)
     {
-        int top = scissor.top_;
-        int bottom = scissor.bottom_;
-        scissor.top_ = viewSize.y_ - bottom;
-        scissor.bottom_ = viewSize.y_ - top;
+        int top = scissor_.top_;
+        int bottom = scissor_.bottom_;
+        scissor_.top_ = viewportSize_.y_ - bottom;
+        scissor_.bottom_ = viewportSize_.y_ - top;
     }
 #endif
+}
 
+// TODO(renderer): Support transformed scissors
+#if 0
     if (transformEnabled_)
     {
         graphics_->SetColorWrite(false);
@@ -340,10 +314,7 @@ void RmlRenderer::ApplyScissorRegion(RenderSurface* surface, const IntVector2& v
             Urho3D::StencilOp::OP_KEEP,
             Urho3D::StencilOp::OP_KEEP,
             Urho3D::StencilOp::OP_KEEP, 1);
-    }
-    else
-        graphics_->SetScissorTest(true, scissor);
-}
+#endif
 
 bool RmlRenderer::LoadTexture(Rml::TextureHandle& textureOut, Rml::Vector2i& sizeOut, const Rml::String& source)
 {
@@ -383,7 +354,7 @@ void RmlRenderer::ReleaseTexture(Rml::TextureHandle textureHandle)
 void RmlRenderer::SetTransform(const Rml::Matrix4f* transform)
 {
     transformEnabled_ = transform != nullptr;
-    matrix_ = transform ? transform->data() : Matrix4::IDENTITY.Data();
+    transform_ = transform ? Matrix3x4(Matrix4(transform->data())) : Matrix3x4::IDENTITY;
 }
 
 }   // namespace Detail

@@ -393,6 +393,8 @@ void Graphics::SetGlobalShaderDefines(const ea::string& globalShaderDefines)
 
 void Graphics::SetShaderCacheDir(const ea::string& path)
 {
+    shaderCacheDir_ = "D:/Temp/rbfx-renderer-master/";
+    return;
     ea::string trimmedPath = path.trimmed();
     if (trimmedPath.length())
         shaderCacheDir_ = AddTrailingSlash(trimmedPath);

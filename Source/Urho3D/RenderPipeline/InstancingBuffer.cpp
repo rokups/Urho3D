@@ -46,55 +46,32 @@ void InstancingBuffer::SetSettings(const InstancingBufferSettings& settings)
 
 void InstancingBuffer::Begin()
 {
-    nextVertex_ = 0;
+    if (vertexBuffer_)
+        vertexBuffer_->Discard();
 }
 
 void InstancingBuffer::End()
 {
-    if (nextVertex_ == 0 || !settings_.enableInstancing_)
-        return;
-
-    if (vertexBufferDirty_)
-    {
-        vertexBufferDirty_ = false;
-        if (!vertexBuffer_->SetSize(numVertices_, vertexElements_, true))
-        {
-            URHO3D_LOGERROR("Failed to create instancing buffer of {} vertices with stride {}", numVertices_, vertexStride_);
-            return;
-        }
-    }
-
-    vertexBuffer_->SetData(data_.data());
+    if (vertexBuffer_)
+        vertexBuffer_->Commit();
 }
 
 void InstancingBuffer::Initialize()
 {
-    nextVertex_ = 0;
-    vertexElements_.clear();
-    data_.clear();
     vertexBuffer_ = nullptr;
 
     if (settings_.enableInstancing_)
     {
+        ea::vector<VertexElement> vertexElements;
         for (unsigned i = 0; i < settings_.numInstancingTexCoords_; ++i)
         {
             const unsigned index = settings_.firstInstancingTexCoord_ + i;
-            vertexElements_.push_back(VertexElement(TYPE_VECTOR4, SEM_TEXCOORD, index, true));
+            vertexElements.push_back(VertexElement(TYPE_VECTOR4, SEM_TEXCOORD, index, true));
         }
-        vertexStride_ = settings_.numInstancingTexCoords_ * ElementStride;
-        vertexBufferDirty_ = true;
 
-        // Always pre-initialize buffer so it has valid layout
-        vertexBuffer_ = MakeShared<VertexBuffer>(context_);
-        vertexBuffer_->SetSize(1u, vertexElements_, true);
+        vertexBuffer_ = MakeShared<DynamicVertexBuffer>(context_);
+        vertexBuffer_->Initialize(128, vertexElements);
     }
-}
-
-void InstancingBuffer::GrowBuffer()
-{
-    numVertices_ = numVertices_ > 0 ? 2 * numVertices_ : 128;
-    data_.resize(numVertices_ * vertexStride_);
-    vertexBufferDirty_ = true;
 }
 
 }

@@ -161,4 +161,52 @@ private:
     bool discardLock_;
 };
 
+/// Index Buffer of dynamic size. Resize policy is similar to standard vector.
+class URHO3D_API DynamicIndexBuffer : public Object
+{
+    URHO3D_OBJECT(DynamicIndexBuffer, Object);
+
+public:
+    DynamicIndexBuffer(Context* context);
+    bool Initialize(unsigned indexCount, bool largeIndices);
+
+    /// Discard existing content of the buffer.
+    void Discard();
+    /// Commit all added data to GPU.
+    void Commit();
+
+    /// Allocate indices. Returns index of first index and writeable buffer of sufficient size.
+    ea::pair<unsigned, unsigned char*> AddIndices(unsigned numIndices)
+    {
+        const unsigned startIndex = numIndices_;
+        if (startIndex + numIndices > maxNumIndices_)
+            GrowBuffer();
+
+        numIndices_ += numIndices;
+        unsigned char* data = shadowData_.data() + startIndex * indexSize_;
+        return { startIndex, data };
+    }
+
+    /// Store indices. Returns index of first vertex.
+    unsigned AddIndices(unsigned count, const void* data)
+    {
+        const auto indexAndData = AddIndices(count);
+        memcpy(indexAndData.second, data, count * indexSize_);
+        return indexAndData.first;
+    }
+
+    IndexBuffer* GetIndexBuffer() { return indexBuffer_; }
+
+private:
+    void GrowBuffer();
+
+    SharedPtr<IndexBuffer> indexBuffer_;
+    ByteVector shadowData_;
+    bool indexBufferNeedResize_{};
+
+    unsigned indexSize_{};
+    unsigned numIndices_{};
+    unsigned maxNumIndices_{};
+};
+
 }

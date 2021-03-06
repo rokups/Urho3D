@@ -487,7 +487,6 @@ private:
 
     /// Default materials
     /// @{
-    /// TODO(renderer): Move it to Renderer
     SharedPtr<Material> noTextureMaterial_;
     SharedPtr<Material> alphaMapMaterial_;
     SharedPtr<Material> diffMapMaterial_;

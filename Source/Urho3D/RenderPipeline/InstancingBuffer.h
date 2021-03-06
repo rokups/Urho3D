@@ -47,57 +47,33 @@ public:
     /// End buffer composition and commit added instances to GPU.
     void End();
 
-    /// Add "vertex" to buffer. Use SetElements to fill it after.
+    /// Add instance to buffer. Use SetElements to fill it after.
     unsigned AddInstance()
     {
-        const unsigned currentVertex = nextVertex_;
-        if (currentVertex >= numVertices_)
-            GrowBuffer();
-
-        ++nextVertex_;
-        currentVertexData_ = data_.data() + currentVertex * vertexStride_;
-        return currentVertex;
+        const auto indexAndData = vertexBuffer_->AddVertices(1);
+        currentInstanceData_ = indexAndData.second;
+        return indexAndData.first;
     }
 
     /// Set one or more 4-float elements in current instance.
     void SetElements(const void* data, unsigned index, unsigned count)
     {
-        memcpy(currentVertexData_ + index * ElementStride, data, count * ElementStride);
+        memcpy(currentInstanceData_ + index * ElementStride, data, count * ElementStride);
     }
 
     /// Getters
     /// @{
-    VertexBuffer* GetVertexBuffer() const { return vertexBuffer_; }
+    VertexBuffer* GetVertexBuffer() const { return vertexBuffer_->GetVertexBuffer(); }
     bool IsEnabled() const { return settings_.enableInstancing_; }
     /// @}
 
 private:
-    /// Initialize instancing buffer.
     void Initialize();
-    /// Grow buffer.
-    void GrowBuffer();
 
-    /// Settings.
     InstancingBufferSettings settings_;
+    SharedPtr<DynamicVertexBuffer> vertexBuffer_;
 
-    /// GPU buffer.
-    SharedPtr<VertexBuffer> vertexBuffer_;
-    /// Whether the GPU buffer has to be resized.
-    bool vertexBufferDirty_{};
-    /// Buffer layout.
-    ea::vector<VertexElement> vertexElements_;
-    /// Vertex stride.
-    unsigned vertexStride_{};
-
-    /// Number of vertices in buffer.
-    unsigned numVertices_{};
-    /// Buffer data.
-    ByteVector data_;
-
-    /// Index of next vertex.
-    unsigned nextVertex_{};
-    /// Pointer to current vertex data.
-    unsigned char* currentVertexData_{};
+    unsigned char* currentInstanceData_{};
 };
 
 }

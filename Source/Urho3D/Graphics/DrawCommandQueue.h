@@ -117,6 +117,9 @@ public:
     /// Set scissor rect.
     void SetScissorRect(const IntRect& scissorRect)
     {
+        if (scissorRects_.size() > 1 && scissorRects_.back() == scissorRect)
+            return;
+
         currentDrawCommand_.scissorRect_ = scissorRects_.size();
         scissorRects_.push_back(scissorRect);
     }

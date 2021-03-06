@@ -167,6 +167,10 @@ public:
     /// @nobind
     static void RegisterObject(Context* context);
 
+    /// Create simple material with only base pass. Used by UI renderers.
+    static SharedPtr<Material> CreateBaseMaterial(Context* context,
+        const ea::string& shaderName, const ea::string& vsDefines, const ea::string& psDefines);
+
     /// Load resource from stream. May be called from a worker thread. Return true if successful.
     bool BeginLoad(Deserializer& source) override;
     /// Finish resource loading. Always called from the main thread. Return true if successful.

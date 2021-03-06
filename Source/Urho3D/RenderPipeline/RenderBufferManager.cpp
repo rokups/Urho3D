@@ -181,19 +181,6 @@ Vector4 CalculateViewportOffsetAndScale(const IntVector2& textureSize, const Int
 #endif
 }
 
-RenderSurface* GetOrCreateDepthStencil(Renderer* renderer, RenderSurface* renderSurface)
-{
-    // If using the backbuffer, return the backbuffer depth-stencil
-    if (!renderSurface)
-        return nullptr;
-
-    if (RenderSurface* linkedDepthStencil = renderSurface->GetLinkedDepthStencil())
-        return linkedDepthStencil;
-
-    return renderer->GetDepthStencil(renderSurface->GetWidth(), renderSurface->GetHeight(),
-        renderSurface->GetMultiSample(), renderSurface->GetAutoResolve());
-}
-
 }
 
 RenderBufferManager::RenderBufferManager(RenderPipelineInterface* renderPipeline)
@@ -307,7 +294,7 @@ void RenderBufferManager::ClearColorRect(const IntRect& viewportRect, RenderBuff
 {
     RenderSurfaceArray renderSurfaces;
     renderSurfaces.renderTargets_[0] = colorBuffer->GetRenderSurface(face);
-    renderSurfaces.depthStencil_ = GetOrCreateDepthStencil(renderer_, renderSurfaces.renderTargets_[0]);
+    renderSurfaces.depthStencil_ = renderer_->GetDepthStencil(renderSurfaces.renderTargets_[0]);
     SetRenderSurfaces(graphics_, renderSurfaces);
 
     if (viewportRect == IntRect::ZERO)
@@ -592,7 +579,7 @@ void RenderBufferManager::CopyTextureRegion(Texture* sourceTexture, const IntRec
     graphics_->SetRenderTarget(0, destinationSurface);
     for (unsigned i = 1; i < MAX_RENDERTARGETS; ++i)
         graphics_->ResetRenderTarget(i);
-    graphics_->SetDepthStencil(GetOrCreateDepthStencil(renderer_, destinationSurface));
+    graphics_->SetDepthStencil(renderer_->GetDepthStencil(destinationSurface));
     graphics_->SetViewport(destinationRect);
 
     DrawQuadParams callParams;

@@ -69,7 +69,10 @@ void AddPipelineBatch(const BatchStateCreateKey& key, BatchStateCache& cache,
 {
     PipelineState* pipelineState = cache.GetPipelineState(key);
     if (pipelineState)
-        batches.Insert(CreatePipelineBatch(key, pipelineState));
+    {
+        if (pipelineState->IsValid())
+            batches.Insert(CreatePipelineBatch(key, pipelineState));
+    }
     else
         delayedBatches.Insert(key);
 }
