@@ -135,6 +135,8 @@ void RenderPipeline::RegisterObject(Context* context)
 {
     context->RegisterFactory<RenderPipeline>();
 
+    URHO3D_ATTRIBUTE_EX("Max Vertex Lights", int, settings_.maxVertexLights_, MarkSettingsDirty, 4, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Max Pixel Lights", int, settings_.maxPixelLights_, MarkSettingsDirty, 4, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Ambient Mode", settings_.ambientMode_, MarkSettingsDirty, ambientModeNames, DrawableAmbientMode::Directional, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Enable Instancing", bool, settings_.enableInstancing_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Enable Shadow", bool, settings_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
@@ -155,7 +157,8 @@ void RenderPipeline::ApplyAttributes()
 SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     const BatchStateCreateKey& key, const BatchStateCreateContext& ctx)
 {
-    const bool isInternalPass = sceneProcessor_->IsInternalPass(ctx.pass_);
+    const auto scenePass = sceneProcessor_->GetUserPass(ctx.pass_);
+    const bool isInternalPass = !scenePass;
     if (isInternalPass && ctx.subpassIndex_ == BatchCompositor::LitVolumeSubpass)
     {
         return CreateLightVolumePipelineState(key.pixelLight_, key.geometry_);
@@ -165,11 +168,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     Material* material = key.material_;
     Pass* pass = key.pass_;
     Light* light = key.pixelLight_ ? key.pixelLight_->GetLight() : nullptr;
-    const bool isLitBasePass = ctx.subpassIndex_ == 1;
     const bool isShadowPass = isInternalPass;
-    const bool isAdditiveLightPass = !isInternalPass && ctx.subpassIndex_ == 2;
-    const bool isVertexLitPass = ctx.pass_ == alphaPass_ || ctx.pass_ == basePass_;
-    const bool isAmbientLitPass = !isAdditiveLightPass && (isVertexLitPass || ctx.pass_ == deferredPass_);
 
     PipelineStateDesc desc;
     ea::string commonDefines;
@@ -213,15 +212,16 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         desc.slopeScaledDepthBias_ *= multiplier;
 #endif
     }
-
-    if (isVertexLitPass)
-        commonDefines += "URHO3D_NUM_VERTEX_LIGHTS=4 ";
-
-    if (isAmbientLitPass)
-        commonDefines += "URHO3D_AMBIENT_PASS ";
-
-    if (isAdditiveLightPass)
-        commonDefines += "URHO3D_ADDITIVE_PASS ";
+    else
+    {
+        const DrawableProcessorPassFlags flags = scenePass->GetFlags();
+        if (flags.Test(DrawableProcessorPassFlag::BasePassNeedsAmbient))
+            commonDefines += "URHO3D_AMBIENT_PASS ";
+        if (flags.Test(DrawableProcessorPassFlag::BasePassNeedsAmbient))
+            commonDefines += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", settings_.maxVertexLights_);
+        if (ctx.subpassIndex_ == BatchCompositorPass::LightSubpass)
+            commonDefines += "URHO3D_ADDITIVE_LIGHT_PASS ";
+    }
 
     // Add lightmap
     const bool isLightmap = !!key.drawable_->GetBatches()[key.sourceBatchIndex_].lightmapScaleOffset_;
@@ -333,10 +333,6 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         case 2: commonDefines += "PASS_ALPHA_LIGHT "; break;
         }
     }
-
-    // TODO(renderer): This check is not correct, have to check for AMBIENT is pass defines
-    if (isLitBasePass || ctx.subpassIndex_ == 0)
-        commonDefines += "NUMVERTEXLIGHTS=4 AMBIENT ";
 
     if (light)
     {
@@ -535,7 +531,8 @@ void RenderPipeline::ApplySettings()
     {
         basePass_ = nullptr;
         alphaPass_ = nullptr;
-        deferredPass_ = MakeShared<UnlitScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "deferred");
+        deferredPass_ = MakeShared<UnorderedScenePass>(this, sceneProcessor_->GetDrawableProcessor(),
+            DrawableProcessorPassFlag::BasePassNeedsAmbient, "deferred");
 
         deferredAlbedo_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
         deferredNormal_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
@@ -545,8 +542,10 @@ void RenderPipeline::ApplySettings()
 
     if (!settings_.deferredLighting_ && !basePass_)
     {
-        basePass_ = MakeShared<OpaqueForwardLightingScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "base", "litbase", "light");
-        alphaPass_ = MakeShared<AlphaForwardLightingScenePass>(this, sceneProcessor_->GetDrawableProcessor(), "alpha", "alpha", "litalpha");
+        basePass_ = MakeShared<UnorderedScenePass>(this, sceneProcessor_->GetDrawableProcessor(),
+            DrawableProcessorPassFlag::BasePassNeedsAmbientAndVertexLights, "base", "litbase", "light");
+        alphaPass_ = MakeShared<BackToFrontScenePass>(this, sceneProcessor_->GetDrawableProcessor(),
+            DrawableProcessorPassFlag::BasePassNeedsAmbientAndVertexLights, "alpha", "alpha", "litalpha");
         deferredPass_ = nullptr;
 
         deferredAlbedo_ = nullptr;
@@ -721,8 +720,6 @@ void RenderPipeline::Render()
 #ifdef DESKTOP_GRAPHICS
     if (settings_.deferredLighting_)
     {
-        //deferredFinal_ = renderBufferManager_->GetColorOutput();
-
         // Draw deferred GBuffer
         renderBufferManager_->ClearColor(deferredAlbedo_, Color::TRANSPARENT_BLACK);
         renderBufferManager_->ClearOutput(fogColor, 1.0f, 0);
@@ -738,8 +735,7 @@ void RenderPipeline::Render()
 
         instancingBuffer_->Begin();
         sceneBatchRenderer_->RenderBatches({ *drawQueue, *sceneProcessor_->GetFrameInfo().camera_ },
-            BatchRenderFlag::EnableAmbientLighting | BatchRenderFlag::EnableInstancingForStaticGeometry,
-            deferredPass_->GetBatches());
+            deferredPass_->GetBaseRenderFlags(), deferredPass_->GetSortedBaseBatches());
         instancingBuffer_->End();
 
         drawQueue->Execute();
@@ -777,12 +773,9 @@ void RenderPipeline::Render()
         drawQueue->Reset();
         instancingBuffer_->Begin();
         BatchRenderingContext ctx{ *drawQueue, *sceneProcessor_->GetFrameInfo().camera_ };
-        sceneBatchRenderer_->RenderBatches(ctx,
-            BatchRenderFlag::EnableAmbientLighting | BatchRenderFlag::EnableVertexLights | BatchRenderFlag::EnablePixelLights | BatchRenderFlag::EnableInstancingForStaticGeometry, basePass_->GetSortedBaseBatches());
-        sceneBatchRenderer_->RenderBatches(ctx,
-            BatchRenderFlag::EnablePixelLights | BatchRenderFlag::EnableInstancingForStaticGeometry, basePass_->GetSortedLightBatches());
-        sceneBatchRenderer_->RenderBatches(ctx,
-            BatchRenderFlag::EnableAmbientLighting | BatchRenderFlag::EnableVertexLights | BatchRenderFlag::EnablePixelLights | BatchRenderFlag::EnableInstancingForStaticGeometry, alphaPass_->GetSortedBatches());
+        sceneBatchRenderer_->RenderBatches(ctx, basePass_->GetBaseRenderFlags(), basePass_->GetSortedBaseBatches());
+        sceneBatchRenderer_->RenderBatches(ctx, basePass_->GetLightRenderFlags(), basePass_->GetSortedLightBatches());
+        sceneBatchRenderer_->RenderBatches(ctx, alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches());
         instancingBuffer_->End();
         drawQueue->Execute();
     }

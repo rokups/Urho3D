@@ -32,15 +32,6 @@ class PipelineState;
 class RenderBufferManager;
 class RenderPipelineInterface;
 
-enum class PostProcessPassFlag
-{
-    None = 0,
-    NeedColorOutputReadAndWrite = 1 << 0,
-    NeedColorOutputBilinear = 1 << 1,
-};
-
-URHO3D_FLAGSET(PostProcessPassFlag, PostProcessPassFlags);
-
 /// Post-processing pass of render pipeline. Expected to output to color buffer.
 class URHO3D_API PostProcessPass
     : public Object

@@ -101,15 +101,16 @@ public:
         bool litAdded_{};
     };
 
-    DrawableProcessorPass(RenderPipelineInterface* renderPipeline, bool needAmbient,
+    DrawableProcessorPass(RenderPipelineInterface* renderPipeline, DrawableProcessorPassFlags flags,
         unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
     AddBatchResult AddBatch(unsigned threadIndex, Drawable* drawable, unsigned sourceBatchIndex, Technique* technique);
 
-    bool NeedAmbient() const { return needAmbient_; }
+    DrawableProcessorPassFlags GetFlags() const { return flags_; }
+    bool HasLightPass() const { return lightPassIndex_ != M_MAX_UNSIGNED; }
 
 private:
-    const bool needAmbient_{};
+    const DrawableProcessorPassFlags flags_{};
 
     const unsigned unlitBasePassIndex_{};
     const unsigned litBasePassIndex_{};

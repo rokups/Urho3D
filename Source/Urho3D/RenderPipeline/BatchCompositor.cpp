@@ -80,9 +80,9 @@ void AddPipelineBatch(const BatchStateCreateKey& key, BatchStateCache& cache,
 }
 
 BatchCompositorPass::BatchCompositorPass(RenderPipelineInterface* renderPipeline,
-    DrawableProcessor* drawableProcessor, bool needAmbient,
+    DrawableProcessor* drawableProcessor, DrawableProcessorPassFlags flags,
     unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
-    : DrawableProcessorPass(renderPipeline, needAmbient, unlitBasePassIndex, litBasePassIndex, lightPassIndex)
+    : DrawableProcessorPass(renderPipeline, flags, unlitBasePassIndex, litBasePassIndex, lightPassIndex)
     , workQueue_(GetSubsystem<WorkQueue>())
     , defaultMaterial_(GetSubsystem<Renderer>()->GetDefaultMaterial())
     , drawableProcessor_(drawableProcessor)
@@ -101,8 +101,8 @@ void BatchCompositorPass::ComposeBatches()
     });
 
     // Create missing pipeline states from main thread
-    ResolveDelayedBatches(UnlitBaseSubpass, delayedUnlitBaseBatches_, unlitBaseCache_, baseBatches_);
-    ResolveDelayedBatches(LitBaseSubpass, delayedLitBaseBatches_, litBaseCache_, baseBatches_);
+    ResolveDelayedBatches(BaseSubpass, delayedUnlitBaseBatches_, unlitBaseCache_, baseBatches_);
+    ResolveDelayedBatches(BaseSubpass, delayedLitBaseBatches_, litBaseCache_, baseBatches_);
     ResolveDelayedBatches(LightSubpass, delayedLightBatches_, lightCache_, lightBatches_);
 
     OnBatchesReady();

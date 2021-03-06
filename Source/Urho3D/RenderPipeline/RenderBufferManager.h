@@ -35,29 +35,6 @@ namespace Urho3D
 class RenderPipelineInterface;
 struct FrameInfo;
 
-/// Flags that define how primary viewport of RenderPipeline is managed.
-enum class ViewportRenderBufferFlag
-{
-    /// Controls properties that can be inherited from render target
-    /// @{
-    InheritColorFormat = 1 << 0,
-    InheritSRGB = 1 << 1,
-    InheritMultiSampleLevel = 1 << 2,
-    InheritBilinearFiltering = 1 << 3,
-    /// @}
-
-    /// Traits required from output color and depth-stencil buffers
-    /// @{
-    IsReadableColor = 1 << 4,
-    IsReadableDepth = 1 << 5,
-    HasStencil = 1 << 6,
-    SupportOutputColorReadWrite = 1 << 7,
-    UsableWithMultipleRenderTargets = 1 << 8,
-    /// @}
-};
-
-URHO3D_FLAGSET(ViewportRenderBufferFlag, ViewportRenderBufferFlags);
-
 /// Pipeline state, shader parameters and shader resources needed to draw a fullscreen quad.
 /// clipToUVOffsetAndScale_ and invInputSize_ are filled automatically for viewport quad.
 struct DrawQuadParams

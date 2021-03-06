@@ -278,6 +278,14 @@ void SceneProcessor::RenderShadowMaps()
     }
 }
 
+BatchCompositorPass* SceneProcessor::GetUserPass(Object* pass) const
+{
+    assert(pass);
+    if (pass == batchCompositor_.Get())
+        return nullptr;
+    return static_cast<BatchCompositorPass*>(pass);
+}
+
 void SceneProcessor::OnUpdateBegin(const CommonFrameInfo& frameInfo)
 {
     frameInfo_.frameNumber_ = frameInfo.frameNumber_;

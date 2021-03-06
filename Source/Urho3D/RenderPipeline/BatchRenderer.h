@@ -39,18 +39,6 @@ class ShadowSplitProcessor;
 struct PipelineBatchBackToFront;
 struct PipelineBatchByState;
 
-/// Flags that control how exactly batches are rendered.
-enum class BatchRenderFlag
-{
-    None = 0,
-    EnableAmbientLighting = 1 << 0,
-    EnableVertexLights = 1 << 1,
-    EnablePixelLights = 1 << 2,
-    EnableInstancingForStaticGeometry = 1 << 3,
-};
-
-URHO3D_FLAGSET(BatchRenderFlag, BatchRenderFlags);
-
 /// Common parameters of batch rendering
 struct BatchRenderingContext
 {

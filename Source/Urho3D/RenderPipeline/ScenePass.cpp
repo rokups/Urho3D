@@ -24,7 +24,6 @@
 
 #include "../Core/Context.h"
 #include "../Core/StringUtils.h"
-#include "../Core/WorkQueue.h"
 #include "../Graphics/Renderer.h"
 #include "../Graphics/Technique.h"
 #include "../RenderPipeline/ScenePass.h"
@@ -36,38 +35,69 @@
 namespace Urho3D
 {
 
-ForwardLightingScenePass::ForwardLightingScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
+ScenePass::ScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
+    DrawableProcessorPassFlags flags,
     const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass)
-    : BatchCompositorPass(renderPipeline, drawableProcessor,
-        true,
-        Technique::GetPassIndex(unlitBasePass),
-        Technique::GetPassIndex(litBasePass),
-        Technique::GetPassIndex(lightPass))
+    : BatchCompositorPass(renderPipeline, drawableProcessor, flags,
+        Technique::GetPassIndex(unlitBasePass), Technique::GetPassIndex(litBasePass), Technique::GetPassIndex(lightPass))
 {
-    assert(!unlitBasePass.empty());
-    assert(!litBasePass.empty());
-    assert(!lightPass.empty());
 }
 
-void OpaqueForwardLightingScenePass::OnBatchesReady()
+ScenePass::ScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
+    DrawableProcessorPassFlags flags, const ea::string& pass)
+    : BatchCompositorPass(renderPipeline, drawableProcessor, flags,
+        Technique::GetPassIndex(pass), M_MAX_UNSIGNED, M_MAX_UNSIGNED)
+{
+}
+
+BatchRenderFlags UnorderedScenePass::GetBaseRenderFlags() const
+{
+    const DrawableProcessorPassFlags passFlags = GetFlags();
+    BatchRenderFlags result;
+    if (passFlags.Test(DrawableProcessorPassFlag::BasePassNeedsAmbient))
+        result |= BatchRenderFlag::EnableAmbientLighting;
+    if (passFlags.Test(DrawableProcessorPassFlag::BasePassNeedsVertexLights))
+        result |= BatchRenderFlag::EnableVertexLights;
+    if (HasLightPass())
+        result |= BatchRenderFlag::EnablePixelLights;
+    if (!passFlags.Test(DrawableProcessorPassFlag::DisableInstancing))
+        result |= BatchRenderFlag::EnableInstancingForStaticGeometry;
+    return result;
+}
+
+BatchRenderFlags UnorderedScenePass::GetLightRenderFlags() const
+{
+    const DrawableProcessorPassFlags passFlags = GetFlags();
+    BatchRenderFlags result = BatchRenderFlag::EnablePixelLights;
+    if (!passFlags.Test(DrawableProcessorPassFlag::DisableInstancing))
+        result |= BatchRenderFlag::EnableInstancingForStaticGeometry;
+    return result;
+}
+
+void UnorderedScenePass::OnBatchesReady()
 {
     BatchCompositor::SortBatches(sortedBaseBatches_, baseBatches_);
     BatchCompositor::SortBatches(sortedLightBatches_, lightBatches_);
 }
 
-void AlphaForwardLightingScenePass::OnBatchesReady()
+BatchRenderFlags BackToFrontScenePass::GetRenderFlags() const
+{
+    const DrawableProcessorPassFlags passFlags = GetFlags();
+    BatchRenderFlags result;
+    if (passFlags.Test(DrawableProcessorPassFlag::BasePassNeedsAmbient))
+        result |= BatchRenderFlag::EnableAmbientLighting;
+    if (passFlags.Test(DrawableProcessorPassFlag::BasePassNeedsVertexLights))
+        result |= BatchRenderFlag::EnableVertexLights;
+    if (HasLightPass())
+        result |= BatchRenderFlag::EnablePixelLights;
+    if (!passFlags.Test(DrawableProcessorPassFlag::DisableInstancing))
+        result |= BatchRenderFlag::EnableInstancingForStaticGeometry;
+    return result;
+}
+
+void BackToFrontScenePass::OnBatchesReady()
 {
     BatchCompositor::SortBatches(sortedBatches_, baseBatches_, lightBatches_);
-}
-
-UnlitScenePass::UnlitScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor, const ea::string& pass)
-    : BatchCompositorPass(renderPipeline, drawableProcessor, true, Technique::GetPassIndex(pass), M_MAX_UNSIGNED, M_MAX_UNSIGNED)
-{
-}
-
-void UnlitScenePass::OnBatchesReady()
-{
-    BatchCompositor::SortBatches(sortedBatches_, baseBatches_);
 }
 
 }

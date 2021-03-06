@@ -69,8 +69,10 @@ public:
     /// Getters
     /// @{
     const FrameInfo& GetFrameInfo() const { return frameInfo_; }
-    /// Return whether the pass object in callback corresponds to internal pass.
-    bool IsInternalPass(Object* pass) const { return batchCompositor_ == pass; }
+    /// Takes pass object from BatchStateCreateContext.
+    /// Returns user-configured pass (inherited from BatchCompositorPass) if possible.
+    /// Returns nullptr if internal pass from BatchCompositor itself (e.g. shadow or light volume pass).
+    BatchCompositorPass* GetUserPass(Object* pass) const;
     const auto& GetLightVolumeBatches() const { return batchCompositor_->GetLightVolumeBatches(); }
     CameraProcessor* GetCameraProcessor() const { return cameraProcessor_; }
     DrawableProcessor* GetDrawableProcessor() const { return drawableProcessor_; }

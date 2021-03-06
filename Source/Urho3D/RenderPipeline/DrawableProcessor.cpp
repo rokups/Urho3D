@@ -112,10 +112,10 @@ bool IsShadowCasterVisible(const BoundingBox& lightSpaceBoundingBox, Camera* sha
 
 }
 
-DrawableProcessorPass::DrawableProcessorPass(RenderPipelineInterface* renderPipeline, bool needAmbient,
+DrawableProcessorPass::DrawableProcessorPass(RenderPipelineInterface* renderPipeline, DrawableProcessorPassFlags flags,
     unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
     : Object(renderPipeline->GetContext())
-    , needAmbient_(needAmbient)
+    , flags_(flags)
     , unlitBasePassIndex_(unlitBasePassIndex)
     , litBasePassIndex_(litBasePassIndex)
     , lightPassIndex_(lightPassIndex)
@@ -352,7 +352,7 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
                 const DrawableProcessorPass::AddBatchResult result = pass->AddBatch(threadIndex, drawable, i, technique);
                 if (result.litAdded_)
                     isForwardLit = true;
-                if (result.litAdded_ || (result.added_ && pass->NeedAmbient()))
+                if (result.added_ && pass->GetFlags().Test(DrawableProcessorPassFlag::BasePassNeedsAmbient))
                     needAmbient = true;
             }
         }

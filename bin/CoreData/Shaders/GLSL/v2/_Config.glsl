@@ -5,6 +5,11 @@
 
 // =================================== Material configuration ===================================
 
+// Ignored deprecated defines:
+// NOUV: Detected automatically
+// AMBIENT: Useless
+
+// Material defines:
 // NORMALMAP: Whether to apply normal mapping
 // TRANSLUCENT: Whether to use two-sided ligthing for geometries
 // VOLUMETRIC: Whether to use volumetric ligthing for geometries

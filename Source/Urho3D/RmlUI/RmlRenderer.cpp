@@ -190,7 +190,7 @@ void RmlRenderer::RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* i
 
     Material* material = GetBatchMaterial(texture);
     Pass* pass = material->GetDefaultPass();
-    const UIBatchStateKey batchStateKey{ material, pass, UIBatchStencilMode::Ignore, BLEND_ALPHA };
+    const UIBatchStateKey batchStateKey{ material, pass, BLEND_ALPHA };
     PipelineState* pipelineState = batchStateCache_->GetOrCreatePipelineState(batchStateKey, batchStateCreateContext_);
 
     const IntRect scissor = scissorEnabled_ ? scissor_ : IntRect{ IntVector2::ZERO, viewportSize_ };

@@ -133,28 +133,18 @@ private:
     ea::unordered_map<BatchStateLookupKey, CachedBatchState> cache_;
 };
 
-/// Stencil mode for UI batch.
-enum class UIBatchStencilMode
-{
-    Ignore,
-    MarkToStencil,
-    CheckStencil
-};
-
 /// Key used to lookup cached pipeline states for UI batches.
 /// It's assumed that all UI batches use the same vertex and index buffer formats and material pass.
 struct UIBatchStateKey
 {
     Material* material_{};
     Pass* pass_{};
-    UIBatchStencilMode stencilMode_{};
     BlendMode blendMode_{};
 
     bool operator ==(const UIBatchStateKey& rhs) const
     {
         return material_ == rhs.material_
             && pass_ == rhs.pass_
-            && stencilMode_ == rhs.stencilMode_
             && blendMode_ == rhs.blendMode_;
     }
 
@@ -163,7 +153,6 @@ struct UIBatchStateKey
         unsigned hash = 0;
         CombineHash(hash, MakeHash(material_));
         CombineHash(hash, MakeHash(pass_));
-        CombineHash(hash, MakeHash(stencilMode_));
         CombineHash(hash, MakeHash(blendMode_));
         return hash;
     }

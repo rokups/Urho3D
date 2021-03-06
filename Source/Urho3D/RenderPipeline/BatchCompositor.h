@@ -71,13 +71,12 @@ public:
     /// Subpass indices.
     enum : unsigned
     {
-        UnlitBaseSubpass = 0,
-        LitBaseSubpass,
+        BaseSubpass = 0,
         LightSubpass,
     };
 
     BatchCompositorPass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
-        bool needAmbient, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
+        DrawableProcessorPassFlags flags, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
     void ComposeBatches();
 

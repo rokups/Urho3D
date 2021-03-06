@@ -53,6 +53,76 @@ struct CommonFrameInfo
     RenderSurface* renderTarget_{};
 };
 
+/// Traits of scene pass.
+enum class DrawableProcessorPassFlag
+{
+    BasePassNeedsAmbient = 1 << 0,
+    BasePassNeedsVertexLights = 1 << 1,
+    BasePassNeedsAmbientAndVertexLights = BasePassNeedsAmbient | BasePassNeedsVertexLights,
+    DisableInstancing = 1 << 2,
+};
+
+URHO3D_FLAGSET(DrawableProcessorPassFlag, DrawableProcessorPassFlags);
+
+/// Flags that control how exactly batches are rendered.
+enum class BatchRenderFlag
+{
+    None = 0,
+    EnableAmbientLighting = 1 << 0,
+    EnableVertexLights = 1 << 1,
+    EnablePixelLights = 1 << 2,
+    EnableInstancingForStaticGeometry = 1 << 3,
+};
+
+URHO3D_FLAGSET(BatchRenderFlag, BatchRenderFlags);
+
+/// Render buffer traits.
+enum class RenderBufferFlag
+{
+    /// Texture content is preserved between frames.
+    Persistent = 1 << 0,
+    FixedTextureSize = 1 << 1,
+    sRGB = 1 << 2,
+    BilinearFiltering = 1 << 3,
+    CubeMap = 1 << 4,
+    NoMultiSampledAutoResolve = 1 << 5
+};
+
+URHO3D_FLAGSET(RenderBufferFlag, RenderBufferFlags);
+
+/// Flags that define how primary viewport of RenderPipeline is managed.
+enum class ViewportRenderBufferFlag
+{
+    /// Controls properties that can be inherited from render target
+    /// @{
+    InheritColorFormat = 1 << 0,
+    InheritSRGB = 1 << 1,
+    InheritMultiSampleLevel = 1 << 2,
+    InheritBilinearFiltering = 1 << 3,
+    /// @}
+
+    /// Traits required from output color and depth-stencil buffers
+    /// @{
+    IsReadableColor = 1 << 4,
+    IsReadableDepth = 1 << 5,
+    HasStencil = 1 << 6,
+    SupportOutputColorReadWrite = 1 << 7,
+    UsableWithMultipleRenderTargets = 1 << 8,
+    /// @}
+};
+
+URHO3D_FLAGSET(ViewportRenderBufferFlag, ViewportRenderBufferFlags);
+
+/// Traits of post-processing pass
+enum class PostProcessPassFlag
+{
+    None = 0,
+    NeedColorOutputReadAndWrite = 1 << 0,
+    NeedColorOutputBilinear = 1 << 1,
+};
+
+URHO3D_FLAGSET(PostProcessPassFlag, PostProcessPassFlags);
+
 /// Pipeline state cache callback used to create actual pipeline state.
 class BatchStateCacheCallback
 {
@@ -117,7 +187,9 @@ struct DrawableProcessorSettings
     /// @{
     unsigned CalculatePipelineStateHash() const
     {
-        return 0;
+        unsigned hash = 0;
+        CombineHash(hash, maxVertexLights_);
+        return hash;
     }
 
     bool operator==(const DrawableProcessorSettings& rhs) const

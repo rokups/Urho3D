@@ -134,9 +134,9 @@ private:
     SharedPtr<InstancingBuffer> instancingBuffer_;
     SharedPtr<SceneProcessor> sceneProcessor_;
 
-    SharedPtr<OpaqueForwardLightingScenePass> basePass_;
-    SharedPtr<AlphaForwardLightingScenePass> alphaPass_;
-    SharedPtr<UnlitScenePass> deferredPass_;
+    SharedPtr<UnorderedScenePass> basePass_;
+    SharedPtr<BackToFrontScenePass> alphaPass_;
+    SharedPtr<UnorderedScenePass> deferredPass_;
 
     SharedPtr<RenderBuffer> deferredAlbedo_;
     SharedPtr<RenderBuffer> deferredNormal_;
