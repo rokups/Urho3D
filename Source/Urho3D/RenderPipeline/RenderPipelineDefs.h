@@ -90,6 +90,29 @@ enum class RenderBufferFlag
 
 URHO3D_FLAGSET(RenderBufferFlag, RenderBufferFlags);
 
+/// Render buffer parameters. Actual render buffer size is controlled externally.
+struct RenderBufferParams
+{
+    unsigned textureFormat_{};
+    int multiSampleLevel_{ 1 };
+    RenderBufferFlags flags_;
+
+    bool operator==(const RenderBufferParams& rhs) const
+    {
+        return textureFormat_ == rhs.textureFormat_
+            && multiSampleLevel_ == rhs.multiSampleLevel_
+            && flags_ == rhs.flags_;
+    }
+
+    bool operator!=(const RenderBufferParams& rhs) const { return !(*this == rhs); }
+};
+
+/// Settings of render buffer manager.
+/*struct RenderBufferManagerSettings
+{
+    RenderBufferParams outputColorParams_;
+};*/
+
 /// Flags that define how primary viewport of RenderPipeline is managed.
 enum class ViewportRenderBufferFlag
 {

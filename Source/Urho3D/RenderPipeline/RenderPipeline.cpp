@@ -215,12 +215,17 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     else
     {
         const DrawableProcessorPassFlags flags = scenePass->GetFlags();
-        if (flags.Test(DrawableProcessorPassFlag::BasePassNeedsAmbient))
-            commonDefines += "URHO3D_AMBIENT_PASS ";
-        if (flags.Test(DrawableProcessorPassFlag::BasePassNeedsAmbient))
-            commonDefines += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", settings_.maxVertexLights_);
-        if (ctx.subpassIndex_ == BatchCompositorPass::LightSubpass)
+        if (ctx.subpassIndex_ == BatchCompositorPass::BaseSubpass)
+        {
+            if (flags.Test(DrawableProcessorPassFlag::BasePassNeedsAmbient))
+                commonDefines += "URHO3D_AMBIENT_PASS ";
+            if (flags.Test(DrawableProcessorPassFlag::BasePassNeedsVertexLights))
+                commonDefines += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", settings_.maxVertexLights_);
+        }
+        else if (ctx.subpassIndex_ == BatchCompositorPass::LightSubpass)
+        {
             commonDefines += "URHO3D_ADDITIVE_LIGHT_PASS ";
+        }
     }
 
     // Add lightmap
@@ -691,6 +696,7 @@ void RenderPipeline::Render()
     ViewportRenderBufferFlags viewportFlags;
     viewportFlags.Assign(ViewportRenderBufferFlag::SupportOutputColorReadWrite, needColorOutputReadAndWrite);
     viewportFlags.Assign(ViewportRenderBufferFlag::InheritBilinearFiltering, !needColorOutputBilinear);
+    viewportParams.flags_.Assign(RenderBufferFlag::sRGB, settings_.gammaCorrection_);
     viewportParams.flags_.Assign(RenderBufferFlag::BilinearFiltering, needColorOutputBilinear);
 
     if (settings_.deferredLighting_)

@@ -168,6 +168,9 @@ private:
     SharedPtr<RenderBuffer> viewportDepthBuffer_;
 
     SharedPtr<PipelineState> copyTexturePipelineState_;
+    SharedPtr<PipelineState> copyGammaToLinearTexturePipelineState_;
+    SharedPtr<PipelineState> copyLinearToGammaTexturePipelineState_;
+
     SharedPtr<RenderBuffer> substituteRenderBuffers_[2];
     SharedPtr<RenderBuffer> substituteDepthBuffer_;
 

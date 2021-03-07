@@ -558,6 +558,8 @@ void RenderBufferManager::InitializeCopyTexturePipelineState()
 {
     static const char* shaderName = "v2/CopyFramebuffer";
     copyTexturePipelineState_ = CreateQuadPipelineState(BLEND_REPLACE, shaderName, "");
+    copyGammaToLinearTexturePipelineState_ = CreateQuadPipelineState(BLEND_REPLACE, shaderName, "URHO3D_GAMMA_TO_LINEAR");
+    copyLinearToGammaTexturePipelineState_ = CreateQuadPipelineState(BLEND_REPLACE, shaderName, "URHO3D_LINEAR_TO_GAMMA");
 }
 
 void RenderBufferManager::CopyTextureRegion(Texture* sourceTexture, const IntRect& sourceRect,
@@ -569,26 +571,35 @@ void RenderBufferManager::CopyTextureRegion(Texture* sourceTexture, const IntRec
         return;
     }
 
-    if (!copyTexturePipelineState_)
-    {
+    static const char* shaderName = "v2/CopyFramebuffer";
+    if (!copyTexturePipelineState_ || !copyGammaToLinearTexturePipelineState_ || !copyLinearToGammaTexturePipelineState_)
         InitializeCopyTexturePipelineState();
-        if (!copyTexturePipelineState_)
-            return;
-    }
+
+    const bool isSRGBSource = sourceTexture->GetSRGB();
+    const bool isSRGBDestination = RenderSurface::GetSRGB(graphics_, destinationSurface);
+
+    DrawQuadParams callParams;
+    if (isSRGBSource && !isSRGBDestination)
+        callParams.pipelineState_ = copyLinearToGammaTexturePipelineState_;
+    else if (!isSRGBSource && isSRGBDestination)
+        callParams.pipelineState_ = copyGammaToLinearTexturePipelineState_;
+    else
+        callParams.pipelineState_ = copyTexturePipelineState_;
+
+    callParams.invInputSize_ = Vector2::ONE / static_cast<Vector2>(sourceTexture->GetSize());
+    callParams.clipToUVOffsetAndScale_ = CalculateViewportOffsetAndScale(sourceTexture->GetSize(), sourceRect);
+
+    const ShaderResourceDesc shaderResources[] = { { TU_DIFFUSE, sourceTexture } };
+    callParams.resources_ = shaderResources;
+
+    if (!callParams.pipelineState_->IsValid())
+        return;
 
     graphics_->SetRenderTarget(0, destinationSurface);
     for (unsigned i = 1; i < MAX_RENDERTARGETS; ++i)
         graphics_->ResetRenderTarget(i);
     graphics_->SetDepthStencil(renderer_->GetDepthStencil(destinationSurface));
     graphics_->SetViewport(destinationRect);
-
-    DrawQuadParams callParams;
-    callParams.pipelineState_ = copyTexturePipelineState_;
-    callParams.invInputSize_ = Vector2::ONE / static_cast<Vector2>(sourceTexture->GetSize());
-    callParams.clipToUVOffsetAndScale_ = CalculateViewportOffsetAndScale(sourceTexture->GetSize(), sourceRect);
-
-    const ShaderResourceDesc shaderResources[] = { { TU_DIFFUSE, sourceTexture } };
-    callParams.resources_ = shaderResources;
 
     DrawQuad(callParams, flipVertical);
 }

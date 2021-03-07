@@ -115,6 +115,8 @@ void DrawCommandQueue::Execute()
             cmd.pipelineState_->Apply(graphics_);
             currentPipelineState = cmd.pipelineState_;
             currentPrimitiveType = currentPipelineState->GetDesc().primitiveType_;
+            // TODO(renderer): Either remove this reset or remove check for HasTextureUnit below. Profile?
+            currentShaderResources = {};
         }
 
         // Set scissor

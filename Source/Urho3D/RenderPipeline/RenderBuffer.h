@@ -40,23 +40,6 @@ class Texture;
 class Texture2D;
 struct FrameInfo;
 
-/// Render buffer parameters. Actual render buffer size is controlled externally.
-struct RenderBufferParams
-{
-    unsigned textureFormat_{};
-    int multiSampleLevel_{ 1 };
-    RenderBufferFlags flags_;
-
-    bool operator==(const RenderBufferParams& rhs) const
-    {
-        return textureFormat_ == rhs.textureFormat_
-            && multiSampleLevel_ == rhs.multiSampleLevel_
-            && flags_ == rhs.flags_;
-    }
-
-    bool operator!=(const RenderBufferParams& rhs) const { return !(*this == rhs); }
-};
-
 /// Base class fro writable texture or texture region. Readability is not guaranteed.
 class URHO3D_API RenderBuffer : public Object, public IDFamily<RenderBuffer>
 {

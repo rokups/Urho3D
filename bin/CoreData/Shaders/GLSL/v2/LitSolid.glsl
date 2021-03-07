@@ -157,8 +157,11 @@ void main()
             finalColor = diff * lightColor * diffColor.rgb;
         #endif
 
-        #ifdef AMBIENT
+        #ifdef URHO3D_HAS_AMBIENT_LIGHT
             finalColor += vVertexLight * diffColor.rgb;
+        #endif
+
+        #ifdef AMBIENT
             #ifdef LIGHTMAP
                 finalColor += texture2D(sEmissiveMap, vTexCoord2).rgb * 2.0 * diffColor.rgb;
             #elif defined(EMISSIVEMAP)
@@ -166,9 +169,9 @@ void main()
             #else
                 finalColor += cMatEmissiveColor;
             #endif
-            gl_FragColor = vec4(GetFog(LightToGammaSpace(finalColor), fogFactor), diffColor.a);
+            gl_FragColor = vec4(GetFog(finalColor, fogFactor), diffColor.a);
         #else
-            gl_FragColor = vec4(GetLitFog(LightToGammaSpace(finalColor), fogFactor), diffColor.a);
+            gl_FragColor = vec4(GetLitFog(finalColor, fogFactor), diffColor.a);
         #endif
     #elif defined(PASS_DEFERRED)
         // Fill deferred G-buffer
@@ -192,7 +195,7 @@ void main()
             finalColor += cMatEmissiveColor;
         #endif
 
-        gl_FragData[0] = vec4(GetFog(LightToGammaSpace(finalColor), fogFactor), 1.0);
+        gl_FragData[0] = vec4(GetFog(finalColor, fogFactor), 1.0);
         gl_FragData[1] = fogFactor * vec4(diffColor.rgb, specIntensity);
         gl_FragData[2] = vec4(normal * 0.5 + 0.5, specPower);
     #endif

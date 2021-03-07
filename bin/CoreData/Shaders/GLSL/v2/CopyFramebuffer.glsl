@@ -2,6 +2,7 @@
 
 #include "_Config.glsl"
 #include "_Uniforms.glsl"
+#include "_GammaCorrection.glsl"
 #include "_VertexLayout.glsl"
 #include "_VertexTransform.glsl"
 #include "_VertexScreenPos.glsl"
@@ -15,9 +16,7 @@ VERTEX_OUTPUT(vec2 vScreenPos)
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    //mat4 modelMatrix = iModelMatrix;
-    vec3 worldPos = vertexTransform.position;// GetWorldPos(modelMatrix);
-    gl_Position = GetClipPos(worldPos);
+    gl_Position = GetClipPos(vertexTransform.position);
     vScreenPos = GetScreenPosPreDiv(gl_Position);
 }
 #endif
@@ -25,7 +24,14 @@ void main()
 #ifdef URHO3D_PIXEL_SHADER
 void main()
 {
-    gl_FragColor = texture2D(sDiffMap, vScreenPos);
+    vec4 color = texture2D(sDiffMap, vScreenPos);
+    #if defined(URHO3D_GAMMA_TO_LINEAR)
+        gl_FragColor = GammaToLinearSpaceAlpha(color);
+    #elif defined(URHO3D_LINEAR_TO_GAMMA)
+        gl_FragColor = LinearToGammaSpaceAlpha(color);
+    #else
+        gl_FragColor = color;
+    #endif
 }
 #endif
 

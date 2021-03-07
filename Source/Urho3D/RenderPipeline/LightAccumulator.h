@@ -100,10 +100,11 @@ struct LightAccumulator
         if (vertexLightsHash_)
             return;
 
-        const auto compareIndex = [](const LightData& lhs, const LightData& rhs) { return lhs.second < rhs.second; };
-        ea::sort(lights_.begin() + firstVertexLight_, lights_.end(), compareIndex);
-
         const unsigned numLights = lights_.size();
+        const auto compareIndex = [](const LightData& lhs, const LightData& rhs) { return lhs.second < rhs.second; };
+        if (firstVertexLight_ < numLights)
+            ea::sort(lights_.begin() + firstVertexLight_, lights_.end(), compareIndex);
+
         for (unsigned i = firstVertexLight_; i < numLights; ++i)
             CombineHash(vertexLightsHash_, (lights_[i].second + 1) * 2654435761);
         vertexLightsHash_ += !vertexLightsHash_;

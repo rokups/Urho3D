@@ -417,7 +417,7 @@
 				<attribute name="Variables" />
 				<component type="Light" id="54">
 					<attribute name="Color" value="1 0 0 1" />
-					<attribute name="Brightness Multiplier" value="0.300000" />
+					<attribute name="Brightness Multiplier" value="0.600000" />
 					<attribute name="Range" value="1.500000" />
 					<attribute name="Light Shape Texture" value="TextureCube;" />
 				</component>
@@ -432,7 +432,7 @@
 				<attribute name="Variables" />
 				<component type="Light" id="56">
 					<attribute name="Color" value="1 0.921429 0 1" />
-					<attribute name="Brightness Multiplier" value="0.300000" />
+					<attribute name="Brightness Multiplier" value="0.600000" />
 					<attribute name="Range" value="1.500000" />
 					<attribute name="Light Shape Texture" value="TextureCube;" />
 				</component>
@@ -447,7 +447,7 @@
 				<attribute name="Variables" />
 				<component type="Light" id="58">
 					<attribute name="Color" value="0 1 0.742857 1" />
-					<attribute name="Brightness Multiplier" value="0.300000" />
+					<attribute name="Brightness Multiplier" value="0.600000" />
 					<attribute name="Range" value="1.500000" />
 					<attribute name="Light Shape Texture" value="TextureCube;" />
 				</component>
@@ -462,7 +462,7 @@
 				<attribute name="Variables" />
 				<component type="Light" id="60">
 					<attribute name="Color" value="0 0.592857 1 1" />
-					<attribute name="Brightness Multiplier" value="0.300000" />
+					<attribute name="Brightness Multiplier" value="0.600000" />
 					<attribute name="Range" value="1.500000" />
 					<attribute name="Light Shape Texture" value="TextureCube;" />
 				</component>
@@ -477,7 +477,7 @@
 				<attribute name="Variables" />
 				<component type="Light" id="62">
 					<attribute name="Color" value="0.885714 0 1 1" />
-					<attribute name="Brightness Multiplier" value="0.300000" />
+					<attribute name="Brightness Multiplier" value="0.600000" />
 					<attribute name="Range" value="1.500000" />
 					<attribute name="Light Shape Texture" value="TextureCube;" />
 				</component>
@@ -492,7 +492,7 @@
 				<attribute name="Variables" />
 				<component type="Light" id="64">
 					<attribute name="Color" value="0 0.85 1 1" />
-					<attribute name="Brightness Multiplier" value="0.300000" />
+					<attribute name="Brightness Multiplier" value="0.600000" />
 					<attribute name="Range" value="1.500000" />
 					<attribute name="Light Shape Texture" value="TextureCube;" />
 				</component>
