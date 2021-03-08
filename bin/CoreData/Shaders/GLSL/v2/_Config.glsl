@@ -3,45 +3,103 @@
 
 #extension GL_ARB_shading_language_420pack: enable
 
-// =================================== Material configuration ===================================
-
 // Ignored deprecated defines:
-// NOUV: Detected automatically
-// AMBIENT: Useless
+// - NOUV: Detected automatically;
+// - AMBIENT: Useless;
 
 // Material defines:
-// NORMALMAP: Whether to apply normal mapping
-// TRANSLUCENT: Whether to use two-sided ligthing for geometries
-// VOLUMETRIC: Whether to use volumetric ligthing for geometries
+// - NORMALMAP: Whether to apply normal mapping;
+// - TRANSLUCENT: Whether to use two-sided ligthing for geometries (forward lighting only);
+// - VOLUMETRIC: Whether to use volumetric ligthing for geometries (forward lighting only);
+// - UNLIT: Whether all lighting calculations should be ignored;
 
-// URHO3D_NORMAL_MAPPING: Whether to apply normal mapping
-#if defined(NORMALMAP) && defined(URHO3D_VERTEX_HAS_NORMAL) && defined(URHO3D_VERTEX_HAS_TANGENT)
-    #define URHO3D_NORMAL_MAPPING
+// =================================== Global configuration ===================================
+
+#ifdef COMPILEVS
+    #define URHO3D_VERTEX_SHADER
+#endif
+#ifdef COMPILEPS
+    #define URHO3D_PIXEL_SHADER
 #endif
 
-// URHO3D_NEED_SECONDARY_TEXCOORD: Whether vertex needs second UV coordinate
-#if defined(AO) || defined(URHO3D_HAS_LIGHTMAP) || defined(URHO3D_GEOMETRY_BILLBOARD) || defined(URHO3D_GEOMETRY_DIRBILLBOARD)
-    #define URHO3D_NEED_SECONDARY_TEXCOORD
+// URHO3D_HAS_LIGHT: Whether there's lighting in any form.
+// URHO3D_NORMAL_MAPPING: Whether to apply normal mapping.
+#if !defined(UNLIT) && !defined(URHO3D_SHADOW_PASS)
+    #define URHO3D_HAS_LIGHT
+
+    #ifdef NORMALMAP
+        #define URHO3D_NORMAL_MAPPING
+    #endif
 #endif
 
-// URHO3D_SURFACE_ONE_SIDED: Normal is clamped when calculating lighting. Ignored in deferred rendering.
-// URHO3D_SURFACE_TWO_SIDED: Normal is mirrored when calculating lighting. Ignored in deferred rendering.
-// URHO3D_SURFACE_VOLUMETRIC: Normal is ignored when calculating lighting. Ignored in deferred rendering.
-// CONVERT_N_DOT_L: Conversion function
-#if defined(VOLUMETRIC)
-    #define URHO3D_SURFACE_VOLUMETRIC
-    #define CONVERT_N_DOT_L(NdotL) 1.0
-#elif defined(TRANSLUCENT)
-    #define URHO3D_SURFACE_TWO_SIDED
-    #define CONVERT_N_DOT_L(NdotL) abs(NdotL)
-#else
-    #define URHO3D_SURFACE_ONE_SIDED
-    #define CONVERT_N_DOT_L(NdotL) max(0.0, NdotL)
+// =================================== Vertex layout configuration ===================================
+
+#ifdef URHO3D_VERTEX_SHADER
+    // URHO3D_VERTEX_NORMAL_AVAILABLE: Whether vertex normal in object space is available.
+    // URHO3D_VERTEX_TANGENT_AVAILABLE: Whether vertex tangent in object space is available.
+    // Some geometry types may deduce vertex tangent or normal and don't need them present in actual vertex layout.
+    // Don't rely on URHO3D_VERTEX_HAS_NORMAL and URHO3D_VERTEX_HAS_TANGENT.
+    #if defined(URHO3D_GEOMETRY_BILLBOARD) || defined(URHO3D_GEOMETRY_DIRBILLBOARD) || defined(URHO3D_GEOMETRY_TRAIL_FACE_CAMERA) || defined(URHO3D_GEOMETRY_TRAIL_BONE)
+        #define URHO3D_VERTEX_NORMAL_AVAILABLE
+        #define URHO3D_VERTEX_TANGENT_AVAILABLE
+    #else
+        #ifdef URHO3D_VERTEX_HAS_NORMAL
+            #define URHO3D_VERTEX_NORMAL_AVAILABLE
+        #endif
+        #ifdef URHO3D_VERTEX_HAS_TANGENT
+            #define URHO3D_VERTEX_TANGENT_AVAILABLE
+        #endif
+    #endif
+
+    // URHO3D_VERTEX_TRANSFORM_NEED_NORMAL: Whether VertexTransform need world-space normal.
+    // Could be defined by user externally.
+    #if defined(URHO3D_VERTEX_NORMAL_AVAILABLE) && (defined(URHO3D_HAS_LIGHT) || defined(URHO3D_SHADOW_NORMAL_OFFSET))
+        #ifndef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
+            #define URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
+        #endif
+    #endif
+
+    // URHO3D_VERTEX_TRANSFORM_NEED_TANGENT: Whether VertexTransform need world-space tangent and binormal.
+    // Could be defined by user externally.
+    #if defined(URHO3D_VERTEX_TANGENT_AVAILABLE) && defined(URHO3D_NORMAL_MAPPING)
+        #ifndef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
+            #define URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
+        #endif
+    #endif
+
+    // Disable shadow normal offset if there's no normal
+    #if defined(URHO3D_SHADOW_NORMAL_OFFSET) && !defined(URHO3D_VERTEX_NORMAL_AVAILABLE)
+        #undef URHO3D_SHADOW_NORMAL_OFFSET
+    #endif
 #endif
 
-// URHO3D_HAS_AMBIENT_LIGHT: Whether the shader need to process ambient and/or vertex lighting
-#if defined(URHO3D_AMBIENT_PASS) || defined(URHO3D_NUM_VERTEX_LIGHTS)
-    #define URHO3D_HAS_AMBIENT_LIGHT
+// =================================== Lighting configuration ===================================
+
+#if defined(URHO3D_HAS_LIGHT)
+    // URHO3D_SURFACE_ONE_SIDED: Normal is clamped when calculating lighting. Ignored in deferred rendering.
+    // URHO3D_SURFACE_TWO_SIDED: Normal is mirrored when calculating lighting. Ignored in deferred rendering.
+    // URHO3D_SURFACE_VOLUMETRIC: Normal is ignored when calculating lighting. Ignored in deferred rendering.
+    // CONVERT_N_DOT_L: Conversion function.
+    #if defined(VOLUMETRIC)
+        #define URHO3D_SURFACE_VOLUMETRIC
+        #define CONVERT_N_DOT_L(NdotL) 1.0
+    #elif defined(TRANSLUCENT)
+        #define URHO3D_SURFACE_TWO_SIDED
+        #define CONVERT_N_DOT_L(NdotL) abs(NdotL)
+    #else
+        #define URHO3D_SURFACE_ONE_SIDED
+        #define CONVERT_N_DOT_L(NdotL) max(0.0, NdotL)
+    #endif
+
+    // URHO3D_HAS_AMBIENT_OR_VERTEX_LIGHT: Whether the shader need to process ambient and/or vertex lighting.
+    #if defined(URHO3D_AMBIENT_PASS) || defined(URHO3D_NUM_VERTEX_LIGHTS)
+        #define URHO3D_HAS_AMBIENT_OR_VERTEX_LIGHT
+    #endif
+
+    // URHO3D_HAS_PIXEL_LIGHT: Whether the shader need to process per-pixel lighting.
+    #if !defined(URHO3D_SHADOW_PASS) && (defined(URHO3D_LIGHT_DIRECTIONAL) || defined(URHO3D_LIGHT_POINT) || defined(URHO3D_LIGHT_SPOT))
+        #define URHO3D_HAS_PIXEL_LIGHT
+    #endif
 #endif
 
 // =================================== Platform configuration ===================================
@@ -53,9 +111,7 @@
 // URHO3D_VERTEX_SHADER: Defined for vertex shader
 // VERTEX_INPUT: Declare vertex input variable
 // VERTEX_OUTPUT: Declare vertex output variable
-#ifdef COMPILEVS
-    #define URHO3D_VERTEX_SHADER
-
+#ifdef URHO3D_VERTEX_SHADER
     #ifdef GL3
         #define VERTEX_INPUT(decl) in decl;
         #define VERTEX_OUTPUT(decl) out decl;
@@ -67,9 +123,7 @@
 
 // URHO3D_PIXEL_SHADER: Defined for pixel shader
 // VERTEX_OUTPUT: Declared vertex shader output
-#ifdef COMPILEPS
-    #define URHO3D_PIXEL_SHADER
-
+#ifdef URHO3D_PIXEL_SHADER
     #ifdef GL3
         #define VERTEX_OUTPUT(decl) in decl;
     #else

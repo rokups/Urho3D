@@ -382,7 +382,10 @@ void BatchCompositor::BeginShadowBatchesComposition(unsigned lightIndex, ShadowS
 
             PipelineState* pipelineState = shadowCache_.GetPipelineState(key);
             if (pipelineState)
-                shadowBatches.push_back(CreatePipelineBatch(key, pipelineState, CreateBatchTag::Unlit));
+            {
+                if (pipelineState->IsValid())
+                    shadowBatches.push_back(CreatePipelineBatch(key, pipelineState, CreateBatchTag::Unlit));
+            }
             else
                 delayedShadowBatches_.PushBack(threadIndex, { splitProcessor, key });
         }

@@ -7,27 +7,6 @@
 
 #ifdef URHO3D_VERTEX_SHADER
 
-// Fake normal and tangent defines for some geometry types because they are calculated
-#if defined(URHO3D_GEOMETRY_BILLBOARD) || defined(URHO3D_GEOMETRY_DIRBILLBOARD) || defined(URHO3D_GEOMETRY_TRAIL_FACE_CAMERA) || defined(URHO3D_GEOMETRY_TRAIL_BONE)
-    #ifndef URHO3D_VERTEX_HAS_NORMAL
-        #define URHO3D_VERTEX_HAS_NORMAL
-    #endif
-    #ifndef URHO3D_VERTEX_HAS_TANGENT
-        #define URHO3D_VERTEX_HAS_TANGENT
-    #endif
-#endif
-
-// URHO3D_IGNORE_NORMAL: Whether shader is not interested in vertex normal
-// TODO(renderer): Check for unlit here
-#if !defined(URHO3D_VERTEX_HAS_NORMAL)
-    #define URHO3D_IGNORE_NORMAL
-#endif
-
-// URHO3D_IGNORE_TANGENT: Whether shader is not interested in vertex tangent
-#if defined(URHO3D_IGNORE_NORMAL) || !defined(URHO3D_VERTEX_HAS_TANGENT) || !defined(URHO3D_NORMAL_MAPPING)
-    #define URHO3D_IGNORE_TANGENT
-#endif
-
 /// Return normal matrix from model matrix.
 mat3 GetNormalMatrix(mat4 modelMatrix)
 {
@@ -44,15 +23,11 @@ vec2 GetTransformedTexCoord()
     #endif
 }
 
-#ifdef URHO3D_NEED_SECONDARY_TEXCOORD
-    /// Return transformed secondary UV coordinate.
-    vec2 GetTransformedTexCoord1()
+#ifdef URHO3D_HAS_LIGHTMAP
+    /// Return transformed secondary UV coordinate for ligthmap.
+    vec2 GetLightMapTexCoord()
     {
-        #ifdef URHO3D_HAS_LIGHTMAP
-            return iTexCoord1 * cLMOffset.xy + cLMOffset.zw;
-        #else
-            return iTexCoord1;
-        #endif
+        return iTexCoord1 * cLMOffset.xy + cLMOffset.zw;
     }
 #endif
 
@@ -76,11 +51,11 @@ struct VertexTransform
 {
     /// Vertex position in world space
     vec3 position;
-#ifndef URHO3D_IGNORE_NORMAL
+#ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
     /// Vertex normal in world space
     vec3 normal;
 #endif
-#ifndef URHO3D_IGNORE_TANGENT
+#ifdef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
     /// Vertex tangent in world space
     vec3 tangent;
     /// Vertex bitangent in world space
@@ -105,6 +80,23 @@ struct VertexTransform
     }
 #else
     #define GetModelMatrix() cModel
+#endif
+
+/// Apply normal offset to position in world space.
+#ifdef URHO3D_SHADOW_NORMAL_OFFSET
+    void ApplyShadowNormalOffset(inout vec3 position, vec3 normal)
+    {
+        #ifdef URHO3D_LIGHT_DIRECTIONAL
+            vec3 lightDir = cLightDir;
+        #else
+            vec3 lightDir = normalize(cLightPos.xyz - position);
+        #endif
+        float lightAngleCos = dot(normal, lightDir);
+        float lightAngleSin = sqrt(1.0 - lightAngleCos * lightAngleCos);
+        position -= normal * lightAngleSin * cNormalOffsetScale;
+    }
+#else
+    #define ApplyShadowNormalOffset(position, normal)
 #endif
 
 /// Return vertex transform in world space. Expected vertex inputs are listed below:
@@ -140,19 +132,13 @@ struct VertexTransform
         VertexTransform result;
         result.position = (iPos * modelMatrix).xyz;
 
-        #ifndef URHO3D_IGNORE_NORMAL
+        #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
             mat3 normalMatrix = GetNormalMatrix(modelMatrix);
             result.normal = normalize(iNormal * normalMatrix);
 
-            #ifdef NORMALOFFSET
-                // TODO(renderer): Support other light types
-                vec3 lightDir = cLightDir;
-                float lightAngleCos = dot(result.normal, lightDir);
-                float lightAngleSin = sqrt(1.0 - lightAngleCos * lightAngleCos);
-                result.position -= result.normal * lightAngleSin * cNormalOffsetScale;
-            #endif
+            ApplyShadowNormalOffset(result.position, result.normal);
 
-            #ifndef URHO3D_IGNORE_TANGENT
+            #ifdef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
                 result.tangent = normalize(iTangent.xyz * normalMatrix);
                 result.bitangent = cross(result.tangent, result.normal) * iTangent.w;
             #endif
@@ -169,10 +155,12 @@ struct VertexTransform
         result.position = (iPos * modelMatrix).xyz;
         result.position += vec3(iTexCoord1.x, iTexCoord1.y, 0.0) * cBillboardRot;
 
-        #ifndef URHO3D_IGNORE_NORMAL
+        #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
             result.normal = vec3(-cBillboardRot[0][2], -cBillboardRot[1][2], -cBillboardRot[2][2]);
 
-            #ifndef URHO3D_IGNORE_TANGENT
+            ApplyShadowNormalOffset(result.position, result.normal);
+
+            #ifdef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
                 result.tangent = vec3(cBillboardRot[0][0], cBillboardRot[1][0], cBillboardRot[2][0]);
                 result.bitangent = vec3(cBillboardRot[0][1], cBillboardRot[1][1], cBillboardRot[2][1]);
             #endif
@@ -203,10 +191,12 @@ struct VertexTransform
         mat3 rotation = GetFaceCameraRotation(result.position, iNormal);
         result.position += vec3(iTexCoord1.x, 0.0, iTexCoord1.y) * rotation;
 
-        #ifndef URHO3D_IGNORE_NORMAL
+        #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
             result.normal = vec3(rotation[0][1], rotation[1][1], rotation[2][1]);
 
-            #ifndef URHO3D_IGNORE_TANGENT
+            ApplyShadowNormalOffset(result.position, result.normal);
+
+            #ifdef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
                 result.tangent = vec3(rotation[0][0], rotation[1][0], rotation[2][0]);
                 result.bitangent = vec3(rotation[0][2], rotation[1][2], rotation[2][2]);
             #endif
@@ -223,10 +213,12 @@ struct VertexTransform
         VertexTransform result;
         result.position = (vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix).xyz;
 
-        #ifndef URHO3D_IGNORE_NORMAL
+        #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
             result.normal = normalize(cross(right, iTangent.xyz));
 
-            #ifndef URHO3D_IGNORE_TANGENT
+            ApplyShadowNormalOffset(result.position, result.normal);
+
+            #ifdef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
                 result.tangent = iTangent.xyz;
                 result.bitangent = right;
             #endif
@@ -245,10 +237,12 @@ struct VertexTransform
         VertexTransform result;
         result.position = (vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix).xyz;
 
-        #ifndef URHO3D_IGNORE_NORMAL
+        #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
             result.normal = up;
 
-            #ifndef URHO3D_IGNORE_TANGENT
+            ApplyShadowNormalOffset(result.position, result.normal);
+
+            #ifdef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
                 result.tangent = front;
                 result.bitangent = normalize(cross(result.tangent, result.normal));
             #endif

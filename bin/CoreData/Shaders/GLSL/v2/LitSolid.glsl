@@ -14,7 +14,7 @@ VERTEX_OUTPUT(vec2 vTexCoord)
     VERTEX_OUTPUT(vec4 vTangent)
     VERTEX_OUTPUT(vec2 vBitangentXY)
 #endif
-#ifdef URHO3D_NEED_SECONDARY_TEXCOORD
+#ifdef URHO3D_HAS_LIGHTMAP
     VERTEX_OUTPUT(vec2 vTexCoord2)
 #endif
 #ifdef URHO3D_VERTEX_HAS_COLOR
@@ -64,11 +64,11 @@ void main()
         vBitangentXY = vertexTransform.bitangent.xy;
     #endif
 
-    #ifdef URHO3D_NEED_SECONDARY_TEXCOORD
-        vTexCoord2 = GetTransformedTexCoord1();
+    #ifdef URHO3D_HAS_LIGHTMAP
+        vTexCoord2 = GetLightMapTexCoord();
     #endif
 
-    #ifdef URHO3D_HAS_AMBIENT_LIGHT
+    #ifdef URHO3D_HAS_AMBIENT_OR_VERTEX_LIGHT
         vVertexLight = GetAmbientAndVertexLights(vertexTransform.position, vertexTransform.normal);
     #endif
 
@@ -157,7 +157,7 @@ void main()
             finalColor = diff * lightColor * diffColor.rgb;
         #endif
 
-        #ifdef URHO3D_HAS_AMBIENT_LIGHT
+        #ifdef URHO3D_HAS_AMBIENT_OR_VERTEX_LIGHT
             finalColor += vVertexLight * diffColor.rgb;
         #endif
 

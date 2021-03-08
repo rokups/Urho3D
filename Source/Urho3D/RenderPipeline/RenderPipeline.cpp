@@ -211,6 +211,10 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         desc.constantDepthBias_ = desc.constantDepthBias_ * multiplier + addition;
         desc.slopeScaledDepthBias_ *= multiplier;
 #endif
+
+        commonDefines += "URHO3D_SHADOW_PASS ";
+        if (light->GetShadowBias().normalOffset_ > 0.0)
+            vertexShaderDefines += "URHO3D_SHADOW_NORMAL_OFFSET ";
     }
     else
     {
@@ -225,6 +229,16 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         else if (ctx.subpassIndex_ == BatchCompositorPass::LightSubpass)
         {
             commonDefines += "URHO3D_ADDITIVE_LIGHT_PASS ";
+        }
+
+        if (light)
+        {
+            static const ea::string lightTypeDefines[] = {
+                "URHO3D_LIGHT_DIRECTIONAL ",
+                "URHO3D_LIGHT_POINT ",
+                "URHO3D_LIGHT_SPOT "
+            };
+            commonDefines += lightTypeDefines[static_cast<int>(light->GetLightType())];
         }
     }
 
@@ -261,16 +275,20 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
     for (const VertexElement& element : desc.vertexElements_)
     {
         if (element.index_ != 0)
+        {
+            if (element.semantic_ == SEM_TEXCOORD && element.index_ == 1)
+                vertexShaderDefines += "URHO3D_VERTEX_HAS_TEXCOORD1 ";
             continue;
+        }
 
         switch (element.semantic_)
         {
         case SEM_NORMAL:
-            commonDefines += "URHO3D_VERTEX_HAS_NORMAL ";
+            vertexShaderDefines += "URHO3D_VERTEX_HAS_NORMAL ";
             break;
 
         case SEM_TANGENT:
-            commonDefines += "URHO3D_VERTEX_HAS_TANGENT ";
+            vertexShaderDefines += "URHO3D_VERTEX_HAS_TANGENT ";
             break;
 
         case SEM_COLOR:
@@ -665,6 +683,9 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
 void RenderPipeline::Update(const FrameInfo& frameInfo)
 {
+    frameInfo_.frameNumber_ = frameInfo.frameNumber_;
+    frameInfo_.timeStep_ = frameInfo.timeStep_;
+
     // Begin update. Should happen before pipeline state hash check.
     shadowMapAllocator_->ResetAllShadowMaps();
     OnUpdateBegin(this, frameInfo_);

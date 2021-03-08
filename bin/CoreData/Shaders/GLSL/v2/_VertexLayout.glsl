@@ -13,7 +13,7 @@ VERTEX_INPUT(vec4 iPos)
     VERTEX_INPUT(vec4 iBlendWeights)
     VERTEX_INPUT(ivec4_attrib iBlendIndices)
 #endif
-#ifdef URHO3D_NEED_SECONDARY_TEXCOORD
+#ifdef URHO3D_VERTEX_HAS_TEXCOORD1
     VERTEX_INPUT(vec2 iTexCoord1)
 #endif
 
