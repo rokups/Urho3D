@@ -47,6 +47,18 @@ namespace
 /// Cube shadow map padding, in pixels.
 const float cubeShadowMapPadding = 2.0f;
 
+/// Calculate size of shadow map region that is actually used for rendering, all padding is excluded.
+float GetEffectiveShadowMapWidth(LightType lightType, float shadowMapWidth)
+{
+    // Ensure zoom out of 2 pixels to eliminate border filtering issues
+    // For point lights use 4 pixels, as they must not cross sides of the virtual cube map (maximum 3x3 PCF)
+    // TODO(renderer): Revisit this place when PCF with larger kernel is supported
+    if (lightType != LIGHT_POINT)
+        return shadowMapWidth - 2.0f;
+    else
+        return shadowMapWidth - 2.0f * cubeShadowMapPadding;
+}
+
 /// Calculate view size for given min view size and light parameters
 Vector2 CalculateViewSize(const Vector2& minViewSize, const FocusParameters& params)
 {
@@ -197,8 +209,9 @@ void ShadowSplitProcessor::FinalizeShadow(const ShadowMapRegion& shadowMap)
     shadowMap_ = shadowMap;
 
     const auto shadowMapWidth = static_cast<float>(shadowMap_.rect_.Width());
+    const LightType lightType = light_->GetLightType();
 
-    if (light_->GetLightType() == LIGHT_DIRECTIONAL)
+    if (lightType == LIGHT_DIRECTIONAL)
     {
         BoundingBox shadowBox;
         shadowBox.max_.y_ = shadowCamera_->GetOrthoSize() * 0.5f;
@@ -210,21 +223,12 @@ void ShadowSplitProcessor::FinalizeShadow(const ShadowMapRegion& shadowMap)
         AdjustDirectionalLightCamera(shadowBox, shadowMapWidth);
     }
 
-    // Perform a finalization step for all lights: ensure zoom out of 2 pixels to eliminate border filtering issues
-    // For point lights use 4 pixels, as they must not cross sides of the virtual cube map (maximum 3x3 PCF)
-    if (light_->GetLightType() != LIGHT_POINT)
-        shadowCamera_->SetZoom(((shadowMapWidth - 2.0f) / shadowMapWidth));
-    else
-    {
-        const float scale = (shadowMapWidth - 2.0f * cubeShadowMapPadding) / shadowMapWidth;
-        shadowCamera_->SetZoom(scale);
-    }
+    const float effectiveShadowMapWidth = GetEffectiveShadowMapWidth(lightType, shadowMapWidth);
+    shadowCamera_->SetZoom(effectiveShadowMapWidth / shadowMapWidth);
 
-    if (light_->GetLightType() == LIGHT_DIRECTIONAL)
-    {
-        const float cameraSize = shadowCamera_->GetOrthoSize() * ea::max(1.0f, shadowCamera_->GetAspectRatio());
-        shadowMapWorldSpaceTexelSize_ = cameraSize / shadowMapWidth / shadowCamera_->GetZoom();
-    }
+    // Estimate shadow map texel size. Exact size for directional light, upper bound for point and spot lights.
+    const Vector2 cameraSize = shadowCamera_->GetViewSizeAt(shadowCamera_->GetFarClip());
+    shadowMapWorldSpaceTexelSize_ = ea::max(cameraSize.x_, cameraSize.y_) / shadowMapWidth;
 }
 
 void ShadowSplitProcessor::InitializeBaseDirectionalCamera(Camera* cullCamera)

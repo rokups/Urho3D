@@ -204,6 +204,8 @@ public:
     /// Return half view size.
     /// @property
     float GetHalfViewSize() const;
+    /// Return dimensions of camera frustum at given distance.
+    Vector2 GetViewSizeAt(float z) const;
     /// Return frustum split by custom near and far clip distances.
     Frustum GetSplitFrustum(float nearClip, float farClip) const;
     /// Return frustum in view space.

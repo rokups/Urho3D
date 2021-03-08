@@ -23,7 +23,10 @@ VERTEX_OUTPUT(vec2 vTexCoord)
 
 VERTEX_OUTPUT(vec3 vNormal)
 VERTEX_OUTPUT(vec4 vWorldPos)
-VERTEX_OUTPUT(vec3 vVertexLight)
+
+#ifdef URHO3D_HAS_AMBIENT_OR_VERTEX_LIGHT
+    VERTEX_OUTPUT(vec3 vVertexLight)
+#endif
 #ifdef PERPIXEL
     #ifdef SHADOW
         #ifndef GL_ES
@@ -49,7 +52,7 @@ VERTEX_OUTPUT(vec3 vVertexLight)
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-        gl_Position = WorldToClipSpace(vertexTransform.position);
+    gl_Position = WorldToClipSpace(vertexTransform.position);
 
     vTexCoord = GetTransformedTexCoord();
     vNormal = vertexTransform.normal;

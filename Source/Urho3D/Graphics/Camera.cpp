@@ -520,6 +520,16 @@ float Camera::GetHalfViewSize() const
         return orthoSize_ * 0.5f / zoom_;
 }
 
+Vector2 Camera::GetViewSizeAt(float z) const
+{
+    const float halfHeight = GetHalfViewSize();
+    const Vector2 halfSize{ aspectRatio_ * halfHeight, halfHeight };
+    if (orthographic_)
+        return halfSize;
+    else
+        return halfSize * z;
+}
+
 float Camera::GetDistance(const Vector3& worldPos) const
 {
     if (!orthographic_)
