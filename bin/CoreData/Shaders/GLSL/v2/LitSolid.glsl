@@ -5,36 +5,34 @@
 #include "_PixelOutput.glsl"
 #include "_GammaCorrection.glsl"
 #include "_AmbientLighting.glsl"
-#include "Samplers.glsl"
+#include "_Samplers.glsl"
+#include "_Shadow.glsl"
 #include "Lighting.glsl"
 #include "Fog.glsl"
 
 VERTEX_OUTPUT(vec2 vTexCoord)
-#ifdef URHO3D_NORMAL_MAPPING
-    VERTEX_OUTPUT(vec4 vTangent)
-    VERTEX_OUTPUT(vec2 vBitangentXY)
-#endif
 #ifdef URHO3D_HAS_LIGHTMAP
     VERTEX_OUTPUT(vec2 vTexCoord2)
 #endif
 #ifdef URHO3D_VERTEX_HAS_COLOR
     VERTEX_OUTPUT(vec4 vColor)
 #endif
+#ifdef URHO3D_NORMAL_MAPPING
+    VERTEX_OUTPUT(vec4 vTangent)
+    VERTEX_OUTPUT(vec2 vBitangentXY)
+#endif
 
 VERTEX_OUTPUT(vec3 vNormal)
 VERTEX_OUTPUT(vec4 vWorldPos)
 
 #ifdef URHO3D_HAS_AMBIENT_OR_VERTEX_LIGHT
-    VERTEX_OUTPUT(vec3 vVertexLight)
+    VERTEX_OUTPUT(vec3 vAmbientAndVertexLigthing)
 #endif
+#ifdef URHO3D_HAS_SHADOW
+    VERTEX_OUTPUT(optional_highp vec4 vShadowPos[URHO3D_SHADOW_NUM_CASCADES])
+#endif
+
 #ifdef PERPIXEL
-    #ifdef SHADOW
-        #ifndef GL_ES
-            VERTEX_OUTPUT(vec4 vShadowPos[NUMCASCADES])
-        #else
-            VERTEX_OUTPUT(highp vec4 vShadowPos[NUMCASCADES])
-        #endif
-    #endif
     #ifdef SPOTLIGHT
         VERTEX_OUTPUT(vec4 vSpotPos)
     #endif
@@ -52,11 +50,11 @@ VERTEX_OUTPUT(vec4 vWorldPos)
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    gl_Position = WorldToClipSpace(vertexTransform.position);
+    gl_Position = WorldToClipSpace(vertexTransform.position.xyz);
 
     vTexCoord = GetTransformedTexCoord();
     vNormal = vertexTransform.normal;
-    vWorldPos = vec4(vertexTransform.position, GetDepth(gl_Position));
+    vWorldPos = vec4(vertexTransform.position.xyz, GetDepth(gl_Position));
 
     #ifdef URHO3D_VERTEX_HAS_COLOR
         vColor = iColor;
@@ -72,22 +70,19 @@ void main()
     #endif
 
     #ifdef URHO3D_HAS_AMBIENT_OR_VERTEX_LIGHT
-        vVertexLight = GetAmbientAndVertexLights(vertexTransform.position, vertexTransform.normal);
+        vAmbientAndVertexLigthing = GetAmbientAndVertexLights(vertexTransform.position.xyz, vertexTransform.normal);
     #endif
 
-    vec4 projWorldPos = vec4(vertexTransform.position, 1.0);
-    #ifdef SHADOW
-        // Shadow projection: transform from world space to shadow space
-        for (int i = 0; i < NUMCASCADES; i++)
-            vShadowPos[i] = GetShadowPos(i, vNormal, projWorldPos);
+    #ifdef URHO3D_HAS_SHADOW
+        WorldSpaceToShadowCoord(vShadowPos, vertexTransform.position);
     #endif
 
     #ifdef SPOTLIGHT
-        vSpotPos = projWorldPos * cLightMatrices[0];
+        vSpotPos = vertexTransform.position * cLightMatrices[0];
     #endif
 
     #ifdef POINTLIGHT
-        vCubeMaskVec = (vertexTransform.position - cLightPos.xyz) * mat3(cLightMatrices[0][0].xyz, cLightMatrices[0][1].xyz, cLightMatrices[0][2].xyz);
+        vCubeMaskVec = (vertexTransform.position.xyz - cLightPos.xyz) * mat3(cLightMatrices[0][0].xyz, cLightMatrices[0][1].xyz, cLightMatrices[0][2].xyz);
     #endif
 }
 #endif
@@ -142,7 +137,7 @@ void main()
         float diff = GetDiffuse(normal, vWorldPos.xyz, lightDir);
 
         #ifdef SHADOW
-            diff *= GetShadow(vShadowPos, vWorldPos.w);
+            diff *= GetForwardShadow(vShadowPos, vWorldPos.w);
         #endif
 
         #if defined(SPOTLIGHT)
@@ -161,7 +156,7 @@ void main()
         #endif
 
         #ifdef URHO3D_HAS_AMBIENT_OR_VERTEX_LIGHT
-            finalColor += vVertexLight * diffColor.rgb;
+            finalColor += vAmbientAndVertexLigthing * diffColor.rgb;
         #endif
 
         #ifdef AMBIENT
@@ -181,7 +176,7 @@ void main()
         float specIntensity = specColor.g;
         float specPower = cMatSpecColor.a / 255.0;
 
-        vec3 finalColor = vVertexLight * diffColor.rgb;
+        vec3 finalColor = vAmbientAndVertexLigthing * diffColor.rgb;
         /*#ifdef AO
             // If using AO, the vertex light ambient is black, calculate occluded ambient here
             finalColor += texture2D(sEmissiveMap, vTexCoord2).rgb * cAmbientColor.rgb * diffColor.rgb;

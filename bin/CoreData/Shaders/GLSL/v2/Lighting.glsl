@@ -297,7 +297,7 @@ float GetDirShadowDeferred(vec4 projWorldPos, vec3 normal, float depth)
 #endif
 #endif
 
-#ifndef GL_ES
+/*#ifndef GL_ES
 float GetShadow(const vec4 iShadowPos[NUMCASCADES], float depth)
 #else
 float GetShadow(const highp vec4 iShadowPos[NUMCASCADES], float depth)
@@ -332,6 +332,6 @@ float GetShadowDeferred(vec4 projWorldPos, vec3 normal, float depth)
         #endif
     #endif
 }
-#endif
+#endif*/
 #endif
 #endif

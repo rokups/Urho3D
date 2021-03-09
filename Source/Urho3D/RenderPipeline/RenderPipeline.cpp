@@ -141,6 +141,7 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("Enable Instancing", bool, settings_.enableInstancing_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Enable Shadow", bool, settings_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Deferred Lighting", bool, settings_.deferredLighting_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("PCF Kernel Size", unsigned, settings_.pcfKernelSize_, MarkSettingsDirty, 1, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Use Variance Shadow Maps", bool, settings_.enableVarianceShadowMaps_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, settings_.varianceShadowMapParams_, MarkSettingsDirty, BatchRendererSettings{}.varianceShadowMapParams_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("VSM Multi Sample", int, settings_.varianceShadowMapMultiSample_, MarkSettingsDirty, 1, AM_DEFAULT);
@@ -235,10 +236,23 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
         {
             static const ea::string lightTypeDefines[] = {
                 "URHO3D_LIGHT_DIRECTIONAL ",
-                "URHO3D_LIGHT_POINT ",
-                "URHO3D_LIGHT_SPOT "
+                "URHO3D_LIGHT_SPOT ",
+                "URHO3D_LIGHT_POINT "
             };
             commonDefines += lightTypeDefines[static_cast<int>(light->GetLightType())];
+
+            if (key.pixelLight_->HasShadow())
+            {
+                commonDefines += "URHO3D_HAS_SHADOW ";
+                if (settings_.enableVarianceShadowMaps_)
+                    commonDefines += "URHO3D_VARIANCE_SHADOW_MAP ";
+                else
+                    commonDefines += Format("URHO3D_SHADOW_PCF_SIZE={} ", settings_.pcfKernelSize_);
+                /*if (settings_.enableVarianceShadowMaps_)
+                    ;//commonDefines += "SHADOW VSM_SHADOW ";
+                else
+                    ;//commonDefines += "SHADOW SIMPLE_SHADOW ";*/
+            }
         }
     }
 
@@ -438,6 +452,23 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
 
     Light* light = sceneLight->GetLight();
     LightType type = light->GetLightType();
+    static const ea::string lightTypeDefines[] = {
+        "URHO3D_LIGHT_DIRECTIONAL ",
+        "URHO3D_LIGHT_SPOT ",
+        "URHO3D_LIGHT_POINT "
+    };
+    vertexDefines += lightTypeDefines[static_cast<int>(light->GetLightType())];
+    pixelDefiles += lightTypeDefines[static_cast<int>(light->GetLightType())];
+
+    if (sceneLight->HasShadow())
+    {
+        pixelDefiles += "URHO3D_HAS_SHADOW ";
+        if (settings_.enableVarianceShadowMaps_)
+            pixelDefiles += "URHO3D_VARIANCE_SHADOW_MAP ";
+        else
+            pixelDefiles += Format("URHO3D_SHADOW_PCF_SIZE={} ", settings_.pcfKernelSize_);
+    }
+
     switch (type)
     {
     case LIGHT_DIRECTIONAL:
@@ -849,6 +880,7 @@ unsigned RenderPipeline::RecalculatePipelineStateHash() const
     unsigned hash = 0;
     CombineHash(hash, sceneProcessor_->GetCameraProcessor()->GetPipelineStateHash());
     CombineHash(hash, settings_.CalculatePipelineStateHash());
+    CombineHash(hash, settings_.pcfKernelSize_);
     return hash;
 }
 

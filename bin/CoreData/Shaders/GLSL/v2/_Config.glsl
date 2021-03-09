@@ -102,6 +102,15 @@
     #endif
 #endif
 
+#if defined(URHO3D_HAS_SHADOW)
+    // TODO(renderer): Revisit WebGL
+    #if defined(URHO3D_LIGHT_DIRECTIONAL) && (!defined(GL_ES) || defined(WEBGL))
+        #define URHO3D_SHADOW_NUM_CASCADES 4
+    #else
+        #define URHO3D_SHADOW_NUM_CASCADES 1
+    #endif
+#endif
+
 // =================================== Platform configuration ===================================
 
 // Helper utility to generate names
@@ -204,6 +213,13 @@
     #define highp
     #define mediump
     #define lowp
+    #define optional_highp
+#else
+    #if defined(GL_FRAGMENT_PRECISION_HIGH) || !defined(URHO3D_PIXEL_SHADER)
+        #define optional_highp highp
+    #else
+        #define optional_highp mediump
+    #endif
 #endif
 
 #endif // _CONFIG_GLSL_

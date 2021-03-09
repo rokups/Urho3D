@@ -3,7 +3,7 @@
 #include "_VertexLayout.glsl"
 #include "_VertexTransform.glsl"
 #include "_PixelOutput.glsl"
-#include "Samplers.glsl"
+#include "_Samplers.glsl"
 
 #ifdef VSM_SHADOW
     VERTEX_OUTPUT(vec4 vTexCoord)
@@ -16,7 +16,7 @@ void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
     //mat4 modelMatrix = iModelMatrix;
-    vec3 worldPos = vertexTransform.position;// GetWorldPos(modelMatrix);
+    vec3 worldPos = vertexTransform.position.xyz;// GetWorldPos(modelMatrix);
     gl_Position = GetClipPos(worldPos);
 
     vTexCoord.xy = GetTransformedTexCoord();

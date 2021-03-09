@@ -1,6 +1,6 @@
 #define MRT_COUNT 6
 #include "Uniforms.glsl"
-#include "Samplers.glsl"
+#include "_Samplers.glsl"
 #include "Transform.glsl"
 #include "ScreenPos.glsl"
 

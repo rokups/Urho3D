@@ -7,7 +7,8 @@
 #include "_VertexScreenPos.glsl"
 #include "_PixelOutput.glsl"
 #include "_GammaCorrection.glsl"
-#include "Samplers.glsl"
+#include "_Samplers.glsl"
+#include "_Shadow.glsl"
 #include "Lighting.glsl"
 
 #ifdef DIRLIGHT
@@ -25,7 +26,7 @@ void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
     //mat4 modelMatrix = iModelMatrix;
-    vec3 worldPos = vertexTransform.position;// GetWorldPos(modelMatrix);
+    vec3 worldPos = vertexTransform.position.xyz;// GetWorldPos(modelMatrix);
     gl_Position = GetClipPos(worldPos);
     #ifdef DIRLIGHT
         vScreenPos = GetScreenPosPreDiv(gl_Position);
@@ -87,7 +88,7 @@ void main()
     float diff = GetDiffuse(normal, worldPos, lightDir);
 
     #ifdef SHADOW
-        diff *= GetShadowDeferred(projWorldPos, normal, depth);
+        diff *= GetDeferredShadow(projWorldPos, depth);
     #endif
 
     #if defined(SPOTLIGHT)
@@ -102,9 +103,9 @@ void main()
 
     #ifdef SPECULAR
         float spec = GetSpecular(normal, eyeVec, lightDir, normalInput.a * 255.0);
-        gl_FragColor = LightToGammaSpaceAlpha(diff * vec4(lightColor * (albedoInput.rgb + spec * cLightColor.a * albedoInput.aaa), 0.0));
+        gl_FragColor = diff * vec4(lightColor * (albedoInput.rgb + spec * cLightColor.a * albedoInput.aaa), 0.0);
     #else
-        gl_FragColor = LightToGammaSpaceAlpha(diff * vec4(lightColor * albedoInput.rgb, 0.0));
+        gl_FragColor = diff * vec4(lightColor * albedoInput.rgb, 0.0);
     #endif
 }
 #endif

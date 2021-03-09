@@ -75,6 +75,7 @@ struct PostProcessSettings
 struct RenderPipelineSettings : public BaseRenderPipelineSettings
 {
     PostProcessSettings postProcess_;
+    unsigned pcfKernelSize_{ 1 };
 };
 
 ///

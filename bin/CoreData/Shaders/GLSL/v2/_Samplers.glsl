@@ -1,4 +1,12 @@
-#ifdef COMPILEPS
+#ifndef _SAMPLERS_GLSL_
+#define _SAMPLERS_GLSL_
+
+#ifndef _CONFIG_GLSL_
+    #error Include "_Config.glsl" before "_Samplers.glsl"
+#endif
+
+#ifdef URHO3D_PIXEL_SHADER
+
 SAMPLER(0, sampler2D sDiffMap)
 SAMPLER(0, samplerCube sDiffCubeMap)
 SAMPLER(1, sampler2D sNormalMap)
@@ -9,30 +17,28 @@ SAMPLER(4, samplerCube sEnvCubeMap)
 SAMPLER(8, sampler2D sLightRampMap)
 SAMPLER(9, sampler2D sLightSpotMap)
 SAMPLER(9, samplerCube sLightCubeMap)
+#ifdef URHO3D_VARIANCE_SHADOW_MAP
+    SAMPLER(10, optional_highp sampler2D sShadowMap)
+#else
+    SAMPLER(10, optional_highp sampler2DShadow sShadowMap)
+#endif
 #ifndef GL_ES
     SAMPLER(5, sampler3D sVolumeMap)
     SAMPLER(0, sampler2D sAlbedoBuffer)
     SAMPLER(1, sampler2D sNormalBuffer)
     SAMPLER(13, sampler2D sDepthBuffer)
     SAMPLER(14, sampler2D sLightBuffer)
-    #ifdef VSM_SHADOW
-        SAMPLER(10, sampler2D sShadowMap)
-    #else
-        SAMPLER(10, sampler2DShadow sShadowMap)
-    #endif
     SAMPLER(15, samplerCube sZoneCubeMap)
     SAMPLER(15, sampler3D sZoneVolumeMap)
-#else
-    SAMPLER(10, highp sampler2D sShadowMap)
 #endif
 
 #ifdef GL3
-#define texture2D texture
-#define texture2DProj textureProj
-#define texture3D texture
-#define textureCube texture
-#define texture2DLod textureLod
-#define texture2DLodOffset textureLodOffset
+    #define texture2D texture
+    #define texture2DProj textureProj
+    #define texture3D texture
+    #define textureCube texture
+    #define texture2DLod textureLod
+    #define texture2DLodOffset textureLodOffset
 #endif
 
 #ifdef URHO3D_MATERIAL_HAS_DIFFUSE
@@ -53,36 +59,10 @@ vec3 DecodeNormal(vec4 normalInput)
     #endif
 }
 
-vec3 EncodeDepth(float depth)
-{
-    #ifndef GL3
-        vec3 ret;
-        depth *= 255.0;
-        ret.x = floor(depth);
-        depth = (depth - ret.x) * 255.0;
-        ret.y = floor(depth);
-        ret.z = (depth - ret.y);
-        ret.xy *= 1.0 / 255.0;
-        return ret;
-    #else
-        // OpenGL 3 can use different MRT formats, so no need for encoding
-        return vec3(depth, 0.0, 0.0);
-    #endif
-}
-
-float DecodeDepth(vec3 depth)
-{
-    #ifndef GL3
-        const vec3 dotValues = vec3(1.0, 1.0 / 255.0, 1.0 / (255.0 * 255.0));
-        return dot(depth, dotValues);
-    #else
-        // OpenGL 3 can use different MRT formats, so no need for encoding
-        return depth.r;
-    #endif
-}
-
 float ReconstructDepth(float hwDepth)
 {
     return dot(vec2(hwDepth, cDepthReconstruct.y / (hwDepth - cDepthReconstruct.x)), cDepthReconstruct.zw);
 }
-#endif
+
+#endif // URHO3D_PIXEL_SHADER
+#endif // _SAMPLERS_GLSL_

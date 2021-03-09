@@ -52,7 +52,7 @@
 #include "_VertexTransform.glsl"
 #include "_VertexScreenPos.glsl"
 #include "_PixelOutput.glsl"
-#include "Samplers.glsl"
+#include "_Samplers.glsl"
 
 VERTEX_OUTPUT(vec2 vScreenPos);
 
@@ -732,7 +732,7 @@ vec4 FxaaPixelShader(
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    gl_Position = GetClipPos(vertexTransform.position);
+    gl_Position = GetClipPos(vertexTransform.position.xyz);
     vScreenPos = GetScreenPosPreDiv(gl_Position);
 }
 #endif

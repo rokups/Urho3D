@@ -14,7 +14,7 @@
 #include "_VertexTransform.glsl"
 #include "_VertexScreenPos.glsl"
 #include "_PixelOutput.glsl"
-#include "Samplers.glsl"
+#include "_Samplers.glsl"
 
 #ifdef URHO3D_PIXEL_SHADER
     UNIFORM_BUFFER_BEGIN(6, Custom)
@@ -28,7 +28,7 @@ VERTEX_OUTPUT(vec2 vScreenPos);
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    gl_Position = GetClipPos(vertexTransform.position);
+    gl_Position = GetClipPos(vertexTransform.position.xyz);
     vScreenPos = GetScreenPosPreDiv(gl_Position);
 }
 #endif

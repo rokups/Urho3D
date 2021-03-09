@@ -6,7 +6,7 @@
 #include "_VertexTransform.glsl"
 #include "_VertexScreenPos.glsl"
 #include "_PixelOutput.glsl"
-#include "Samplers.glsl"
+#include "_Samplers.glsl"
 #include "PostProcess.glsl"
 
 VERTEX_OUTPUT(vec2 vScreenPos);
@@ -22,7 +22,7 @@ VERTEX_OUTPUT(vec2 vScreenPos);
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    gl_Position = GetClipPos(vertexTransform.position);
+    gl_Position = GetClipPos(vertexTransform.position.xyz);
     vScreenPos = GetScreenPosPreDiv(gl_Position);
 }
 #endif

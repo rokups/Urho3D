@@ -49,8 +49,8 @@ float GetDepth(vec4 clipPos)
 /// Vertex data in world space
 struct VertexTransform
 {
-    /// Vertex position in world space
-    vec3 position;
+    /// Vertex position in world space, w = 1.0
+    vec4 position;
 #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
     /// Vertex normal in world space
     vec3 normal;
@@ -84,16 +84,16 @@ struct VertexTransform
 
 /// Apply normal offset to position in world space.
 #ifdef URHO3D_SHADOW_NORMAL_OFFSET
-    void ApplyShadowNormalOffset(inout vec3 position, vec3 normal)
+    void ApplyShadowNormalOffset(inout vec4 position, vec3 normal)
     {
         #ifdef URHO3D_LIGHT_DIRECTIONAL
             vec3 lightDir = cLightDir;
         #else
-            vec3 lightDir = normalize(cLightPos.xyz - position);
+            vec3 lightDir = normalize(cLightPos.xyz - position.xyz);
         #endif
         float lightAngleCos = dot(normal, lightDir);
         float lightAngleSin = sqrt(1.0 - lightAngleCos * lightAngleCos);
-        position -= normal * lightAngleSin * cNormalOffsetScale;
+        position.xyz -= normal * lightAngleSin * cNormalOffsetScale;
     }
 #else
     #define ApplyShadowNormalOffset(position, normal)
@@ -130,7 +130,7 @@ struct VertexTransform
         mat4 modelMatrix = GetModelMatrix();
 
         VertexTransform result;
-        result.position = (iPos * modelMatrix).xyz;
+        result.position = iPos * modelMatrix;
 
         #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
             mat3 normalMatrix = GetNormalMatrix(modelMatrix);
@@ -152,7 +152,7 @@ struct VertexTransform
         mat4 modelMatrix = GetModelMatrix();
 
         VertexTransform result;
-        result.position = (iPos * modelMatrix).xyz;
+        result.position = iPos * modelMatrix;
         result.position += vec3(iTexCoord1.x, iTexCoord1.y, 0.0) * cBillboardRot;
 
         #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
@@ -187,9 +187,9 @@ struct VertexTransform
         mat4 modelMatrix = GetModelMatrix();
 
         VertexTransform result;
-        result.position = (iPos * modelMatrix).xyz;
-        mat3 rotation = GetFaceCameraRotation(result.position, iNormal);
-        result.position += vec3(iTexCoord1.x, 0.0, iTexCoord1.y) * rotation;
+        result.position = iPos * modelMatrix;
+        mat3 rotation = GetFaceCameraRotation(result.position.xyz, iNormal);
+        result.position.xyz += vec3(iTexCoord1.x, 0.0, iTexCoord1.y) * rotation;
 
         #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
             result.normal = vec3(rotation[0][1], rotation[1][1], rotation[2][1]);
@@ -211,7 +211,7 @@ struct VertexTransform
         vec3 right = normalize(cross(iTangent.xyz, up));
 
         VertexTransform result;
-        result.position = (vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix).xyz;
+        result.position = vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix;
 
         #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
             result.normal = normalize(cross(right, iTangent.xyz));
@@ -235,7 +235,7 @@ struct VertexTransform
         vec3 up = normalize(cross(front, right));
 
         VertexTransform result;
-        result.position = (vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix).xyz;
+        result.position = vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix;
 
         #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
             result.normal = up;
