@@ -202,9 +202,9 @@ struct ShadowMapRegion
 struct DrawableProcessorSettings
 {
     MaterialQuality materialQuality_{ QUALITY_HIGH };
-    // TODO(renderer): Make maxVertexLights_ contribute to pipeline state
     unsigned maxVertexLights_{ 4 };
     unsigned maxPixelLights_{ 4 };
+    unsigned pcfKernelSize_{ 1 };
 
     /// Utility operators
     /// @{
@@ -219,7 +219,8 @@ struct DrawableProcessorSettings
     {
         return materialQuality_ == rhs.materialQuality_
             && maxVertexLights_ == rhs.maxVertexLights_
-            && maxPixelLights_ == rhs.maxPixelLights_;
+            && maxPixelLights_ == rhs.maxPixelLights_
+            && pcfKernelSize_ == rhs.pcfKernelSize_;
     }
 
     bool operator!=(const DrawableProcessorSettings& rhs) const { return !(*this == rhs); }

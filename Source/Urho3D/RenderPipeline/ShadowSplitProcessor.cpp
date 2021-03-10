@@ -44,21 +44,6 @@ namespace Urho3D
 namespace
 {
 
-/// Cube shadow map padding, in pixels.
-const float cubeShadowMapPadding = 2.0f;
-
-/// Calculate size of shadow map region that is actually used for rendering, all padding is excluded.
-float GetEffectiveShadowMapWidth(LightType lightType, float shadowMapWidth)
-{
-    // Ensure zoom out of 2 pixels to eliminate border filtering issues
-    // For point lights use 4 pixels, as they must not cross sides of the virtual cube map (maximum 3x3 PCF)
-    // TODO(renderer): Revisit this place when PCF with larger kernel is supported
-    if (lightType != LIGHT_POINT)
-        return shadowMapWidth - 2.0f;
-    else
-        return shadowMapWidth - 2.0f * cubeShadowMapPadding;
-}
-
 /// Calculate view size for given min view size and light parameters
 Vector2 CalculateViewSize(const Vector2& minViewSize, const FocusParameters& params)
 {
@@ -204,7 +189,7 @@ void ShadowSplitProcessor::ProcessPointShadowCasters(
     drawableProcessor->PreprocessShadowCasters(shadowCasters_, shadowCasterCandidates, {}, light_, shadowCamera_);
 }
 
-void ShadowSplitProcessor::FinalizeShadow(const ShadowMapRegion& shadowMap)
+void ShadowSplitProcessor::FinalizeShadow(const ShadowMapRegion& shadowMap, unsigned pcfKernelSize)
 {
     shadowMap_ = shadowMap;
 
@@ -223,7 +208,8 @@ void ShadowSplitProcessor::FinalizeShadow(const ShadowMapRegion& shadowMap)
         AdjustDirectionalLightCamera(shadowBox, shadowMapWidth);
     }
 
-    const float effectiveShadowMapWidth = GetEffectiveShadowMapWidth(lightType, shadowMapWidth);
+    const unsigned padding = ea::min(4u, 1 + pcfKernelSize / 2);
+    const float effectiveShadowMapWidth = shadowMapWidth - 2.0f * padding;
     shadowCamera_->SetZoom(effectiveShadowMapWidth / shadowMapWidth);
 
     // Estimate shadow map texel size. Exact size for directional light, upper bound for point and spot lights.

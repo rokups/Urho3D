@@ -64,7 +64,7 @@ public:
     void ProcessPointShadowCasters(DrawableProcessor* drawableProcessor, const ea::vector<Drawable*>& shadowCasterCandidates);
     /// @}
 
-    void FinalizeShadow(const ShadowMapRegion& shadowMap);
+    void FinalizeShadow(const ShadowMapRegion& shadowMap, unsigned pcfKernelSize);
 
     /// Return immutable
     /// @{

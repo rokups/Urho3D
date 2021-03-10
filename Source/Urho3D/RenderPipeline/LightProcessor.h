@@ -107,7 +107,7 @@ public:
     /// Update light in worker thread.
     void Update(DrawableProcessor* drawableProcessor);
     /// End update from main thread.
-    void EndUpdate(DrawableProcessor* drawableProcessor, LightProcessorCallback* callback);
+    void EndUpdate(DrawableProcessor* drawableProcessor, LightProcessorCallback* callback, unsigned pcfKernelSize);
 
     /// Return pipeline state hashes
     /// @{
@@ -146,7 +146,7 @@ public:
 private:
     void InitializeShadowSplits(DrawableProcessor* drawableProcessor);
     void UpdateHashes();
-    void CookShaderParameters(Camera* cullCamera, float subPixelOffset);
+    void CookShaderParameters(Camera* cullCamera, unsigned pcfKernelSize);
     IntVector2 GetNumSplitsInGrid() const;
 
     Light* light_{};

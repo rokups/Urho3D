@@ -86,6 +86,15 @@ vec3 DirectionToUV(vec3 vec, vec2 bias)
         #endif
     }
 
+    /// Sample shadow map texture with given offset
+    #if defined(GL3)
+        #define SampleShadowOffset(shadowPos, identity, dx, dy) \
+            textureProjOffset(sShadowMap, (shadowPos), ivec2(dx, dy))
+    #else
+        #define SampleShadowOffset(shadowPos, identity, dx, dy) \
+            SampleShadow((shadowPos) + vec4(identity.x * dx, identity.y * dy, 0.0, 0.0))
+    #endif
+
     /// Return UV coordinate offset corresponding to one texel
     #ifndef URHO3D_LIGHT_POINT
         #define GetShadowTexelOffset(shadowPos_w) (cShadowMapInvSize * shadowPos_w)
@@ -100,16 +109,89 @@ float SampleShadowFiltered(optional_highp vec4 shadowPos)
     #if defined(URHO3D_VARIANCE_SHADOW_MAP)
         optional_highp vec2 moments = texture2D(sShadowMap, shadowPos.xy / shadowPos.w).rg;
         return cShadowIntensity.y + cShadowIntensity.x * EvaluateVarianceShadow(moments, shadowPos.z / shadowPos.w);
-    #elif URHO3D_SHADOW_PCF_SIZE <= 1 || URHO3D_SHADOW_PCF_SIZE > 2
-        return cShadowIntensity.y + cShadowIntensity.x * SampleShadow(shadowPos);
+
     #elif URHO3D_SHADOW_PCF_SIZE == 2
         vec2 offsets = GetShadowTexelOffset(shadowPos.w);
+
         vec4 shadowSamples;
         shadowSamples.x = SampleShadow(shadowPos);
         shadowSamples.y = SampleShadow(shadowPos + vec4(offsets.x, 0.0, 0.0, 0.0));
         shadowSamples.z = SampleShadow(shadowPos + vec4(0.0, offsets.y, 0.0, 0.0));
         shadowSamples.w = SampleShadow(shadowPos + vec4(offsets.xy, 0.0, 0.0));
+
         return cShadowIntensity.y + dot(cShadowIntensity.xxxx, shadowSamples);
+
+    #elif URHO3D_SHADOW_PCF_SIZE == 3
+        vec2 offsets = GetShadowTexelOffset(shadowPos.w);
+
+        float sample4 = SampleShadow(shadowPos);
+
+        vec4 sample2;
+        sample2.x = SampleShadowOffset(shadowPos, offsets, -1,  0);
+        sample2.y = SampleShadowOffset(shadowPos, offsets,  1,  0);
+        sample2.z = SampleShadowOffset(shadowPos, offsets,  0, -1);
+        sample2.w = SampleShadowOffset(shadowPos, offsets,  0,  1);
+
+        vec4 sample1;
+        sample1.x = SampleShadowOffset(shadowPos, offsets, -1, -1);
+        sample1.y = SampleShadowOffset(shadowPos, offsets,  1, -1);
+        sample1.z = SampleShadowOffset(shadowPos, offsets, -1,  1);
+        sample1.w = SampleShadowOffset(shadowPos, offsets,  1,  1);
+
+        const vec3 factors = vec3(4.0 / 16.0, 2.0 / 16.0, 1.0 / 16.0);
+        float average = sample4 * factors.x
+            + dot(sample2, factors.yyyy)
+            + dot(sample1, factors.zzzz);
+
+        return cShadowIntensity.y + cShadowIntensity.x * average;
+
+    #elif URHO3D_SHADOW_PCF_SIZE == 5
+        vec2 offsets = GetShadowTexelOffset(shadowPos.w);
+
+        float sample41 = SampleShadow(shadowPos);
+
+        vec4 sample26;
+        sample26.x = SampleShadowOffset(shadowPos, offsets, -1,  0);
+        sample26.y = SampleShadowOffset(shadowPos, offsets,  1,  0);
+        sample26.z = SampleShadowOffset(shadowPos, offsets,  0, -1);
+        sample26.w = SampleShadowOffset(shadowPos, offsets,  0,  1);
+
+        vec4 sample16;
+        sample16.x = SampleShadowOffset(shadowPos, offsets, -1, -1);
+        sample16.y = SampleShadowOffset(shadowPos, offsets,  1, -1);
+        sample16.z = SampleShadowOffset(shadowPos, offsets, -1,  1);
+        sample16.w = SampleShadowOffset(shadowPos, offsets,  1,  1);
+
+        vec4 sample7;
+        sample7.x = SampleShadowOffset(shadowPos, offsets, -2,  0);
+        sample7.y = SampleShadowOffset(shadowPos, offsets,  2,  0);
+        sample7.z = SampleShadowOffset(shadowPos, offsets,  0, -2);
+        sample7.w = SampleShadowOffset(shadowPos, offsets,  0,  2);
+
+        vec4 sample4_1;
+        sample4_1.x = SampleShadowOffset(shadowPos, offsets, -2, -1);
+        sample4_1.y = SampleShadowOffset(shadowPos, offsets, -1, -2);
+        sample4_1.z = SampleShadowOffset(shadowPos, offsets,  2, -1);
+        sample4_1.w = SampleShadowOffset(shadowPos, offsets,  1, -2);
+
+        vec4 sample4_2;
+        sample4_2.x = SampleShadowOffset(shadowPos, offsets, -2, 1);
+        sample4_2.y = SampleShadowOffset(shadowPos, offsets, -1, 2);
+        sample4_2.z = SampleShadowOffset(shadowPos, offsets,  2, 1);
+        sample4_2.w = SampleShadowOffset(shadowPos, offsets,  1, 2);
+
+        const vec4 factors = vec4(26.0 / 273.0, 16.0 / 273.0, 7.0 / 273.0, 4.0 / 273.0);
+        float average = sample41 * (41.0 / 273.0)
+            + dot(sample26, factors.xxxx)
+            + dot(sample16, factors.yyyy)
+            + dot(sample7, factors.zzzz)
+            + dot(sample4_1, factors.wwww)
+            + dot(sample4_2, factors.wwww);
+
+        return cShadowIntensity.y + cShadowIntensity.x * average;
+
+    #else
+        return cShadowIntensity.y + cShadowIntensity.x * SampleShadow(shadowPos);
     #endif
 }
 

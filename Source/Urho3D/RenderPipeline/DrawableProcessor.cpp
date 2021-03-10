@@ -420,7 +420,7 @@ void DrawableProcessor::ProcessLights(LightProcessorCallback* callback)
 
     SortLightProcessorsByShadowMap();
     for (LightProcessor* lightProcessor : lightProcessorsByShadowMapSize_)
-        lightProcessor->EndUpdate(this, callback);
+        lightProcessor->EndUpdate(this, callback, settings_.pcfKernelSize_);
 
     ProcessShadowCasters();
 }

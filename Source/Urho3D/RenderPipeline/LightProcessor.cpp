@@ -281,7 +281,8 @@ void LightProcessor::Update(DrawableProcessor* drawableProcessor)
     shadowMapSize_ = IntVector2{ shadowMapSplitSize_, shadowMapSplitSize_ } * GetNumSplitsInGrid();
 }
 
-void LightProcessor::EndUpdate(DrawableProcessor* drawableProcessor, LightProcessorCallback* callback)
+void LightProcessor::EndUpdate(DrawableProcessor* drawableProcessor,
+    LightProcessorCallback* callback, unsigned pcfKernelSize)
 {
     // Allocate shadow map
     if (numActiveSplits_ > 0)
@@ -292,13 +293,13 @@ void LightProcessor::EndUpdate(DrawableProcessor* drawableProcessor, LightProces
         else
         {
             for (unsigned i = 0; i < numActiveSplits_; ++i)
-                splits_[i].FinalizeShadow(shadowMap_.GetSplit(i, GetNumSplitsInGrid()));
+                splits_[i].FinalizeShadow(shadowMap_.GetSplit(i, GetNumSplitsInGrid()), pcfKernelSize);
         }
     }
 
     // TODO(renderer): Fill second parameter
     Camera* cullCamera = drawableProcessor->GetFrameInfo().camera_;
-    CookShaderParameters(cullCamera, 0.0f);
+    CookShaderParameters(cullCamera, pcfKernelSize);
     UpdateHashes();
 }
 
@@ -335,7 +336,7 @@ void LightProcessor::InitializeShadowSplits(DrawableProcessor* drawableProcessor
 
 }
 
-void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffset)
+void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernelSize)
 {
     Node* lightNode = light_->GetNode();
     const LightType lightType = light_->GetLightType();
@@ -392,6 +393,9 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
     // Skip the rest if no shadow
     if (!shadowMap_)
         return;
+
+    // Add subpixel offset if PCF kernel is even
+    const float subPixelOffset = pcfKernelSize % 2 == 0 ? 0.5f : 0.0f;
 
     // Initialize size of shadow map
     const float textureSizeX = static_cast<float>(shadowMap_.texture_->GetWidth());
@@ -462,13 +466,11 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
         const float fadeStart = light_->GetShadowFadeDistance();
         const float fadeEnd = light_->GetShadowDistance();
         if (fadeStart > 0.0f && fadeEnd > 0.0f && fadeEnd > fadeStart)
-            intensity =
-                Lerp(intensity, 1.0f, Clamp((light_->GetDistance() - fadeStart) / (fadeEnd - fadeStart), 0.0f, 1.0f));
+            intensity = Lerp(intensity, 1.0f, Clamp((light_->GetDistance() - fadeStart) / (fadeEnd - fadeStart), 0.0f, 1.0f));
         const float pcfValues = (1.0f - intensity);
-        float samples = 1.0f;
-        // TODO(renderer): Support me
-        //if (renderer->GetShadowQuality() == SHADOWQUALITY_PCF_16BIT || renderer->GetShadowQuality() == SHADOWQUALITY_PCF_24BIT)
-        //    samples = 4.0f;
+
+        // Include number of samples for PCF 1x1 and 2x2 only, bigger PCFs need non-uniform factors
+        const float samples = pcfKernelSize == 2 ? 4.0f : 1.0f;
         cookedParams_.shadowIntensity_ = { pcfValues / samples, intensity, 0.0f, 0.0f };
     }
 
@@ -481,30 +483,8 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, float subPixelOffs
         cookedParams_.shadowSplitDistances_.z_ = splits_[2].GetCascadeZRange().second / cullCamera->GetFarClip();
 
     // TODO(renderer): Implement me
-    //cookedParams_.shadowNormalBias_ = light_->GetShadowBias().normalOffset_;
-    //cookedParams_.shadowNormalBias_ = Vector4::ZERO;
     /*if (light->GetShadowBias().normalOffset_ > 0.0f)
     {
-        Vector4 normalOffsetScale(Vector4::ZERO);
-
-        // Scale normal offset strength with the width of the shadow camera view
-        if (light->GetLightType() != LIGHT_DIRECTIONAL)
-        {
-            Camera* shadowCamera = lightQueue_->shadowSplits_[0].shadowCamera_;
-            normalOffsetScale.x_ = 2.0f * tanf(shadowCamera->GetFov() * M_DEGTORAD * 0.5f) * shadowCamera->GetFarClip();
-        }
-        else
-        {
-            normalOffsetScale.x_ = lightQueue_->shadowSplits_[0].shadowCamera_->GetOrthoSize();
-            if (lightQueue_->shadowSplits_.size() > 1)
-                normalOffsetScale.y_ = lightQueue_->shadowSplits_[1].shadowCamera_->GetOrthoSize();
-            if (lightQueue_->shadowSplits_.size() > 2)
-                normalOffsetScale.z_ = lightQueue_->shadowSplits_[2].shadowCamera_->GetOrthoSize();
-            if (lightQueue_->shadowSplits_.size() > 3)
-                normalOffsetScale.w_ = lightQueue_->shadowSplits_[3].shadowCamera_->GetOrthoSize();
-        }
-
-        normalOffsetScale *= light->GetShadowBias().normalOffset_;
 #ifdef GL_ES_VERSION_2_0
         normalOffsetScale *= renderer->GetMobileNormalOffsetMul();
 #endif
