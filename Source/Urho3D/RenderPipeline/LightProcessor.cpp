@@ -187,7 +187,7 @@ void LightProcessor::BeginUpdate(DrawableProcessor* drawableProcessor, LightProc
     }
 }
 
-void LightProcessor::Update(DrawableProcessor* drawableProcessor)
+void LightProcessor::Update(DrawableProcessor* drawableProcessor, const LightProcessorCallback* callback)
 {
     const FrameInfo& frameInfo = drawableProcessor->GetFrameInfo();
     Octree* octree = frameInfo.octree_;
@@ -276,8 +276,7 @@ void LightProcessor::Update(DrawableProcessor* drawableProcessor)
     }
 
     // Evaluate split shadow map size
-    // TODO(renderer): Implement me
-    shadowMapSplitSize_ = light_->GetLightType() != LIGHT_POINT ? 512 : 256;
+    shadowMapSplitSize_ = callback->GetShadowMapSize(light_);
     shadowMapSize_ = IntVector2{ shadowMapSplitSize_, shadowMapSplitSize_ } * GetNumSplitsInGrid();
 }
 

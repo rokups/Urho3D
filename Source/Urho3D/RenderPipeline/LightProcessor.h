@@ -95,7 +95,7 @@ public:
     /// Begin update from main thread.
     void BeginUpdate(DrawableProcessor* drawableProcessor, LightProcessorCallback* callback);
     /// Update light in worker thread.
-    void Update(DrawableProcessor* drawableProcessor);
+    void Update(DrawableProcessor* drawableProcessor, const LightProcessorCallback* callback);
     /// End update from main thread.
     void EndUpdate(DrawableProcessor* drawableProcessor, LightProcessorCallback* callback, unsigned pcfKernelSize);
 

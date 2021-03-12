@@ -160,6 +160,22 @@ struct ConstantBufferRange
     bool operator !=(const ConstantBufferRange& rhs) const { return !(*this == rhs); }
 };
 
+/// Graphics capabilities aggregator.
+/// TODO: Move all other things here
+struct GraphicsCaps
+{
+    bool constantBuffersSupported_{};
+    bool globalUniformsSupported_{};
+
+    unsigned maxVertexShaderUniforms_{};
+    unsigned maxPixelShaderUniforms_{};
+    unsigned constantBufferOffsetAlignment_{};
+
+    unsigned maxTextureSize_{};
+    unsigned maxRenderTargetSize_{};
+    unsigned maxNumRenderTargets_{};
+};
+
 /// %Graphics subsystem. Manages the application window, rendering state and GPU resources.
 class URHO3D_API Graphics : public Object
 {
@@ -506,21 +522,6 @@ public:
     /// @property
     bool GetSRGBWriteSupport() const { return sRGBWriteSupport_; }
 
-    /// Return max vertex shader uniforms support.
-    unsigned GetMaxVertexShaderUniforms() const { return maxVertexShaderUniforms_; }
-
-    /// Return max pixel shader uniforms support.
-    unsigned GetMaxPixelShaderUniforms() const { return maxPixelShaderUniforms_; }
-
-    /// Return whether constant buffers are support.
-    bool GetConstantBuffersSupport() const { return constantBuffersSupport_; }
-
-    /// Return whether constant buffers are required.
-    bool GetConstantBuffersRequired() const { return constantBuffersRequired_; }
-
-    /// Return constant buffer offset alignment.
-    unsigned GetConstantBuffersOffsetAlignment() const { return constantBufferOffsetAlignment_; }
-
     /// Return supported fullscreen resolutions (third component is refreshRate). Will be empty if listing the resolutions is not supported on the platform (e.g. Web).
     /// @property
     ea::vector<IntVector3> GetResolutions(int monitor) const;
@@ -750,6 +751,8 @@ public:
     static unsigned GetMaxBones();
     /// Return whether is using an OpenGL 3 context. Return always false on Direct3D9 & Direct3D11.
     static bool GetGL3Support();
+    /// Return graphics capabilities.
+    static const GraphicsCaps& GetCaps() { return caps; }
 
     /// Get the SDL_Window as a void* to avoid having to include the graphics implementation
     void* GetSDLWindow() { return window_; }
@@ -867,16 +870,6 @@ private:
     bool sRGBSupport_{};
     /// sRGB conversion on write support flag.
     bool sRGBWriteSupport_{};
-    /// Max number of vertex shader uniforms.
-    unsigned maxVertexShaderUniforms_{};
-    /// Max number of pixel shader uniforms.
-    unsigned maxPixelShaderUniforms_{};
-	/// Constant buffers support flag.
-    bool constantBuffersSupport_{};
-    /// Whether the constant buffers are required.
-    bool constantBuffersRequired_{};
-    /// Constant buffer offset alignment.
-    unsigned constantBufferOffsetAlignment_{};
     /// Number of primitives this frame.
     unsigned numPrimitives_{};
     /// Number of batches this frame.
@@ -996,6 +989,8 @@ private:
     static const Vector2 pixelUVOffset;
     /// OpenGL3 support flag.
     static bool gl3Support;
+    /// Graphics capabilities. Static for easier access.
+    static GraphicsCaps caps;
 };
 
 /// Register Graphics library objects.

@@ -396,7 +396,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
             break;
         }
     }
-    if (graphics_->GetConstantBuffersSupport())
+    if (graphics_->GetCaps().constantBuffersSupported_)
         commonDefines += "URHO3D_USE_CBUFFERS ";
 
     if (settings_.gammaCorrection_)
@@ -440,7 +440,7 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
     ea::string vertexDefines;
     ea::string pixelDefiles = "HWDEPTH ";
 
-    if (graphics_->GetConstantBuffersSupport())
+    if (graphics_->GetCaps().constantBuffersSupported_)
     {
         vertexDefines += "URHO3D_USE_CBUFFERS ";
         pixelDefiles += "URHO3D_USE_CBUFFERS ";
@@ -553,6 +553,8 @@ SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightPro
 
 void RenderPipeline::ValidateSettings()
 {
+    settings_.shadowAtlasPageSize_ = ea::min(settings_.shadowAtlasPageSize_, Graphics::GetCaps().maxRenderTargetSize_);
+
     if (settings_.deferredLighting_ && !graphics_->GetDeferredSupport()
         && !Graphics::GetReadableDepthStencilFormat())
         settings_.deferredLighting_ = false;

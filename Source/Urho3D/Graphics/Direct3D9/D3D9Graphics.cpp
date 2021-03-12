@@ -2494,8 +2494,12 @@ void Graphics::CheckFeatureSupport()
     sRGBSupport_ = impl_->CheckFormatSupport(D3DFMT_X8R8G8B8, D3DUSAGE_QUERY_SRGBREAD, D3DRTYPE_TEXTURE);
     sRGBWriteSupport_ = impl_->CheckFormatSupport(D3DFMT_X8R8G8B8, D3DUSAGE_QUERY_SRGBWRITE, D3DRTYPE_TEXTURE);
 
-    maxVertexShaderUniforms_ = impl_->deviceCaps_.MaxVertexShaderConst;
-    maxPixelShaderUniforms_ = impl_->deviceCaps_.MaxVertexShaderConst; // there's no MaxPixelShaderConst
+    caps.globalUniformsSupported_ = true;
+    caps.maxVertexShaderUniforms_ = impl_->deviceCaps_.MaxVertexShaderConst;
+    caps.maxPixelShaderUniforms_ = impl_->deviceCaps_.MaxVertexShaderConst; // there's no MaxPixelShaderConst
+    caps.maxTextureSize_ = ea::min(impl_->deviceCaps_.MaxTextureWidth, impl_->deviceCaps_.MaxTextureHeight);
+    caps.maxRenderTargetSize_ = caps.maxTextureSize_; // probably incorrect
+    caps.maxNumRenderTargets_ = 4;
 }
 
 void Graphics::ResetDevice()

@@ -749,8 +749,6 @@ using ViewOverrideFlags = Urho3D::ViewOverride;
 %csattribute(Urho3D::Graphics, %arg(bool), ReadableDepthSupport, GetReadableDepthSupport);
 %csattribute(Urho3D::Graphics, %arg(bool), SRGBSupport, GetSRGBSupport);
 %csattribute(Urho3D::Graphics, %arg(bool), SRGBWriteSupport, GetSRGBWriteSupport);
-%csattribute(Urho3D::Graphics, %arg(unsigned int), MaxVertexShaderUniforms, GetMaxVertexShaderUniforms);
-%csattribute(Urho3D::Graphics, %arg(unsigned int), MaxPixelShaderUniforms, GetMaxPixelShaderUniforms);
 %csattribute(Urho3D::Graphics, %arg(ea::vector<int>), MultiSampleLevels, GetMultiSampleLevels);
 %csattribute(Urho3D::Graphics, %arg(int), MonitorCount, GetMonitorCount);
 %csattribute(Urho3D::Graphics, %arg(int), CurrentMonitor, GetCurrentMonitor);

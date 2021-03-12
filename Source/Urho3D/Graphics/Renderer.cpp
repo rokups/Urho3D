@@ -1703,7 +1703,7 @@ void Renderer::Initialize()
 
     defaultDrawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
 
-    hardwareSkinningSupported_ = graphics_->GetMaxVertexShaderUniforms() >= 256;
+    hardwareSkinningSupported_ = graphics_->GetCaps().maxVertexShaderUniforms_ >= 256;
 
     if (!graphics_->GetShadowMapFormat())
         drawShadows_ = false;

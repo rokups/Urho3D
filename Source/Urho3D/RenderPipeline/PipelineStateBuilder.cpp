@@ -171,7 +171,7 @@ void PipelineStateBuilder::ClearState()
 
 void PipelineStateBuilder::ApplyCommonDefines(const Pass* materialPass)
 {
-    if (graphics_->GetConstantBuffersSupport())
+    if (graphics_->GetCaps().constantBuffersSupported_)
         commonDefines_ += "URHO3D_USE_CBUFFERS ";
 
     if (sceneProcessor_->GetSettings().gammaCorrection_)

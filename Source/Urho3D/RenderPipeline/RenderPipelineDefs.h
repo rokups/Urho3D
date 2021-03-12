@@ -206,6 +206,8 @@ class LightProcessorCallback
 public:
     /// Return whether light needs shadow.
     virtual bool IsLightShadowed(Light* light) = 0;
+    /// Return best shadow map size for given light. Should be safe to call from multiple threads.
+    virtual unsigned GetShadowMapSize(Light* light) const = 0;
     /// Allocate shadow map for one frame.
     virtual ShadowMapRegion AllocateTransientShadowMap(const IntVector2& size) = 0;
 };

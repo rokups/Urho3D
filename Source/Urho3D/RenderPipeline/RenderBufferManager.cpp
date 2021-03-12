@@ -353,7 +353,7 @@ SharedPtr<PipelineState> RenderBufferManager::CreateQuadPipelineState(BlendMode 
     const ea::string& shaderName, const ea::string& shaderDefines)
 {
     ea::string defines = shaderDefines;
-    if (graphics_->GetConstantBuffersSupport())
+    if (graphics_->GetCaps().constantBuffersSupported_)
         defines += " URHO3D_USE_CBUFFERS";
 
     PipelineStateDesc desc;

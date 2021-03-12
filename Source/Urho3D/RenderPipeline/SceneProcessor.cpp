@@ -332,6 +332,12 @@ bool SceneProcessor::IsLightShadowed(Light* light)
     return true;
 }
 
+unsigned SceneProcessor::GetShadowMapSize(Light* light) const
+{
+    // TODO(renderer): Implement me
+    return light->GetLightType() != LIGHT_POINT ? 512 : 256;
+}
+
 ShadowMapRegion SceneProcessor::AllocateTransientShadowMap(const IntVector2& size)
 {
     return shadowMapAllocator_->AllocateShadowMap(size);

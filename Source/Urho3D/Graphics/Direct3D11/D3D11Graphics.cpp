@@ -2279,11 +2279,13 @@ void Graphics::CheckFeatureSupport()
     sRGBSupport_ = true;
     sRGBWriteSupport_ = true;
 
-    maxVertexShaderUniforms_ = 4096;
-    maxPixelShaderUniforms_ = 4096;
-    constantBuffersSupport_ = true;
-    constantBuffersRequired_ = true;
-    constantBufferOffsetAlignment_ = 256;
+    caps.maxVertexShaderUniforms_ = D3D11_REQ_CONSTANT_BUFFER_ELEMENT_COUNT;
+    caps.maxPixelShaderUniforms_ = D3D11_REQ_CONSTANT_BUFFER_ELEMENT_COUNT;
+    caps.constantBuffersSupport_ = true;
+    caps.constantBufferOffsetAlignment_ = 256;
+    caps.maxTextureSize_ = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+    caps.maxRenderTargetSize_ = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+    caps.maxNumRenderTargets_ = 8;
 }
 
 void Graphics::ResetCachedState()

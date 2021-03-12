@@ -39,8 +39,8 @@ DrawCommandQueue::DrawCommandQueue(Graphics* graphics)
 void DrawCommandQueue::Reset(bool preferConstantBuffers)
 {
     useConstantBuffers_ = preferConstantBuffers
-        ? graphics_->GetConstantBuffersSupport()
-        : graphics_->GetConstantBuffersRequired();
+        ? graphics_->GetCaps().constantBuffersSupported_
+        : !graphics_->GetCaps().globalUniformsSupported_;
 
     // Reset state accumulators
     currentDrawCommand_ = {};
@@ -49,7 +49,7 @@ void DrawCommandQueue::Reset(bool preferConstantBuffers)
     // Clear shadep parameters
     if (useConstantBuffers_)
     {
-        constantBuffers_.collection_.ClearAndInitialize(graphics_->GetConstantBuffersOffsetAlignment());
+        constantBuffers_.collection_.ClearAndInitialize(graphics_->GetCaps().constantBufferOffsetAlignment_);
         constantBuffers_.currentLayout_ = nullptr;
         constantBuffers_.currentData_ = nullptr;
         constantBuffers_.currentHashes_.fill(0);

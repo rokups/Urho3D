@@ -162,6 +162,25 @@ extern "C"
 namespace Urho3D
 {
 
+namespace
+{
+
+int GetIntParam(GLenum name)
+{
+    int value;
+    glGetIntegerv(name, &value);
+    return value;
+}
+
+IntVector2 GetIntVectorParam(GLenum name)
+{
+    IntVector2 value;
+    glGetIntegerv(name, &value.x_);
+    return value;
+}
+
+}
+
 static const unsigned glCmpFunc[] =
 {
     GL_ALWAYS,
@@ -1173,7 +1192,7 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 
 void Graphics::SetShaderConstantBuffers(ea::span<const ConstantBufferRange, MAX_SHADER_PARAMETER_GROUPS> constantBuffers)
 {
-    if (!constantBuffersSupport_)
+    if (!caps.constantBuffersSupported_)
     {
         URHO3D_LOGERROR("Constant buffers are disabled, SetShaderConstantBuffers call is ignored");
         return;
@@ -2775,7 +2794,8 @@ void Graphics::CheckFeatureSupport()
     deferredSupport_ = false;
 
 #ifndef GL_ES_VERSION_2_0
-    int numSupportedRTs = 1;
+    caps.maxNumRenderTargets_ = 1;
+    caps.globalUniformsSupported_ = true;
     if (gl3Support)
     {
         // Work around GLEW failure to check extensions properly from a GL3 context
@@ -2784,13 +2804,10 @@ void Graphics::CheckFeatureSupport()
         anisotropySupport_ = true;
         sRGBSupport_ = true;
         sRGBWriteSupport_ = true;
-        constantBuffersSupport_ = true;
 
-        int uniformBufferAlignSize = 0;
-        glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &uniformBufferAlignSize);
-        constantBufferOffsetAlignment_ = static_cast<unsigned>(uniformBufferAlignSize);
-
-        glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &numSupportedRTs);
+        caps.constantBufferOffsetAlignment_ = GetIntParam(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT);
+        caps.constantBuffersSupported_ = true;
+        caps.maxNumRenderTargets_ = GetIntParam(GL_MAX_COLOR_ATTACHMENTS);
     }
     else
     {
@@ -2799,15 +2816,15 @@ void Graphics::CheckFeatureSupport()
         anisotropySupport_ = GLEW_EXT_texture_filter_anisotropic != 0;
         sRGBSupport_ = GLEW_EXT_texture_sRGB != 0;
         sRGBWriteSupport_ = GLEW_EXT_framebuffer_sRGB != 0;
-        constantBuffersSupport_ = false;
 
-        glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS_EXT, &numSupportedRTs);
+        caps.constantBuffersSupported_ = false;
+        caps.maxNumRenderTargets_ = GetIntParam(GL_MAX_COLOR_ATTACHMENTS_EXT);
     }
 
     // Must support 2 rendertargets for light pre-pass, and 4 for deferred
-    if (numSupportedRTs >= 2)
+    if (caps.maxNumRenderTargets_ >= 2)
         lightPrepassSupport_ = true;
-    if (numSupportedRTs >= 4)
+    if (caps.maxNumRenderTargets_ >= 4)
         deferredSupport_ = true;
 
 #if defined(__APPLE__) && !defined(IOS) && !defined(TVOS)
@@ -2876,12 +2893,12 @@ void Graphics::CheckFeatureSupport()
     hardwareShadowSupport_ = shadowMapFormat_ != 0;
 
     // Get number of uniforms available
-    GLint maxVertexUniforms{};
-    GLint maxPixelUniforms{};
-    glGetIntegerv(GL_MAX_VERTEX_UNIFORM_VECTORS, &maxVertexUniforms);
-    glGetIntegerv(GL_MAX_FRAGMENT_UNIFORM_VECTORS, &maxPixelUniforms);
-    maxVertexShaderUniforms_ = static_cast<unsigned>(maxVertexUniforms);
-    maxPixelShaderUniforms_ = static_cast<unsigned>(maxPixelUniforms);
+    caps.maxVertexShaderUniforms_ = GetIntParam(GL_MAX_VERTEX_UNIFORM_VECTORS);
+    caps.maxPixelShaderUniforms_ = GetIntParam(GL_MAX_FRAGMENT_UNIFORM_VECTORS);
+
+    caps.maxTextureSize_ = GetIntParam(GL_MAX_TEXTURE_SIZE);
+    const IntVector2 maxViewportDims = GetIntVectorParam(GL_MAX_VIEWPORT_DIMS);
+    caps.maxRenderTargetSize_ = NextPowerOfTwo(ea::min(maxViewportDims.x_, maxViewportDims.y_) + 1) >> 1;
 }
 
 void Graphics::PrepareDraw()

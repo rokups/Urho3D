@@ -415,7 +415,7 @@ void DrawableProcessor::ProcessLights(LightProcessorCallback* callback)
     ForEachParallel(workQueue_, lightProcessors_,
         [&](unsigned /*index*/, LightProcessor* lightProcessor)
     {
-        lightProcessor->Update(this);
+        lightProcessor->Update(this, callback);
     });
 
     SortLightProcessorsByShadowMap();

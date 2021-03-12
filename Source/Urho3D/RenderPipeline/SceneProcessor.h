@@ -107,6 +107,7 @@ private:
     /// LightProcessorCallback implementation
     /// @{
     bool IsLightShadowed(Light* light) override;
+    unsigned GetShadowMapSize(Light* light) const override;
     ShadowMapRegion AllocateTransientShadowMap(const IntVector2& size) override;
     /// @}
 
