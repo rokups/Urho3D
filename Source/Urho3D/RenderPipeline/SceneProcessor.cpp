@@ -54,7 +54,6 @@ namespace Urho3D
 namespace
 {
 
-/// %Frustum octree query for occluders.
 class OccluderOctreeQuery : public FrustumOctreeQuery
 {
 public:
@@ -79,7 +78,6 @@ public:
     }
 };
 
-/// %Frustum octree query with occlusion.
 class OccludedFrustumOctreeQuery : public FrustumOctreeQuery
 {
 public:
@@ -122,12 +120,61 @@ public:
     OcclusionBuffer* buffer_;
 };
 
-/// Calculate occlusion buffer size.
 IntVector2 CalculateOcclusionBufferSize(unsigned size, Camera* cullCamera)
 {
     const auto width = static_cast<int>(size);
     const int height = RoundToInt(size / cullCamera->GetAspectRatio());
     return { width, height };
+}
+
+BoundingBox GetViewSpaceLightBoundingBox(Light* light, Camera* camera)
+{
+    const Matrix3x4& view = camera->GetView();
+
+    switch (light->GetLightType())
+    {
+    case LIGHT_POINT:
+    {
+        const Vector3 center = view * light->GetNode()->GetWorldPosition();
+        const float extent = 0.58f * light->GetRange();
+        return BoundingBox{ center - extent * Vector3::ONE, center + extent * Vector3::ONE };
+    }
+    case LIGHT_SPOT:
+    {
+        const Frustum lightFrustum = light->GetViewSpaceFrustum(view);
+        return BoundingBox{ &lightFrustum.vertices_[4], 4 };
+    }
+    default:
+        assert(0);
+        return {};
+    }
+}
+
+float GetLightSizeInPixels(Light* light, const FrameInfo& frameInfo)
+{
+    const auto viewSize = static_cast<Vector2>(frameInfo.viewSize_);
+    const LightType lightType = light->GetLightType();
+    if (lightType == LIGHT_DIRECTIONAL)
+        return ea::max(viewSize.x_, viewSize.y_);
+
+    const BoundingBox lightBox = GetViewSpaceLightBoundingBox(light, frameInfo.camera_);
+    const Matrix4& projection = frameInfo.camera_->GetProjection();
+    const Vector2 projectionSize = 0.5f * lightBox.Projected(projection).Size() * viewSize;
+    return ea::max(projectionSize.x_, projectionSize.y_);
+}
+
+unsigned GetMaxShadowSplitSize(const SceneProcessorSettings& settings, unsigned pageSize, Light* light)
+{
+    switch (light->GetLightType())
+    {
+    case LIGHT_DIRECTIONAL:
+        return ea::min(settings.directionalShadowSize_, light->GetNumShadowSplits() == 1 ? pageSize : pageSize / 2);
+    case LIGHT_POINT:
+        return ea::min(settings.pointShadowSize_, pageSize / 4);
+    case LIGHT_SPOT:
+    default:
+        return ea::min(settings.spotShadowSize_, pageSize);
+    }
 }
 
 }
@@ -332,10 +379,20 @@ bool SceneProcessor::IsLightShadowed(Light* light)
     return true;
 }
 
-unsigned SceneProcessor::GetShadowMapSize(Light* light) const
+unsigned SceneProcessor::GetShadowMapSize(Light* light, unsigned /*numActiveSplits*/) const
 {
-    // TODO(renderer): Implement me
-    return light->GetLightType() != LIGHT_POINT ? 512 : 256;
+    const FocusParameters& parameters = light->GetShadowFocus();
+    const float shadowResolutionScale = light->GetShadowResolution();
+    const LightType lightType = light->GetLightType();
+
+    const float lightSizeInPixels = GetLightSizeInPixels(light, frameInfo_);
+    const unsigned pageSize = shadowMapAllocator_->GetSettings().shadowAtlasPageSize_;
+    const unsigned maxShadowSize = GetMaxShadowSplitSize(settings_, pageSize, light);
+
+    const float baseShadowSize = parameters.autoSize_ ? lightSizeInPixels : maxShadowSize;
+    const auto shadowSize = NextPowerOfTwo(static_cast<unsigned>(baseShadowSize * shadowResolutionScale));
+
+    return Clamp<unsigned>(shadowSize, SHADOW_MIN_PIXELS, maxShadowSize);
 }
 
 ShadowMapRegion SceneProcessor::AllocateTransientShadowMap(const IntVector2& size)

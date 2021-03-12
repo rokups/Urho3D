@@ -276,7 +276,7 @@ void LightProcessor::Update(DrawableProcessor* drawableProcessor, const LightPro
     }
 
     // Evaluate split shadow map size
-    shadowMapSplitSize_ = callback->GetShadowMapSize(light_);
+    shadowMapSplitSize_ = callback->GetShadowMapSize(light_, numActiveSplits_);
     shadowMapSize_ = IntVector2{ shadowMapSplitSize_, shadowMapSplitSize_ } * GetNumSplitsInGrid();
 }
 

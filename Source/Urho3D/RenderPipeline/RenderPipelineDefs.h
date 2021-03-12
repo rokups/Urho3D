@@ -207,7 +207,7 @@ public:
     /// Return whether light needs shadow.
     virtual bool IsLightShadowed(Light* light) = 0;
     /// Return best shadow map size for given light. Should be safe to call from multiple threads.
-    virtual unsigned GetShadowMapSize(Light* light) const = 0;
+    virtual unsigned GetShadowMapSize(Light* light, unsigned numActiveSplits) const = 0;
     /// Allocate shadow map for one frame.
     virtual ShadowMapRegion AllocateTransientShadowMap(const IntVector2& size) = 0;
 };
@@ -366,6 +366,9 @@ struct SceneProcessorSettings
 {
     bool enableShadows_{ true };
     bool deferredLighting_{ false };
+    unsigned directionalShadowSize_{ 1024 };
+    unsigned spotShadowSize_{ 1024 };
+    unsigned pointShadowSize_{ 256 };
 
     /// Utility operators
     /// @{
@@ -386,7 +389,10 @@ struct SceneProcessorSettings
             && OcclusionBufferSettings::operator==(rhs)
             && BatchRendererSettings::operator==(rhs)
             && enableShadows_ == rhs.enableShadows_
-            && deferredLighting_ == rhs.deferredLighting_;
+            && deferredLighting_ == rhs.deferredLighting_
+            && directionalShadowSize_ == rhs.directionalShadowSize_
+            && spotShadowSize_ == rhs.spotShadowSize_
+            && pointShadowSize_ == rhs.pointShadowSize_;
     }
 
     bool operator!=(const SceneProcessorSettings& rhs) const { return !(*this == rhs); }
