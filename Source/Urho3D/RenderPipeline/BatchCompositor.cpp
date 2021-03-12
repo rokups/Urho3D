@@ -80,13 +80,13 @@ void AddPipelineBatch(const BatchStateCreateKey& key, BatchStateCache& cache,
 }
 
 BatchCompositorPass::BatchCompositorPass(RenderPipelineInterface* renderPipeline,
-    DrawableProcessor* drawableProcessor, DrawableProcessorPassFlags flags,
+    DrawableProcessor* drawableProcessor, BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags,
     unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
     : DrawableProcessorPass(renderPipeline, flags, unlitBasePassIndex, litBasePassIndex, lightPassIndex)
     , workQueue_(GetSubsystem<WorkQueue>())
     , defaultMaterial_(GetSubsystem<Renderer>()->GetDefaultMaterial())
     , drawableProcessor_(drawableProcessor)
-    , batchStateCacheCallback_(renderPipeline)
+    , batchStateCacheCallback_(callback)
 {
     renderPipeline->OnPipelineStatesInvalidated.Subscribe(this, &BatchCompositorPass::OnPipelineStatesInvalidated);
 }
@@ -236,17 +236,20 @@ void BatchCompositorPass::ResolveDelayedBatches(unsigned index, const WorkQueueV
     }
 }
 
-BatchCompositor::BatchCompositor(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
-    unsigned shadowPassIndex)
+BatchCompositor::BatchCompositor(RenderPipelineInterface* renderPipeline,
+    const DrawableProcessor* drawableProcessor, BatchStateCacheCallback* callback, unsigned shadowPassIndex)
     : Object(renderPipeline->GetContext())
     , shadowPassIndex_(shadowPassIndex)
     , workQueue_(GetSubsystem<WorkQueue>())
     , renderer_(GetSubsystem<Renderer>())
     , drawableProcessor_(drawableProcessor)
     , defaultMaterial_(renderer_->GetDefaultMaterial())
-    , nullPassForLightVolumes_(MakeShared<Pass>(""))
-    , batchStateCacheCallback_(renderPipeline)
+    , lightVolumePass_(MakeShared<Pass>(""))
+    , batchStateCacheCallback_(callback)
 {
+    lightVolumePass_->SetVertexShader("DeferredLight");
+    lightVolumePass_->SetPixelShader("DeferredLight");
+
     renderPipeline->OnUpdateBegin.Subscribe(this, &BatchCompositor::OnUpdateBegin);
     renderPipeline->OnPipelineStatesInvalidated.Subscribe(this, &BatchCompositor::OnPipelineStatesInvalidated);
 }
@@ -304,7 +307,7 @@ void BatchCompositor::ComposeLightVolumeBatches()
         key.geometryType_ = GEOM_STATIC_NOINSTANCING;
         key.geometry_ = renderer_->GetLightGeometry(lightProcessor->GetLight());
         key.material_ = defaultMaterial_;
-        key.pass_ = nullPassForLightVolumes_;
+        key.pass_ = lightVolumePass_;
         key.drawable_ = lightProcessor->GetLight();
         key.pixelLight_ = lightProcessor;
         key.pixelLightIndex_ = lightIndex;

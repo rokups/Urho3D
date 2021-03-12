@@ -22,22 +22,23 @@
 
 #pragma once
 
-#include "../Graphics/Drawable.h"
-#include "../RenderPipeline/BatchCompositor.h"
-#include "../RenderPipeline/BatchRenderer.h"
-#include "../RenderPipeline/CameraProcessor.h"
 #include "../RenderPipeline/RenderPipelineDefs.h"
-#include "../RenderPipeline/DrawableProcessor.h"
-#include "../RenderPipeline/InstancingBuffer.h"
-#include "../RenderPipeline/LightProcessor.h"
-#include "../RenderPipeline/ShadowMapAllocator.h"
+#include "../RenderPipeline/PipelineBatchSortKey.h"
 
 namespace Urho3D
 {
 
+class BatchCompositor;
+class BatchRenderer;
+class CameraProcessor;
+class Drawable;
+class DrawableProcessor;
 class DrawCommandQueue;
+class InstancingBuffer;
+class PipelineStateBuilder;
 class RenderPipelineInterface;
 class RenderSurface;
+class ShadowMapAllocator;
 class Viewport;
 
 /// Scene processor for RenderPipeline
@@ -56,6 +57,20 @@ public:
     void SetSettings(const SceneProcessorSettings& settings);
     /// @}
 
+    /// Create scene passes
+    /// @{
+    template <class T> SharedPtr<T> CreatePass(DrawableProcessorPassFlags flags,
+        const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass)
+    {
+        return MakeShared<T>(renderPipeline_, drawableProcessor_, batchStateCacheCallback_,
+            flags, unlitBasePass, litBasePass, lightPass);
+    }
+    template <class T> SharedPtr<T> CreatePass(DrawableProcessorPassFlags flags, const ea::string& pass)
+    {
+        return MakeShared<T>(renderPipeline_, drawableProcessor_, batchStateCacheCallback_, flags, pass);
+    }
+    /// @}
+
     /// Called on every frame.
     /// @{
     bool Define(const CommonFrameInfo& frameInfo);
@@ -68,6 +83,7 @@ public:
 
     /// Getters
     /// @{
+    const SceneProcessorSettings& GetSettings() const { return settings_; }
     const FrameInfo& GetFrameInfo() const { return frameInfo_; }
     /// Takes pass object from BatchStateCreateContext.
     /// Returns user-configured pass (inherited from BatchCompositorPass) if possible.
@@ -75,6 +91,7 @@ public:
     BatchCompositorPass* GetUserPass(Object* pass) const;
     const auto& GetLightVolumeBatches() const { return batchCompositor_->GetLightVolumeBatches(); }
     CameraProcessor* GetCameraProcessor() const { return cameraProcessor_; }
+    PipelineStateBuilder* GetPipelineStateBuilder() const { return pipelineStateBuilder_; }
     DrawableProcessor* GetDrawableProcessor() const { return drawableProcessor_; }
     BatchCompositor* GetBatchCompositor() const { return batchCompositor_; }
     BatchRenderer* GetBatchRenderer() const { return batchRenderer_; }
@@ -107,10 +124,12 @@ private:
     /// Owned objects
     /// @{
     SharedPtr<CameraProcessor> cameraProcessor_;
+    SharedPtr<PipelineStateBuilder> pipelineStateBuilder_;
     SharedPtr<DrawableProcessor> drawableProcessor_;
     SharedPtr<BatchCompositor> batchCompositor_;
     SharedPtr<BatchRenderer> batchRenderer_;
     SharedPtr<OcclusionBuffer> occlusionBuffer_;
+    BatchStateCacheCallback* batchStateCacheCallback_{};
     /// @}
 
     SceneProcessorSettings settings_;

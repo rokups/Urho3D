@@ -43,6 +43,8 @@ public:
     void SetCameras(ea::span<Camera* const> cameras);
 
     unsigned GetPipelineStateHash() const;
+    bool IsCameraReversed() const;
+    bool IsCameraOrthographic() const;
 
     /// Callbacks from SceneProcessor
     /// @{
@@ -53,7 +55,9 @@ public:
 private:
     void UpdateCamera(const FrameInfo& frameInfo, Camera* camera);
 
+    bool isCameraOrthographic_{};
     bool isCameraFlippedByUser_{};
+    bool isReflectionCamera_{};
     bool flipCameraForRendering_{};
     ea::vector<WeakPtr<Camera>> cameras_{};
 };

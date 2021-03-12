@@ -37,16 +37,6 @@ class Camera;
 class DrawableProcessor;
 class LightProcessor;
 
-/// Light processor callback.
-class LightProcessorCallback
-{
-public:
-    /// Return whether light needs shadow.
-    virtual bool IsLightShadowed(Light* light) = 0;
-    /// Allocate shadow map for one frame.
-    virtual ShadowMapRegion AllocateTransientShadowMap(const IntVector2& size) = 0;
-};
-
 struct CookedLightParams
 {
     /// Common light parameters

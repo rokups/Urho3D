@@ -43,12 +43,12 @@ class ScenePass : public BatchCompositorPass
 public:
     /// Construct pass with forward lighting.
     ScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
-        DrawableProcessorPassFlags flags,
+        BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags,
         const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass);
 
     /// Construct pass without forward lighting.
     ScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
-        DrawableProcessorPassFlags flags, const ea::string& pass);
+        BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags, const ea::string& pass);
 };
 
 /// Scene pass with batches sorted by render order and pipeline state.

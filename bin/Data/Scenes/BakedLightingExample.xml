@@ -98,6 +98,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.833984 0.949219" />
 				</component>
@@ -114,6 +115,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapGreen.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.914063 0.949219" />
 				</component>
@@ -130,6 +132,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapStone.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.00195313 0.941406" />
 				</component>
@@ -146,6 +149,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.0820313 0.941406" />
 				</component>
@@ -162,6 +166,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapRed.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.162109 0.941406" />
 				</component>
@@ -178,6 +183,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.242188 0.941406" />
 				</component>
@@ -194,6 +200,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapGlowingGreen.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.0761719 0.0488281 0.322266 0.941406" />
 				</component>
@@ -219,6 +226,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapBlueTransparentShallow.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.152344 0.0976563 0.833984 0.847656" />
 				</component>
@@ -235,6 +243,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapBlueTransparentDeep.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.152344 0.0976563 0.00195313 0.839844" />
 				</component>
@@ -251,6 +260,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapStoneTransparent.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.152344 0.0976563 0.158203 0.839844" />
 				</component>
@@ -413,6 +423,7 @@
 			<component type="StaticModel" id="75">
 				<attribute name="Model" value="Model;Models/LightmapMushroom.mdl" />
 				<attribute name="Material" value="Material;Materials/LightmapGreen.xml" />
+				<attribute name="Global Illumination" value="Use LightMap" />
 				<attribute name="Bake Lightmap" value="true" />
 				<attribute name="Lightmap Index" value="1" />
 				<attribute name="Lightmap Scale &amp; Offset" value="0.5 0.503906 0.380859 0.00195313" />
@@ -430,6 +441,7 @@
 			<component type="StaticModel" id="76">
 				<attribute name="Model" value="Model;Models/LightmapMushroom.mdl" />
 				<attribute name="Material" value="Material;Materials/LightmapGreen.xml" />
+				<attribute name="Global Illumination" value="Use LightMap" />
 				<attribute name="Bake Lightmap" value="true" />
 				<attribute name="Lightmap Scale &amp; Offset" value="0.25 0.251953 0.695313 0.591797" />
 			</component>
@@ -446,6 +458,7 @@
 			<component type="StaticModel" id="77">
 				<attribute name="Model" value="Model;Models/Sphere.mdl" />
 				<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
+				<attribute name="Global Illumination" value="Use LightMap" />
 				<attribute name="Bake Lightmap" value="true" />
 				<attribute name="Lightmap Scale &amp; Offset" value="0.210938 0.134766 0.619141 0.847656" />
 			</component>
@@ -589,6 +602,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.380859 0.244141 0.00195313 0.591797" />
 				</component>
@@ -605,6 +619,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.228516 0.146484 0.386719 0.791016" />
 				</component>
@@ -621,6 +636,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.914063 0.585938 0.00195313 0.00195313" />
 				</component>
@@ -637,6 +653,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Lightmap Index" value="1" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.152344 0.0976563 0.00195313 0.755859" />
@@ -654,6 +671,7 @@
 					<attribute name="Model" value="Model;Models/Box.mdl" />
 					<attribute name="Material" value="Material;Materials/LightmapWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
+					<attribute name="Global Illumination" value="Use LightMap" />
 					<attribute name="Bake Lightmap" value="true" />
 					<attribute name="Scale in Lightmap" value="2.000000" />
 					<attribute name="Lightmap Scale &amp; Offset" value="0.304688 0.195313 0.386719 0.591797" />
@@ -726,6 +744,7 @@
 				<attribute name="Model" value="Model;Models/Plane.mdl" />
 				<attribute name="Material" value="Material;Materials/LightmapLogo.xml" />
 				<attribute name="Cast Shadows" value="true" />
+				<attribute name="Global Illumination" value="Use LightMap" />
 				<attribute name="Bake Lightmap" value="true" />
 				<attribute name="Lightmap Scale &amp; Offset" value="0.046875 0.046875 0.619141 0.791016" />
 			</component>
@@ -1178,8 +1197,6 @@
 			<attribute name="Model" value="Model;Models/Sphere.mdl" />
 			<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
 			<attribute name="Cast Shadows" value="true" />
-			<attribute name="Bake Lightmap" value="true" />
-			<attribute name="Scale in Lightmap" value="0.000000" />
 			<attribute name="Lightmap Scale &amp; Offset" value="0.0683594 0.0449219 0.216797 0.00195313" />
 		</component>
 	</node>

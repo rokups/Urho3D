@@ -52,6 +52,8 @@ public:
     /// Begin shadow map rendering. Clears shadow map if necessary.
     bool BeginShadowMapRendering(const ShadowMapRegion& shadowMap);
 
+    const ShadowMapAllocatorSettings& GetSettings() const { return settings_; }
+
 private:
     struct AtlasPage
     {

@@ -113,7 +113,7 @@ protected:
     void ApplySettings();
 
     SharedPtr<PipelineState> CreateBatchPipelineState(
-        const BatchStateCreateKey& key, const BatchStateCreateContext& ctx) override;
+        const BatchStateCreateKey& key, const BatchStateCreateContext& ctx);
     /// Return new or existing pipeline state for deferred light volume.
     SharedPtr<PipelineState> CreateLightVolumePipelineState(LightProcessor* sceneLight, Geometry* lightGeometry);
 

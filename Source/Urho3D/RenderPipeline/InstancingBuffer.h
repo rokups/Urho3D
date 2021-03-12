@@ -63,6 +63,7 @@ public:
 
     /// Getters
     /// @{
+    const InstancingBufferSettings& GetSettings() const { return settings_; }
     VertexBuffer* GetVertexBuffer() const { return vertexBuffer_->GetVertexBuffer(); }
     bool IsEnabled() const { return settings_.enableInstancing_; }
     /// @}

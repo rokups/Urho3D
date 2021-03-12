@@ -45,14 +45,23 @@ void CameraProcessor::SetCameras(ea::span<Camera* const> cameras)
     cameras_.resize(numCameras);
     ea::copy(cameras.begin(), cameras.end(), cameras_.begin());
 
+    isCameraOrthographic_ = false;
+    isCameraFlippedByUser_ = false;
+    isReflectionCamera_ = false;
+
     if (numCameras > 0)
     {
+        isCameraOrthographic_ = cameras[0]->IsOrthographic();
         isCameraFlippedByUser_ = cameras[0]->GetFlipVertical();
+        isReflectionCamera_ = cameras[0]->GetUseReflection();
         for (unsigned i = 1; i < numCameras; ++i)
         {
-            if (isCameraFlippedByUser_ != cameras[i]->GetFlipVertical())
+            if (isCameraFlippedByUser_ != cameras[i]->GetFlipVertical()
+                || isCameraOrthographic_ != cameras[i]->IsOrthographic()
+                || isReflectionCamera_ != cameras[i]->GetUseReflection())
             {
-                URHO3D_LOGERROR("All Cameras used in RenderPipeline should have the same Flip Vertical flag value");
+                URHO3D_LOGERROR("All Cameras used in one SceneProcessor should have the same following settings: "
+                    "Flip Vertical, Orthographic, Use Reflection");
                 assert(0);
             }
         }
@@ -102,9 +111,21 @@ void CameraProcessor::OnRenderEnd(const FrameInfo& frameInfo)
 unsigned CameraProcessor::GetPipelineStateHash() const
 {
     unsigned hash = 0;
+    CombineHash(hash, isCameraOrthographic_);
     CombineHash(hash, isCameraFlippedByUser_);
+    CombineHash(hash, isReflectionCamera_);
     CombineHash(hash, flipCameraForRendering_);
     return hash;
+}
+
+bool CameraProcessor::IsCameraReversed() const
+{
+    return flipCameraForRendering_ ^ isCameraFlippedByUser_ ^ isReflectionCamera_;
+}
+
+bool CameraProcessor::IsCameraOrthographic() const
+{
+    return isCameraOrthographic_;
 }
 
 }

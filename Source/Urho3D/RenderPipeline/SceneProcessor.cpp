@@ -24,6 +24,7 @@
 
 #include "../Core/Context.h"
 #include "../Core/IteratorRange.h"
+#include "../Graphics/Drawable.h"
 #include "../Graphics/DrawCommandQueue.h"
 #include "../Graphics/OcclusionBuffer.h"
 #include "../Graphics/Octree.h"
@@ -32,9 +33,17 @@
 #include "../Graphics/RenderSurface.h"
 #include "../Graphics/Technique.h"
 #include "../Graphics/Viewport.h"
+#include "../RenderPipeline/BatchCompositor.h"
+#include "../RenderPipeline/BatchRenderer.h"
+#include "../RenderPipeline/CameraProcessor.h"
 #include "../RenderPipeline/DrawableProcessor.h"
+#include "../RenderPipeline/InstancingBuffer.h"
+#include "../RenderPipeline/LightProcessor.h"
+#include "../RenderPipeline/PipelineBatchSortKey.h"
+#include "../RenderPipeline/PipelineStateBuilder.h"
 #include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../RenderPipeline/SceneProcessor.h"
+#include "../RenderPipeline/ShadowMapAllocator.h"
 #include "../Scene/Scene.h"
 
 #include "../DebugNew.h"
@@ -131,9 +140,13 @@ SceneProcessor::SceneProcessor(RenderPipelineInterface* renderPipeline, const ea
     , instancingBuffer_(instancingBuffer)
     , drawQueue_(GetSubsystem<Renderer>()->GetDefaultDrawQueue())
     , cameraProcessor_(MakeShared<CameraProcessor>(context_))
+    , pipelineStateBuilder_(MakeShared<PipelineStateBuilder>(context_,
+        this, cameraProcessor_, shadowMapAllocator_, instancingBuffer_))
     , drawableProcessor_(MakeShared<DrawableProcessor>(renderPipeline_))
-    , batchCompositor_(MakeShared<BatchCompositor>(renderPipeline_, drawableProcessor_, Technique::GetPassIndex("shadow")))
+    , batchCompositor_(MakeShared<BatchCompositor>(
+        renderPipeline_, drawableProcessor_, pipelineStateBuilder_, Technique::GetPassIndex("shadow")))
     , batchRenderer_(MakeShared<BatchRenderer>(context_, drawableProcessor_, instancingBuffer_))
+    , batchStateCacheCallback_(pipelineStateBuilder_)
 {
     renderPipeline_->OnUpdateBegin.Subscribe(this, &SceneProcessor::OnUpdateBegin);
     renderPipeline_->OnRenderEnd.Subscribe(this, &SceneProcessor::OnRenderEnd);

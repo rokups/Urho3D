@@ -153,7 +153,7 @@ struct VertexTransform
 
         VertexTransform result;
         result.position = iPos * modelMatrix;
-        result.position += vec3(iTexCoord1.x, iTexCoord1.y, 0.0) * cBillboardRot;
+        result.position.xyz += vec3(iTexCoord1.x, iTexCoord1.y, 0.0) * cBillboardRot;
 
         #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
             result.normal = vec3(-cBillboardRot[0][2], -cBillboardRot[1][2], -cBillboardRot[2][2]);

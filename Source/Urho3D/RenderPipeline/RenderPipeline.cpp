@@ -35,6 +35,8 @@
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Viewport.h"
 #include "../RenderPipeline/RenderPipeline.h"
+#include "../RenderPipeline/InstancingBuffer.h"
+#include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/BatchRenderer.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
@@ -585,8 +587,8 @@ void RenderPipeline::ApplySettings()
     {
         basePass_ = nullptr;
         alphaPass_ = nullptr;
-        deferredPass_ = MakeShared<UnorderedScenePass>(this, sceneProcessor_->GetDrawableProcessor(),
-            DrawableProcessorPassFlag::BasePassNeedsAmbient, "deferred");
+        deferredPass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(
+            DrawableProcessorPassFlag::BasePassNeedsAmbient | DrawableProcessorPassFlag::MarkLightsToStencil, "deferred");
 
         deferredAlbedo_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
         deferredNormal_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
@@ -596,9 +598,9 @@ void RenderPipeline::ApplySettings()
 
     if (!settings_.deferredLighting_ && !basePass_)
     {
-        basePass_ = MakeShared<UnorderedScenePass>(this, sceneProcessor_->GetDrawableProcessor(),
+        basePass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(
             DrawableProcessorPassFlag::BasePassNeedsAmbientAndVertexLights, "base", "litbase", "light");
-        alphaPass_ = MakeShared<BackToFrontScenePass>(this, sceneProcessor_->GetDrawableProcessor(),
+        alphaPass_ = sceneProcessor_->CreatePass<BackToFrontScenePass>(
             DrawableProcessorPassFlag::BasePassNeedsAmbientAndVertexLights, "alpha", "alpha", "litalpha");
         deferredPass_ = nullptr;
 
@@ -880,7 +882,6 @@ unsigned RenderPipeline::RecalculatePipelineStateHash() const
     unsigned hash = 0;
     CombineHash(hash, sceneProcessor_->GetCameraProcessor()->GetPipelineStateHash());
     CombineHash(hash, settings_.CalculatePipelineStateHash());
-    CombineHash(hash, settings_.pcfKernelSize_);
     return hash;
 }
 

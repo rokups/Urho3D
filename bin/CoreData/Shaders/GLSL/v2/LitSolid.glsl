@@ -128,7 +128,7 @@ void main()
         float fogFactor = GetFogFactor(vWorldPos.w);
     #endif
 
-    #if defined(PASS_BASE) || defined(PASS_ALPHA)
+    #ifndef DEFERRED
         // Per-pixel forward lighting
         vec3 lightColor;
         vec3 lightDir;
@@ -149,7 +149,7 @@ void main()
         #endif
 
         #ifdef SPECULAR
-            float spec = GetSpecular(normal, cCameraPosPS - vWorldPos.xyz, lightDir, cMatSpecColor.a);
+            float spec = GetSpecular(normal, cCameraPos - vWorldPos.xyz, lightDir, cMatSpecColor.a);
             finalColor = diff * lightColor * (diffColor.rgb + spec * specColor * cLightColor.a);
         #else
             finalColor = diff * lightColor * diffColor.rgb;
@@ -159,7 +159,7 @@ void main()
             finalColor += vAmbientAndVertexLigthing * diffColor.rgb;
         #endif
 
-        #ifdef AMBIENT
+        #ifdef URHO3D_AMBIENT_PASS
             #ifdef LIGHTMAP
                 finalColor += texture2D(sEmissiveMap, vTexCoord2).rgb * 2.0 * diffColor.rgb;
             #elif defined(EMISSIVEMAP)
@@ -171,7 +171,7 @@ void main()
         #else
             gl_FragColor = vec4(GetLitFog(finalColor, fogFactor), diffColor.a);
         #endif
-    #elif defined(PASS_DEFERRED)
+    #else
         // Fill deferred G-buffer
         float specIntensity = specColor.g;
         float specPower = cMatSpecColor.a / 255.0;

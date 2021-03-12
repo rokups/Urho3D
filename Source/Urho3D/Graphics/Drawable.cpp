@@ -106,7 +106,7 @@ void Drawable::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE("Light Mask", int, lightMask_, DEFAULT_LIGHTMASK, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Shadow Mask", int, shadowMask_, DEFAULT_SHADOWMASK, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Zone Mask", GetZoneMask, SetZoneMask, unsigned, DEFAULT_ZONEMASK, AM_DEFAULT);
-    URHO3D_ENUM_ATTRIBUTE("Global Illumination", giType_, giTypeNames, GlobalIlluminationType::None, AM_DEFAULT);
+    URHO3D_ENUM_ACCESSOR_ATTRIBUTE("Global Illumination", GetGlobalIlluminationType, SetGlobalIlluminationType, GlobalIlluminationType, giTypeNames, GlobalIlluminationType::None, AM_DEFAULT);
 }
 
 void Drawable::OnSetEnabled()
@@ -253,6 +253,7 @@ void Drawable::SetOccludee(bool enable)
 void Drawable::SetGlobalIlluminationType(GlobalIlluminationType type)
 {
     giType_ = type;
+    MarkPipelineStateHashDirty();
     MarkNetworkUpdate();
 }
 

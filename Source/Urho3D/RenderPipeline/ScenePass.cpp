@@ -36,16 +36,16 @@ namespace Urho3D
 {
 
 ScenePass::ScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
-    DrawableProcessorPassFlags flags,
+    BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags,
     const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass)
-    : BatchCompositorPass(renderPipeline, drawableProcessor, flags,
+    : BatchCompositorPass(renderPipeline, drawableProcessor, callback, flags,
         Technique::GetPassIndex(unlitBasePass), Technique::GetPassIndex(litBasePass), Technique::GetPassIndex(lightPass))
 {
 }
 
 ScenePass::ScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
-    DrawableProcessorPassFlags flags, const ea::string& pass)
-    : BatchCompositorPass(renderPipeline, drawableProcessor, flags,
+    BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags, const ea::string& pass)
+    : BatchCompositorPass(renderPipeline, drawableProcessor, callback, flags,
         Technique::GetPassIndex(pass), M_MAX_UNSIGNED, M_MAX_UNSIGNED)
 {
 }

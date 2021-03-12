@@ -75,7 +75,8 @@ public:
         LightSubpass,
     };
 
-    BatchCompositorPass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
+    BatchCompositorPass(RenderPipelineInterface* renderPipeline,
+        DrawableProcessor* drawableProcessor, BatchStateCacheCallback* callback,
         DrawableProcessorPassFlags flags, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
     void ComposeBatches();
@@ -137,8 +138,8 @@ public:
         LitVolumeSubpass
     };
 
-    BatchCompositor(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
-        unsigned shadowPassIndex);
+    BatchCompositor(RenderPipelineInterface* renderPipeline,
+        const DrawableProcessor* drawableProcessor, BatchStateCacheCallback* callback, unsigned shadowPassIndex);
     void SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes);
     void SetShadowMaterialQuality(MaterialQuality materialQuality) { shadowMaterialQuality_ = materialQuality; }
 
@@ -205,7 +206,7 @@ private:
     /// @{
     ea::vector<SharedPtr<BatchCompositorPass>> passes_;
     MaterialQuality shadowMaterialQuality_{};
-    SharedPtr<Pass> nullPassForLightVolumes_{};
+    SharedPtr<Pass> lightVolumePass_{};
 
     BatchStateCache shadowCache_;
     BatchStateCache lightVolumeCache_;

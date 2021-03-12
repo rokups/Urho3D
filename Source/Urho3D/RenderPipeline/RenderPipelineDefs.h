@@ -31,6 +31,7 @@
 namespace Urho3D
 {
 
+class Light;
 class PipelineState;
 class RenderSurface;
 class Texture2D;
@@ -60,6 +61,7 @@ enum class DrawableProcessorPassFlag
     BasePassNeedsVertexLights = 1 << 1,
     BasePassNeedsAmbientAndVertexLights = BasePassNeedsAmbient | BasePassNeedsVertexLights,
     DisableInstancing = 1 << 2,
+    MarkLightsToStencil = 1 << 3,
 };
 
 URHO3D_FLAGSET(DrawableProcessorPassFlag, DrawableProcessorPassFlags);
@@ -168,7 +170,6 @@ public:
 /// Base interface of render pipeline required by Render Pipeline classes.
 class URHO3D_API RenderPipelineInterface
     : public Serializable
-    , public BatchStateCacheCallback
 {
     URHO3D_OBJECT(RenderPipelineInterface, Serializable);
 
@@ -199,6 +200,16 @@ struct ShadowMapRegion
     ShadowMapRegion GetSplit(unsigned split, const IntVector2& numSplits) const;
 };
 
+/// Light processor callback.
+class LightProcessorCallback
+{
+public:
+    /// Return whether light needs shadow.
+    virtual bool IsLightShadowed(Light* light) = 0;
+    /// Allocate shadow map for one frame.
+    virtual ShadowMapRegion AllocateTransientShadowMap(const IntVector2& size) = 0;
+};
+
 struct DrawableProcessorSettings
 {
     MaterialQuality materialQuality_{ QUALITY_HIGH };
@@ -212,6 +223,7 @@ struct DrawableProcessorSettings
     {
         unsigned hash = 0;
         CombineHash(hash, maxVertexLights_);
+        CombineHash(hash, pcfKernelSize_);
         return hash;
     }
 
