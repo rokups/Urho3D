@@ -113,8 +113,8 @@ struct PipelineStateDesc
     /// Depth-stencil state
     /// @{
     bool depthWriteEnabled_{};
-    CompareMode depthCompareFunction_{};
     bool stencilTestEnabled_{};
+    CompareMode depthCompareFunction_{};
     CompareMode stencilCompareFunction_{};
     StencilOp stencilOperationOnPassed_{};
     StencilOp stencilOperationOnStencilFailed_{};
@@ -131,6 +131,7 @@ struct PipelineStateDesc
     float constantDepthBias_{};
     float slopeScaledDepthBias_{};
     bool scissorTestEnabled_{};
+    bool lineAntiAlias_{};
     /// @}
 
     /// Blend state
@@ -149,17 +150,18 @@ struct PipelineStateDesc
         if (hash_ != rhs.hash_)
             return false;
 
-        return vertexElements_ == rhs.vertexElements_
+        return primitiveType_ == rhs.primitiveType_
+
+            && numVertexElements_ == rhs.numVertexElements_
+            && vertexElements_ == rhs.vertexElements_
+            && indexType_ == rhs.indexType_
 
             && vertexShader_ == rhs.vertexShader_
             && pixelShader_ == rhs.pixelShader_
 
-            && primitiveType_ == rhs.primitiveType_
-            && indexType_ == rhs.indexType_
-
             && depthWriteEnabled_ == rhs.depthWriteEnabled_
-            && depthCompareFunction_ == rhs.depthCompareFunction_
             && stencilTestEnabled_ == rhs.stencilTestEnabled_
+            && depthCompareFunction_ == rhs.depthCompareFunction_
             && stencilCompareFunction_ == rhs.stencilCompareFunction_
             && stencilOperationOnPassed_ == rhs.stencilOperationOnPassed_
             && stencilOperationOnStencilFailed_ == rhs.stencilOperationOnStencilFailed_
@@ -168,15 +170,16 @@ struct PipelineStateDesc
             && stencilCompareMask_ == rhs.stencilCompareMask_
             && stencilWriteMask_ == rhs.stencilWriteMask_
 
-            && colorWriteEnabled_ == rhs.colorWriteEnabled_
-            && blendMode_ == rhs.blendMode_
-            && alphaToCoverageEnabled_ == rhs.alphaToCoverageEnabled_
-
             && fillMode_ == rhs.fillMode_
             && cullMode_ == rhs.cullMode_
             && constantDepthBias_ == rhs.constantDepthBias_
             && slopeScaledDepthBias_ == rhs.slopeScaledDepthBias_
-            && scissorTestEnabled_ == rhs.scissorTestEnabled_;
+            && scissorTestEnabled_ == rhs.scissorTestEnabled_
+            && lineAntiAlias_ == rhs.lineAntiAlias_
+
+            && colorWriteEnabled_ == rhs.colorWriteEnabled_
+            && blendMode_ == rhs.blendMode_
+            && alphaToCoverageEnabled_ == rhs.alphaToCoverageEnabled_;
     }
 
     /// Return whether the description structure is properly initialized.
@@ -188,15 +191,15 @@ struct PipelineStateDesc
     void RecalculateHash()
     {
         unsigned hash = 0;
-        CombineHash(hash, vertexElements_.size());
-        for (const VertexElement& element : vertexElements_)
-            CombineHash(hash, element.ToHash());
+        CombineHash(hash, primitiveType_);
+
+        CombineHash(hash, numVertexElements_);
+        for (unsigned i = 0; i < numVertexElements_; ++i)
+            CombineHash(hash, vertexElements_[i].ToHash());
+        CombineHash(hash, indexType_);
 
         CombineHash(hash, MakeHash(vertexShader_));
         CombineHash(hash, MakeHash(pixelShader_));
-
-        CombineHash(hash, primitiveType_);
-        CombineHash(hash, indexType_);
 
         CombineHash(hash, depthWriteEnabled_);
         CombineHash(hash, depthCompareFunction_);
@@ -209,15 +212,16 @@ struct PipelineStateDesc
         CombineHash(hash, stencilCompareMask_);
         CombineHash(hash, stencilWriteMask_);
 
-        CombineHash(hash, colorWriteEnabled_);
-        CombineHash(hash, blendMode_);
-        CombineHash(hash, alphaToCoverageEnabled_);
-
         CombineHash(hash, fillMode_);
         CombineHash(hash, cullMode_);
         CombineHash(hash, MakeHash(constantDepthBias_));
         CombineHash(hash, MakeHash(slopeScaledDepthBias_));
         CombineHash(hash, scissorTestEnabled_);
+        CombineHash(hash, lineAntiAlias_);
+
+        CombineHash(hash, colorWriteEnabled_);
+        CombineHash(hash, blendMode_);
+        CombineHash(hash, alphaToCoverageEnabled_);
 
         // Consider 0-hash invalid
         hash_ = ea::max(1u, hash);

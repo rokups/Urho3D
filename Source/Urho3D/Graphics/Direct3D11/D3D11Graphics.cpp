@@ -2281,7 +2281,7 @@ void Graphics::CheckFeatureSupport()
 
     caps.maxVertexShaderUniforms_ = D3D11_REQ_CONSTANT_BUFFER_ELEMENT_COUNT;
     caps.maxPixelShaderUniforms_ = D3D11_REQ_CONSTANT_BUFFER_ELEMENT_COUNT;
-    caps.constantBuffersSupport_ = true;
+    caps.constantBuffersSupported_ = true;
     caps.constantBufferOffsetAlignment_ = 256;
     caps.maxTextureSize_ = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
     caps.maxRenderTargetSize_ = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;

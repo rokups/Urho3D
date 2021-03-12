@@ -106,18 +106,20 @@ void PipelineState::RestoreCachedState(Graphics* graphics)
 void PipelineState::Apply(Graphics* graphics)
 {
     graphics->SetShaders(desc_.vertexShader_, desc_.pixelShader_);
+
     graphics->SetDepthWrite(desc_.depthWriteEnabled_);
     graphics->SetDepthTest(desc_.depthCompareFunction_);
     graphics->SetStencilTest(desc_.stencilTestEnabled_, desc_.stencilCompareFunction_,
         desc_.stencilOperationOnPassed_, desc_.stencilOperationOnStencilFailed_, desc_.stencilOperationOnDepthFailed_,
         desc_.stencilReferenceValue_, desc_.stencilCompareMask_, desc_.stencilWriteMask_);
 
-    graphics->SetColorWrite(desc_.colorWriteEnabled_);
-    graphics->SetBlendMode(desc_.blendMode_, desc_.alphaToCoverageEnabled_);
-
     graphics->SetFillMode(desc_.fillMode_);
     graphics->SetCullMode(desc_.cullMode_);
     graphics->SetDepthBias(desc_.constantDepthBias_, desc_.slopeScaledDepthBias_);
+    graphics->SetLineAntiAlias(desc_.lineAntiAlias_);
+
+    graphics->SetColorWrite(desc_.colorWriteEnabled_);
+    graphics->SetBlendMode(desc_.blendMode_, desc_.alphaToCoverageEnabled_);
 }
 
 PipelineStateCache::PipelineStateCache(Context* context)

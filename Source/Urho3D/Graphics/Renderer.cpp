@@ -281,7 +281,7 @@ Renderer::Renderer(Context* context) :
 {
     SubscribeToEvent(E_SCREENMODE, URHO3D_HANDLER(Renderer, HandleScreenMode));
 
-#if URHO3D_SPHERICAL_HARMONICS && defined(URHO3D_LEGACY_RENDERER)
+#if URHO3D_SPHERICAL_HARMONICS && (defined(URHO3D_LEGACY_RENDERER) || defined(URHO3D_D3D9))
     sphericalHarmonics_ = true;
     SetGlobalShaderDefine("SPHERICALHARMONICS", sphericalHarmonics_);
 #endif
