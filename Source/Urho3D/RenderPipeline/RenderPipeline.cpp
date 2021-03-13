@@ -842,39 +842,16 @@ void RenderPipeline::Render()
         drawQueue->Execute();
     }
 
-    // Draw debug geometry if enabled
+    for (PostProcessPass* postProcessPass : postProcessPasses_)
+        postProcessPass->Execute();
+
     auto debug = sceneProcessor_->GetFrameInfo().octree_->GetComponent<DebugRenderer>();
     if (debug && debug->IsEnabledEffective() && debug->HasContent())
     {
-#if 0
-        // If used resolve from backbuffer, blit first to the backbuffer to ensure correct depth buffer on OpenGL
-        // Otherwise use the last rendertarget and blit after debug geometry
-        if (usedResolve_ && currentRenderTarget_ != renderTarget_)
-        {
-            BlitFramebuffer(currentRenderTarget_->GetParentTexture(), renderTarget_, false);
-            currentRenderTarget_ = renderTarget_;
-            lastCustomDepthSurface_ = nullptr;
-        }
-
-        graphics_->SetRenderTarget(0, currentRenderTarget_);
-        for (unsigned i = 1; i < MAX_RENDERTARGETS; ++i)
-            graphics_->SetRenderTarget(i, (RenderSurface*)nullptr);
-
-        // If a custom depth surface was used, use it also for debug rendering
-        graphics_->SetDepthStencil(lastCustomDepthSurface_ ? lastCustomDepthSurface_ : GetDepthStencil(currentRenderTarget_));
-
-        IntVector2 rtSizeNow = graphics_->GetRenderTargetDimensions();
-        IntRect viewport = (currentRenderTarget_ == renderTarget_) ? viewRect_ : IntRect(0, 0, rtSizeNow.x_,
-            rtSizeNow.y_);
-        graphics_->SetViewport(viewport);
-
-        debug->SetView(camera_);
+        renderBufferManager_->SetOutputRenderTargers();
+        debug->SetView(sceneProcessor_->GetFrameInfo().camera_);
         debug->Render();
-#endif
     }
-
-    for (PostProcessPass* postProcessPass : postProcessPasses_)
-        postProcessPass->Execute();
 
     OnRenderEnd(this, frameInfo_);
 }
