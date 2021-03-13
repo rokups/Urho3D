@@ -450,6 +450,9 @@ void SamplesManager::OnKeyPress(VariantMap& args)
     if (key == KEY_ESCAPE)
         isClosing_ = true;
 
+    if (runningSample_)
+        return;
+
     if (key == KEY_SPACE)
     {
         UIElement* button = GetSampleButtonAt(GetSelectedIndex());
