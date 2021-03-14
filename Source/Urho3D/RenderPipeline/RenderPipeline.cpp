@@ -63,25 +63,6 @@ namespace Urho3D
 namespace
 {
 
-int GetTextureColorSpaceHint(bool linearInput, bool srgbTexture)
-{
-    return static_cast<int>(linearInput) + static_cast<int>(srgbTexture);
-}
-
-CullMode GetEffectiveCullMode(CullMode mode, const Camera* camera)
-{
-    // If a camera is specified, check whether it reverses culling due to vertical flipping or reflection
-    if (camera && camera->GetReverseCulling())
-    {
-        if (mode == CULL_CW)
-            mode = CULL_CCW;
-        else if (mode == CULL_CCW)
-            mode = CULL_CW;
-    }
-
-    return mode;
-}
-
 static const ea::vector<ea::string> ambientModeNames =
 {
     "Constant",
@@ -103,21 +84,6 @@ static const ea::vector<ea::string> postProcessTonemappingNames =
     "ReinhardEq4",
     "Uncharted2",
 };
-
-/*enum class ShaderInputFlag
-{
-    None = 0,
-    VertexHasNormal     = 1 << 0,
-    VertexHasTangent    = 1 << 1,
-    VertexHasColor      = 1 << 2,
-    VertexHasTexCoord0  = 1 << 3,
-    MaterialHasDiffuse  = 1 << 4,
-    MaterialHasNormal   = 1 << 5,
-    MaterialHasSpecular = 1 << 6,
-    MaterialHasEmissive = 1 << 7,
-};
-
-URHO3D_FLAGSET(ShaderInputFlag, ShaderInputFlags);*/
 
 }
 
@@ -422,29 +388,27 @@ void RenderPipeline::Render()
         ctx.globalResources_ = geometryBuffer;
         ctx.cameraParameters_ = cameraParameters;
 
+        renderBufferManager_->SetOutputRenderTargers();
+
         drawQueue->Reset();
         sceneBatchRenderer_->RenderLightVolumeBatches(ctx, sceneProcessor_->GetLightVolumeBatches());
-
-        renderBufferManager_->SetOutputRenderTargers();
         drawQueue->Execute();
-
-        graphics_->SetDepthWrite(true);
     }
     else
 #endif
     {
         renderBufferManager_->ClearOutput(fogColor, 1.0f, 0);
         renderBufferManager_->SetOutputRenderTargers();
-
-        drawQueue->Reset();
-        instancingBuffer_->Begin();
-        BatchRenderingContext ctx{ *drawQueue, *sceneProcessor_->GetFrameInfo().camera_ };
-        sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetBaseRenderFlags(), opaquePass_->GetSortedBaseBatches());
-        sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetLightRenderFlags(), opaquePass_->GetSortedLightBatches());
-        sceneBatchRenderer_->RenderBatches(ctx, alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches());
-        instancingBuffer_->End();
-        drawQueue->Execute();
     }
+
+    drawQueue->Reset();
+    instancingBuffer_->Begin();
+    BatchRenderingContext ctx{ *drawQueue, *sceneProcessor_->GetFrameInfo().camera_ };
+    sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetBaseRenderFlags(), opaquePass_->GetSortedBaseBatches());
+    sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetLightRenderFlags(), opaquePass_->GetSortedLightBatches());
+    sceneBatchRenderer_->RenderBatches(ctx, alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches());
+    instancingBuffer_->End();
+    drawQueue->Execute();
 
     for (PostProcessPass* postProcessPass : postProcessPasses_)
         postProcessPass->Execute();
