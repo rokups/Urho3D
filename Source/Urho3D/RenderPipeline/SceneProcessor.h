@@ -59,11 +59,11 @@ public:
 
     /// Create scene passes
     /// @{
-    template <class T> SharedPtr<T> CreatePass(DrawableProcessorPassFlags flags,
+    template <class T> SharedPtr<T> CreatePass(DrawableProcessorPassFlags flags, const ea::string& overridePass,
         const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass)
     {
         return MakeShared<T>(renderPipeline_, drawableProcessor_, batchStateCacheCallback_,
-            flags, unlitBasePass, litBasePass, lightPass);
+            flags, overridePass, unlitBasePass, litBasePass, lightPass);
     }
     template <class T> SharedPtr<T> CreatePass(DrawableProcessorPassFlags flags, const ea::string& pass)
     {

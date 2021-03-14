@@ -71,6 +71,8 @@ struct GeometryBatch
     Drawable* geometry_{};
     unsigned sourceBatchIndex_{};
 
+    /// If override pass is present, unlit base, lit base and light passes are ignored.
+    Pass* overridePass_{};
     /// Unlit base pass (no per-pixel lighting, optional ambient lighting).
     Pass* unlitBasePass_{};
     /// Lit base pass (per-pixel lighting from one light source and ambient lighting).
@@ -81,13 +83,14 @@ struct GeometryBatch
 
 /// Interface of scene pass used by drawable processor.
 ///
-/// There are 3 types of batches:
-/// 1) Unlit Base + Lit Base + Light:
+/// There are 4 types of batches:
+/// 1) Override Pass: if present, used unconditionally. Unlit base, lit base and light passes are ignored.
+/// 2) Unlit Base + Lit Base + Light:
 ///    Batch is rendered in N passes if the first per-pixel light can be rendered together with ambient.
 ///    Batch is rendered in N + 1 passes otherwise.
 ///    N is equal to the number per-pixel lights affecting object.
-/// 2) Unlit Base + Light: batch is rendered with per-pixel forward lighting in N + 1 passes.
-/// 3) Unlit Base: batch is rendered once, per-pixel lighting is not applied.
+/// 3) Unlit Base + Light: batch is rendered with per-pixel forward lighting in N + 1 passes.
+/// 4) Unlit Base: batch is rendered once, per-pixel lighting is not applied.
 ///
 /// Other pass combinations are invalid.
 class URHO3D_API DrawableProcessorPass : public Object
@@ -98,11 +101,11 @@ public:
     struct AddBatchResult
     {
         bool added_{};
-        bool litAdded_{};
+        bool forwardLitAdded_{};
     };
 
     DrawableProcessorPass(RenderPipelineInterface* renderPipeline, DrawableProcessorPassFlags flags,
-        unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
+        unsigned overridePassIndex, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
     AddBatchResult AddBatch(unsigned threadIndex, Drawable* drawable, unsigned sourceBatchIndex, Technique* technique);
 
@@ -112,6 +115,7 @@ public:
 private:
     const DrawableProcessorPassFlags flags_{};
 
+    const unsigned overridePassIndex_{};
     const unsigned unlitBasePassIndex_{};
     const unsigned litBasePassIndex_{};
     const unsigned lightPassIndex_{};

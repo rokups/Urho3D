@@ -149,10 +149,7 @@ SharedPtr<PipelineState> PipelineStateBuilder::CreateBatchPipelineState(
     else if (isLightVolumePass)
         ApplyLightVolumePass(key.pixelLight_);
     else if (batchCompositorPass)
-    {
-        ApplyUserPass(batchCompositorPass, ctx.subpassIndex_ == BatchCompositorPass::BaseSubpass,
-            key.material_, key.pass_, key.drawable_);
-    }
+        ApplyUserPass(batchCompositorPass, ctx.subpassIndex_, key.material_, key.pass_, key.drawable_);
 
     if (!isShadowPass && key.pixelLight_)
         ApplyPixelLight(key.pixelLight_, key.material_);
@@ -307,20 +304,20 @@ void PipelineStateBuilder::ApplyLightVolumePass(const LightProcessor* lightProce
     desc_.stencilReferenceValue_ = 0;
 }
 
-void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPass, bool isBasePass,
+void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPass, unsigned subpassIndex,
      const Material* material, const Pass* materialPass, const Drawable* drawable)
 {
     const DrawableProcessorPassFlags passFlags = compositorPass->GetFlags();
-    if (isBasePass)
-    {
-        if (passFlags.Test(DrawableProcessorPassFlag::BasePassNeedsAmbient))
-            commonDefines_ += "URHO3D_AMBIENT_PASS ";
-        if (passFlags.Test(DrawableProcessorPassFlag::BasePassNeedsVertexLights))
-            commonDefines_ += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", sceneProcessor_->GetSettings().maxVertexLights_);
-    }
-    else
+    const bool isDeferred = subpassIndex == BatchCompositorPass::OverrideSubpass;
+    if (subpassIndex == BatchCompositorPass::LightSubpass)
     {
         commonDefines_ += "URHO3D_ADDITIVE_LIGHT_PASS ";
+    }
+    else if (passFlags.Test(DrawableProcessorPassFlag::HasAmbientLighting))
+    {
+        commonDefines_ += "URHO3D_AMBIENT_PASS ";
+        if (!isDeferred)
+            commonDefines_ += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", sceneProcessor_->GetSettings().maxVertexLights_);
     }
 
     static const ea::string ambientModeDefines[] = {
@@ -362,7 +359,7 @@ void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPa
     desc_.cullMode_ = GetEffectiveCullMode(materialPass->GetCullMode(),
         material->GetCullMode(), cameraProcessor_->IsCameraReversed());
 
-    if (compositorPass->GetFlags().Test(DrawableProcessorPassFlag::MarkLightsToStencil))
+    if (isDeferred && compositorPass->GetFlags().Test(DrawableProcessorPassFlag::DeferredLightMaskToStencil))
     {
         desc_.stencilTestEnabled_ = true;
         desc_.stencilOperationOnPassed_ = OP_REF;

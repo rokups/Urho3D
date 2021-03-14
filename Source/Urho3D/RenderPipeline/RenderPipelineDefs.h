@@ -57,11 +57,9 @@ struct CommonFrameInfo
 /// Traits of scene pass.
 enum class DrawableProcessorPassFlag
 {
-    BasePassNeedsAmbient = 1 << 0,
-    BasePassNeedsVertexLights = 1 << 1,
-    BasePassNeedsAmbientAndVertexLights = BasePassNeedsAmbient | BasePassNeedsVertexLights,
-    DisableInstancing = 1 << 2,
-    MarkLightsToStencil = 1 << 3,
+    HasAmbientLighting = 1 << 0,
+    DisableInstancing = 1 << 1,
+    DeferredLightMaskToStencil = 1 << 2,
 };
 
 URHO3D_FLAGSET(DrawableProcessorPassFlag, DrawableProcessorPassFlags);
@@ -74,6 +72,8 @@ enum class BatchRenderFlag
     EnableVertexLights = 1 << 1,
     EnablePixelLights = 1 << 2,
     EnableInstancingForStaticGeometry = 1 << 3,
+
+    EnableAmbientAndVertexLighting = EnableAmbientLighting | EnableVertexLights,
 };
 
 URHO3D_FLAGSET(BatchRenderFlag, BatchRenderFlags);

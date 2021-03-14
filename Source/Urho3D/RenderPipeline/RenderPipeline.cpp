@@ -157,400 +157,6 @@ void RenderPipeline::ApplyAttributes()
 {
 }
 
-SharedPtr<PipelineState> RenderPipeline::CreateBatchPipelineState(
-    const BatchStateCreateKey& key, const BatchStateCreateContext& ctx)
-{
-    const auto scenePass = sceneProcessor_->GetUserPass(ctx.pass_);
-    const bool isInternalPass = !scenePass;
-    if (isInternalPass && ctx.subpassIndex_ == BatchCompositor::LitVolumeSubpass)
-    {
-        return CreateLightVolumePipelineState(key.pixelLight_, key.geometry_);
-    }
-
-    Geometry* geometry = key.geometry_;
-    Material* material = key.material_;
-    Pass* pass = key.pass_;
-    Light* light = key.pixelLight_ ? key.pixelLight_->GetLight() : nullptr;
-    const bool isShadowPass = isInternalPass;
-
-    PipelineStateDesc desc;
-    ea::string commonDefines;
-    ea::string vertexShaderDefines;
-    ea::string pixelShaderDefines;
-
-    // Update vertex elements
-    // TODO(renderer): Consider instancing buffer here
-    desc.InitializeInputLayoutAndPrimitiveType(geometry);
-    if (desc.numVertexElements_ == 0)
-        return nullptr;
-
-    // Update shadow parameters
-    // TODO(renderer): Don't use ShadowMapAllocator for this
-    if (isShadowPass)
-    {
-        const CookedLightParams& lightParams = key.pixelLight_->GetParams();
-        const float biasMultiplier = lightParams.shadowDepthBiasMultiplier_[ctx.shadowSplitIndex_];
-        const BiasParameters& biasParameters = light->GetShadowBias();
-        desc.fillMode_ = FILL_SOLID;
-        desc.stencilTestEnabled_ = false;
-        if (!settings_.enableVarianceShadowMaps_)
-        {
-            desc.colorWriteEnabled_ = false;
-            desc.constantDepthBias_ = biasMultiplier * biasParameters.constantBias_;
-            desc.slopeScaledDepthBias_ = biasMultiplier * biasParameters.slopeScaledBias_;
-        }
-        else
-        {
-            desc.colorWriteEnabled_ = true;
-            desc.constantDepthBias_ = 0.0f;
-            desc.slopeScaledDepthBias_ = 0.0f;
-        }
-
-        // TODO(renderer): Revisit this place
-        // Perform further modification of depth bias on OpenGL ES, as shadow calculations' precision is limited
-#ifdef GL_ES_VERSION_2_0
-        const float multiplier = renderer_->GetMobileShadowBiasMul();
-        const float addition = renderer_->GetMobileShadowBiasAdd();
-        desc.constantDepthBias_ = desc.constantDepthBias_ * multiplier + addition;
-        desc.slopeScaledDepthBias_ *= multiplier;
-#endif
-
-        commonDefines += "URHO3D_SHADOW_PASS ";
-        if (light->GetShadowBias().normalOffset_ > 0.0)
-            vertexShaderDefines += "URHO3D_SHADOW_NORMAL_OFFSET ";
-    }
-    else
-    {
-        const DrawableProcessorPassFlags flags = scenePass->GetFlags();
-        if (ctx.subpassIndex_ == BatchCompositorPass::BaseSubpass)
-        {
-            if (flags.Test(DrawableProcessorPassFlag::BasePassNeedsAmbient))
-                commonDefines += "URHO3D_AMBIENT_PASS ";
-            if (flags.Test(DrawableProcessorPassFlag::BasePassNeedsVertexLights))
-                commonDefines += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", settings_.maxVertexLights_);
-        }
-        else if (ctx.subpassIndex_ == BatchCompositorPass::LightSubpass)
-        {
-            commonDefines += "URHO3D_ADDITIVE_LIGHT_PASS ";
-        }
-
-        if (light)
-        {
-            static const ea::string lightTypeDefines[] = {
-                "URHO3D_LIGHT_DIRECTIONAL ",
-                "URHO3D_LIGHT_SPOT ",
-                "URHO3D_LIGHT_POINT "
-            };
-            commonDefines += lightTypeDefines[static_cast<int>(light->GetLightType())];
-
-            if (key.pixelLight_->HasShadow())
-            {
-                commonDefines += "URHO3D_HAS_SHADOW ";
-                if (settings_.enableVarianceShadowMaps_)
-                    commonDefines += "URHO3D_VARIANCE_SHADOW_MAP ";
-                else
-                    commonDefines += Format("URHO3D_SHADOW_PCF_SIZE={} ", settings_.pcfKernelSize_);
-                /*if (settings_.enableVarianceShadowMaps_)
-                    ;//commonDefines += "SHADOW VSM_SHADOW ";
-                else
-                    ;//commonDefines += "SHADOW SIMPLE_SHADOW ";*/
-            }
-        }
-    }
-
-    // Add lightmap
-    const bool isLightmap = !!key.drawable_->GetBatches()[key.sourceBatchIndex_].lightmapScaleOffset_;
-    if (isLightmap)
-    {
-        commonDefines += "URHO3D_HAS_LIGHTMAP ";
-        commonDefines += "LIGHTMAP ";
-    }
-
-    // Add vertex defines: ambient
-    static const ea::string ambientModeDefines[] = {
-        "URHO3D_AMBIENT_CONSTANT ",
-        "URHO3D_AMBIENT_FLAT ",
-        "URHO3D_AMBIENT_DIRECTIONAL ",
-    };
-    vertexShaderDefines += ambientModeDefines[static_cast<int>(settings_.ambientMode_)];
-
-    // Add vertex defines: geometry
-    static const ea::string geometryTypeDefines[] = {
-        "URHO3D_GEOMETRY_STATIC ",
-        "URHO3D_GEOMETRY_SKINNED ",
-        "URHO3D_GEOMETRY_STATIC ",
-        "URHO3D_GEOMETRY_BILLBOARD ",
-        "URHO3D_GEOMETRY_DIRBILLBOARD ",
-        "URHO3D_GEOMETRY_TRAIL_FACE_CAMERA ",
-        "URHO3D_GEOMETRY_TRAIL_BONE ",
-        "URHO3D_GEOMETRY_STATIC ",
-    };
-    vertexShaderDefines += geometryTypeDefines[static_cast<int>(key.geometryType_)];
-
-    // Add vertex input layout defines
-    for (const VertexElement& element : desc.vertexElements_)
-    {
-        if (element.index_ != 0)
-        {
-            if (element.semantic_ == SEM_TEXCOORD && element.index_ == 1)
-                vertexShaderDefines += "URHO3D_VERTEX_HAS_TEXCOORD1 ";
-            continue;
-        }
-
-        switch (element.semantic_)
-        {
-        case SEM_NORMAL:
-            vertexShaderDefines += "URHO3D_VERTEX_HAS_NORMAL ";
-            break;
-
-        case SEM_TANGENT:
-            vertexShaderDefines += "URHO3D_VERTEX_HAS_TANGENT ";
-            break;
-
-        case SEM_COLOR:
-            commonDefines += "URHO3D_VERTEX_HAS_COLOR ";
-            break;
-
-        case SEM_TEXCOORD:
-            vertexShaderDefines += "URHO3D_VERTEX_HAS_TEXCOORD0 ";
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    // Add material defines
-    if (Texture* diffuseTexture = material->GetTexture(TU_DIFFUSE))
-    {
-        pixelShaderDefines += "URHO3D_MATERIAL_HAS_DIFFUSE ";
-        const bool isLinear = diffuseTexture->GetLinear();
-        const bool sRGB = diffuseTexture->GetSRGB();
-        const int hint = GetTextureColorSpaceHint(isLinear, sRGB);
-        // TODO(renderer): Throttle logging
-        if (hint > 1)
-            URHO3D_LOGWARNING("Texture {} cannot be both sRGB and Linear", diffuseTexture->GetName());
-        pixelShaderDefines += Format("URHO3D_MATERIAL_DIFFUSE_HINT={} ", ea::min(1, hint));
-    }
-    if (material->GetTexture(TU_NORMAL))
-        pixelShaderDefines += "URHO3D_MATERIAL_HAS_NORMAL ";
-    if (material->GetTexture(TU_SPECULAR))
-        pixelShaderDefines += "URHO3D_MATERIAL_HAS_SPECULAR ";
-    if (material->GetTexture(TU_EMISSIVE))
-        pixelShaderDefines += "URHO3D_MATERIAL_HAS_EMISSIVE ";
-
-    // Add geometry type defines
-    if (key.geometryType_ == GEOM_STATIC && settings_.enableInstancing_)
-        vertexShaderDefines += "URHO3D_INSTANCING ";
-
-    if (isShadowPass)
-    {
-        commonDefines += "PASS_SHADOW ";
-        // TODO(renderer): Add define for normal offset
-        if (light->GetShadowBias().normalOffset_ > 0.0)
-            vertexShaderDefines += "NORMALOFFSET ";
-    }
-    else if (ctx.pass_ == deferredPass_)
-        commonDefines += "PASS_DEFERRED ";
-    else if (ctx.pass_ == basePass_)
-    {
-        commonDefines += "PASS_BASE ";
-        switch (ctx.subpassIndex_)
-        {
-        case 0: commonDefines += "PASS_BASE_UNLIT "; break;
-        case 1: commonDefines += "PASS_BASE_LITBASE "; break;
-        case 2: commonDefines += "PASS_BASE_LIGHT "; break;
-        }
-    }
-    else if (ctx.pass_ == alphaPass_)
-    {
-        commonDefines += "PASS_ALPHA ";
-        switch (ctx.subpassIndex_)
-        {
-        case 0: commonDefines += "PASS_ALPHA_UNLIT "; break;
-        case 1: commonDefines += "PASS_ALPHA_LITBASE "; break;
-        case 2: commonDefines += "PASS_ALPHA_LIGHT "; break;
-        }
-    }
-
-    if (light)
-    {
-        commonDefines += "PERPIXEL ";
-        if (key.pixelLight_->HasShadow())
-        {
-            if (settings_.enableVarianceShadowMaps_)
-                commonDefines += "SHADOW VSM_SHADOW ";
-            else
-                commonDefines += "SHADOW SIMPLE_SHADOW ";
-        }
-        switch (light->GetLightType())
-        {
-        case LIGHT_DIRECTIONAL:
-            commonDefines += "DIRLIGHT ";
-            break;
-        case LIGHT_POINT:
-            commonDefines += "POINTLIGHT ";
-            break;
-        case LIGHT_SPOT:
-            commonDefines += "SPOTLIGHT ";
-            break;
-        }
-    }
-    if (graphics_->GetCaps().constantBuffersSupported_)
-        commonDefines += "URHO3D_USE_CBUFFERS ";
-
-    if (settings_.gammaCorrection_)
-        commonDefines += "URHO3D_GAMMA_CORRECTION ";
-
-    vertexShaderDefines += commonDefines;
-    vertexShaderDefines += pass->GetEffectiveVertexShaderDefines();
-    pixelShaderDefines += commonDefines;
-    pixelShaderDefines += pass->GetEffectivePixelShaderDefines();
-    desc.vertexShader_ = graphics_->GetShader(VS, "v2/" + pass->GetVertexShader(), vertexShaderDefines);
-    desc.pixelShader_ = graphics_->GetShader(PS, "v2/" + pass->GetPixelShader(), pixelShaderDefines);
-
-    desc.depthWriteEnabled_ = pass->GetDepthWrite();
-    desc.depthCompareFunction_ = pass->GetDepthTestMode();
-    desc.stencilTestEnabled_ = false;
-    desc.stencilCompareFunction_ = CMP_ALWAYS;
-
-    desc.colorWriteEnabled_ = true;
-    desc.blendMode_ = pass->GetBlendMode();
-    desc.alphaToCoverageEnabled_ = pass->GetAlphaToCoverage();
-
-    desc.fillMode_ = FILL_SOLID;
-    const CullMode passCullMode = pass->GetCullMode();
-    const CullMode materialCullMode = isShadowPass ? material->GetShadowCullMode() : material->GetCullMode();
-    const CullMode cullMode = passCullMode != MAX_CULLMODES ? passCullMode : materialCullMode;
-    desc.cullMode_ = isShadowPass ? cullMode : GetEffectiveCullMode(cullMode, sceneProcessor_->GetFrameInfo().camera_);
-
-    if (ctx.pass_ == deferredPass_)
-    {
-        desc.stencilTestEnabled_ = true;
-        desc.stencilOperationOnPassed_ = OP_REF;
-        desc.stencilWriteMask_ = PORTABLE_LIGHTMASK;
-        desc.stencilReferenceValue_ = key.drawable_->GetLightMaskInZone() & PORTABLE_LIGHTMASK;
-    }
-
-    return renderer_->GetOrCreatePipelineState(desc);
-}
-
-SharedPtr<PipelineState> RenderPipeline::CreateLightVolumePipelineState(LightProcessor* sceneLight, Geometry* lightGeometry)
-{
-    ea::string vertexDefines;
-    ea::string pixelDefiles = "HWDEPTH ";
-
-    if (graphics_->GetCaps().constantBuffersSupported_)
-    {
-        vertexDefines += "URHO3D_USE_CBUFFERS ";
-        pixelDefiles += "URHO3D_USE_CBUFFERS ";
-    }
-
-    if (settings_.gammaCorrection_)
-    {
-        vertexDefines += "URHO3D_GAMMA_CORRECTION ";
-        pixelDefiles += "URHO3D_GAMMA_CORRECTION ";
-    }
-
-    Light* light = sceneLight->GetLight();
-    LightType type = light->GetLightType();
-    static const ea::string lightTypeDefines[] = {
-        "URHO3D_LIGHT_DIRECTIONAL ",
-        "URHO3D_LIGHT_SPOT ",
-        "URHO3D_LIGHT_POINT "
-    };
-    vertexDefines += lightTypeDefines[static_cast<int>(light->GetLightType())];
-    pixelDefiles += lightTypeDefines[static_cast<int>(light->GetLightType())];
-
-    if (sceneLight->HasShadow())
-    {
-        pixelDefiles += "URHO3D_HAS_SHADOW ";
-        if (settings_.enableVarianceShadowMaps_)
-            pixelDefiles += "URHO3D_VARIANCE_SHADOW_MAP ";
-        else
-            pixelDefiles += Format("URHO3D_SHADOW_PCF_SIZE={} ", settings_.pcfKernelSize_);
-    }
-
-    switch (type)
-    {
-    case LIGHT_DIRECTIONAL:
-        vertexDefines += "DIRLIGHT ";
-        pixelDefiles += "DIRLIGHT ";
-        break;
-
-    case LIGHT_SPOT:
-        pixelDefiles += "SPOTLIGHT ";
-        break;
-
-    case LIGHT_POINT:
-        pixelDefiles += "POINTLIGHT ";
-        if (light->GetShapeTexture())
-            pixelDefiles += "CUBEMASK ";
-        break;
-    }
-
-    if (sceneLight->GetNumSplits() > 0)
-    {
-        if (settings_.enableVarianceShadowMaps_)
-            pixelDefiles += "SHADOW VSM_SHADOW ";
-        else
-            pixelDefiles += "SHADOW SIMPLE_SHADOW ";
-        // TODO(renderer): Add define for normal offset
-        //if (light->GetShadowBias().normalOffset_ > 0.0)
-        //    pixelDefiles += "NORMALOFFSET ";
-    }
-
-    if (light->GetSpecularIntensity() > 0.0f)
-        pixelDefiles += "SPECULAR ";
-
-    // TODO(renderer): Fix me
-    /*if (camera->IsOrthographic())
-    {
-        vertexDefines += DLVS_ORTHO;
-        pixelDefiles += DLPS_ORTHO;
-    }*/
-
-    PipelineStateDesc desc;
-    desc.InitializeInputLayoutAndPrimitiveType(lightGeometry);
-    desc.stencilTestEnabled_ = false;
-    desc.stencilCompareFunction_ = CMP_ALWAYS;
-
-    desc.colorWriteEnabled_ = true;
-    desc.blendMode_ = light->IsNegative() ? BLEND_SUBTRACT : BLEND_ADD;
-    desc.alphaToCoverageEnabled_ = false;
-
-    desc.fillMode_ = FILL_SOLID;
-
-    if (type != LIGHT_DIRECTIONAL)
-    {
-        if (sceneLight->DoesOverlapCamera())
-        {
-            desc.cullMode_ = GetEffectiveCullMode(CULL_CW, sceneProcessor_->GetFrameInfo().camera_);
-            desc.depthCompareFunction_ = CMP_GREATER;
-        }
-        else
-        {
-            desc.cullMode_ = GetEffectiveCullMode(CULL_CCW, sceneProcessor_->GetFrameInfo().camera_);
-            desc.depthCompareFunction_ = CMP_LESSEQUAL;
-        }
-    }
-    else
-    {
-        desc.cullMode_ = CULL_NONE;
-        desc.depthCompareFunction_ = CMP_ALWAYS;
-    }
-
-    desc.vertexShader_ = graphics_->GetShader(VS, "v2/DeferredLight", vertexDefines);
-    desc.pixelShader_ = graphics_->GetShader(PS, "v2/DeferredLight", pixelDefiles);
-
-    desc.stencilTestEnabled_ = true;
-    desc.stencilCompareFunction_ = CMP_NOTEQUAL;
-    desc.stencilCompareMask_ = light->GetLightMaskEffective() & PORTABLE_LIGHTMASK;
-    desc.stencilReferenceValue_ = 0;
-
-    return renderer_->GetOrCreatePipelineState(desc);
-}
-
 void RenderPipeline::ValidateSettings()
 {
     settings_.shadowAtlasPageSize_ = ea::min(settings_.shadowAtlasPageSize_, Graphics::GetCaps().maxRenderTargetSize_);
@@ -583,34 +189,29 @@ void RenderPipeline::ApplySettings()
     instancingBuffer_->SetSettings(settings_);
     shadowMapAllocator_->SetSettings(settings_);
 
-    // Initialize or reset deferred rendering
-    // TODO(renderer): Make it more clean
-    if (settings_.deferredLighting_ && !deferredPass_)
+    if (!opaquePass_ || settings_.deferredLighting_ != deferred_.has_value())
     {
-        basePass_ = nullptr;
-        alphaPass_ = nullptr;
-        deferredPass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(
-            DrawableProcessorPassFlag::BasePassNeedsAmbient | DrawableProcessorPassFlag::MarkLightsToStencil, "deferred");
+        if (settings_.deferredLighting_)
+        {
+            opaquePass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(
+                DrawableProcessorPassFlag::HasAmbientLighting | DrawableProcessorPassFlag::DeferredLightMaskToStencil,
+                "deferred", "base", "litbase", "light");
 
-        deferredAlbedo_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
-        deferredNormal_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
+            deferred_ = DeferredLightingData{};
+            deferred_->albedoBuffer_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
+            deferred_->normalBuffer_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
+        }
+        else
+        {
+            opaquePass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(
+                DrawableProcessorPassFlag::HasAmbientLighting,
+                "", "base", "litbase", "light");
 
-        sceneProcessor_->SetPasses({ deferredPass_ });
+            deferred_ = ea::nullopt;
+        }
     }
 
-    if (!settings_.deferredLighting_ && !basePass_)
-    {
-        basePass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(
-            DrawableProcessorPassFlag::BasePassNeedsAmbientAndVertexLights, "base", "litbase", "light");
-        alphaPass_ = sceneProcessor_->CreatePass<BackToFrontScenePass>(
-            DrawableProcessorPassFlag::BasePassNeedsAmbientAndVertexLights, "alpha", "alpha", "litalpha");
-        deferredPass_ = nullptr;
-
-        deferredAlbedo_ = nullptr;
-        deferredNormal_ = nullptr;
-
-        sceneProcessor_->SetPasses({ basePass_, alphaPass_ });
-    }
+    sceneProcessor_->SetPasses({ opaquePass_, alphaPass_ });
 
     postProcessPasses_.clear();
 
@@ -690,6 +291,9 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
         shadowMapAllocator_ = MakeShared<ShadowMapAllocator>(context_);
         instancingBuffer_ = MakeShared<InstancingBuffer>(context_);
         sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow", shadowMapAllocator_, instancingBuffer_);
+
+        alphaPass_ = sceneProcessor_->CreatePass<BackToFrontScenePass>(
+            DrawableProcessorPassFlag::HasAmbientLighting, "", "alpha", "alpha", "litalpha");
     }
 
     frameInfo_.viewport_ = viewport;
@@ -783,13 +387,13 @@ void RenderPipeline::Render()
     if (settings_.deferredLighting_)
     {
         // Draw deferred GBuffer
-        renderBufferManager_->ClearColor(deferredAlbedo_, Color::TRANSPARENT_BLACK);
+        renderBufferManager_->ClearColor(deferred_->albedoBuffer_, Color::TRANSPARENT_BLACK);
         renderBufferManager_->ClearOutput(fogColor, 1.0f, 0);
 
         RenderBuffer* const gBuffer[] = {
             renderBufferManager_->GetColorOutput(),
-            deferredAlbedo_,
-            deferredNormal_
+            deferred_->albedoBuffer_,
+            deferred_->normalBuffer_
         };
         renderBufferManager_->SetRenderTargets(renderBufferManager_->GetDepthStencilOutput(), gBuffer);
 
@@ -797,15 +401,15 @@ void RenderPipeline::Render()
 
         instancingBuffer_->Begin();
         sceneBatchRenderer_->RenderBatches({ *drawQueue, *sceneProcessor_->GetFrameInfo().camera_ },
-            deferredPass_->GetBaseRenderFlags(), deferredPass_->GetSortedBaseBatches());
+            opaquePass_->GetOverrideRenderFlags(), opaquePass_->GetSortedOverrideBatches());
         instancingBuffer_->End();
 
         drawQueue->Execute();
 
         // Draw deferred lights
         const ShaderResourceDesc geometryBuffer[] = {
-            { TU_ALBEDOBUFFER, deferredAlbedo_->GetTexture() },
-            { TU_NORMALBUFFER, deferredNormal_->GetTexture() },
+            { TU_ALBEDOBUFFER, deferred_->albedoBuffer_->GetTexture() },
+            { TU_NORMALBUFFER, deferred_->normalBuffer_->GetTexture() },
             { TU_DEPTHBUFFER, renderBufferManager_->GetDepthStencilTexture() }
         };
 
@@ -835,8 +439,8 @@ void RenderPipeline::Render()
         drawQueue->Reset();
         instancingBuffer_->Begin();
         BatchRenderingContext ctx{ *drawQueue, *sceneProcessor_->GetFrameInfo().camera_ };
-        sceneBatchRenderer_->RenderBatches(ctx, basePass_->GetBaseRenderFlags(), basePass_->GetSortedBaseBatches());
-        sceneBatchRenderer_->RenderBatches(ctx, basePass_->GetLightRenderFlags(), basePass_->GetSortedLightBatches());
+        sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetBaseRenderFlags(), opaquePass_->GetSortedBaseBatches());
+        sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetLightRenderFlags(), opaquePass_->GetSortedLightBatches());
         sceneBatchRenderer_->RenderBatches(ctx, alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches());
         instancingBuffer_->End();
         drawQueue->Execute();

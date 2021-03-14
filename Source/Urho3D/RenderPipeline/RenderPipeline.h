@@ -34,6 +34,8 @@
 #include "../RenderPipeline/ScenePass.h"
 #include "../Scene/Serializable.h"
 
+#include <EASTL/optional.h>
+
 namespace Urho3D
 {
 
@@ -112,11 +114,6 @@ protected:
     void ValidateSettings();
     void ApplySettings();
 
-    SharedPtr<PipelineState> CreateBatchPipelineState(
-        const BatchStateCreateKey& key, const BatchStateCreateContext& ctx);
-    /// Return new or existing pipeline state for deferred light volume.
-    SharedPtr<PipelineState> CreateLightVolumePipelineState(LightProcessor* sceneLight, Geometry* lightGeometry);
-
 private:
     Graphics* graphics_{};
     Renderer* renderer_{};
@@ -134,12 +131,16 @@ private:
     SharedPtr<InstancingBuffer> instancingBuffer_;
     SharedPtr<SceneProcessor> sceneProcessor_;
 
-    SharedPtr<UnorderedScenePass> basePass_;
+    SharedPtr<UnorderedScenePass> opaquePass_;
     SharedPtr<BackToFrontScenePass> alphaPass_;
-    SharedPtr<UnorderedScenePass> deferredPass_;
 
-    SharedPtr<RenderBuffer> deferredAlbedo_;
-    SharedPtr<RenderBuffer> deferredNormal_;
+    struct DeferredLightingData
+    {
+        SharedPtr<RenderBuffer> albedoBuffer_;
+        SharedPtr<RenderBuffer> specularBuffer_;
+        SharedPtr<RenderBuffer> normalBuffer_;
+    };
+    ea::optional<DeferredLightingData> deferred_;
 
     ea::vector<SharedPtr<PostProcessPass>> postProcessPasses_;
 };

@@ -113,9 +113,10 @@ bool IsShadowCasterVisible(const BoundingBox& lightSpaceBoundingBox, Camera* sha
 }
 
 DrawableProcessorPass::DrawableProcessorPass(RenderPipelineInterface* renderPipeline, DrawableProcessorPassFlags flags,
-    unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
+    unsigned overridePassIndex, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
     : Object(renderPipeline->GetContext())
     , flags_(flags)
+    , overridePassIndex_(overridePassIndex)
     , unlitBasePassIndex_(unlitBasePassIndex)
     , litBasePassIndex_(litBasePassIndex)
     , lightPassIndex_(lightPassIndex)
@@ -126,6 +127,12 @@ DrawableProcessorPass::DrawableProcessorPass(RenderPipelineInterface* renderPipe
 DrawableProcessorPass::AddBatchResult DrawableProcessorPass::AddBatch(unsigned threadIndex,
     Drawable* drawable, unsigned sourceBatchIndex, Technique* technique)
 {
+    if (Pass* overridePass = technique->GetPass(overridePassIndex_))
+    {
+        geometryBatches_.PushBack(threadIndex, { drawable, sourceBatchIndex, overridePass, nullptr, nullptr, nullptr });
+        return { true, false };
+    }
+
     Pass* unlitBasePass = technique->GetPass(unlitBasePassIndex_);
     Pass* lightPass = technique->GetPass(lightPassIndex_);
     Pass* litBasePass = lightPass ? technique->GetPass(litBasePassIndex_) : nullptr;
@@ -133,7 +140,7 @@ DrawableProcessorPass::AddBatchResult DrawableProcessorPass::AddBatch(unsigned t
     if (!unlitBasePass)
         return { false, false };
 
-    geometryBatches_.PushBack(threadIndex, { drawable, sourceBatchIndex, unlitBasePass, litBasePass, lightPass });
+    geometryBatches_.PushBack(threadIndex, { drawable, sourceBatchIndex, nullptr, unlitBasePass, litBasePass, lightPass });
     return { true, !!lightPass };
 }
 
@@ -350,9 +357,9 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
             for (DrawableProcessorPass* pass : passes_)
             {
                 const DrawableProcessorPass::AddBatchResult result = pass->AddBatch(threadIndex, drawable, i, technique);
-                if (result.litAdded_)
+                if (result.forwardLitAdded_)
                     isForwardLit = true;
-                if (result.added_ && pass->GetFlags().Test(DrawableProcessorPassFlag::BasePassNeedsAmbient))
+                if (result.added_ && pass->GetFlags().Test(DrawableProcessorPassFlag::HasAmbientLighting))
                     needAmbient = true;
             }
         }

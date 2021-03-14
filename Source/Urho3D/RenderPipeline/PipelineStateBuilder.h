@@ -63,7 +63,7 @@ private:
     void ApplyShadowPass(unsigned splitIndex, const LightProcessor* lightProcessor,
         const Material* material, const Pass* materialPass);
     void ApplyLightVolumePass(const LightProcessor* lightProcessor);
-    void ApplyUserPass(const BatchCompositorPass* compositorPass, bool isBasePass,
+    void ApplyUserPass(const BatchCompositorPass* compositorPass, unsigned subpassIndex,
         const Material* material, const Pass* materialPass, const Drawable* drawable);
 
     void ApplyPixelLight(const LightProcessor* lightProcessor, const Material* material);

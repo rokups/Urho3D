@@ -36,28 +36,39 @@ namespace Urho3D
 {
 
 ScenePass::ScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
-    BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags,
+    BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags, const ea::string& overridePass,
     const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass)
-    : BatchCompositorPass(renderPipeline, drawableProcessor, callback, flags,
+    : BatchCompositorPass(renderPipeline, drawableProcessor, callback, flags, Technique::GetPassIndex(overridePass),
         Technique::GetPassIndex(unlitBasePass), Technique::GetPassIndex(litBasePass), Technique::GetPassIndex(lightPass))
 {
 }
 
 ScenePass::ScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
     BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags, const ea::string& pass)
-    : BatchCompositorPass(renderPipeline, drawableProcessor, callback, flags,
-        Technique::GetPassIndex(pass), M_MAX_UNSIGNED, M_MAX_UNSIGNED)
+    : BatchCompositorPass(renderPipeline, drawableProcessor, callback, flags, Technique::GetPassIndex(pass),
+        M_MAX_UNSIGNED, M_MAX_UNSIGNED, M_MAX_UNSIGNED)
 {
+}
+
+BatchRenderFlags UnorderedScenePass::GetOverrideRenderFlags() const
+{
+    const DrawableProcessorPassFlags passFlags = GetFlags();
+    BatchRenderFlags result;
+    if (passFlags.Test(DrawableProcessorPassFlag::HasAmbientLighting))
+        result |= BatchRenderFlag::EnableAmbientLighting;
+    if (HasLightPass())
+        result |= BatchRenderFlag::EnablePixelLights;
+    if (!passFlags.Test(DrawableProcessorPassFlag::DisableInstancing))
+        result |= BatchRenderFlag::EnableInstancingForStaticGeometry;
+    return result;
 }
 
 BatchRenderFlags UnorderedScenePass::GetBaseRenderFlags() const
 {
     const DrawableProcessorPassFlags passFlags = GetFlags();
     BatchRenderFlags result;
-    if (passFlags.Test(DrawableProcessorPassFlag::BasePassNeedsAmbient))
-        result |= BatchRenderFlag::EnableAmbientLighting;
-    if (passFlags.Test(DrawableProcessorPassFlag::BasePassNeedsVertexLights))
-        result |= BatchRenderFlag::EnableVertexLights;
+    if (passFlags.Test(DrawableProcessorPassFlag::HasAmbientLighting))
+        result |= BatchRenderFlag::EnableAmbientAndVertexLighting;
     if (HasLightPass())
         result |= BatchRenderFlag::EnablePixelLights;
     if (!passFlags.Test(DrawableProcessorPassFlag::DisableInstancing))
@@ -76,6 +87,7 @@ BatchRenderFlags UnorderedScenePass::GetLightRenderFlags() const
 
 void UnorderedScenePass::OnBatchesReady()
 {
+    BatchCompositor::SortBatches(sortedOverrideBatches_, overrideBatches_);
     BatchCompositor::SortBatches(sortedBaseBatches_, baseBatches_);
     BatchCompositor::SortBatches(sortedLightBatches_, lightBatches_);
 }
@@ -84,10 +96,8 @@ BatchRenderFlags BackToFrontScenePass::GetRenderFlags() const
 {
     const DrawableProcessorPassFlags passFlags = GetFlags();
     BatchRenderFlags result;
-    if (passFlags.Test(DrawableProcessorPassFlag::BasePassNeedsAmbient))
-        result |= BatchRenderFlag::EnableAmbientLighting;
-    if (passFlags.Test(DrawableProcessorPassFlag::BasePassNeedsVertexLights))
-        result |= BatchRenderFlag::EnableVertexLights;
+    if (passFlags.Test(DrawableProcessorPassFlag::HasAmbientLighting))
+        result |= BatchRenderFlag::EnableAmbientAndVertexLighting;
     if (HasLightPass())
         result |= BatchRenderFlag::EnablePixelLights;
     if (!passFlags.Test(DrawableProcessorPassFlag::DisableInstancing))
