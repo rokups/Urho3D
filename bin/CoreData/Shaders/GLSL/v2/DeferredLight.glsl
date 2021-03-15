@@ -1,5 +1,3 @@
-#define URHO3D_GEOMETRY_STATIC
-
 #include "_Config.glsl"
 #include "_Uniforms.glsl"
 #include "_VertexLayout.glsl"
@@ -9,7 +7,10 @@
 #include "_GammaCorrection.glsl"
 #include "_Samplers.glsl"
 #include "_Shadow.glsl"
-#include "Lighting.glsl"
+#include "_PixelLighting.glsl"
+
+#include "_Material.glsl"
+#include "_Fog.glsl"
 
 #ifdef DIRLIGHT
     VERTEX_OUTPUT(vec2 vScreenPos)
@@ -49,11 +50,7 @@ void main()
 {
     // If rendering a directional light quad, optimize out the w divide
     #ifdef DIRLIGHT
-        #ifdef HWDEPTH
-            float depth = ReconstructDepth(texture2D(sDepthBuffer, vScreenPos).r);
-        #else
-            float depth = DecodeDepth(texture2D(sDepthBuffer, vScreenPos).rgb);
-        #endif
+        float depth = ReconstructDepth(texture2D(sDepthBuffer, vScreenPos).r);
         #ifdef ORTHO
             vec3 worldPos = mix(vNearRay, vFarRay, depth);
         #else
@@ -62,11 +59,7 @@ void main()
         vec4 albedoInput = texture2D(sAlbedoBuffer, vScreenPos);
         vec4 normalInput = texture2D(sNormalBuffer, vScreenPos);
     #else
-        #ifdef HWDEPTH
-            float depth = ReconstructDepth(texture2DProj(sDepthBuffer, vScreenPos).r);
-        #else
-            float depth = DecodeDepth(texture2DProj(sDepthBuffer, vScreenPos).rgb);
-        #endif
+        float depth = ReconstructDepth(texture2DProj(sDepthBuffer, vScreenPos).r);
         #ifdef ORTHO
             vec3 worldPos = mix(vNearRay, vFarRay, depth) / vScreenPos.w;
         #else
@@ -77,32 +70,28 @@ void main()
     #endif
 
     // Position acquired via near/far ray is relative to camera. Bring position to world space
-    vec3 eyeVec = -worldPos;
+    vec3 eyeVec = normalize(-worldPos);
     worldPos += cCameraPos;
 
     vec3 normal = normalize(normalInput.rgb * 2.0 - 1.0);
     vec4 projWorldPos = vec4(worldPos, 1.0);
-    vec3 lightColor;
-    vec3 lightDir;
 
-    float diff = GetDiffuse(normal, worldPos, lightDir);
+    vec4 lightVec = NormalizeLightVector(GetLightVector(worldPos));
+    float diff = GetDiffuseIntensity(normal, lightVec.xyz, lightVec.w);
 
     #ifdef SHADOW
         diff *= GetDeferredShadow(projWorldPos, depth);
     #endif
 
-    #if defined(SPOTLIGHT)
-        vec4 spotPos = projWorldPos * cLightMatrices[0];
-        lightColor = spotPos.w > 0.0 ? texture2DProj(sLightSpotMap, spotPos).rgb * cLightColor.rgb : vec3(0.0);
-    #elif defined(CUBEMASK)
-        mat3 lightVecRot = mat3(cLightMatrices[0][0].xyz, cLightMatrices[0][1].xyz, cLightMatrices[0][2].xyz);
-        lightColor = textureCube(sLightCubeMap, (worldPos - cLightPos.xyz) * lightVecRot).rgb * cLightColor.rgb;
+    #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
+        vec4 shapePos = projWorldPos * cLightShapeMatrix;
+        vec3 lightColor = GetLightColorFromShape(shapePos);
     #else
-        lightColor = cLightColor.rgb;
+        vec3 lightColor = GetLightColor(lightVec.xyz);
     #endif
 
     #ifdef SPECULAR
-        float spec = GetSpecular(normal, eyeVec, lightDir, normalInput.a * 255.0);
+        float spec = GetSpecularIntensity(normal, eyeVec, lightVec.xyz, normalInput.a * 255.0);
         gl_FragColor = diff * vec4(lightColor * (albedoInput.rgb + spec * cLightColor.a * albedoInput.aaa), 0.0);
     #else
         gl_FragColor = diff * vec4(lightColor * albedoInput.rgb, 0.0);

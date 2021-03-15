@@ -22,7 +22,7 @@ void WorldSpaceToShadowCoord(out vec4 shadowPos[URHO3D_SHADOW_NUM_CASCADES], vec
     #elif defined(URHO3D_LIGHT_POINT)
         shadowPos[0] = vec4(worldPos.xyz - cLightPos.xyz, 1.0);
     #elif defined(URHO3D_LIGHT_SPOT)
-        shadowPos[0] = worldPos * cLightMatrices[1];
+        shadowPos[0] = worldPos * cLightMatrices[0];
     #endif
 }
 
@@ -238,7 +238,7 @@ float SampleShadowFiltered(optional_highp vec4 shadowPos)
 #elif defined(URHO3D_LIGHT_DIRECTIONAL)
     #define WorldSpaceToShadowUV(worldPos, depth) ((worldPos) * cLightMatrices[0])
 #elif defined(URHO3D_LIGHT_SPOT)
-    #define WorldSpaceToShadowUV(worldPos, depth) ((worldPos) * cLightMatrices[1])
+    #define WorldSpaceToShadowUV(worldPos, depth) ((worldPos) * cLightMatrices[0])
 #elif defined(URHO3D_LIGHT_POINT)
     #define WorldSpaceToShadowUV(worldPos, depth) PointShadowCoordToUV((worldPos).xyz - cLightPos.xyz)
 #endif

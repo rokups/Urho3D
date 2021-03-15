@@ -343,8 +343,8 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernel
     // Setup resources
     auto renderer = light_->GetSubsystem<Renderer>();
     cookedParams_.shadowMap_ = shadowMap_.texture_;
-    cookedParams_.lightRamp_ = light_->GetRampTexture() ? light_->GetRampTexture() : renderer->GetDefaultLightRamp();
-    cookedParams_.lightShape_ = light_->GetShapeTexture() ? light_->GetShapeTexture() : renderer->GetDefaultLightSpot();
+    cookedParams_.lightRamp_ = light_->GetRampTexture();
+    cookedParams_.lightShape_ = light_->GetShapeTexture();
 
     // Setup common shader parameters
     cookedParams_.position_ = lightNode->GetWorldPosition();
@@ -371,22 +371,23 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernel
         cookedParams_.inverseSpotCutoff_ = 1.0f;
     }
 
-    // TODO(renderer): Skip this step if there's no cookies
-    switch (lightType)
+    cookedParams_.numLightMatrices_ = 0;
+    if (cookedParams_.lightShape_)
     {
-    case LIGHT_DIRECTIONAL:
-        cookedParams_.numLightMatrices_ = 0;
-        break;
-    case LIGHT_SPOT:
-        cookedParams_.lightMatrices_[0] = CalculateSpotMatrix(light_);
-        cookedParams_.numLightMatrices_ = 1;
-        break;
-    case LIGHT_POINT:
-        cookedParams_.lightMatrices_[0] = lightNode->GetWorldRotation().RotationMatrix();
-        cookedParams_.numLightMatrices_ = 1;
-        break;
-    default:
-        break;
+        switch (lightType)
+        {
+        case LIGHT_DIRECTIONAL:
+            cookedParams_.lightShapeMatrix_ = Matrix4::IDENTITY;
+            break;
+        case LIGHT_SPOT:
+            cookedParams_.lightShapeMatrix_ = CalculateSpotMatrix(light_);
+            break;
+        case LIGHT_POINT:
+            cookedParams_.lightShapeMatrix_ = lightNode->GetWorldTransform().Inverse().ToMatrix4();
+            break;
+        default:
+            break;
+        }
     }
 
     // Skip the rest if no shadow
@@ -412,8 +413,8 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernel
         break;
 
     case LIGHT_SPOT:
-        cookedParams_.numLightMatrices_ = 2;
-        cookedParams_.lightMatrices_[1] = splits_[0].GetWorldToShadowSpaceMatrix(subPixelOffset);
+        cookedParams_.numLightMatrices_ = 1;
+        cookedParams_.lightMatrices_[0] = splits_[0].GetWorldToShadowSpaceMatrix(subPixelOffset);
         break;
 
     case LIGHT_POINT:
@@ -514,6 +515,7 @@ void LightProcessor::UpdateHashes()
     CombineHash(commonHash, light_->GetLightType());
     CombineHash(commonHash, HasShadow());
     CombineHash(commonHash, !!light_->GetShapeTexture());
+    CombineHash(commonHash, !!light_->GetRampTexture());
     CombineHash(commonHash, light_->GetSpecularIntensity() > 0.0f);
     CombineHash(commonHash, biasParameters.normalOffset_ > 0.0f);
     CombineHash(commonHash, MakeHash(biasParameters.constantBias_));

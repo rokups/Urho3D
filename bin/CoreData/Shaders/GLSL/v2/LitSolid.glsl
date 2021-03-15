@@ -1,49 +1,48 @@
 #include "_Config.glsl"
 #include "_Uniforms.glsl"
+#include "_Samplers.glsl"
 #include "_VertexLayout.glsl"
-#include "_VertexTransform.glsl"
 #include "_PixelOutput.glsl"
+
+#include "_VertexTransform.glsl"
 #include "_GammaCorrection.glsl"
 #include "_AmbientLighting.glsl"
-#include "_Samplers.glsl"
+#include "_PixelLighting.glsl"
 #include "_Shadow.glsl"
-#include "Lighting.glsl"
-#include "Fog.glsl"
+
+#include "_Material.glsl"
+#include "_Fog.glsl"
+
+VERTEX_OUTPUT(float vWorldDepth)
 
 VERTEX_OUTPUT(vec2 vTexCoord)
 #ifdef URHO3D_HAS_LIGHTMAP
     VERTEX_OUTPUT(vec2 vTexCoord2)
 #endif
+
 #ifdef URHO3D_VERTEX_HAS_COLOR
     VERTEX_OUTPUT(vec4 vColor)
+#endif
+
+VERTEX_OUTPUT(vec3 vNormal)
+VERTEX_OUTPUT(vec3 vLightVec)
+#ifdef URHO3D_NEED_EYE_VECTOR
+    VERTEX_OUTPUT(vec3 vEyeVec)
 #endif
 #ifdef URHO3D_NORMAL_MAPPING
     VERTEX_OUTPUT(vec4 vTangent)
     VERTEX_OUTPUT(vec2 vBitangentXY)
 #endif
 
-VERTEX_OUTPUT(vec3 vNormal)
-VERTEX_OUTPUT(vec4 vWorldPos)
-
-#ifdef URHO3D_HAS_AMBIENT_OR_VERTEX_LIGHT
+#ifdef URHO3D_AMBIENT_PASS
     VERTEX_OUTPUT(vec3 vAmbientAndVertexLigthing)
 #endif
 #ifdef URHO3D_HAS_SHADOW
     VERTEX_OUTPUT(optional_highp vec4 vShadowPos[URHO3D_SHADOW_NUM_CASCADES])
 #endif
 
-#ifdef PERPIXEL
-    #ifdef SPOTLIGHT
-        VERTEX_OUTPUT(vec4 vSpotPos)
-    #endif
-    #ifdef POINTLIGHT
-        VERTEX_OUTPUT(vec3 vCubeMaskVec)
-    #endif
-#else
-    VERTEX_OUTPUT(vec4 vScreenPos)
-    #ifdef ENVCUBEMAP
-        VERTEX_OUTPUT(vec3 vReflectionVec)
-    #endif
+#ifdef URHO3D_LIGHT_CUSTOM_SHAPE
+    VERTEX_OUTPUT(vec4 vShapePos)
 #endif
 
 #ifdef URHO3D_VERTEX_SHADER
@@ -51,10 +50,14 @@ void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
     gl_Position = WorldToClipSpace(vertexTransform.position.xyz);
+    vWorldDepth = GetDepth(gl_Position);
 
     vTexCoord = GetTransformedTexCoord();
     vNormal = vertexTransform.normal;
-    vWorldPos = vec4(vertexTransform.position.xyz, GetDepth(gl_Position));
+    vLightVec = GetLightVector(vertexTransform.position.xyz);
+    #ifdef URHO3D_NEED_EYE_VECTOR
+        vEyeVec = GetEyeVector(vertexTransform.position.xyz);
+    #endif
 
     #ifdef URHO3D_VERTEX_HAS_COLOR
         vColor = iColor;
@@ -69,7 +72,7 @@ void main()
         vTexCoord2 = GetLightMapTexCoord();
     #endif
 
-    #ifdef URHO3D_HAS_AMBIENT_OR_VERTEX_LIGHT
+    #ifdef URHO3D_AMBIENT_PASS
         vAmbientAndVertexLigthing = GetAmbientAndVertexLights(vertexTransform.position.xyz, vertexTransform.normal);
     #endif
 
@@ -77,12 +80,8 @@ void main()
         WorldSpaceToShadowCoord(vShadowPos, vertexTransform.position);
     #endif
 
-    #ifdef SPOTLIGHT
-        vSpotPos = vertexTransform.position * cLightMatrices[0];
-    #endif
-
-    #ifdef POINTLIGHT
-        vCubeMaskVec = (vertexTransform.position.xyz - cLightPos.xyz) * mat3(cLightMatrices[0][0].xyz, cLightMatrices[0][1].xyz, cLightMatrices[0][2].xyz);
+    #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
+        vShapePos = vertexTransform.position * cLightShapeMatrix;
     #endif
 }
 #endif
@@ -90,111 +89,70 @@ void main()
 #ifdef URHO3D_PIXEL_SHADER
 void main()
 {
-    // Get material diffuse albedo
-    #ifdef DIFFMAP
-        vec4 diffInput = texture2D(sDiffMap, vTexCoord.xy);
-        #ifdef ALPHAMASK
-            if (diffInput.a < 0.5)
-                discard;
-        #endif
-        vec4 diffColor = DiffMap_ToLight(cMatDiffColor * diffInput);
+    vec4 albedo = GetMaterialAlbedo(vTexCoord.xy);
+
+    #ifdef URHO3D_HAS_SPECULAR_HIGHLIGHTS
+        vec3 specColor = GetMaterialSpecularColor(vTexCoord.xy);
     #else
-        vec4 diffColor = GammaToLightSpaceAlpha(cMatDiffColor);
+        vec3 specColor = vec3(0.0);
     #endif
 
     #ifdef URHO3D_VERTEX_HAS_COLOR
-        diffColor *= vColor;
+        albedo *= vColor;
     #endif
 
-    // Get material specular albedo
-    #ifdef SPECMAP
-        vec3 specColor = cMatSpecColor.rgb * texture2D(sSpecMap, vTexCoord.xy).rgb;
-    #else
-        vec3 specColor = cMatSpecColor.rgb;
-    #endif
-
-    // Get normal
     #ifdef URHO3D_NORMAL_MAPPING
-        mat3 tbn = mat3(vTangent.xyz, vec3(vBitangentXY.xy, vTangent.w), vNormal);
-        vec3 normal = normalize(tbn * DecodeNormal(texture2D(sNormalMap, vTexCoord.xy)));
+        vec3 normal = GetMaterialNormal(vTexCoord.xy, vNormal, vTangent, vBitangentXY);
     #else
-        vec3 normal = normalize(vNormal);
+        vec3 normal = GetMaterialNormal(vNormal);
     #endif
 
-    // Get fog factor
-    #ifdef HEIGHTFOG
-        float fogFactor = GetHeightFogFactor(vWorldPos.w, vWorldPos.y);
-    #else
-        float fogFactor = GetFogFactor(vWorldPos.w);
-    #endif
+    float fogFactor = GetFogFactor(vWorldDepth);
 
     #ifndef DEFERRED
-        // Per-pixel forward lighting
-        vec3 lightColor;
-        vec3 lightDir;
-        vec3 finalColor;
-
-        float diff = GetDiffuse(normal, vWorldPos.xyz, lightDir);
+        vec4 lightVec = NormalizeLightVector(vLightVec);
+        float diff = GetDiffuseIntensity(normal, lightVec.xyz, lightVec.w);
 
         #ifdef SHADOW
-            diff *= GetForwardShadow(vShadowPos, vWorldPos.w);
+            diff *= GetForwardShadow(vShadowPos, vWorldDepth);
         #endif
 
-        #if defined(SPOTLIGHT)
-            lightColor = vSpotPos.w > 0.0 ? texture2DProj(sLightSpotMap, vSpotPos).rgb * cLightColor.rgb : vec3(0.0, 0.0, 0.0);
-        #elif defined(CUBEMASK)
-            lightColor = textureCube(sLightCubeMap, vCubeMaskVec).rgb * cLightColor.rgb;
+        #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
+            vec3 lightColor = GetLightColorFromShape(vShapePos);
         #else
-            lightColor = cLightColor.rgb;
+            vec3 lightColor = GetLightColor(lightVec.xyz);
         #endif
 
-        #ifdef SPECULAR
-            float spec = GetSpecular(normal, cCameraPos - vWorldPos.xyz, lightDir, cMatSpecColor.a);
-            finalColor = diff * lightColor * (diffColor.rgb + spec * specColor * cLightColor.a);
+        #ifdef URHO3D_HAS_SPECULAR_HIGHLIGHTS
+            vec3 eyeVec = normalize(vEyeVec.xyz);
+            float spec = GetSpecularIntensity(normal, eyeVec, lightVec.xyz, cMatSpecColor.a);
+            vec3 finalColor = diff * lightColor * (albedo.rgb + spec * specColor * cLightColor.a);
         #else
-            finalColor = diff * lightColor * diffColor.rgb;
-        #endif
-
-        #ifdef URHO3D_HAS_AMBIENT_OR_VERTEX_LIGHT
-            finalColor += vAmbientAndVertexLigthing * diffColor.rgb;
+            vec3 finalColor = diff * lightColor * albedo.rgb;
         #endif
 
         #ifdef URHO3D_AMBIENT_PASS
-            #ifdef LIGHTMAP
-                finalColor += texture2D(sEmissiveMap, vTexCoord2).rgb * 2.0 * diffColor.rgb;
-            #elif defined(EMISSIVEMAP)
-                finalColor += cMatEmissiveColor * texture2D(sEmissiveMap, vTexCoord.xy).rgb;
+            #ifdef URHO3D_HAS_LIGHTMAP
+                finalColor += GetAmbientLightingFromLightmap(vAmbientAndVertexLigthing, vTexCoord2, albedo.rgb);
             #else
-                finalColor += cMatEmissiveColor;
+                finalColor += GetAmbientLighting(vAmbientAndVertexLigthing, vTexCoord, albedo.rgb);
             #endif
-            gl_FragColor = vec4(GetFog(finalColor, fogFactor), diffColor.a);
-        #else
-            gl_FragColor = vec4(GetLitFog(finalColor, fogFactor), diffColor.a);
         #endif
+
+        gl_FragColor = vec4(ApplyFog(finalColor, fogFactor), albedo.a);
     #else
         // Fill deferred G-buffer
         float specIntensity = specColor.g;
         float specPower = cMatSpecColor.a / 255.0;
 
-        vec3 finalColor = vAmbientAndVertexLigthing * diffColor.rgb;
-        /*#ifdef AO
-            // If using AO, the vertex light ambient is black, calculate occluded ambient here
-            finalColor += texture2D(sEmissiveMap, vTexCoord2).rgb * cAmbientColor.rgb * diffColor.rgb;
-        #endif*/
-
-        #ifdef ENVCUBEMAP
-            finalColor += cMatEnvMapColor * textureCube(sEnvCubeMap, reflect(vReflectionVec, normal)).rgb;
-        #endif
-        #ifdef LIGHTMAP
-            finalColor += texture2D(sEmissiveMap, vTexCoord2).rgb * 2.0 * diffColor.rgb;
-        #elif defined(EMISSIVEMAP)
-            finalColor += cMatEmissiveColor * texture2D(sEmissiveMap, vTexCoord.xy).rgb;
+        #ifdef URHO3D_HAS_LIGHTMAP
+            vec3 finalColor = GetAmbientLightingFromLightmap(vAmbientAndVertexLigthing, vTexCoord2, albedo.rgb);
         #else
-            finalColor += cMatEmissiveColor;
+            vec3 finalColor = GetAmbientLighting(vAmbientAndVertexLigthing, vTexCoord, albedo.rgb);
         #endif
 
-        gl_FragData[0] = vec4(GetFog(finalColor, fogFactor), 1.0);
-        gl_FragData[1] = fogFactor * vec4(diffColor.rgb, specIntensity);
+        gl_FragData[0] = vec4(ApplyFog(finalColor, fogFactor), 1.0);
+        gl_FragData[1] = fogFactor * vec4(albedo.rgb, specIntensity);
         gl_FragData[2] = vec4(normal * 0.5 + 0.5, specPower);
     #endif
 }

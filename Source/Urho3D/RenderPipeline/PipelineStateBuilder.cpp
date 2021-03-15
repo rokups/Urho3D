@@ -373,7 +373,13 @@ void PipelineStateBuilder::ApplyPixelLight(const LightProcessor* lightProcessor,
     const Light* light = lightProcessor->GetLight();
 
     if (light->GetSpecularIntensity() > 0.0f && material->GetSpecular())
-        pixelDefines_ += "URHO3D_HAS_SPECULAR_HIGHLIGHTS SPECULAR ";
+        commonDefines_ += "URHO3D_HAS_SPECULAR_HIGHLIGHTS SPECULAR ";
+
+    if (light->GetShapeTexture())
+        commonDefines_ += "URHO3D_LIGHT_CUSTOM_SHAPE ";
+
+    if (light->GetRampTexture())
+        pixelDefines_ += "URHO3D_LIGHT_CUSTOM_RAMP ";
 
     static const ea::string lightTypeDefines[] = {
         "URHO3D_LIGHT_DIRECTIONAL DIRLIGHT ",

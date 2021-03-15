@@ -8,10 +8,13 @@
 // - AMBIENT: Useless;
 
 // Material defines:
+// - ALPHAMASK: Whether to discard pixels with alpha less than 0.5 in diffuse texture, material properties are ignored;
 // - NORMALMAP: Whether to apply normal mapping;
 // - TRANSLUCENT: Whether to use two-sided ligthing for geometries (forward lighting only);
 // - VOLUMETRIC: Whether to use volumetric ligthing for geometries (forward lighting only);
 // - UNLIT: Whether all lighting calculations should be ignored;
+// - ENVCUBEMAP: Whether to sample reflections from environment cubemap;
+// - AO: Whether to treat emission map as occlusion map
 
 // =================================== Global configuration ===================================
 
@@ -30,6 +33,17 @@
     #ifdef NORMALMAP
         #define URHO3D_NORMAL_MAPPING
     #endif
+#endif
+
+// URHO3D_REFLECTION_MAPPING: Whether to apply reflections from environment cubemap
+// TODO(renderer): Implement me
+/*#if defined(URHO3D_AMBIENT_PASS) && defined(ENVCUBEMAP)
+    #define URHO3D_REFLECTION_MAPPING
+#endif*/
+
+// URHO3D_NEED_EYE_VECTOR: Whether pixel shader needs eye vector
+#if defined(URHO3D_REFLECTION_MAPPING) || defined(URHO3D_HAS_SPECULAR_HIGHLIGHTS)
+    #define URHO3D_NEED_EYE_VECTOR
 #endif
 
 // =================================== Vertex layout configuration ===================================
@@ -73,7 +87,7 @@
     #endif
 #endif
 
-// =================================== Lighting configuration ===================================
+// =================================== Light configuration ===================================
 
 #if defined(URHO3D_HAS_LIGHT)
     // URHO3D_SURFACE_ONE_SIDED: Normal is clamped when calculating lighting. Ignored in deferred rendering.
@@ -89,11 +103,6 @@
     #else
         #define URHO3D_SURFACE_ONE_SIDED
         #define CONVERT_N_DOT_L(NdotL) max(0.0, NdotL)
-    #endif
-
-    // URHO3D_HAS_AMBIENT_OR_VERTEX_LIGHT: Whether the shader need to process ambient and/or vertex lighting.
-    #if defined(URHO3D_AMBIENT_PASS) || defined(URHO3D_NUM_VERTEX_LIGHTS)
-        #define URHO3D_HAS_AMBIENT_OR_VERTEX_LIGHT
     #endif
 
     // URHO3D_HAS_PIXEL_LIGHT: Whether the shader need to process per-pixel lighting.
@@ -137,11 +146,6 @@
         #define VERTEX_OUTPUT(decl) in decl;
     #else
         #define VERTEX_OUTPUT(decl) varying decl;
-    #endif
-
-    // Set default precicion to medium for GL ES pixel shader
-    #ifdef GL_ES
-        precision mediump float;
     #endif
 #endif
 
@@ -213,13 +217,16 @@
     #define highp
     #define mediump
     #define lowp
-    #define optional_highp
 #else
     #if defined(GL_FRAGMENT_PRECISION_HIGH) || !defined(URHO3D_PIXEL_SHADER)
-        #define optional_highp highp
+        precision highp float;
     #else
-        #define optional_highp mediump
+        precision mediump float;
     #endif
 #endif
+
+// Define shortcuts for precision-qualified types
+// TODO(renderer): Get rid of optional_highp
+#define optional_highp
 
 #endif // _CONFIG_GLSL_

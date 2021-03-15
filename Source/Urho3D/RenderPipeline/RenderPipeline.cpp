@@ -422,6 +422,7 @@ void RenderPipeline::Render()
     }
 
     OnRenderEnd(this, frameInfo_);
+    graphics_->SetColorWrite(true);
 }
 
 unsigned RenderPipeline::RecalculatePipelineStateHash() const

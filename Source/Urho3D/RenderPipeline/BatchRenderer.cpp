@@ -85,7 +85,7 @@ Vector4 GetFogParameter(const Camera& camera)
 {
     const float farClip = camera.GetFarClip();
     float fogStart = Min(camera.GetEffectiveFogStart(), farClip);
-    float fogEnd = Min(camera.GetEffectiveFogStart(), farClip);
+    float fogEnd = Min(camera.GetEffectiveFogEnd(), farClip);
     if (fogStart >= fogEnd * (1.0f - M_LARGE_EPSILON))
         fogStart = fogEnd * (1.0f - M_LARGE_EPSILON);
     const float fogRange = Max(fogEnd - fogStart, M_EPSILON);
@@ -394,6 +394,11 @@ private:
 
         drawQueue_.AddShaderParameter(PSP_LIGHTRAD, params.volumetricRadius_);
         drawQueue_.AddShaderParameter(PSP_LIGHTLENGTH, params.volumetricLength_);
+
+        // TODO(renderer): Cleanup constants
+        drawQueue_.AddShaderParameter("SpotAngle", Vector2{ params.spotCutoff_, params.inverseSpotCutoff_ });
+        if (params.lightShape_)
+            drawQueue_.AddShaderParameter("LightShapeMatrix", params.lightShapeMatrix_);
 
         if (params.numLightMatrices_ > 0)
         {

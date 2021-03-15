@@ -37,6 +37,7 @@
 				<attribute name="Bounding Box Min" value="-1000 -1000 -1000" />
 				<attribute name="Bounding Box Max" value="1000 1000 1000" />
 				<attribute name="Ambient Color" value="0.17273 0.180021 0.264286 1" />
+				<attribute name="Ambient Brightness" value="0.500000" />
 				<attribute name="Light Mask" value="-8" />
 				<attribute name="Shadow Mask" value="-8" />
 			</component>
@@ -51,8 +52,8 @@
 			<attribute name="Variables" />
 			<component type="Light" id="46">
 				<attribute name="Light Type" value="Directional" />
-				<attribute name="Color" value="1 0.937415 0.771429 1" />
-				<attribute name="Brightness Multiplier" value="0.700000" />
+				<attribute name="Color" value="1 0.989243 0.960714 1" />
+				<attribute name="Brightness Multiplier" value="0.500000" />
 				<attribute name="Cast Shadows" value="true" />
 				<attribute name="CSM Splits" value="20 70 200 400" />
 				<attribute name="Light Mask" value="-8" />
@@ -287,7 +288,7 @@
 	</node>
 	<node id="42">
 		<attribute name="Is Enabled" value="true" />
-		<attribute name="Name" value="Multiple Vertex Lights" />
+		<attribute name="Name" value="Multiple Lights" />
 		<attribute name="Tags" />
 		<attribute name="Position" value="2.5 0 7.5" />
 		<attribute name="Rotation" value="1 0 0 0" />
@@ -605,6 +606,236 @@
 				<attribute name="Material" value="Material;Materials/DefaultWhite.xml;Materials/DefaultWhite.xml" />
 				<attribute name="Cast Shadows" value="true" />
 			</component>
+		</node>
+	</node>
+	<node id="128">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Vertex and Pixel Lights" />
+		<attribute name="Tags" />
+		<attribute name="Position" value="10 0 8" />
+		<attribute name="Rotation" value="1 0 0 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<node id="129">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Plane" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0 0" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="5 5 10" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="120">
+				<attribute name="Model" value="Model;Models/PlaneTess.mdl" />
+				<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+			</component>
+		</node>
+		<node id="130">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Vertex Spot 1" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="-1 0.343344 -0.5" />
+			<attribute name="Rotation" value="-0.990449 -0.137869 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<component type="Light" id="121">
+				<attribute name="Light Type" value="Spot" />
+				<attribute name="Specular Intensity" value="0.000000" />
+				<attribute name="Range" value="5.000000" />
+				<attribute name="Per Vertex" value="true" />
+			</component>
+		</node>
+		<node id="132">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Pixel Spot 1" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="1 0.343344 -0.5" />
+			<attribute name="Rotation" value="-0.990449 -0.137869 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<component type="Light" id="123">
+				<attribute name="Light Type" value="Spot" />
+				<attribute name="Specular Intensity" value="0.000000" />
+				<attribute name="Range" value="5.000000" />
+			</component>
+		</node>
+		<node id="134">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Vertex Spot 2" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="-1 3 -1.5" />
+			<attribute name="Rotation" value="0.692273 0.721631 -0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<component type="Light" id="125">
+				<attribute name="Light Type" value="Spot" />
+				<attribute name="Specular Intensity" value="0.000000" />
+				<attribute name="Range" value="5.000000" />
+				<attribute name="Per Vertex" value="true" />
+			</component>
+		</node>
+		<node id="136">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Pixel Spot 1" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="1 3 -1.5" />
+			<attribute name="Rotation" value="0.707107 0.707107 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<component type="Light" id="127">
+				<attribute name="Light Type" value="Spot" />
+				<attribute name="Specular Intensity" value="0.000000" />
+				<attribute name="Range" value="5.000000" />
+			</component>
+		</node>
+		<node id="138">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Vertex Point" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="-1 0.343344 -4" />
+			<attribute name="Rotation" value="-0.990449 -0.137869 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<component type="Light" id="129">
+				<attribute name="Specular Intensity" value="0.000000" />
+				<attribute name="Range" value="1.000000" />
+				<attribute name="Light Shape Texture" value="TextureCube;" />
+				<attribute name="Per Vertex" value="true" />
+			</component>
+		</node>
+		<node id="140">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Pixel Point" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="1 0.343344 -4" />
+			<attribute name="Rotation" value="-0.990449 -0.137869 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<component type="Light" id="131">
+				<attribute name="Specular Intensity" value="0.000000" />
+				<attribute name="Range" value="1.000000" />
+				<attribute name="Light Shape Texture" value="TextureCube;" />
+			</component>
+		</node>
+	</node>
+	<node id="212">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Light Shapes" />
+		<attribute name="Tags" />
+		<attribute name="Position" value="16.5 0 8" />
+		<attribute name="Rotation" value="1 0 0 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<node id="213">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Plane" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0 0" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="5 5 10" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="203">
+				<attribute name="Model" value="Model;Models/PlaneTess.mdl" />
+				<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+			</component>
+		</node>
+		<node id="214">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Spot 1" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0.343344 -0.5" />
+			<attribute name="Rotation" value="-0.990449 -0.137869 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<component type="Light" id="204">
+				<attribute name="Light Type" value="Spot" />
+				<attribute name="Specular Intensity" value="0.000000" />
+				<attribute name="Range" value="5.000000" />
+				<attribute name="Light Shape Texture" value="Texture2D;Textures/Logo.png" />
+				<attribute name="Cast Shadows" value="true" />
+			</component>
+		</node>
+		<node id="216">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Spot 2" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 3 -1.5" />
+			<attribute name="Rotation" value="0.707107 0.707107 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<component type="Light" id="206">
+				<attribute name="Light Type" value="Spot" />
+				<attribute name="Specular Intensity" value="0.000000" />
+				<attribute name="Range" value="5.000000" />
+				<attribute name="Light Shape Texture" value="Texture2D;Textures/Logo.png" />
+				<attribute name="Cast Shadows" value="true" />
+			</component>
+		</node>
+		<node id="218">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Point" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0.343344 -4" />
+			<attribute name="Rotation" value="-4.37114e-08 1 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<component type="Light" id="208">
+				<attribute name="Specular Intensity" value="0.000000" />
+				<attribute name="Range" value="1.000000" />
+				<attribute name="Light Shape Texture" value="TextureCube;Textures/Skybox.xml" />
+				<attribute name="Cast Shadows" value="true" />
+				<attribute name="Normal Offset" value="1.000000" />
+			</component>
+		</node>
+		<node id="272">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Objects" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0 0" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<node id="274">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Torus" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="-0.0933986 0.525489 -1.26805" />
+				<attribute name="Rotation" value="0.839947 -0.411145 -0.160972 -0.315469" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="263">
+					<attribute name="Model" value="Model;Models/Torus.mdl" />
+					<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="276">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Torus" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="0.410942 0.46471 0.981229" />
+				<attribute name="Rotation" value="0.511716 -0.827663 0.1212 -0.19603" />
+				<attribute name="Scale" value="0.999999 0.999987 0.999987" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="265">
+					<attribute name="Model" value="Model;Models/Torus.mdl" />
+					<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="278">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Torus" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="0.542406 0.00725216 -4.23187" />
+				<attribute name="Rotation" value="-0.441315 0.645542 -0.613413 -0.110551" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="267">
+					<attribute name="Model" value="Model;Models/Torus.mdl" />
+					<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
 		</node>
 	</node>
 </scene>

@@ -52,10 +52,10 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
             vec3 lightVec = (lightPos - worldPos) * invRange;
             float lightDist = length(lightVec);
             vec3 localDir = lightVec / lightDist;
-            float atten = clamp(1.0 - lightDist * lightDist, 0.0, 1.0);
+            float atten = max(0.0, 1.0 - lightDist);
             float spotEffect = dot(localDir, lightDir);
             float spotAtten = clamp((spotEffect - cutoff) * invCutoff, 0.0, 1.0);
-            return CONVERT_N_DOT_L(dot(normal, localDir)) * atten * spotAtten;
+            return CONVERT_N_DOT_L(dot(normal, localDir)) * atten * atten * spotAtten;
         }
     }
 #endif
@@ -71,23 +71,21 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
     #elif defined(URHO3D_AMBIENT_CONSTANT)
         #define GetAmbientLight(normal) cAmbientColor.rgb
     #endif
-#endif // URHO3D_AMBIENT_PASS
 
-// Calculate combined ambient lighting from zones, spherical harmonics and vertex lights
-// cVertexLights should contain light color in light space.
-vec3 GetAmbientAndVertexLights(vec3 position, vec3 normal)
-{
-#ifdef URHO3D_AMBIENT_PASS
-    vec3 result = GetAmbientLight(vec4(normal, 1.0));
-#else
-    vec3 result = vec3(0.0, 0.0, 0.0);
-#endif
-#ifdef URHO3D_NUM_VERTEX_LIGHTS
-    for (int i = 0; i < URHO3D_NUM_VERTEX_LIGHTS; ++i)
-        result += GetVertexLight(i, position, normal) * cVertexLights[i * 3].rgb;
-#endif
-    return result;
-}
+    // Calculate combined ambient lighting from zones, spherical harmonics and vertex lights
+    // cVertexLights should contain light color in light space.
+    vec3 GetAmbientAndVertexLights(vec3 position, vec3 normal)
+    {
+        vec3 result = GetAmbientLight(vec4(normal, 1.0));
+
+        #ifdef URHO3D_NUM_VERTEX_LIGHTS
+            for (int i = 0; i < URHO3D_NUM_VERTEX_LIGHTS; ++i)
+                result += GetVertexLight(i, position, normal) * cVertexLights[i * 3].rgb;
+        #endif
+
+        return result;
+    }
+#endif // URHO3D_AMBIENT_PASS
 
 #endif // URHO3D_VERTEX_SHADER
 #endif // _AMBIENT_LIGHTING_GLSL_

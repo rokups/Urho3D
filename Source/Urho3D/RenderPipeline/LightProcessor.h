@@ -55,6 +55,9 @@ struct CookedLightParams
     float volumetricLength_{};
     /// @}
 
+    /// Matrix for light shape (aka light cookie).
+    Matrix4 lightShapeMatrix_;
+
     /// Shadow matrices for each split (for directional lights).
     /// Light matrix and shadow matrix (for spot lights).
     /// Light matrix (for point lights).
