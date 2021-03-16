@@ -3,32 +3,78 @@
 
 #extension GL_ARB_shading_language_420pack: enable
 
-// Ignored deprecated defines:
-// - NOUV: Detected automatically;
-// - AMBIENT: Useless;
+// =================================== External defines ===================================
 
-// Material defines:
-// - ALPHAMASK: Whether to discard pixels with alpha less than 0.5 in diffuse texture, material properties are ignored;
-// - NORMALMAP: Whether to apply normal mapping;
-// - TRANSLUCENT: Whether to use two-sided ligthing for geometries (forward lighting only);
-// - VOLUMETRIC: Whether to use volumetric ligthing for geometries (forward lighting only);
-// - UNLIT: Whether all lighting calculations should be ignored;
-// - ENVCUBEMAP: Whether to sample reflections from environment cubemap;
-// - AO: Whether to treat emission map as occlusion map
+/// Whether vertex shader needs world-space normal.
+// #define URHO3D_VERTEX_NEED_NORMAL
+
+/// Whether vertex shader needs world-space tangent and bitangent.
+// #define URHO3D_VERTEX_NEED_TANGENT
+
+/// Whether pixel shader needs eye vector.
+// #define URHO3D_PIXEL_NEED_EYE_VECTOR
+
+/// Whether pixel shader needs world-space normal.
+// #define URHO3D_PIXEL_NEED_NORMAL
+
+/// Whether pixel shader needs world-space tangent and bitangent.
+// #define URHO3D_PIXEL_NEED_TANGENT
+
+/// Whether pixel shader needs vertex color.
+// #define URHO3D_PIXEL_NEED_COLOR
+
+/// Whether surface data in pixel shader needs specular.
+// #define URHO3D_SURFACE_NEED_SPECULAR
+
+/// Whether surface data in pixel shader needs occlusion.
+// #define URHO3D_SURFACE_NEED_OCCLUSION
+
+/// Whether to disable all lighting calculation.
+// #define UNLIT
+
+/// Whether to discard pixels with alpha less than 0.5 in diffuse texture. Material properties are ignored.
+// #define ALPHAMASK
+
+/// Whether to apply normal mapping.
+// #define NORMALMAP
+
+/// Whether to treat emission map as occlusion map.
+// #define AO
+
+/// Whether to sample reflections from environment cubemap.
+// #define ENVCUBEMAP
+
+/// Whether to use two-sided or volumetric ligthing for geometries (forward lighting only);
+// #define TRANSLUCENT
+// #define VOLUMETRIC
+
+// =================================== Deprecated external defines ===================================
+
+// #define NOUV
+// #define AMBIENT
+// #define DEFERRED
 
 // =================================== Global configuration ===================================
 
+/// URHO3D_VERTEX_SHADER: Defined for vertex shader only.
 #ifdef COMPILEVS
     #define URHO3D_VERTEX_SHADER
 #endif
+
+/// URHO3D_PIXEL_SHADER: Defined for pixel shader only.
 #ifdef COMPILEPS
     #define URHO3D_PIXEL_SHADER
 #endif
 
-// URHO3D_HAS_LIGHT: Whether there's lighting in any form.
+// URHO3D_IS_LIT: Whether there's lighting in any form applied to geometry.
+// URHO3D_HAS_PIXEL_LIGHT: Whether there's per-pixel lighting from directional, point or spot light source.
 // URHO3D_NORMAL_MAPPING: Whether to apply normal mapping.
 #if !defined(UNLIT) && !defined(URHO3D_SHADOW_PASS)
-    #define URHO3D_HAS_LIGHT
+    #define URHO3D_IS_LIT
+
+    #if defined(URHO3D_LIGHT_DIRECTIONAL) || defined(URHO3D_LIGHT_POINT) || defined(URHO3D_LIGHT_SPOT)
+        #define URHO3D_HAS_PIXEL_LIGHT
+    #endif
 
     #ifdef NORMALMAP
         #define URHO3D_NORMAL_MAPPING
@@ -41,18 +87,43 @@
     #define URHO3D_REFLECTION_MAPPING
 #endif*/
 
-// URHO3D_NEED_EYE_VECTOR: Whether pixel shader needs eye vector
-#if defined(URHO3D_REFLECTION_MAPPING) || defined(URHO3D_HAS_SPECULAR_HIGHLIGHTS)
-    #define URHO3D_NEED_EYE_VECTOR
+// =================================== Vertex output ===================================
+
+#if defined(URHO3D_REFLECTION_MAPPING) || defined(URHO3D_LIGHT_HAS_SPECULAR)
+    #ifndef URHO3D_PIXEL_NEED_EYE_VECTOR
+        #define URHO3D_PIXEL_NEED_EYE_VECTOR
+    #endif
 #endif
 
-// =================================== Vertex layout configuration ===================================
+// Request normal if has pixel lighting or if deferred
+// TODO(renderer): Don't do it for particles?
+#if defined(URHO3D_HAS_PIXEL_LIGHT) || (!defined(UNLIT) && defined(URHO3D_GBUFFER_PASS))
+    #ifndef URHO3D_PIXEL_NEED_NORMAL
+        #define URHO3D_PIXEL_NEED_NORMAL
+    #endif
+#endif
+
+// Request tangent if normal mapping is enabled
+#if defined(URHO3D_NORMAL_MAPPING)
+    #ifndef URHO3D_PIXEL_NEED_TANGENT
+        #define URHO3D_PIXEL_NEED_TANGENT
+    #endif
+#endif
+
+// Request vertex color if not shadow pass
+#if defined(URHO3D_VERTEX_HAS_COLOR) && !defined(URHO3D_SHADOW_PASS)
+    #ifndef URHO3D_PIXEL_NEED_COLOR
+        #define URHO3D_PIXEL_NEED_COLOR
+    #endif
+#endif
+
+// =================================== Vertex input ===================================
 
 #ifdef URHO3D_VERTEX_SHADER
-    // URHO3D_VERTEX_NORMAL_AVAILABLE: Whether vertex normal in object space is available.
-    // URHO3D_VERTEX_TANGENT_AVAILABLE: Whether vertex tangent in object space is available.
-    // Some geometry types may deduce vertex tangent or normal and don't need them present in actual vertex layout.
-    // Don't rely on URHO3D_VERTEX_HAS_NORMAL and URHO3D_VERTEX_HAS_TANGENT.
+    /// URHO3D_VERTEX_NORMAL_AVAILABLE: Whether vertex normal in object space is available.
+    /// URHO3D_VERTEX_TANGENT_AVAILABLE: Whether vertex tangent in object space is available.
+    /// Some geometry types may deduce vertex tangent or normal and don't need them present in actual vertex layout.
+    /// Don't rely on URHO3D_VERTEX_HAS_NORMAL and URHO3D_VERTEX_HAS_TANGENT.
     #if defined(URHO3D_GEOMETRY_BILLBOARD) || defined(URHO3D_GEOMETRY_DIRBILLBOARD) || defined(URHO3D_GEOMETRY_TRAIL_FACE_CAMERA) || defined(URHO3D_GEOMETRY_TRAIL_BONE)
         #define URHO3D_VERTEX_NORMAL_AVAILABLE
         #define URHO3D_VERTEX_TANGENT_AVAILABLE
@@ -65,19 +136,19 @@
         #endif
     #endif
 
-    // URHO3D_VERTEX_TRANSFORM_NEED_NORMAL: Whether VertexTransform need world-space normal.
-    // Could be defined by user externally.
-    #if defined(URHO3D_VERTEX_NORMAL_AVAILABLE) && (defined(URHO3D_HAS_LIGHT) || defined(URHO3D_SHADOW_NORMAL_OFFSET))
-        #ifndef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
-            #define URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
+    #ifdef URHO3D_VERTEX_NORMAL_AVAILABLE
+        #if defined(URHO3D_PIXEL_NEED_NORMAL) || defined(URHO3D_IS_LIT) || defined(URHO3D_SHADOW_NORMAL_OFFSET)
+            #ifndef URHO3D_VERTEX_NEED_NORMAL
+                #define URHO3D_VERTEX_NEED_NORMAL
+            #endif
         #endif
     #endif
 
-    // URHO3D_VERTEX_TRANSFORM_NEED_TANGENT: Whether VertexTransform need world-space tangent and binormal.
-    // Could be defined by user externally.
-    #if defined(URHO3D_VERTEX_TANGENT_AVAILABLE) && defined(URHO3D_NORMAL_MAPPING)
-        #ifndef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
-            #define URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
+    #ifdef URHO3D_VERTEX_TANGENT_AVAILABLE
+        #if defined(URHO3D_PIXEL_NEED_TANGENT)
+            #ifndef URHO3D_VERTEX_NEED_TANGENT
+                #define URHO3D_VERTEX_NEED_TANGENT
+            #endif
         #endif
     #endif
 
@@ -85,11 +156,11 @@
     #if defined(URHO3D_SHADOW_NORMAL_OFFSET) && !defined(URHO3D_VERTEX_NORMAL_AVAILABLE)
         #undef URHO3D_SHADOW_NORMAL_OFFSET
     #endif
-#endif
+#endif // URHO3D_VERTEX_SHADER
 
 // =================================== Light configuration ===================================
 
-#if defined(URHO3D_HAS_LIGHT)
+#if defined(URHO3D_IS_LIT)
     // URHO3D_SURFACE_ONE_SIDED: Normal is clamped when calculating lighting. Ignored in deferred rendering.
     // URHO3D_SURFACE_TWO_SIDED: Normal is mirrored when calculating lighting. Ignored in deferred rendering.
     // URHO3D_SURFACE_VOLUMETRIC: Normal is ignored when calculating lighting. Ignored in deferred rendering.
@@ -103,11 +174,6 @@
     #else
         #define URHO3D_SURFACE_ONE_SIDED
         #define CONVERT_N_DOT_L(NdotL) max(0.0, NdotL)
-    #endif
-
-    // URHO3D_HAS_PIXEL_LIGHT: Whether the shader need to process per-pixel lighting.
-    #if !defined(URHO3D_SHADOW_PASS) && (defined(URHO3D_LIGHT_DIRECTIONAL) || defined(URHO3D_LIGHT_POINT) || defined(URHO3D_LIGHT_SPOT))
-        #define URHO3D_HAS_PIXEL_LIGHT
     #endif
 #endif
 

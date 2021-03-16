@@ -152,7 +152,12 @@ SharedPtr<PipelineState> PipelineStateBuilder::CreateBatchPipelineState(
         ApplyUserPass(batchCompositorPass, ctx.subpassIndex_, key.material_, key.pass_, key.drawable_);
 
     if (!isShadowPass && key.pixelLight_)
-        ApplyPixelLight(key.pixelLight_, key.material_);
+    {
+        if (isLightVolumePass)
+            ApplyPixelLight(key.pixelLight_, true);
+        else
+            ApplyPixelLight(key.pixelLight_, key.material_->GetSpecular());
+    }
 
     FinalizeDescription(key.pass_);
     return renderer_->GetOrCreatePipelineState(desc_);
@@ -318,6 +323,8 @@ void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPa
         commonDefines_ += "URHO3D_AMBIENT_PASS ";
         if (!isDeferred)
             commonDefines_ += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", sceneProcessor_->GetSettings().maxVertexLights_);
+        else
+            commonDefines_ += "URHO3D_GBUFFER_PASS ";
     }
 
     static const ea::string ambientModeDefines[] = {
@@ -368,12 +375,12 @@ void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPa
     }
 }
 
-void PipelineStateBuilder::ApplyPixelLight(const LightProcessor* lightProcessor, const Material* material)
+void PipelineStateBuilder::ApplyPixelLight(const LightProcessor* lightProcessor, bool materialHasSpecular)
 {
     const Light* light = lightProcessor->GetLight();
 
-    if (light->GetSpecularIntensity() > 0.0f && material->GetSpecular())
-        commonDefines_ += "URHO3D_HAS_SPECULAR_HIGHLIGHTS SPECULAR ";
+    if (light->GetSpecularIntensity() > 0.0f && materialHasSpecular)
+        commonDefines_ += "URHO3D_LIGHT_HAS_SPECULAR SPECULAR ";
 
     if (light->GetShapeTexture())
         commonDefines_ += "URHO3D_LIGHT_CUSTOM_SHAPE ";

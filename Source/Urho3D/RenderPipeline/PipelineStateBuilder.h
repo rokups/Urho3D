@@ -66,7 +66,7 @@ private:
     void ApplyUserPass(const BatchCompositorPass* compositorPass, unsigned subpassIndex,
         const Material* material, const Pass* materialPass, const Drawable* drawable);
 
-    void ApplyPixelLight(const LightProcessor* lightProcessor, const Material* material);
+    void ApplyPixelLight(const LightProcessor* lightProcessor, bool materialHasSpecular);
 
     void FinalizeDescription(const Pass* materialPass);
     /// @}

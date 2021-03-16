@@ -165,6 +165,7 @@ void RenderPipeline::ApplySettings()
 
             deferred_ = DeferredLightingData{};
             deferred_->albedoBuffer_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
+            deferred_->specularBuffer_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
             deferred_->normalBuffer_ = renderBufferManager_->CreateColorBuffer({ Graphics::GetRGBAFormat() });
         }
         else
@@ -354,11 +355,13 @@ void RenderPipeline::Render()
     {
         // Draw deferred GBuffer
         renderBufferManager_->ClearColor(deferred_->albedoBuffer_, Color::TRANSPARENT_BLACK);
+        renderBufferManager_->ClearColor(deferred_->specularBuffer_, Color::TRANSPARENT_BLACK);
         renderBufferManager_->ClearOutput(fogColor, 1.0f, 0);
 
         RenderBuffer* const gBuffer[] = {
             renderBufferManager_->GetColorOutput(),
             deferred_->albedoBuffer_,
+            deferred_->specularBuffer_,
             deferred_->normalBuffer_
         };
         renderBufferManager_->SetRenderTargets(renderBufferManager_->GetDepthStencilOutput(), gBuffer);
@@ -374,8 +377,9 @@ void RenderPipeline::Render()
 
         // Draw deferred lights
         const ShaderResourceDesc geometryBuffer[] = {
-            { TU_ALBEDOBUFFER, deferred_->albedoBuffer_->GetTexture() },
-            { TU_NORMALBUFFER, deferred_->normalBuffer_->GetTexture() },
+            { TU_DIFFUSE, deferred_->albedoBuffer_->GetTexture() },
+            { TU_SPECULAR, deferred_->specularBuffer_->GetTexture() },
+            { TU_NORMAL, deferred_->normalBuffer_->GetTexture() },
             { TU_DEPTHBUFFER, renderBufferManager_->GetDepthStencilTexture() }
         };
 

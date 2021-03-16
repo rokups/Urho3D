@@ -51,11 +51,11 @@ struct VertexTransform
 {
     /// Vertex position in world space, w = 1.0
     vec4 position;
-#ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
+#ifdef URHO3D_VERTEX_NEED_NORMAL
     /// Vertex normal in world space
     vec3 normal;
 #endif
-#ifdef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
+#ifdef URHO3D_VERTEX_NEED_TANGENT
     /// Vertex tangent in world space
     vec3 tangent;
     /// Vertex bitangent in world space
@@ -132,13 +132,13 @@ struct VertexTransform
         VertexTransform result;
         result.position = iPos * modelMatrix;
 
-        #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
+        #ifdef URHO3D_VERTEX_NEED_NORMAL
             mat3 normalMatrix = GetNormalMatrix(modelMatrix);
             result.normal = normalize(iNormal * normalMatrix);
 
             ApplyShadowNormalOffset(result.position, result.normal);
 
-            #ifdef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
+            #ifdef URHO3D_VERTEX_NEED_TANGENT
                 result.tangent = normalize(iTangent.xyz * normalMatrix);
                 result.bitangent = cross(result.tangent, result.normal) * iTangent.w;
             #endif
@@ -155,12 +155,12 @@ struct VertexTransform
         result.position = iPos * modelMatrix;
         result.position.xyz += vec3(iTexCoord1.x, iTexCoord1.y, 0.0) * cBillboardRot;
 
-        #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
+        #ifdef URHO3D_VERTEX_NEED_NORMAL
             result.normal = vec3(-cBillboardRot[0][2], -cBillboardRot[1][2], -cBillboardRot[2][2]);
 
             ApplyShadowNormalOffset(result.position, result.normal);
 
-            #ifdef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
+            #ifdef URHO3D_VERTEX_NEED_TANGENT
                 result.tangent = vec3(cBillboardRot[0][0], cBillboardRot[1][0], cBillboardRot[2][0]);
                 result.bitangent = vec3(cBillboardRot[0][1], cBillboardRot[1][1], cBillboardRot[2][1]);
             #endif
@@ -191,12 +191,12 @@ struct VertexTransform
         mat3 rotation = GetFaceCameraRotation(result.position.xyz, iNormal);
         result.position.xyz += vec3(iTexCoord1.x, 0.0, iTexCoord1.y) * rotation;
 
-        #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
+        #ifdef URHO3D_VERTEX_NEED_NORMAL
             result.normal = vec3(rotation[0][1], rotation[1][1], rotation[2][1]);
 
             ApplyShadowNormalOffset(result.position, result.normal);
 
-            #ifdef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
+            #ifdef URHO3D_VERTEX_NEED_TANGENT
                 result.tangent = vec3(rotation[0][0], rotation[1][0], rotation[2][0]);
                 result.bitangent = vec3(rotation[0][2], rotation[1][2], rotation[2][2]);
             #endif
@@ -213,12 +213,12 @@ struct VertexTransform
         VertexTransform result;
         result.position = vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix;
 
-        #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
+        #ifdef URHO3D_VERTEX_NEED_NORMAL
             result.normal = normalize(cross(right, iTangent.xyz));
 
             ApplyShadowNormalOffset(result.position, result.normal);
 
-            #ifdef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
+            #ifdef URHO3D_VERTEX_NEED_TANGENT
                 result.tangent = iTangent.xyz;
                 result.bitangent = right;
             #endif
@@ -237,12 +237,12 @@ struct VertexTransform
         VertexTransform result;
         result.position = vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix;
 
-        #ifdef URHO3D_VERTEX_TRANSFORM_NEED_NORMAL
+        #ifdef URHO3D_VERTEX_NEED_NORMAL
             result.normal = up;
 
             ApplyShadowNormalOffset(result.position, result.normal);
 
-            #ifdef URHO3D_VERTEX_TRANSFORM_NEED_TANGENT
+            #ifdef URHO3D_VERTEX_NEED_TANGENT
                 result.tangent = front;
                 result.bitangent = normalize(cross(result.tangent, result.normal));
             #endif

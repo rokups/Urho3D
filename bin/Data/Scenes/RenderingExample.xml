@@ -227,16 +227,18 @@
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Light" />
 			<attribute name="Tags" />
-			<attribute name="Position" value="5.32174 0.91897 0" />
+			<attribute name="Position" value="-0.019733 0.91897 -3.31015" />
 			<attribute name="Rotation" value="0.053264 0.0538499 -0.183264 0.980116" />
 			<attribute name="Scale" value="0.999999 0.999724 0.999725" />
 			<attribute name="Variables" />
 			<component type="Light" id="26">
-				<attribute name="Light Type" value="Directional" />
 				<attribute name="Color" value="1 0.999997 0.99999 1" />
+				<attribute name="Range" value="30.000000" />
+				<attribute name="Light Shape Texture" value="TextureCube;" />
 				<attribute name="Cast Shadows" value="true" />
 				<attribute name="CSM Splits" value="5 100 0 0" />
 				<attribute name="CSM Bias Auto Adjust" value="0.000000" />
+				<attribute name="Normal Offset" value="0.100000" />
 				<attribute name="Light Mask" value="2" />
 			</component>
 		</node>

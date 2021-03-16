@@ -5,10 +5,8 @@
 
 #ifdef GL3
     #ifndef NUM_RENDER_TARGETS
-        #if defined(DEFERRED)
+        #if defined(URHO3D_GBUFFER_PASS)
             #define NUM_RENDER_TARGETS 4
-        #elif defined(PREPASS)
-            #define NUM_RENDER_TARGETS 2
         #else
             #define NUM_RENDER_TARGETS 1
         #endif

@@ -8,8 +8,6 @@
 #include "_Samplers.glsl"
 #include "_Shadow.glsl"
 #include "_PixelLighting.glsl"
-
-#include "_Material.glsl"
 #include "_Fog.glsl"
 
 #ifdef DIRLIGHT
@@ -56,8 +54,9 @@ void main()
         #else
             vec3 worldPos = vFarRay * depth;
         #endif
-        vec4 albedoInput = texture2D(sAlbedoBuffer, vScreenPos);
-        vec4 normalInput = texture2D(sNormalBuffer, vScreenPos);
+        vec4 albedoInput = texture2D(sDiffMap, vScreenPos);
+        vec4 specularInput = texture2D(sSpecMap, vScreenPos);
+        vec4 normalInput = texture2D(sNormalMap, vScreenPos);
     #else
         float depth = ReconstructDepth(texture2DProj(sDepthBuffer, vScreenPos).r);
         #ifdef ORTHO
@@ -65,8 +64,9 @@ void main()
         #else
             vec3 worldPos = vFarRay * depth / vScreenPos.w;
         #endif
-        vec4 albedoInput = texture2DProj(sAlbedoBuffer, vScreenPos);
-        vec4 normalInput = texture2DProj(sNormalBuffer, vScreenPos);
+        vec4 albedoInput = texture2DProj(sDiffMap, vScreenPos);
+        vec4 specularInput = texture2DProj(sSpecMap, vScreenPos);
+        vec4 normalInput = texture2DProj(sNormalMap, vScreenPos);
     #endif
 
     // Position acquired via near/far ray is relative to camera. Bring position to world space
@@ -75,26 +75,15 @@ void main()
 
     vec3 normal = normalize(normalInput.rgb * 2.0 - 1.0);
     vec4 projWorldPos = vec4(worldPos, 1.0);
+    float specularPower = (1.0 - specularInput.a) * 255;
 
-    vec4 lightVec = NormalizeLightVector(GetLightVector(worldPos));
-    float diff = GetDiffuseIntensity(normal, lightVec.xyz, lightVec.w);
-
-    #ifdef SHADOW
-        diff *= GetDeferredShadow(projWorldPos, depth);
-    #endif
-
-    #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
-        vec4 shapePos = projWorldPos * cLightShapeMatrix;
-        vec3 lightColor = GetLightColorFromShape(shapePos);
+    PixelLightData pixelLightData = GetDeferredPixelLightData(projWorldPos, depth);
+    #ifdef URHO3D_LIGHT_HAS_SPECULAR
+        vec3 finalColor = GetBlinnPhongDiffuseSpecular(pixelLightData, normal, albedoInput.rgb,
+            specularInput.rgb, eyeVec, specularPower);
     #else
-        vec3 lightColor = GetLightColor(lightVec.xyz);
+        vec3 finalColor = GetBlinnPhongDiffuse(pixelLightData, normal, albedoInput.rgb);
     #endif
-
-    #ifdef SPECULAR
-        float spec = GetSpecularIntensity(normal, eyeVec, lightVec.xyz, normalInput.a * 255.0);
-        gl_FragColor = diff * vec4(lightColor * (albedoInput.rgb + spec * cLightColor.a * albedoInput.aaa), 0.0);
-    #else
-        gl_FragColor = diff * vec4(lightColor * albedoInput.rgb, 0.0);
-    #endif
+    gl_FragColor = vec4(finalColor, 0.0);
 }
 #endif

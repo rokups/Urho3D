@@ -5,6 +5,15 @@
     #error Include "_Uniforms.glsl" before "_PixelLighting.glsl"
 #endif
 
+#ifndef _SHADOW_GLSL_
+    #error Include "_Shadow.glsl" before "_PixelLighting.glsl"
+#endif
+
+/// Return eye vector, not normalized.
+#define GetEyeVector(worldPos) (cCameraPos - (worldPos))
+
+#ifdef URHO3D_HAS_PIXEL_LIGHT
+
 /// Return light vector normalized to light range.
 #ifdef URHO3D_LIGHT_DIRECTIONAL
     #define GetLightVector(worldPos) cLightDir
@@ -12,13 +21,23 @@
     #define GetLightVector(worldPos) ((cLightPos.xyz - (worldPos)) * cLightPos.w)
 #endif
 
-/// Return eye vector, not normalized.
-#define GetEyeVector(worldPos) (cCameraPos - (worldPos))
-
 #ifdef URHO3D_PIXEL_SHADER
+    /// Pixel light input independent of surface.
+    struct PixelLightData
+    {
+        /// Light color, with optional shape texture applied.
+        vec3 lightColor;
+        /// Normalized light vector. w component is normalized distance to light.
+        vec4 lightVec;
+    #ifdef URHO3D_HAS_SHADOW
+        /// Shadow factor. 0 is fully shadowed.
+        float shadow;
+    #endif
+    };
+
     /// Normalize light vector, return normalized vector and distance
     #ifdef URHO3D_LIGHT_DIRECTIONAL
-        #define NormalizeLightVector(lightVec) vec4(lightVec, 1.0)
+        #define NormalizeLightVector(lightVec) vec4(lightVec, 0.0)
     #else
         vec4 NormalizeLightVector(vec3 lightVec)
         {
@@ -70,17 +89,58 @@
         #endif
     #endif
 
+    /// Return pixel lighting data for deferred rendering.
+    PixelLightData GetDeferredPixelLightData(vec4 worldPos, float depth)
+    {
+        PixelLightData result;
+        result.lightVec = NormalizeLightVector(GetLightVector(worldPos.xyz));
+    #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
+        vec4 shapePos = worldPos * cLightShapeMatrix;
+        result.lightColor = GetLightColorFromShape(shapePos);
+    #else
+        result.lightColor = GetLightColor(result.lightVec.xyz);
+    #endif
+    #ifdef URHO3D_HAS_SHADOW
+        result.shadow = GetDeferredShadow(worldPos, depth);
+    #endif
+        return result;
+    }
+
     /// Evaluate diffuse lighting intensity.
     #define GetDiffuseIntensity(normal, lightVec, normalizedDistance) \
         (CONVERT_N_DOT_L(dot(normal, lightVec)) * GetLightDistanceAttenuation(normalizedDistance))
 
     /// Evaluate specular lighting intensity.
-    float GetSpecularIntensity(vec3 normal, vec3 eyeVec, vec3 lightVec, float specularPower)
+    float GetBlinnPhongSpecularIntensity(vec3 normal, vec3 eyeVec, vec3 lightVec, float specularPower)
     {
         vec3 halfVec = normalize(eyeVec + lightVec);
         return pow(max(dot(normal, halfVec), 0.0), specularPower);
     }
 
+    /// Evaluate Blinn-Phong diffuse lighting.
+    vec3 GetBlinnPhongDiffuse(PixelLightData lightData, vec3 normal, vec3 albedo)
+    {
+        float diffuseIntensity = GetDiffuseIntensity(normal, lightData.lightVec.xyz, lightData.lightVec.w);
+    #ifdef URHO3D_HAS_SHADOW
+        diffuseIntensity *= lightData.shadow;
+    #endif
+        return diffuseIntensity * lightData.lightColor * albedo;
+    }
+
+    /// Evaluate Blinn-Phong diffuse and specular lighting.
+    vec3 GetBlinnPhongDiffuseSpecular(PixelLightData lightData, vec3 normal, vec3 albedo,
+        vec3 specular, vec3 eyeVec, float specularPower)
+    {
+        float diffuseIntensity = GetDiffuseIntensity(normal, lightData.lightVec.xyz, lightData.lightVec.w);
+    #ifdef URHO3D_HAS_SHADOW
+        diffuseIntensity *= lightData.shadow;
+    #endif
+
+        float specularIntensity = GetBlinnPhongSpecularIntensity(normal, eyeVec, lightData.lightVec.xyz, specularPower);
+        return diffuseIntensity * lightData.lightColor * (albedo + specular * specularIntensity * cLightColor.a);
+    }
+
 #endif // URHO3D_PIXEL_SHADER
+#endif // URHO3D_HAS_PIXEL_LIGHT
 
 #endif // _PIXEL_LIGHTING_GLSL_
