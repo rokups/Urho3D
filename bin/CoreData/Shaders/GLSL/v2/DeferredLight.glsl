@@ -6,9 +6,10 @@
 #include "_PixelOutput.glsl"
 #include "_GammaCorrection.glsl"
 #include "_Samplers.glsl"
+#include "_DirectLighting.glsl"
 #include "_Shadow.glsl"
-#include "_PixelLighting.glsl"
 #include "_Fog.glsl"
+#include "_DeferredLighting.glsl"
 
 #ifdef DIRLIGHT
     VERTEX_OUTPUT(vec2 vScreenPos)

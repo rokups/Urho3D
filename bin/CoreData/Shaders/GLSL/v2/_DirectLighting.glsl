@@ -1,12 +1,8 @@
-#ifndef _PIXEL_LIGHTING_GLSL_
-#define _PIXEL_LIGHTING_GLSL_
+#ifndef _DIRECT_LIGHTING_GLSL_
+#define _DIRECT_LIGHTING_GLSL_
 
 #ifndef _UNIFORMS_GLSL_
-    #error Include "_Uniforms.glsl" before "_PixelLighting.glsl"
-#endif
-
-#ifndef _SHADOW_GLSL_
-    #error Include "_Shadow.glsl" before "_PixelLighting.glsl"
+    #error Include "_Uniforms.glsl" before "_DirectLighting.glsl"
 #endif
 
 /// Return eye vector, not normalized.
@@ -89,23 +85,6 @@
         #endif
     #endif
 
-    /// Return pixel lighting data for deferred rendering.
-    PixelLightData GetDeferredPixelLightData(vec4 worldPos, float depth)
-    {
-        PixelLightData result;
-        result.lightVec = NormalizeLightVector(GetLightVector(worldPos.xyz));
-    #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
-        vec4 shapePos = worldPos * cLightShapeMatrix;
-        result.lightColor = GetLightColorFromShape(shapePos);
-    #else
-        result.lightColor = GetLightColor(result.lightVec.xyz);
-    #endif
-    #ifdef URHO3D_HAS_SHADOW
-        result.shadow = GetDeferredShadow(worldPos, depth);
-    #endif
-        return result;
-    }
-
     /// Evaluate diffuse lighting intensity.
     #define GetDiffuseIntensity(normal, lightVec, normalizedDistance) \
         (CONVERT_N_DOT_L(dot(normal, lightVec)) * GetLightDistanceAttenuation(normalizedDistance))
@@ -143,4 +122,4 @@
 #endif // URHO3D_PIXEL_SHADER
 #endif // URHO3D_HAS_PIXEL_LIGHT
 
-#endif // _PIXEL_LIGHTING_GLSL_
+#endif // _DIRECT_LIGHTING_GLSL_

@@ -1,8 +1,8 @@
-#ifndef _AMBIENT_LIGHTING_GLSL_
-#define _AMBIENT_LIGHTING_GLSL_
+#ifndef _INDIRECT_LIGHTING_GLSL_
+#define _INDIRECT_LIGHTING_GLSL_
 
 #ifndef _GAMMA_CORRECTION_GLSL_
-    #error Include "_GammaCorrection.glsl" before "_AmbientLighting.glsl"
+    #error Include "_GammaCorrection.glsl" before "_IndirectLighting.glsl"
 #endif
 
 #ifdef URHO3D_VERTEX_SHADER
@@ -88,4 +88,4 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
 #endif // URHO3D_AMBIENT_PASS
 
 #endif // URHO3D_VERTEX_SHADER
-#endif // _AMBIENT_LIGHTING_GLSL_
+#endif // _INDIRECT_LIGHTING_GLSL_

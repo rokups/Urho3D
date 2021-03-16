@@ -253,18 +253,6 @@ float SampleShadowFiltered(optional_highp vec4 shadowPos)
     #define FadeShadow(value, depth) (value)
 #endif
 
-/// Calculate effective shadow factor (forward lighting).
-float GetForwardShadow(optional_highp vec4 shadowPos[URHO3D_SHADOW_NUM_CASCADES], float depth)
-{
-    return FadeShadow(SampleShadowFiltered(ShadowCoordToUV(shadowPos, depth)), depth);
-}
-
-/// Calculate effective shadow factor (deferred lighting).
-float GetDeferredShadow(vec4 worldPos, float depth)
-{
-    return FadeShadow(SampleShadowFiltered(WorldSpaceToShadowUV(worldPos, depth)), depth);
-}
-
 #endif // URHO3D_PIXEL_SHADER
 
 #endif // URHO3D_HAS_SHADOW

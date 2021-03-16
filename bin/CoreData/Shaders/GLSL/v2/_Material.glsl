@@ -11,9 +11,9 @@
 
 #include "_VertexTransform.glsl"
 #include "_GammaCorrection.glsl"
-#include "_AmbientLighting.glsl"
+#include "_IndirectLighting.glsl"
 #include "_Shadow.glsl"
-#include "_PixelLighting.glsl"
+#include "_DirectLighting.glsl"
 #include "_Fog.glsl"
 /// @}
 
@@ -248,7 +248,8 @@ SurfaceData GetCommonSurfaceData()
         result.lightColor = GetLightColor(result.lightVec.xyz);
     #endif
     #ifdef URHO3D_HAS_SHADOW
-        result.shadow = GetForwardShadow(vShadowPos, vWorldDepth);
+        vec4 shadowUV = ShadowCoordToUV(vShadowPos, vWorldDepth);
+        result.shadow = FadeShadow(SampleShadowFiltered(shadowUV), vWorldDepth);
     #endif
         return result;
     }
