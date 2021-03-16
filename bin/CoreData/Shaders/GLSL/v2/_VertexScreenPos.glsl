@@ -1,4 +1,8 @@
+#ifndef _VERTEX_SCREEN_POS_GLSL_
+#define _VERTEX_SCREEN_POS_GLSL_
+
 #ifdef URHO3D_VERTEX_SHADER
+
 mat3 GetCameraRot()
 {
     return mat3(cViewInv[0][0], cViewInv[0][1], cViewInv[0][2],
@@ -65,6 +69,13 @@ vec3 GetNearRay(vec4 clipPos)
         clipPos.y / clipPos.w * cFrustumSize.y,
         0.0);
 
+    // TODO(renderer): DX11 uses cDepthMode.z instead, why?
+#ifdef D3D11
+    return (viewRay * GetCameraRot()) * cDepthMode.z;
+#else
     return (viewRay * GetCameraRot()) * cDepthMode.x;
-}
 #endif
+}
+
+#endif // URHO3D_VERTEX_SHADER
+#endif // _VERTEX_SCREEN_POS_GLSL_

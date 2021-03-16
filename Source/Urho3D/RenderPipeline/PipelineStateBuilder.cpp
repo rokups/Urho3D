@@ -279,10 +279,8 @@ void PipelineStateBuilder::ApplyLightVolumePass(const LightProcessor* lightProce
     desc_.colorWriteEnabled_ = true;
     desc_.blendMode_ = light->IsNegative() ? BLEND_SUBTRACT : BLEND_ADD;
 
-    /// TODO(renderer): Remove
-    pixelDefines_ +=  "HWDEPTH ";
     if (cameraProcessor_->IsCameraOrthographic())
-        commonDefines_ += "ORTHO ";
+        commonDefines_ += "URHO3D_ORTHOGRAPHIC_DEPTH ORTHO ";
 
     if (light->GetLightType() != LIGHT_DIRECTIONAL)
     {

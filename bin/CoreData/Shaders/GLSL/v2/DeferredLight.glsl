@@ -11,13 +11,9 @@
 #include "_Fog.glsl"
 #include "_DeferredLighting.glsl"
 
-#ifdef DIRLIGHT
-    VERTEX_OUTPUT(vec2 vScreenPos)
-#else
-    VERTEX_OUTPUT(vec4 vScreenPos)
-#endif
+VERTEX_OUTPUT(vec4 vScreenPos)
 VERTEX_OUTPUT(vec3 vFarRay)
-#ifdef ORTHO
+#ifdef URHO3D_ORTHOGRAPHIC_DEPTH
     VERTEX_OUTPUT(vec3 vNearRay)
 #endif
 
@@ -25,21 +21,13 @@ VERTEX_OUTPUT(vec3 vFarRay)
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    //mat4 modelMatrix = iModelMatrix;
-    vec3 worldPos = vertexTransform.position.xyz;// GetWorldPos(modelMatrix);
+    vec3 worldPos = vertexTransform.position.xyz;
     gl_Position = GetClipPos(worldPos);
-    #ifdef DIRLIGHT
-        vScreenPos = GetScreenPosPreDiv(gl_Position);
-        vFarRay = GetFarRay(gl_Position);
-        #ifdef ORTHO
-            vNearRay = GetNearRay(gl_Position);
-        #endif
-    #else
-        vScreenPos = GetScreenPos(gl_Position);
-        vFarRay = GetFarRay(gl_Position) * gl_Position.w;
-        #ifdef ORTHO
-            vNearRay = GetNearRay(gl_Position) * gl_Position.w;
-        #endif
+
+    vScreenPos = GetDeferredScreenPos(gl_Position);
+    vFarRay = GetDeferredFarRay(gl_Position);
+    #ifdef URHO3D_ORTHOGRAPHIC_DEPTH
+        vNearRay = GetDeferredNearRay(gl_Position);
     #endif
 }
 #endif
@@ -47,38 +35,19 @@ void main()
 #ifdef URHO3D_PIXEL_SHADER
 void main()
 {
-    // If rendering a directional light quad, optimize out the w divide
-    #ifdef DIRLIGHT
-        float depth = ReconstructDepth(texture2D(sDepthBuffer, vScreenPos).r);
-        #ifdef ORTHO
-            vec3 worldPos = mix(vNearRay, vFarRay, depth);
-        #else
-            vec3 worldPos = vFarRay * depth;
-        #endif
-        vec4 albedoInput = texture2D(sDiffMap, vScreenPos);
-        vec4 specularInput = texture2D(sSpecMap, vScreenPos);
-        vec4 normalInput = texture2D(sNormalMap, vScreenPos);
-    #else
-        float depth = ReconstructDepth(texture2DProj(sDepthBuffer, vScreenPos).r);
-        #ifdef ORTHO
-            vec3 worldPos = mix(vNearRay, vFarRay, depth) / vScreenPos.w;
-        #else
-            vec3 worldPos = vFarRay * depth / vScreenPos.w;
-        #endif
-        vec4 albedoInput = texture2DProj(sDiffMap, vScreenPos);
-        vec4 specularInput = texture2DProj(sSpecMap, vScreenPos);
-        vec4 normalInput = texture2DProj(sNormalMap, vScreenPos);
-    #endif
+    float depth = ReconstructDepth(SampleGeometryBuffer(sDepthBuffer, vScreenPos).r);
+    vec4 albedoInput = SampleGeometryBuffer(sDiffMap, vScreenPos);
+    vec4 specularInput = SampleGeometryBuffer(sSpecMap, vScreenPos);
+    vec4 normalInput = SampleGeometryBuffer(sNormalMap, vScreenPos);
 
-    // Position acquired via near/far ray is relative to camera. Bring position to world space
-    vec3 eyeVec = normalize(-worldPos);
-    worldPos += cCameraPos;
+    vec4 worldPos = GetDeferredWorldPos(vScreenPos, depth);
+    vec3 eyeVec = normalize(-worldPos.xyz);
+    worldPos.xyz += cCameraPos;
 
     vec3 normal = normalize(normalInput.rgb * 2.0 - 1.0);
-    vec4 projWorldPos = vec4(worldPos, 1.0);
     float specularPower = (1.0 - specularInput.a) * 255;
 
-    PixelLightData pixelLightData = GetDeferredPixelLightData(projWorldPos, depth);
+    PixelLightData pixelLightData = GetDeferredPixelLightData(worldPos, depth);
     #ifdef URHO3D_LIGHT_HAS_SPECULAR
         vec3 finalColor = GetBlinnPhongDiffuseSpecular(pixelLightData, normal, albedoInput.rgb,
             specularInput.rgb, eyeVec, specularPower);

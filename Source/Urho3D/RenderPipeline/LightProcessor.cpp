@@ -195,7 +195,7 @@ void LightProcessor::Update(DrawableProcessor* drawableProcessor, const LightPro
     const LightType lightType = light_->GetLightType();
 
     // Check if light volume contains camera
-    cameraIsInsideLightVolume_ = EstimateDistanceToCamera(cullCamera, light_) < cullCamera->GetNearClip() * 2.0f;
+    cameraIsInsideLightVolume_ = EstimateDistanceToCamera(cullCamera, light_) <= cullCamera->GetNearClip() * 2.0f;
 
     // Query lit geometries (and shadow casters for spot and point lights)
     switch (lightType)
