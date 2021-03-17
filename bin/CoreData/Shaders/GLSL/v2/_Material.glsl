@@ -12,9 +12,11 @@
 #include "_VertexTransform.glsl"
 #include "_GammaCorrection.glsl"
 #include "_IndirectLighting.glsl"
-#include "_Shadow.glsl"
 #include "_DirectLighting.glsl"
+#include "_Shadow.glsl"
 #include "_Fog.glsl"
+
+#include "_SurfaceData.glsl"
 /// @}
 
 /// Common vertex output for any material
@@ -111,49 +113,6 @@ void FillCommonVertexOutput(VertexTransform vertexTransform, vec2 uv)
 
 #ifdef URHO3D_PIXEL_SHADER
 
-#if defined(URHO3D_LIGHT_HAS_SPECULAR) || defined(URHO3D_GBUFFER_PASS) || defined(URHO3D_PHYSICAL_MATERIAL)
-    #ifndef URHO3D_SURFACE_NEED_SPECULAR
-        #define URHO3D_SURFACE_NEED_SPECULAR
-    #endif
-#endif
-
-#if (!defined(URHO3D_HAS_LIGHTMAP) && defined(AO) && defined(URHO3D_MATERIAL_HAS_EMISSIVE)) || defined(URHO3D_GBUFFER_PASS)
-    #ifndef URHO3D_SURFACE_NEED_OCCLUSION
-        #define URHO3D_SURFACE_NEED_OCCLUSION
-    #endif
-#endif
-
-/// Common pixel input for any material.
-struct SurfaceData
-{
-    /// Fog factor. 0 - fog color, 1 - material color.
-    float fogFactor;
-    /// Albedo color and alpha channel.
-    vec4 albedo;
-    /// Emission color.
-    vec3 emission;
-#ifdef URHO3D_AMBIENT_PASS
-    /// Ambient lighting for surface, including global ambient, vertex lights and lightmaps.
-    vec3 ambientLighting;
-#endif
-#ifdef URHO3D_SURFACE_NEED_SPECULAR
-    /// Specular color.
-    vec3 specular;
-#endif
-#ifdef URHO3D_SURFACE_NEED_OCCLUSION
-    /// Occlusion factor.
-    float occlusion;
-#endif
-#ifdef URHO3D_PIXEL_NEED_NORMAL
-    /// Normal.
-    vec3 normal;
-#endif
-#ifdef URHO3D_PIXEL_NEED_EYE_VECTOR
-    /// Vector from surface to eye in world space.
-    vec3 eyeVec;
-#endif
-};
-
 /// Return common surface data in pixel shader.
 SurfaceData GetCommonSurfaceData()
 {
@@ -190,21 +149,17 @@ SurfaceData GetCommonSurfaceData()
 #endif
 
     // Evaluate specular
-#ifdef URHO3D_SURFACE_NEED_SPECULAR
-    #ifdef URHO3D_MATERIAL_HAS_SPECULAR
-        result.specular = cMatSpecColor.rgb * texture2D(sSpecMap, vTexCoord).rgb;
-    #else
-        result.specular = cMatSpecColor.rgb;
-    #endif
+#ifdef URHO3D_MATERIAL_HAS_SPECULAR
+    result.specular = cMatSpecColor.rgb * texture2D(sSpecMap, vTexCoord).rgb;
+#else
+    result.specular = cMatSpecColor.rgb;
 #endif
 
     // Evaluate occlusion
-#ifdef URHO3D_SURFACE_NEED_OCCLUSION
-    #if !defined(URHO3D_HAS_LIGHTMAP) && defined(AO) && defined(URHO3D_MATERIAL_HAS_EMISSIVE)
-        result.occlusion = texture2D(sEmissiveMap, vTexCoord).r;
-    #else
-        result.occlusion = 1.0;
-    #endif
+#if !defined(URHO3D_HAS_LIGHTMAP) && defined(AO) && defined(URHO3D_MATERIAL_HAS_EMISSIVE)
+    result.occlusion = texture2D(sEmissiveMap, vTexCoord).r;
+#else
+    result.occlusion = 1.0;
 #endif
 
     // Evaluate normal
@@ -222,14 +177,16 @@ SurfaceData GetCommonSurfaceData()
     result.eyeVec = normalize(vEyeVec);
 #endif
 
+    // Evaluate reflection vector
+#ifdef URHO3D_REFLECTION_MAPPING
+    result.reflectionVec = reflect(-result.eyeVec, result.normal);
+#endif
+
     // Evaluate ambient lighting
 #ifdef URHO3D_AMBIENT_PASS
     result.ambientLighting = vAmbientAndVertexLigthing;
     #ifdef URHO3D_HAS_LIGHTMAP
         result.ambientLighting += 2.0 * texture2D(sEmissiveMap, vTexCoord2).rgb;
-    #endif
-    #ifdef URHO3D_SURFACE_NEED_OCCLUSION
-        result.ambientLighting *= result.occlusion;
     #endif
 #endif
 
@@ -253,11 +210,6 @@ SurfaceData GetCommonSurfaceData()
     #endif
         return result;
     }
-#endif
-
-#ifdef URHO3D_AMBIENT_PASS
-    /// Return ambient lighting.
-    #define GetSurfaceAmbient(surfaceData) (surfaceData.ambientLighting * surfaceData.albedo.rgb + surfaceData.emission)
 #endif
 
 #endif // URHO3D_PIXEL_SHADER

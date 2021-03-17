@@ -28,12 +28,6 @@
 /// Whether pixel shader needs vertex color.
 // #define URHO3D_PIXEL_NEED_COLOR
 
-/// Whether surface data in pixel shader needs specular.
-// #define URHO3D_SURFACE_NEED_SPECULAR
-
-/// Whether surface data in pixel shader needs occlusion.
-// #define URHO3D_SURFACE_NEED_OCCLUSION
-
 /// Whether to disable all lighting calculation.
 // #define UNLIT
 
@@ -98,10 +92,9 @@
 #endif
 
 // URHO3D_REFLECTION_MAPPING: Whether to apply reflections from environment cubemap
-// TODO(renderer): Implement me
-/*#if defined(URHO3D_AMBIENT_PASS) && defined(ENVCUBEMAP)
+#if defined(URHO3D_AMBIENT_PASS) && (defined(ENVCUBEMAP) || defined(URHO3D_PHYSICAL_MATERIAL))
     #define URHO3D_REFLECTION_MAPPING
-#endif*/
+#endif
 
 // =================================== Vertex output ===================================
 
@@ -113,7 +106,7 @@
 
 // Request normal if has pixel lighting or if deferred
 // TODO(renderer): Don't do it for particles?
-#if defined(URHO3D_HAS_PIXEL_LIGHT) || (defined(URHO3D_IS_LIT) && defined(URHO3D_GBUFFER_PASS))
+#if defined(URHO3D_HAS_PIXEL_LIGHT) || (defined(URHO3D_IS_LIT) && defined(URHO3D_GBUFFER_PASS)) || defined(URHO3D_REFLECTION_MAPPING)
     #ifndef URHO3D_PIXEL_NEED_NORMAL
         #define URHO3D_PIXEL_NEED_NORMAL
     #endif
