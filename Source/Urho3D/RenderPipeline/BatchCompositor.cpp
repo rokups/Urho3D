@@ -187,8 +187,7 @@ void BatchCompositorPass::ProcessGeometryBatch(const GeometryBatch& geometryBatc
     if (geometryBatch.lightPass_)
     {
         const unsigned drawableIndex = key.drawable_->GetDrawableIndex();
-        LightAccumulator& lightAccumulator = drawableProcessor_->GetMutableGeometryLighting(drawableIndex);
-        lightAccumulator.Cook();
+        const LightAccumulator& lightAccumulator = drawableProcessor_->GetGeometryLighting(drawableIndex);
 
         const auto pixelLights = lightAccumulator.GetPixelLights();
         vertexLightsHash = lightAccumulator.GetVertexLightsHash();

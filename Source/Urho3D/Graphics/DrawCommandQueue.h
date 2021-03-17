@@ -131,7 +131,7 @@ public:
         {
             // Allocate new block if buffer layout is different or new data arrived
             const unsigned groupLayoutHash = constantBuffers_.currentLayout_->GetConstantBufferHash(group);
-            if (differentFromPrevious || groupLayoutHash != constantBuffers_.currentHashes_[group])
+            if (groupLayoutHash != 0 && (differentFromPrevious || groupLayoutHash != constantBuffers_.currentHashes_[group]))
             {
                 const unsigned size = constantBuffers_.currentLayout_->GetConstantBufferSize(group);
                 const auto& refAndData = constantBuffers_.collection_.AddBlock(size);

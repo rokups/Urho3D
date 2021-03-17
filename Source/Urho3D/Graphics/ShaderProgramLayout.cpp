@@ -40,7 +40,8 @@ void ShaderProgramLayout::RecalculateLayoutHash()
     for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
     {
         constantBufferHashes_[i] = 0;
-        CombineHash(constantBufferHashes_[i], constantBufferSizes_[i]);
+        if (constantBufferSizes_[i] != 0)
+            CombineHash(constantBufferHashes_[i], constantBufferSizes_[i]);
     }
 
     for (const auto& item : constantBufferParameters_)

@@ -470,6 +470,21 @@ void DrawableProcessor::ProcessForwardLighting(unsigned lightIndex, const ea::ve
     });
 }
 
+void DrawableProcessor::FinalizeForwardLighting()
+{
+    ForEachParallel(workQueue_, geometries_,
+        [&](unsigned /*index*/, Drawable* drawable)
+    {
+        const unsigned drawableIndex = drawable->GetDrawableIndex();
+        const unsigned char flags = geometryFlags_[drawableIndex];
+        if (flags & GeometryRenderFlag::ForwardLit)
+        {
+            LightAccumulator& lightAccumulator = geometryLighting_[drawableIndex];
+            lightAccumulator.Cook();
+        }
+    });
+}
+
 void DrawableProcessor::PreprocessShadowCasters(ea::vector<Drawable*>& shadowCasters,
     const ea::vector<Drawable*>& candidates, const FloatRange& frustumSubRange, Light* light, Camera* shadowCamera)
 {

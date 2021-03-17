@@ -176,7 +176,6 @@ public:
     unsigned char GetGeometryRenderFlags(unsigned drawableIndex) const { return geometryFlags_[drawableIndex]; }
     const FloatRange& GetGeometryZRange(unsigned drawableIndex) const { return geometryZRanges_[drawableIndex]; }
     const LightAccumulator& GetGeometryLighting(unsigned drawableIndex) const { return geometryLighting_[drawableIndex]; }
-    LightAccumulator& GetMutableGeometryLighting(unsigned drawableIndex) { return geometryLighting_[drawableIndex]; }
     /// @}
 
     /// Internal. Pre-process shadow caster candidates. Safe to call from worker thread.
@@ -189,6 +188,8 @@ public:
     void ProcessLights(LightProcessorCallback* callback);
     /// Accumulate forward lighting for specified light source and geometries.
     void ProcessForwardLighting(unsigned lightIndex, const ea::vector<Drawable*>& litGeometries);
+    /// Should be called after all forward lighting is processed.
+    void FinalizeForwardLighting();
 
     /// Update drawable geometries if needed.
     void UpdateGeometries();

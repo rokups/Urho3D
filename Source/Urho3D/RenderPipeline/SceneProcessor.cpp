@@ -297,13 +297,18 @@ void SceneProcessor::Update()
     drawableProcessor_->ProcessLights(this);
 
     const auto& lightProcessors = drawableProcessor_->GetLightProcessors();
+    bool hasForwardLights = false;
     for (unsigned i = 0; i < lightProcessors.size(); ++i)
     {
         const LightProcessor* lightProcessor = lightProcessors[i];
         if (lightProcessor->HasForwardLitGeometries())
+        {
             drawableProcessor_->ProcessForwardLighting(i, lightProcessor->GetLitGeometries());
+            hasForwardLights = true;
+        }
     }
-
+    if (hasForwardLights)
+        drawableProcessor_->FinalizeForwardLighting();
     drawableProcessor_->UpdateGeometries();
 
     batchCompositor_->ComposeSceneBatches();
