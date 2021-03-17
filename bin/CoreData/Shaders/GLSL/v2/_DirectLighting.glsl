@@ -19,7 +19,7 @@
 
 #ifdef URHO3D_PIXEL_SHADER
     /// Pixel light input independent of surface.
-    struct PixelLightData
+    struct DirectLightData
     {
         /// Light color, with optional shape texture applied.
         vec3 lightColor;
@@ -97,7 +97,7 @@
     }
 
     /// Evaluate Blinn-Phong diffuse lighting.
-    vec3 GetBlinnPhongDiffuse(PixelLightData lightData, vec3 normal, vec3 albedo)
+    vec3 GetBlinnPhongDiffuse(DirectLightData lightData, vec3 normal, vec3 albedo)
     {
         float diffuseIntensity = GetDiffuseIntensity(normal, lightData.lightVec.xyz, lightData.lightVec.w);
     #ifdef URHO3D_HAS_SHADOW
@@ -107,7 +107,7 @@
     }
 
     /// Evaluate Blinn-Phong diffuse and specular lighting.
-    vec3 GetBlinnPhongDiffuseSpecular(PixelLightData lightData, vec3 normal, vec3 albedo,
+    vec3 GetBlinnPhongDiffuseSpecular(DirectLightData lightData, vec3 normal, vec3 albedo,
         vec3 specular, vec3 eyeVec, float specularPower)
     {
         float diffuseIntensity = GetDiffuseIntensity(normal, lightData.lightVec.xyz, lightData.lightVec.w);

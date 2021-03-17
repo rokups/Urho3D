@@ -44,9 +44,9 @@
     #endif
 
     /// Return pixel lighting data for deferred rendering.
-    PixelLightData GetDeferredPixelLightData(vec4 worldPos, float depth)
+    DirectLightData GetDeferredDirectLightData(vec4 worldPos, float depth)
     {
-        PixelLightData result;
+        DirectLightData result;
         result.lightVec = NormalizeLightVector(GetLightVector(worldPos.xyz));
     #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
         vec4 shapePos = worldPos * cLightShapeMatrix;

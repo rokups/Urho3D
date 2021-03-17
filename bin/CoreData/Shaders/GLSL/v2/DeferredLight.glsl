@@ -47,12 +47,12 @@ void main()
     vec3 normal = normalize(normalInput.rgb * 2.0 - 1.0);
     float specularPower = (1.0 - specularInput.a) * 255;
 
-    PixelLightData pixelLightData = GetDeferredPixelLightData(worldPos, depth);
+    DirectLightData lightData = GetDeferredDirectLightData(worldPos, depth);
     #ifdef URHO3D_LIGHT_HAS_SPECULAR
-        vec3 finalColor = GetBlinnPhongDiffuseSpecular(pixelLightData, normal, albedoInput.rgb,
+        vec3 finalColor = GetBlinnPhongDiffuseSpecular(lightData, normal, albedoInput.rgb,
             specularInput.rgb, eyeVec, specularPower);
     #else
-        vec3 finalColor = GetBlinnPhongDiffuse(pixelLightData, normal, albedoInput.rgb);
+        vec3 finalColor = GetBlinnPhongDiffuse(lightData, normal, albedoInput.rgb);
     #endif
     gl_FragColor = vec4(finalColor, 0.0);
 }

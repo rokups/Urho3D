@@ -1,4 +1,5 @@
 #include "_Material.glsl"
+#include "BRDF.glsl"
 
 #ifdef URHO3D_VERTEX_SHADER
 void main()
@@ -29,12 +30,12 @@ void main()
     #endif
 
     #ifdef URHO3D_HAS_PIXEL_LIGHT
-        PixelLightData pixelLightData = GetForwardPixelLightData();
+        DirectLightData lightData = GetForwardDirectLightData();
         #ifdef URHO3D_LIGHT_HAS_SPECULAR
-            finalColor += GetBlinnPhongDiffuseSpecular(pixelLightData, surfaceData.normal, surfaceData.albedo.rgb,
+            finalColor += GetBlinnPhongDiffuseSpecular(lightData, surfaceData.normal, surfaceData.albedo.rgb,
                 surfaceData.specular, surfaceData.eyeVec, cMatSpecColor.a);
         #else
-            finalColor += GetBlinnPhongDiffuse(pixelLightData, surfaceData.normal, surfaceData.albedo.rgb);
+            finalColor += GetBlinnPhongDiffuse(lightData, surfaceData.normal, surfaceData.albedo.rgb);
         #endif
     #endif
 

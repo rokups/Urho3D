@@ -17,8 +17,16 @@
 void WorldSpaceToShadowCoord(out vec4 shadowPos[URHO3D_SHADOW_NUM_CASCADES], vec4 worldPos)
 {
     #if defined(URHO3D_LIGHT_DIRECTIONAL)
-        for (int i = 0; i < URHO3D_SHADOW_NUM_CASCADES; i++)
-            shadowPos[i] = worldPos * cLightMatrices[i];
+        #if URHO3D_SHADOW_NUM_CASCADES >= 4
+            shadowPos[3] = worldPos * cLightMatrices[3];
+        #endif
+        #if URHO3D_SHADOW_NUM_CASCADES >= 3
+            shadowPos[2] = worldPos * cLightMatrices[2];
+        #endif
+        #if URHO3D_SHADOW_NUM_CASCADES >= 2
+            shadowPos[1] = worldPos * cLightMatrices[1];
+        #endif
+        shadowPos[0] = worldPos * cLightMatrices[0];
     #elif defined(URHO3D_LIGHT_POINT)
         shadowPos[0] = vec4(worldPos.xyz - cLightPos.xyz, 1.0);
     #elif defined(URHO3D_LIGHT_SPOT)

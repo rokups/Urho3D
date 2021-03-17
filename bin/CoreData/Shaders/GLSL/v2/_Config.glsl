@@ -3,6 +3,11 @@
 
 #extension GL_ARB_shading_language_420pack: enable
 
+// =================================== Constants ===================================
+
+#define M_PI 3.14159265358979323846
+#define M_EPSILON 0.0001
+
 // =================================== External defines ===================================
 
 /// Whether vertex shader needs world-space normal.
@@ -44,9 +49,12 @@
 /// Whether to sample reflections from environment cubemap.
 // #define ENVCUBEMAP
 
-/// Whether to use two-sided or volumetric ligthing for geometries (forward lighting only);
+/// Whether to use two-sided or volumetric ligthing for geometries (forward lighting only).
 // #define TRANSLUCENT
 // #define VOLUMETRIC
+
+/// Whether to use PBR material.
+// #define PBR
 
 // =================================== Deprecated external defines ===================================
 
@@ -81,6 +89,14 @@
     #endif
 #endif
 
+// URHO3D_PHYSICAL_MATERIAL: Whether to use PBR material. Treat specular map as Roughness+Metallic map.
+#if defined(URHO3D_IS_LIT) && defined(PBR)
+    #define URHO3D_PHYSICAL_MATERIAL
+    #ifndef URHO3D_LIGHT_HAS_SPECULAR
+        #define URHO3D_LIGHT_HAS_SPECULAR
+    #endif
+#endif
+
 // URHO3D_REFLECTION_MAPPING: Whether to apply reflections from environment cubemap
 // TODO(renderer): Implement me
 /*#if defined(URHO3D_AMBIENT_PASS) && defined(ENVCUBEMAP)
@@ -97,7 +113,7 @@
 
 // Request normal if has pixel lighting or if deferred
 // TODO(renderer): Don't do it for particles?
-#if defined(URHO3D_HAS_PIXEL_LIGHT) || (!defined(UNLIT) && defined(URHO3D_GBUFFER_PASS))
+#if defined(URHO3D_HAS_PIXEL_LIGHT) || (defined(URHO3D_IS_LIT) && defined(URHO3D_GBUFFER_PASS))
     #ifndef URHO3D_PIXEL_NEED_NORMAL
         #define URHO3D_PIXEL_NEED_NORMAL
     #endif

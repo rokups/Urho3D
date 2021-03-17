@@ -111,7 +111,7 @@ void FillCommonVertexOutput(VertexTransform vertexTransform, vec2 uv)
 
 #ifdef URHO3D_PIXEL_SHADER
 
-#if defined(URHO3D_LIGHT_HAS_SPECULAR) || defined(URHO3D_GBUFFER_PASS)
+#if defined(URHO3D_LIGHT_HAS_SPECULAR) || defined(URHO3D_GBUFFER_PASS) || defined(URHO3D_PHYSICAL_MATERIAL)
     #ifndef URHO3D_SURFACE_NEED_SPECULAR
         #define URHO3D_SURFACE_NEED_SPECULAR
     #endif
@@ -238,9 +238,9 @@ SurfaceData GetCommonSurfaceData()
 
 #ifdef URHO3D_HAS_PIXEL_LIGHT
     /// Return pixel lighting data for forward rendering.
-    PixelLightData GetForwardPixelLightData()
+    DirectLightData GetForwardDirectLightData()
     {
-        PixelLightData result;
+        DirectLightData result;
         result.lightVec = NormalizeLightVector(vLightVec);
     #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
         result.lightColor = GetLightColorFromShape(vShapePos);
