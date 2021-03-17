@@ -1,4 +1,3 @@
-#define URHO3D_PIXEL_NEED_NORMAL
 #include "_Material.glsl"
 
 #ifdef URHO3D_VERTEX_SHADER

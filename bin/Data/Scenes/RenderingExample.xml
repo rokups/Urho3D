@@ -840,4 +840,184 @@
 			</node>
 		</node>
 	</node>
+	<node id="145">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="PBR Materials" />
+		<attribute name="Tags" />
+		<attribute name="Position" value="13.25 0 0" />
+		<attribute name="Rotation" value="1 0 0 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<node id="146">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Plane" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0 0" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="10 5 5" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="136">
+				<attribute name="Model" value="Model;Models/PlaneTess.mdl" />
+				<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+			</component>
+		</node>
+		<node id="147">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Metallic" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0 0" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<node id="149">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Metallic R0" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="-4 0.5 1" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="137">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/PBR/MetallicR0.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="150">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Metallic R3" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="-2 0.5 1" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="138">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/PBR/MetallicR3.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="152">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Metallic R5" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="0 0.5 1" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="140">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/PBR/MetallicR5.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="151">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Metallic R7" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="2 0.5 1" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="139">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/PBR/MetallicR7.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="153">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Metallic R10" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="4 0.5 1" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="141">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/PBR/MetallicR10.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+		</node>
+		<node id="148">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Dielectric" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0 0" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<node id="154">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Dielectric R0" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="-4 0.5 -1" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="142">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/PBR/DielectricR0.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="155">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Dielectric R3" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="-2 0.5 -1" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="143">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/PBR/DielectricR3.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="156">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Dielectric R5" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="0 0.5 -1" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="144">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/PBR/DielectricR5.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="157">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Dielectric R7" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="2 0.5 -1" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="145">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/PBR/DielectricR7.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="158">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Dielectric R10" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="4 0.5 -1" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="146">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/PBR/DielectricR10.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+		</node>
+	</node>
 </scene>

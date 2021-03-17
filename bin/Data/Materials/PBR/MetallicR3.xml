@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<material>
+    <technique name="Techniques/NoTexture.xml" />
+    <shader vsdefines="PBR" psdefines="PBR" />
+    <parameter name="MatDiffColor" value="1 1 1 1" />
+    <parameter name="Roughness" value="0.3" />
+    <parameter name="Metallic" value="1" />
+</material>
