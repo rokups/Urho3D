@@ -173,16 +173,20 @@
     // URHO3D_SURFACE_ONE_SIDED: Normal is clamped when calculating lighting. Ignored in deferred rendering.
     // URHO3D_SURFACE_TWO_SIDED: Normal is mirrored when calculating lighting. Ignored in deferred rendering.
     // URHO3D_SURFACE_VOLUMETRIC: Normal is ignored when calculating lighting. Ignored in deferred rendering.
-    // CONVERT_N_DOT_L: Conversion function.
+    // VERTEX_ADJUST_NoL: Adjust N dot L for vertex normal.
+    // PXIEL_ADJUST_NoL: Adjust N dot L for pixel normal.
     #if defined(VOLUMETRIC)
         #define URHO3D_SURFACE_VOLUMETRIC
-        #define CONVERT_N_DOT_L(NdotL) 1.0
+        #define VERTEX_ADJUST_NoL(NdotL) 1.0
+        #define PXIEL_ADJUST_NoL(NdotL) 1.0
     #elif defined(TRANSLUCENT)
         #define URHO3D_SURFACE_TWO_SIDED
-        #define CONVERT_N_DOT_L(NdotL) abs(NdotL)
+        #define VERTEX_ADJUST_NoL(NdotL) abs(NdotL)
+        #define PXIEL_ADJUST_NoL(NdotL) max(0.0, NdotL)
     #else
         #define URHO3D_SURFACE_ONE_SIDED
-        #define CONVERT_N_DOT_L(NdotL) max(0.0, NdotL)
+        #define VERTEX_ADJUST_NoL(NdotL) max(0.0, NdotL)
+        #define PXIEL_ADJUST_NoL(NdotL) max(0.0, NdotL)
     #endif
 #endif
 

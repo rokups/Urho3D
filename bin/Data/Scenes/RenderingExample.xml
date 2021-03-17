@@ -892,7 +892,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="137">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/PBR/MetallicR0.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/MetallicR0.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -906,7 +906,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="138">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/PBR/MetallicR3.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/MetallicR3.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -920,7 +920,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="140">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/PBR/MetallicR5.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/MetallicR5.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -934,7 +934,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="139">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/PBR/MetallicR7.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/MetallicR7.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -948,7 +948,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="141">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/PBR/MetallicR10.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/MetallicR10.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -971,7 +971,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="142">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/PBR/DielectricR0.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/DielectricR0.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -985,7 +985,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="143">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/PBR/DielectricR3.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/DielectricR3.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -999,7 +999,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="144">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/PBR/DielectricR5.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/DielectricR5.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -1013,7 +1013,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="145">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/PBR/DielectricR7.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/DielectricR7.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -1027,7 +1027,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="146">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/PBR/DielectricR10.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/DielectricR10.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -1051,7 +1051,7 @@
 			<attribute name="Variables" />
 			<component type="StaticModel" id="147">
 				<attribute name="Model" value="Model;Models/TeaPot.mdl" />
-				<attribute name="Material" value="Material;Materials/DefaultMirror.xml;Materials/DefaultMirror.xml" />
+				<attribute name="Material" value="Material;Materials/Constant/DefaultMirror.xml;Materials/Constant/DefaultMirror.xml" />
 			</component>
 		</node>
 		<node id="161">
@@ -1064,7 +1064,7 @@
 			<attribute name="Variables" />
 			<component type="StaticModel" id="148">
 				<attribute name="Model" value="Model;Models/Sphere.mdl" />
-				<attribute name="Material" value="Material;Materials/DefaultMirror.xml" />
+				<attribute name="Material" value="Material;Materials/Constant/DefaultMirror.xml" />
 			</component>
 		</node>
 		<node id="162">
@@ -1077,7 +1077,7 @@
 			<attribute name="Variables" />
 			<component type="StaticModel" id="149">
 				<attribute name="Model" value="Model;Models/Torus.mdl" />
-				<attribute name="Material" value="Material;Materials/DefaultMirror.xml" />
+				<attribute name="Material" value="Material;Materials/Constant/DefaultMirror.xml" />
 			</component>
 		</node>
 	</node>

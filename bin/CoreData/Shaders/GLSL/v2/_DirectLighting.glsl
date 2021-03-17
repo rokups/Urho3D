@@ -85,9 +85,15 @@
         #endif
     #endif
 
-    /// Evaluate diffuse lighting intensity.
-    #define GetDiffuseIntensity(normal, lightVec, normalizedDistance) \
-        (CONVERT_N_DOT_L(dot(normal, lightVec)) * GetLightDistanceAttenuation(normalizedDistance))
+    /// Calculate light attenuation. Includes shadow and distance attenuation.
+    float GetDirectLightAttenuation(DirectLightData lightData, float NoL)
+    {
+        float attenuation = NoL * GetLightDistanceAttenuation(lightData.lightVec.w);
+    #ifdef URHO3D_HAS_SHADOW
+        attenuation *= lightData.shadow;
+    #endif
+        return attenuation;
+    }
 
     /// Evaluate specular lighting intensity.
     float GetBlinnPhongSpecularIntensity(vec3 normal, vec3 eyeVec, vec3 lightVec, float specularPower)
@@ -99,24 +105,19 @@
     /// Evaluate Blinn-Phong diffuse lighting.
     vec3 GetBlinnPhongDiffuse(DirectLightData lightData, vec3 normal, vec3 albedo)
     {
-        float diffuseIntensity = GetDiffuseIntensity(normal, lightData.lightVec.xyz, lightData.lightVec.w);
-    #ifdef URHO3D_HAS_SHADOW
-        diffuseIntensity *= lightData.shadow;
-    #endif
-        return diffuseIntensity * lightData.lightColor * albedo;
+        float NoL = PXIEL_ADJUST_NoL(dot(normal, lightData.lightVec.xyz));
+        float attenuation = GetDirectLightAttenuation(lightData, NoL);
+        return attenuation * lightData.lightColor * albedo;
     }
 
     /// Evaluate Blinn-Phong diffuse and specular lighting.
     vec3 GetBlinnPhongDiffuseSpecular(DirectLightData lightData, vec3 normal, vec3 albedo,
         vec3 specular, vec3 eyeVec, float specularPower)
     {
-        float diffuseIntensity = GetDiffuseIntensity(normal, lightData.lightVec.xyz, lightData.lightVec.w);
-    #ifdef URHO3D_HAS_SHADOW
-        diffuseIntensity *= lightData.shadow;
-    #endif
-
+        float NoL = PXIEL_ADJUST_NoL(dot(normal, lightData.lightVec.xyz));
+        float attenuation = GetDirectLightAttenuation(lightData, NoL);
         float specularIntensity = GetBlinnPhongSpecularIntensity(normal, eyeVec, lightData.lightVec.xyz, specularPower);
-        return diffuseIntensity * lightData.lightColor * (albedo + specular * specularIntensity * cLightColor.a);
+        return attenuation * lightData.lightColor * (albedo + specular * specularIntensity * cLightColor.a);
     }
 
 #endif // URHO3D_PIXEL_SHADER

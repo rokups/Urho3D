@@ -44,7 +44,7 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
         // Directional light
         if (invRange == 0.0)
         {
-            return CONVERT_N_DOT_L(dot(normal, lightDir));
+            return VERTEX_ADJUST_NoL(dot(normal, lightDir));
         }
         // Point/spot light
         else
@@ -55,7 +55,7 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
             float atten = max(0.0, 1.0 - lightDist);
             float spotEffect = dot(localDir, lightDir);
             float spotAtten = clamp((spotEffect - cutoff) * invCutoff, 0.0, 1.0);
-            return CONVERT_N_DOT_L(dot(normal, localDir)) * atten * atten * spotAtten;
+            return VERTEX_ADJUST_NoL(dot(normal, localDir)) * atten * atten * spotAtten;
         }
     }
 #endif

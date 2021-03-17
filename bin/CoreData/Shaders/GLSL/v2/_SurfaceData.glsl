@@ -18,6 +18,10 @@ struct SurfaceData
     vec3 specular;
     /// Emission color.
     vec3 emission;
+#ifdef URHO3D_PHYSICAL_MATERIAL
+    /// PBR roughness factor.
+    float roughness;
+#endif
 #ifdef URHO3D_AMBIENT_PASS
     /// Ambient lighting for surface, including global ambient, vertex lights and lightmaps.
     vec3 ambientLighting;

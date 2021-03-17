@@ -148,11 +148,27 @@ SurfaceData GetCommonSurfaceData()
     result.emission = cMatEmissiveColor;
 #endif
 
+#if defined(URHO3D_PHYSICAL_MATERIAL)
+    // Evaluate PBR material
+    #ifdef URHO3D_MATERIAL_HAS_SPECULAR
+        vec2 roughnessMetallic = texture2D(sSpecMap, vTexCoord).rg + vec2(cRoughness, cMetallic);
+    #else
+        vec2 roughnessMetallic = vec2(cRoughness, cMetallic);
+    #endif
+    const vec2 minRougnessMetallic = vec2(0.004, 0.00);
+    roughnessMetallic = max(roughnessMetallic, minRougnessMetallic);
+    // TODO(renderer): Make configurable specular?
+    result.specular = mix(vec3(0.03), result.albedo.rgb, roughnessMetallic.y);
+    result.albedo.rgb *= (1.0 - roughnessMetallic.y);
+    result.roughness = roughnessMetallic.x;
+
+#elif defined(URHO3D_SURFACE_NEED_SPECULAR)
     // Evaluate specular
-#ifdef URHO3D_MATERIAL_HAS_SPECULAR
-    result.specular = cMatSpecColor.rgb * texture2D(sSpecMap, vTexCoord).rgb;
-#else
-    result.specular = cMatSpecColor.rgb;
+    #ifdef URHO3D_MATERIAL_HAS_SPECULAR
+        result.specular = cMatSpecColor.rgb * texture2D(sSpecMap, vTexCoord).rgb;
+    #else
+        result.specular = cMatSpecColor.rgb;
+    #endif
 #endif
 
     // Evaluate occlusion
