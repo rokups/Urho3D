@@ -25,6 +25,7 @@
 #include "../Core/Context.h"
 #include "../IO/Log.h"
 #include "../Graphics/DebugRenderer.h"
+#include "../Graphics/Renderer.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/TextureCube.h"
 #include "../Graphics/Zone.h"
@@ -175,6 +176,7 @@ void Zone::SetZoneTexture(Texture* texture)
 {
     zoneTexture_ = texture;
     cachedTextureLighting_.Invalidate();
+    reflectionProbeData_.Invalidate();
     MarkNetworkUpdate();
 }
 
@@ -196,15 +198,30 @@ void Zone::SetAmbientGradient(bool enable)
     MarkNetworkUpdate();
 }
 
+const ReflectionProbeData* Zone::GetReflectionProbe() const
+{
+    if (reflectionProbeData_.IsInvalidated())
+    {
+        ReflectionProbeData data;
+        data.reflectionMap_ = zoneTexture_ ? zoneTexture_->Cast<TextureCube>() : nullptr;
+        auto renderer = GetSubsystem<Renderer>();
+        if (!data.reflectionMap_ && renderer)
+            data.reflectionMap_ = renderer->GetBlackCubeMap();
+        reflectionProbeData_.Restore(data);
+    }
+    return &reflectionProbeData_.Get();
+}
+
 const Vector3 Zone::GetAmbientLighting() const
 {
-    UpdateCachedAmbientLighting();
+    if (cachedAmbientLighting_.IsInvalidated())
+        cachedAmbientLighting_.Restore((ambientColor_ * ambientBrightness_).GammaToLinear().ToVector3());
     return cachedAmbientLighting_.Get();
 }
 
 const SphericalHarmonicsDot9 Zone::GetAmbientAndBackgroundLighting() const
 {
-    UpdateCachedAmbientLighting();
+    UpdateCachedAmbientAndBackgroundLighting();
     return cachedAmbientAndBackgroundLighting_.Get();
 }
 
@@ -253,6 +270,7 @@ void Zone::SetZoneTextureAttr(const ResourceRef& value)
     auto* cache = GetSubsystem<ResourceCache>();
     zoneTexture_ = static_cast<Texture*>(cache->GetResource(value.type_, value.name_));
     cachedTextureLighting_.Invalidate();
+    reflectionProbeData_.Invalidate();
 }
 
 ResourceRef Zone::GetZoneTextureAttr() const
@@ -396,11 +414,8 @@ void Zone::MarkCachedAmbientDirty()
     cachedAmbientAndBackgroundLighting_.Invalidate();
 }
 
-void Zone::UpdateCachedAmbientLighting() const
+void Zone::UpdateCachedAmbientAndBackgroundLighting() const
 {
-    if (cachedAmbientLighting_.IsInvalidated())
-        cachedAmbientLighting_.Restore((ambientColor_ * ambientBrightness_).GammaToLinear().ToVector3());
-
     if (cachedTextureLighting_.IsInvalidated())
     {
         SphericalHarmonicsDot9 sh;
@@ -421,7 +436,7 @@ void Zone::UpdateCachedAmbientLighting() const
     {
         SphericalHarmonicsDot9 sh = zoneTexture_ ? cachedTextureLighting_.Get() : SphericalHarmonicsDot9(fogColor_);
         sh *= backgroundBrightness_;
-        sh += cachedAmbientLighting_.Get();
+        sh += GetAmbientLighting();
 
         cachedAmbientAndBackgroundLighting_.Restore(sh);
     }

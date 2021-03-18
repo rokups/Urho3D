@@ -31,6 +31,8 @@
 namespace Urho3D
 {
 
+class ReflectionProbeData;
+
 /// Common parameters for light accumulation.
 struct LightAccumulatorContext
 {
@@ -133,6 +135,8 @@ struct LightAccumulator
 
     /// Accumulated SH lights and ambient light.
     SphericalHarmonicsDot9 sphericalHarmonics_;
+    /// Reflection probe.
+    const ReflectionProbeData* reflectionProbe_{};
 
 private:
     /// Container with per-pixel and per-vertex lights.

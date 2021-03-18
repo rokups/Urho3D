@@ -1947,6 +1947,14 @@ void Renderer::CreateGeometries()
         SetIndirectionTextureData();
     }
 #endif
+
+    blackCubeMap_ = MakeShared<TextureCube>(context_);
+    blackCubeMap_->SetNumLevels(1);
+    blackCubeMap_->SetSize(1, graphics_->GetRGBAFormat());
+    blackCubeMap_->SetFilterMode(FILTER_NEAREST);
+    const unsigned char blackCubeMapData[4] = { 0, 0, 0, 255 };
+    for (unsigned i = 0; i < MAX_CUBEMAP_FACES; ++i)
+        blackCubeMap_->SetData((CubeMapFace)i, 0, 0, 0, 1, 1, blackCubeMapData);
 }
 
 void Renderer::SetIndirectionTextureData()

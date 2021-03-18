@@ -24,10 +24,7 @@ SAMPLER(9, samplerCube sLightCubeMap)
 #endif
 #ifndef GL_ES
     SAMPLER(5, sampler3D sVolumeMap)
-    SAMPLER(0, sampler2D sAlbedoBuffer)
-    SAMPLER(1, sampler2D sNormalBuffer)
     SAMPLER(13, sampler2D sDepthBuffer)
-    SAMPLER(14, sampler2D sLightBuffer)
     SAMPLER(15, samplerCube sZoneCubeMap)
     SAMPLER(15, sampler3D sZoneVolumeMap)
 #endif

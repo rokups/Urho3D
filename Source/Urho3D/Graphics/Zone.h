@@ -24,6 +24,7 @@
 
 #include "../Core/ThreadSafeCache.h"
 #include "../Graphics/Drawable.h"
+#include "../Graphics/ReflectionProbe.h"
 #include "../Graphics/Texture.h"
 #include "../Math/Color.h"
 #include "../Math/SphericalHarmonics.h"
@@ -100,6 +101,9 @@ public:
     /// Return ambient brightness.
     float GetAmbientBrightness() const { return ambientBrightness_; }
 
+    /// Return reflection probe data. Pointer is valid until Zone is destroyed.
+    const ReflectionProbeData* GetReflectionProbe() const;
+
     /// Return zone's ambient light in linear space.
     const Vector3 GetAmbientLighting() const;
 
@@ -175,7 +179,7 @@ protected:
     void MarkNodeDirty() { OnMarkedDirty(node_); }
     // TODO(renderer): Call this when texture is reloaded
     void MarkCachedAmbientDirty();
-    void UpdateCachedAmbientLighting() const;
+    void UpdateCachedAmbientAndBackgroundLighting() const;
 
     /// Cached inverse world transform matrix.
     mutable Matrix3x4 inverseWorld_;
@@ -217,6 +221,8 @@ protected:
     WeakPtr<Zone> lastAmbientStartZone_;
     /// Last zone used for ambient gradient end color.
     WeakPtr<Zone> lastAmbientEndZone_;
+
+    mutable ThreadSafeCache<ReflectionProbeData> reflectionProbeData_;
 
     /// Cached ambient lighting in linear space.
     /// @{

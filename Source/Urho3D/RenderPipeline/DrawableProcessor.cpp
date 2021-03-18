@@ -390,6 +390,8 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
                 lightAccumulator.sphericalHarmonics_ += cachedZone.zone_->GetAmbientAndBackgroundLighting();
             else
                 lightAccumulator.sphericalHarmonics_ += cachedZone.zone_->GetAmbientLighting();
+
+            lightAccumulator.reflectionProbe_ = cachedZone.zone_->GetReflectionProbe();
         }
 
         // Store geometry

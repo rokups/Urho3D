@@ -479,6 +479,9 @@ public:
     /// Return the shadowed pointlight indirection cube map.
     TextureCube* GetIndirectionCubeMap() const { return indirectionCubeMap_; }
 
+    /// Return completely black 1x1x1 cubemap.
+    TextureCube* GetBlackCubeMap() const { return blackCubeMap_; }
+
     /// Return the instancing vertex buffer.
     VertexBuffer* GetInstancingBuffer() const { return dynamicInstancing_ ? instancingBuffer_.Get() : nullptr; }
 
@@ -602,6 +605,7 @@ private:
     SharedPtr<TextureCube> faceSelectCubeMap_;
     /// Indirection cube map for shadowed pointlights.
     SharedPtr<TextureCube> indirectionCubeMap_;
+    SharedPtr<TextureCube> blackCubeMap_;
     /// Reusable scene nodes with shadow camera components.
     ea::vector<SharedPtr<Node> > shadowCameraNodes_;
     /// Reusable occlusion buffers.
