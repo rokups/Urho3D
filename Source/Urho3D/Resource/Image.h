@@ -201,6 +201,8 @@ public:
     CompressedLevel GetCompressedLevel(unsigned index) const;
     /// Return decompressed image data in RGBA format.
     SharedPtr<Image> GetDecompressedImage() const;
+    /// Return LOD of decompressed image in RGBA format.
+    SharedPtr<Image> GetDecompressedImageLevel(unsigned index) const;
     /// Return subimage from the image by the defined rect or null if failed. 3D images are not supported. You must free the subimage yourself.
     SharedPtr<Image> GetSubimage(const IntRect& rect) const;
     /// Return an SDL surface from the image, or null if failed. Only RGB images are supported. Specify rect to only return partial image. You must free the surface yourself.

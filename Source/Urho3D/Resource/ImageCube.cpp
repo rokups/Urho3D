@@ -246,11 +246,16 @@ Color ImageCube::SampleNearest(const Vector3& direction) const
     return faceImages_[projection.first]->GetPixel(texel.x_, texel.y_);
 }
 
+Vector3 ImageCube::ProjectTexelOnCubeLevel(CubeMapFace face, int x, int y, unsigned level) const
+{
+    const float u = (x + 0.5f) / (width_ >> level);
+    const float v = (y + 0.5f) / (width_ >> level);
+    return ProjectUVOnCube(face, { u, v });
+}
+
 Vector3 ImageCube::ProjectTexelOnCube(CubeMapFace face, int x, int y) const
 {
-    const float u = (x + 0.5f) / width_;
-    const float v = (y + 0.5f) / width_;
-    return ProjectUVOnCube(face, { u, v });
+    return ProjectTexelOnCubeLevel(face, x, y, 0);
 }
 
 ea::pair<CubeMapFace, IntVector2> ImageCube::ProjectDirectionOnFaceTexel(const Vector3& direction) const
@@ -275,14 +280,18 @@ SphericalHarmonicsColor9 ImageCube::CalculateSphericalHarmonics() const
         if (!faceImage)
             continue;
 
-        auto decompressedImage = faceImage->GetDecompressedImage();
+        const unsigned maxLevel = LogBaseTwo(faceImage->GetWidth());
+        const unsigned bestLevelCountedFromSmallest = ea::min(maxLevel, LogBaseTwo(8)); // 8x8 should be enough for SH
+        const unsigned bestLevel = maxLevel - bestLevelCountedFromSmallest;
 
-        for (int y = 0; y < width_; ++y)
+        auto decompressedImage = faceImage->GetDecompressedImageLevel(bestLevel);
+        const unsigned bestLevelWidth = width_ >> bestLevel;
+        for (int y = 0; y < bestLevelWidth; ++y)
         {
-            for (int x = 0; x < width_; ++x)
+            for (int x = 0; x < bestLevelWidth; ++x)
             {
-                const Color sample = decompressedImage->GetPixel(x, y);
-                const Vector3 offset = ProjectTexelOnCube(face, x, y);
+                const Color sample = decompressedImage->GetPixel(x, y).GammaToLinear();
+                const Vector3 offset = ProjectTexelOnCubeLevel(face, x, y, bestLevel);
                 const float distance = offset.Length();
                 const float weight = 4.0f / (distance * distance * distance);
                 const Vector3 direction = offset / distance;

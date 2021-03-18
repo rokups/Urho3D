@@ -5,17 +5,17 @@
 	<attribute name="Smoothing Constant" value="50.000000" />
 	<attribute name="Snap Threshold" value="5.000000" />
 	<attribute name="Elapsed Time" value="0.000000" />
-	<attribute name="Next Replicated Node ID" value="111" />
-	<attribute name="Next Replicated Component ID" value="103" />
-	<attribute name="Next Local Node ID" value="16777234" />
-	<attribute name="Next Local Component ID" value="16777246" />
+	<attribute name="Next Replicated Node ID" value="248" />
+	<attribute name="Next Replicated Component ID" value="234" />
+	<attribute name="Next Local Node ID" value="16777242" />
+	<attribute name="Next Local Component ID" value="16777258" />
 	<attribute name="Variables" />
 	<attribute name="Variable Names" value="" />
 	<attribute name="Lightmaps" value="Texture2D" />
 	<component type="Octree" id="1" />
 	<component type="EditorSceneSettings" id="16777216">
-		<attribute name="Camera Position" value="13.0001 13.3008 -2.82601" />
-		<attribute name="Camera Rotation" value="0.854213 0.45869 -0.215577 0.115974" />
+		<attribute name="Camera Position" value="18.215 6.69225 -8.15328" />
+		<attribute name="Camera Rotation" value="0.928484 0.285925 -0.226416 0.0699984" />
 	</component>
 	<node id="2">
 		<attribute name="Is Enabled" value="true" />
@@ -37,7 +37,9 @@
 				<attribute name="Bounding Box Min" value="-1000 -1000 -1000" />
 				<attribute name="Bounding Box Max" value="1000 1000 1000" />
 				<attribute name="Ambient Color" value="0.17273 0.180021 0.264286 1" />
-				<attribute name="Ambient Brightness" value="0.500000" />
+				<attribute name="Ambient Brightness" value="0.000000" />
+				<attribute name="Background Brightness" value="0.100000" />
+				<attribute name="Zone Texture" value="TextureCube;Textures/Skybox.xml" />
 				<attribute name="Light Mask" value="-8" />
 				<attribute name="Shadow Mask" value="-8" />
 			</component>
@@ -47,7 +49,7 @@
 			<attribute name="Name" value="Directional Light" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="0 0 0" />
-			<attribute name="Rotation" value="-0.886932 -0.461896 0 0" />
+			<attribute name="Rotation" value="-0.501596 -0.15565 -0.812743 0.252205" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
 			<component type="Light" id="46">
@@ -73,7 +75,7 @@
 				<attribute name="Is Occluder" value="true" />
 			</component>
 		</node>
-		<node id="190">
+		<node id="192">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Skybox" />
 			<attribute name="Tags" />
@@ -81,7 +83,7 @@
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
-			<component type="Skybox" id="178">
+			<component type="Skybox" id="179">
 				<attribute name="Model" value="Model;Models/Box.mdl" />
 				<attribute name="Material" value="Material;Materials/Skybox.xml" />
 			</component>
@@ -732,7 +734,7 @@
 			</component>
 		</node>
 	</node>
-	<node id="212">
+	<node id="214">
 		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Light Shapes" />
 		<attribute name="Tags" />
@@ -740,7 +742,7 @@
 		<attribute name="Rotation" value="1 0 0 0" />
 		<attribute name="Scale" value="1 1 1" />
 		<attribute name="Variables" />
-		<node id="213">
+		<node id="215">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Plane" />
 			<attribute name="Tags" />
@@ -753,7 +755,7 @@
 				<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
 			</component>
 		</node>
-		<node id="214">
+		<node id="216">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Spot 1" />
 			<attribute name="Tags" />
@@ -769,7 +771,7 @@
 				<attribute name="Cast Shadows" value="true" />
 			</component>
 		</node>
-		<node id="216">
+		<node id="218">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Spot 2" />
 			<attribute name="Tags" />
@@ -777,7 +779,7 @@
 			<attribute name="Rotation" value="0.707107 0.707107 0 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
-			<component type="Light" id="206">
+			<component type="Light" id="230">
 				<attribute name="Light Type" value="Spot" />
 				<attribute name="Specular Intensity" value="0.000000" />
 				<attribute name="Range" value="5.000000" />
@@ -785,7 +787,7 @@
 				<attribute name="Cast Shadows" value="true" />
 			</component>
 		</node>
-		<node id="218">
+		<node id="220">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Point" />
 			<attribute name="Tags" />
@@ -793,7 +795,7 @@
 			<attribute name="Rotation" value="-4.37114e-08 1 0 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
-			<component type="Light" id="208">
+			<component type="Light" id="232">
 				<attribute name="Specular Intensity" value="0.000000" />
 				<attribute name="Range" value="1.000000" />
 				<attribute name="Light Shape Texture" value="TextureCube;Textures/Skybox.xml" />
@@ -853,7 +855,7 @@
 			</node>
 		</node>
 	</node>
-	<node id="145">
+	<node id="171">
 		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="PBR Materials" />
 		<attribute name="Tags" />
@@ -861,7 +863,7 @@
 		<attribute name="Rotation" value="1 0 0 0" />
 		<attribute name="Scale" value="1 1 1" />
 		<attribute name="Variables" />
-		<node id="146">
+		<node id="172">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Plane" />
 			<attribute name="Tags" />
@@ -869,12 +871,12 @@
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="10 5 5" />
 			<attribute name="Variables" />
-			<component type="StaticModel" id="136">
+			<component type="StaticModel" id="162">
 				<attribute name="Model" value="Model;Models/PlaneTess.mdl" />
 				<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
 			</component>
 		</node>
-		<node id="147">
+		<node id="173">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Metallic" />
 			<attribute name="Tags" />
@@ -882,7 +884,7 @@
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
-			<node id="149">
+			<node id="174">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Metallic R0" />
 				<attribute name="Tags" />
@@ -890,13 +892,13 @@
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
-				<component type="StaticModel" id="137">
+				<component type="StaticModel" id="163">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
 					<attribute name="Material" value="Material;Materials/Constant/MetallicR0.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
-			<node id="150">
+			<node id="175">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Metallic R3" />
 				<attribute name="Tags" />
@@ -904,13 +906,13 @@
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
-				<component type="StaticModel" id="138">
+				<component type="StaticModel" id="164">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
 					<attribute name="Material" value="Material;Materials/Constant/MetallicR3.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
-			<node id="152">
+			<node id="176">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Metallic R5" />
 				<attribute name="Tags" />
@@ -918,13 +920,13 @@
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
-				<component type="StaticModel" id="140">
+				<component type="StaticModel" id="165">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
 					<attribute name="Material" value="Material;Materials/Constant/MetallicR5.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
-			<node id="151">
+			<node id="177">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Metallic R7" />
 				<attribute name="Tags" />
@@ -932,13 +934,13 @@
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
-				<component type="StaticModel" id="139">
+				<component type="StaticModel" id="166">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
 					<attribute name="Material" value="Material;Materials/Constant/MetallicR7.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
-			<node id="153">
+			<node id="178">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Metallic R10" />
 				<attribute name="Tags" />
@@ -946,14 +948,14 @@
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
-				<component type="StaticModel" id="141">
+				<component type="StaticModel" id="167">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
 					<attribute name="Material" value="Material;Materials/Constant/MetallicR10.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
 		</node>
-		<node id="148">
+		<node id="180">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Dielectric" />
 			<attribute name="Tags" />
@@ -961,7 +963,7 @@
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
-			<node id="154">
+			<node id="181">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Dielectric R0" />
 				<attribute name="Tags" />
@@ -969,13 +971,13 @@
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
-				<component type="StaticModel" id="142">
+				<component type="StaticModel" id="168">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
 					<attribute name="Material" value="Material;Materials/Constant/DielectricR0.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
-			<node id="155">
+			<node id="182">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Dielectric R3" />
 				<attribute name="Tags" />
@@ -983,13 +985,13 @@
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
-				<component type="StaticModel" id="143">
+				<component type="StaticModel" id="169">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
 					<attribute name="Material" value="Material;Materials/Constant/DielectricR3.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
-			<node id="156">
+			<node id="183">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Dielectric R5" />
 				<attribute name="Tags" />
@@ -997,13 +999,13 @@
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
-				<component type="StaticModel" id="144">
+				<component type="StaticModel" id="170">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
 					<attribute name="Material" value="Material;Materials/Constant/DielectricR5.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
-			<node id="157">
+			<node id="184">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Dielectric R7" />
 				<attribute name="Tags" />
@@ -1011,13 +1013,13 @@
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
-				<component type="StaticModel" id="145">
+				<component type="StaticModel" id="172">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
 					<attribute name="Material" value="Material;Materials/Constant/DielectricR7.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
-			<node id="158">
+			<node id="185">
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Dielectric R10" />
 				<attribute name="Tags" />
@@ -1025,7 +1027,7 @@
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
-				<component type="StaticModel" id="146">
+				<component type="StaticModel" id="173">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
 					<attribute name="Material" value="Material;Materials/Constant/DielectricR10.xml" />
 					<attribute name="Cast Shadows" value="true" />
@@ -1033,7 +1035,7 @@
 			</node>
 		</node>
 	</node>
-	<node id="160">
+	<node id="186">
 		<attribute name="Is Enabled" value="true" />
 		<attribute name="Name" value="Mirror" />
 		<attribute name="Tags" />
@@ -1041,7 +1043,7 @@
 		<attribute name="Rotation" value="1 0 0 0" />
 		<attribute name="Scale" value="1 1 1" />
 		<attribute name="Variables" />
-		<node id="159">
+		<node id="187">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Teapot" />
 			<attribute name="Tags" />
@@ -1049,12 +1051,12 @@
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="2 2 2" />
 			<attribute name="Variables" />
-			<component type="StaticModel" id="147">
+			<component type="StaticModel" id="174">
 				<attribute name="Model" value="Model;Models/TeaPot.mdl" />
 				<attribute name="Material" value="Material;Materials/Constant/DefaultMirror.xml;Materials/Constant/DefaultMirror.xml" />
 			</component>
 		</node>
-		<node id="161">
+		<node id="188">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Sphere" />
 			<attribute name="Tags" />
@@ -1062,12 +1064,12 @@
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1.5 1.5 1.5" />
 			<attribute name="Variables" />
-			<component type="StaticModel" id="148">
+			<component type="StaticModel" id="175">
 				<attribute name="Model" value="Model;Models/Sphere.mdl" />
 				<attribute name="Material" value="Material;Materials/Constant/DefaultMirror.xml" />
 			</component>
 		</node>
-		<node id="162">
+		<node id="189">
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Torus" />
 			<attribute name="Tags" />
@@ -1075,7 +1077,7 @@
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1.5 1.5 1.5" />
 			<attribute name="Variables" />
-			<component type="StaticModel" id="149">
+			<component type="StaticModel" id="176">
 				<attribute name="Model" value="Model;Models/Torus.mdl" />
 				<attribute name="Material" value="Material;Materials/Constant/DefaultMirror.xml" />
 			</component>

@@ -386,7 +386,10 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
 
             // Apply ambient from Zone
             const CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
-            lightAccumulator.sphericalHarmonics_ += cachedZone.zone_->GetLinearAmbient().ToVector3();
+            if (!gi_ || !gi_->GetBackgroundStatic())
+                lightAccumulator.sphericalHarmonics_ += cachedZone.zone_->GetAmbientAndBackgroundLighting();
+            else
+                lightAccumulator.sphericalHarmonics_ += cachedZone.zone_->GetAmbientLighting();
         }
 
         // Store geometry

@@ -22,9 +22,11 @@
 
 #pragma once
 
+#include "../Core/ThreadSafeCache.h"
 #include "../Graphics/Drawable.h"
 #include "../Graphics/Texture.h"
 #include "../Math/Color.h"
+#include "../Math/SphericalHarmonics.h"
 
 namespace Urho3D
 {
@@ -54,6 +56,8 @@ public:
     void SetAmbientColor(const Color& color);
     /// Set ambient brightness.
     void SetAmbientBrightness(float brightness);
+    /// Set background brightness.
+    void SetBackgroundBrightness(float brightness);
     /// Set fog color.
     /// @property
     void SetFogColor(const Color& color);
@@ -97,8 +101,10 @@ public:
     float GetAmbientBrightness() const { return ambientBrightness_; }
 
     /// Return zone's ambient light in linear space.
-    /// TODO(renderer): Cache this value
-    const Color GetLinearAmbient() const { return (ambientColor_ * ambientBrightness_).GammaToLinear(); }
+    const Vector3 GetAmbientLighting() const;
+
+    /// Return zone's ambient and background light in linear space.
+    const SphericalHarmonicsDot9 GetAmbientAndBackgroundLighting() const;
 
     /// Return ambient start color. Not safe to call from worker threads due to possible octree query.
     /// @property
@@ -167,6 +173,9 @@ protected:
     void ClearDrawablesZone();
     /// Mark node transform dirty.
     void MarkNodeDirty() { OnMarkedDirty(node_); }
+    // TODO(renderer): Call this when texture is reloaded
+    void MarkCachedAmbientDirty();
+    void UpdateCachedAmbientLighting() const;
 
     /// Cached inverse world transform matrix.
     mutable Matrix3x4 inverseWorld_;
@@ -184,6 +193,8 @@ protected:
     Color ambientColor_;
     /// Ambient brightness.
     float ambientBrightness_{ 1.0f };
+    /// Background brightness.
+    float backgroundBrightness_{ 0.0f };
     /// Cached ambient start color.
     Color ambientStartColor_;
     /// Cached ambient end color.
@@ -206,6 +217,13 @@ protected:
     WeakPtr<Zone> lastAmbientStartZone_;
     /// Last zone used for ambient gradient end color.
     WeakPtr<Zone> lastAmbientEndZone_;
+
+    /// Cached ambient lighting in linear space.
+    /// @{
+    mutable ThreadSafeCache<Vector3> cachedAmbientLighting_;
+    mutable ThreadSafeCache<SphericalHarmonicsDot9> cachedTextureLighting_;
+    mutable ThreadSafeCache<SphericalHarmonicsDot9> cachedAmbientAndBackgroundLighting_;
+    /// @}
 };
 
 }
