@@ -677,6 +677,7 @@ void Octree::AddDrawable(Drawable* drawable)
             return;
         }
         zones_.AddZone(zone);
+        zone->ClearDrawablesZone();
     }
 }
 

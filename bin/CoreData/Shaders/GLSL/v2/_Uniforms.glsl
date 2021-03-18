@@ -25,6 +25,10 @@ UNIFORM_BUFFER_BEGIN(1, Camera)
     UNIFORM(mediump vec3 cFogColor)
 UNIFORM_BUFFER_END()
 
+UNIFORM_BUFFER_BEGIN(2, Zone)
+    UNIFORM(mediump half cRoughnessToLODFactor)
+UNIFORM_BUFFER_END()
+
 UNIFORM_BUFFER_BEGIN(3, Light)
     UNIFORM(mediump vec4 cLightPos) // TODO(renderer): Increase precision
     UNIFORM(mediump vec3 cLightDir)

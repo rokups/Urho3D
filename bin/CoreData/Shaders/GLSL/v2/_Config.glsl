@@ -2,6 +2,7 @@
 #define _CONFIG_GLSL_
 
 #extension GL_ARB_shading_language_420pack: enable
+#extension GL_EXT_shader_texture_lod: enable
 
 // =================================== Constants ===================================
 
@@ -174,19 +175,19 @@
     // URHO3D_SURFACE_TWO_SIDED: Normal is mirrored when calculating lighting. Ignored in deferred rendering.
     // URHO3D_SURFACE_VOLUMETRIC: Normal is ignored when calculating lighting. Ignored in deferred rendering.
     // VERTEX_ADJUST_NoL: Adjust N dot L for vertex normal.
-    // PXIEL_ADJUST_NoL: Adjust N dot L for pixel normal.
+    // PIXEL_ADJUST_NoL: Adjust N dot L for pixel normal.
     #if defined(VOLUMETRIC)
         #define URHO3D_SURFACE_VOLUMETRIC
         #define VERTEX_ADJUST_NoL(NdotL) 1.0
-        #define PXIEL_ADJUST_NoL(NdotL) 1.0
+        #define PIXEL_ADJUST_NoL(NdotL) 1.0
     #elif defined(TRANSLUCENT)
         #define URHO3D_SURFACE_TWO_SIDED
         #define VERTEX_ADJUST_NoL(NdotL) abs(NdotL)
-        #define PXIEL_ADJUST_NoL(NdotL) max(0.0, NdotL)
+        #define PIXEL_ADJUST_NoL(NdotL) max(0.0, NdotL)
     #else
         #define URHO3D_SURFACE_ONE_SIDED
         #define VERTEX_ADJUST_NoL(NdotL) max(0.0, NdotL)
-        #define PXIEL_ADJUST_NoL(NdotL) max(0.0, NdotL)
+        #define PIXEL_ADJUST_NoL(NdotL) max(0.0, NdotL)
     #endif
 #endif
 
@@ -287,6 +288,7 @@
     #define texture2DProj textureProj
     #define texture3D texture
     #define textureCube texture
+    #define textureCubeLod textureLod
     #define texture2DLod textureLod
     #define texture2DLodOffset textureLodOffset
 #endif
@@ -305,7 +307,14 @@
 #endif
 
 // Define shortcuts for precision-qualified types
+#define half  mediump float
+#define half2 mediump vec2
+#define half3 mediump vec3
+#define half4 mediump vec4
 // TODO(renderer): Get rid of optional_highp
 #define optional_highp
+
+#define M_MEDIUMP_FLT_MAX 65504.0
+#define SaturateMediump(x) min(x, M_MEDIUMP_FLT_MAX)
 
 #endif // _CONFIG_GLSL_

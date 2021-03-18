@@ -39,6 +39,8 @@ struct SurfaceData
 #ifdef URHO3D_REFLECTION_MAPPING
     /// Vector from surface to reflection.
     vec3 reflectionVec;
+    /// Reflection data from cubemap, prefetched.
+    half4 reflectionColorRaw;
 #endif
 };
 

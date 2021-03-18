@@ -105,7 +105,7 @@
     /// Evaluate Blinn-Phong diffuse lighting.
     vec3 GetBlinnPhongDiffuse(DirectLightData lightData, vec3 normal, vec3 albedo)
     {
-        float NoL = PXIEL_ADJUST_NoL(dot(normal, lightData.lightVec.xyz));
+        float NoL = PIXEL_ADJUST_NoL(dot(normal, lightData.lightVec.xyz));
         float attenuation = GetDirectLightAttenuation(lightData, NoL);
         return attenuation * lightData.lightColor * albedo;
     }
@@ -114,7 +114,7 @@
     vec3 GetBlinnPhongDiffuseSpecular(DirectLightData lightData, vec3 normal, vec3 albedo,
         vec3 specular, vec3 eyeVec, float specularPower)
     {
-        float NoL = PXIEL_ADJUST_NoL(dot(normal, lightData.lightVec.xyz));
+        float NoL = PIXEL_ADJUST_NoL(dot(normal, lightData.lightVec.xyz));
         float attenuation = GetDirectLightAttenuation(lightData, NoL);
         float specularIntensity = GetBlinnPhongSpecularIntensity(normal, eyeVec, lightData.lightVec.xyz, specularPower);
         return attenuation * lightData.lightColor * (albedo + specular * specularIntensity * cLightColor.a);

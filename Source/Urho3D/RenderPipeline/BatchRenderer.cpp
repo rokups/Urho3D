@@ -163,9 +163,12 @@ private:
 
     void CheckDirtyReflectionProbe(const LightAccumulator& lightAccumulator)
     {
-        TextureCube* reflectionMap = lightAccumulator.reflectionProbe_->reflectionMap_;
-        dirty_.reflectionProbeTextures_ = current_.reflectionProbeTexture_ != reflectionMap;
-        current_.reflectionProbeTexture_ = reflectionMap;
+        dirty_.reflectionProbe_ = current_.reflectionProbe_ != lightAccumulator.reflectionProbe_;
+        if (dirty_.reflectionProbe_)
+        {
+            current_.reflectionProbe_ = lightAccumulator.reflectionProbe_;
+            current_.reflectionProbeTexture_ = lightAccumulator.reflectionProbe_->reflectionMap_;
+        }
     }
 
     void CheckDirtyPixelLight(const PipelineBatch& pipelineBatch)
@@ -270,6 +273,15 @@ private:
             dirty_.cameraConstants_ = false;
         }
 
+        if (enabled_.ambientLighting_)
+        {
+            if (drawQueue_.BeginShaderParameterGroup(SP_ZONE, dirty_.reflectionProbe_))
+            {
+                AddReflectionProbeConstants();
+                drawQueue_.CommitShaderParameterGroup(SP_ZONE);
+            }
+        }
+
         // Commit pixel light constants once during shadow map rendering to support normal bias
         if (outputShadowSplit_ != nullptr)
         {
@@ -311,8 +323,7 @@ private:
 
     void UpdateDirtyResources()
     {
-        const bool resourcesDirty = dirty_.material_ || dirty_.lightmapTextures_
-            || dirty_.pixelLightTextures_ || dirty_.reflectionProbeTextures_;
+        const bool resourcesDirty = dirty_.material_ || dirty_.reflectionProbe_ || dirty_.IsResourcesDirty();
         if (resourcesDirty)
         {
             for (const ShaderResourceDesc& desc : globalResources_)
@@ -343,7 +354,6 @@ private:
 
             dirty_.lightmapTextures_ = false;
             dirty_.pixelLightTextures_ = false;
-            dirty_.reflectionProbeTextures_ = false;
         }
     }
 
@@ -392,6 +402,11 @@ private:
             settings_.gammaCorrection_ ? ambientColorGamma.GammaToLinear() : ambientColorGamma);
         drawQueue_.AddShaderParameter(PSP_FOGCOLOR, camera_.GetEffectiveFogColor());
         drawQueue_.AddShaderParameter(PSP_FOGPARAMS, GetFogParameter(camera_));
+    }
+
+    void AddReflectionProbeConstants()
+    {
+        drawQueue_.AddShaderParameter("RoughnessToLODFactor", current_.reflectionProbe_->roughnessToLODFactor_);
     }
 
     void AddVertexLightConstants()
@@ -532,7 +547,7 @@ private:
             CheckDirtyLightmap(sourceBatch);
         }
 
-        const bool resetInstancingGroup = instancingGroup_.count_ == 0 || dirty_.IsAnyStateDirty();
+        const bool resetInstancingGroup = instancingGroup_.count_ == 0 || dirty_.IsAnythingDirty();
         if (resetInstancingGroup)
         {
             if (instancingGroup_.count_ > 0)
@@ -609,6 +624,12 @@ private:
         bool pipelineState_{};
         bool material_{};
         bool geometry_{};
+        bool reflectionProbe_{};
+
+        bool IsStateDirty() const
+        {
+            return pipelineState_ || material_ || geometry_ || reflectionProbe_;
+        }
         /// @}
 
         /// Should be cleared in corresponding constant filler
@@ -618,20 +639,28 @@ private:
         bool pixelLightConstants_{};
         bool vertexLightConstants_{};
         bool lightmapConstants_{};
+
+        bool IsConstantsDirty() const
+        {
+            return frameConstants_ || cameraConstants_
+                || pixelLightConstants_ || vertexLightConstants_ || lightmapConstants_;
+        }
         /// @}
 
         /// Should be cleared in resource filler
         /// @{
-        bool reflectionProbeTextures_{};
         bool pixelLightTextures_{};
         bool lightmapTextures_{};
+
+        bool IsResourcesDirty() const
+        {
+            return pixelLightTextures_ || lightmapTextures_;
+        }
         /// @}
 
-        bool IsAnyStateDirty() const
+        bool IsAnythingDirty() const
         {
-            return pipelineState_ || frameConstants_ || cameraConstants_ || reflectionProbeTextures_
-                || pixelLightConstants_ || pixelLightTextures_ || vertexLightConstants_
-                || lightmapConstants_ || lightmapTextures_ || material_ || geometry_;
+            return IsStateDirty() || IsConstantsDirty() || IsResourcesDirty();
         }
     } dirty_;
 
@@ -640,6 +669,7 @@ private:
         PipelineState* pipelineState_{};
         float constantDepthBias_{};
 
+        const ReflectionProbeData* reflectionProbe_{};
         TextureCube* reflectionProbeTexture_{};
 
         unsigned pixelLightIndex_{ M_MAX_UNSIGNED };

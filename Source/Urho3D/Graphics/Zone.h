@@ -164,6 +164,9 @@ public:
     /// Return zone texture attribute.
     ResourceRef GetZoneTextureAttr() const;
 
+    /// Internal. Clear zone reference from drawables inside the bounding box.
+    void ClearDrawablesZone();
+
 protected:
     /// Handle node transform being dirtied.
     void OnMarkedDirty(Node* node) override;
@@ -173,8 +176,6 @@ protected:
     void OnRemoveFromOctree() override;
     /// Recalculate the ambient gradient colors from neighbor zones. Not safe to call from worker threads due to octree query.
     void UpdateAmbientGradient();
-    /// Clear zone reference from drawables inside the bounding box.
-    void ClearDrawablesZone();
     /// Mark node transform dirty.
     void MarkNodeDirty() { OnMarkedDirty(node_); }
     // TODO(renderer): Call this when texture is reloaded

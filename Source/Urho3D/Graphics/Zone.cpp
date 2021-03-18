@@ -207,6 +207,9 @@ const ReflectionProbeData* Zone::GetReflectionProbe() const
         auto renderer = GetSubsystem<Renderer>();
         if (!data.reflectionMap_ && renderer)
             data.reflectionMap_ = renderer->GetBlackCubeMap();
+        data.roughnessToLODFactor_ = data.reflectionMap_ ? LogBaseTwo(data.reflectionMap_->GetWidth()) : 1.0f;
+        UpdateCachedAmbientAndBackgroundLighting();
+        data.reflectionMapSH_ = cachedTextureLighting_.Get();
         reflectionProbeData_.Restore(data);
     }
     return &reflectionProbeData_.Get();

@@ -116,7 +116,56 @@ void FillCommonVertexOutput(VertexTransform vertexTransform, vec2 uv)
 /// Return common surface data in pixel shader.
 SurfaceData GetCommonSurfaceData()
 {
+    // Fetch PBR parameters
+#ifdef URHO3D_PHYSICAL_MATERIAL
+    // TODO(renderer): Add occlusion
+    #ifdef URHO3D_MATERIAL_HAS_SPECULAR
+        vec2 roughnessMetallic = texture2D(sSpecMap, vTexCoord).rg + vec2(cRoughness, cMetallic);
+    #else
+        vec2 roughnessMetallic = vec2(cRoughness, cMetallic);
+    #endif
+    const vec2 minRougnessMetallic = vec2(0.089, 0.00);
+    roughnessMetallic = max(roughnessMetallic, minRougnessMetallic);
+#endif
+
     SurfaceData result;
+
+    // Evaluate normal
+#ifdef URHO3D_PIXEL_NEED_NORMAL
+    #ifdef URHO3D_NORMAL_MAPPING
+        mat3 tbn = mat3(vTangent.xyz, vec3(vBitangentXY.xy, vTangent.w), vNormal);
+        result.normal = normalize(tbn * DecodeNormal(texture2D(sNormalMap, vTexCoord)));
+    #else
+        result.normal = normalize(vNormal);
+    #endif
+#endif
+
+    // Evaluate eye vector
+#ifdef URHO3D_PIXEL_NEED_EYE_VECTOR
+    result.eyeVec = normalize(vEyeVec);
+#endif
+
+    // Evaluate reflection vector
+#ifdef URHO3D_REFLECTION_MAPPING
+    result.reflectionVec = reflect(-result.eyeVec, result.normal);
+    #ifdef URHO3D_PHYSICAL_MATERIAL
+        #ifdef GL_ES
+            #ifdef GL_EXT_shader_texture_lod
+                result.reflectionColorRaw = textureCubeLodEXT(
+                    sEnvCubeMap, result.reflectionVec, roughnessMetallic.x * cRoughnessToLODFactor);
+            #else
+                result.reflectionColorRaw = textureCube(sEnvCubeMap, result.reflectionVec); // Too bad
+            #endif
+        #else
+            result.reflectionColorRaw = textureCubeLod(
+                sEnvCubeMap, result.reflectionVec, roughnessMetallic.x * cRoughnessToLODFactor);
+        #endif
+    #else
+        result.reflectionColorRaw = textureCube(sEnvCubeMap, result.reflectionVec);
+    #endif
+#endif
+
+    // Evaluate fog
     result.fogFactor = GetFogFactor(vWorldDepth);
 
     // Evaluate albedo
@@ -148,22 +197,13 @@ SurfaceData GetCommonSurfaceData()
     result.emission = cMatEmissiveColor;
 #endif
 
-#if defined(URHO3D_PHYSICAL_MATERIAL)
-    // Evaluate PBR material
-    #ifdef URHO3D_MATERIAL_HAS_SPECULAR
-        vec2 roughnessMetallic = texture2D(sSpecMap, vTexCoord).rg + vec2(cRoughness, cMetallic);
-    #else
-        vec2 roughnessMetallic = vec2(cRoughness, cMetallic);
-    #endif
-    const vec2 minRougnessMetallic = vec2(0.004, 0.00);
-    roughnessMetallic = max(roughnessMetallic, minRougnessMetallic);
+    // Evaluate specular and/or PBR properties
+#ifdef URHO3D_PHYSICAL_MATERIAL
     // TODO(renderer): Make configurable specular?
     result.specular = mix(vec3(0.03), result.albedo.rgb, roughnessMetallic.y);
     result.albedo.rgb *= (1.0 - roughnessMetallic.y);
     result.roughness = roughnessMetallic.x;
-
-#elif defined(URHO3D_SURFACE_NEED_SPECULAR)
-    // Evaluate specular
+#else
     #ifdef URHO3D_MATERIAL_HAS_SPECULAR
         result.specular = cMatSpecColor.rgb * texture2D(sSpecMap, vTexCoord).rgb;
     #else
@@ -176,26 +216,6 @@ SurfaceData GetCommonSurfaceData()
     result.occlusion = texture2D(sEmissiveMap, vTexCoord).r;
 #else
     result.occlusion = 1.0;
-#endif
-
-    // Evaluate normal
-#ifdef URHO3D_PIXEL_NEED_NORMAL
-    #ifdef URHO3D_NORMAL_MAPPING
-        mat3 tbn = mat3(vTangent.xyz, vec3(vBitangentXY.xy, vTangent.w), vNormal);
-        result.normal = normalize(tbn * DecodeNormal(texture2D(sNormalMap, vTexCoord)));
-    #else
-        result.normal = normalize(vNormal);
-    #endif
-#endif
-
-    // Evaluate eye vector
-#ifdef URHO3D_PIXEL_NEED_EYE_VECTOR
-    result.eyeVec = normalize(vEyeVec);
-#endif
-
-    // Evaluate reflection vector
-#ifdef URHO3D_REFLECTION_MAPPING
-    result.reflectionVec = reflect(-result.eyeVec, result.normal);
 #endif
 
     // Evaluate ambient lighting

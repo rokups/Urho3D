@@ -9,18 +9,114 @@
 
 #ifdef URHO3D_AMBIENT_PASS
 
-/// Calculate indirect lighting: material ambient and reflection.
-vec3 BRDF_Indirect_Simple(SurfaceData surfaceData)
+/// Calculate simple indirect lighting: ambient and reflection. Also includes emission.
+half3 Indirect_Simple(SurfaceData surfaceData)
 {
-    vec3 result = surfaceData.emission;
-    result += surfaceData.ambientLighting * surfaceData.albedo.rgb * surfaceData.occlusion;
+    half3 result = surfaceData.emission;
+    result += surfaceData.ambientLighting * surfaceData.albedo.rgb;
 #ifdef URHO3D_REFLECTION_MAPPING
-    result += cMatEnvMapColor * textureCube(sEnvCubeMap, surfaceData.reflectionVec).rgb;
+    result += GammaToLightSpace(cMatEnvMapColor * surfaceData.reflectionColorRaw.rgb);
 #endif
+    result *= surfaceData.occlusion;
     return result;
 }
 
+#ifdef URHO3D_PHYSICAL_MATERIAL
+
+/// Evaluate approximated specular color for indirect lighting.
+/// https://www.unrealengine.com/en-US/blog/physically-based-shading-on-mobile
+half3 BRDF_IndirectSpecular(half3 specularColor, half roughness, half NoV)
+{
+    const half4 c0 = vec4(-1, -0.0275, -0.572, 0.022);
+    const half4 c1 = vec4(1, 0.0425, 1.04, -0.04);
+    half4 r = roughness * c0 + c1;
+    half a004 = min(r.x * r.x, exp2(-9.28 * NoV)) * r.x + r.y;
+    half2 ab = vec2(-1.04, 1.04) * a004 + r.zw;
+    return specularColor * ab.x + ab.y;
+}
+
+/// Calculate indirect PBR lighting. Also includes emission.
+half3 Indirect_PBR(SurfaceData surfaceData, half NoV)
+{
+    half3 brdf = BRDF_IndirectSpecular(surfaceData.specular, surfaceData.roughness, NoV);
+
+    half3 diffuse = surfaceData.ambientLighting * surfaceData.albedo.rgb;
+    half3 specular = M_PI * GammaToLinearSpace(surfaceData.reflectionColorRaw.rgb);
+    #ifndef URHO3D_GAMMA_CORRECTION
+        specular = sqrt(specular);
+    #endif
+
+    return surfaceData.emission + (diffuse + brdf * specular) * surfaceData.occlusion;
+}
+
+#endif // URHO3D_PHYSICAL_MATERIAL
+
 #endif // URHO3D_AMBIENT_PASS
+
+#ifdef URHO3D_HAS_PIXEL_LIGHT
+
+#ifdef URHO3D_PHYSICAL_MATERIAL
+
+/// Evaluate GGX distribution function.
+half D_GGX(half roughness2, half3 normal, half3 halfVec, half NoH)
+{
+#ifdef GL_ES
+    half3 NxH = cross(normal, halfVec);
+    half oneMinusNoHSquared = dot(NxH, NxH);
+#else
+    half oneMinusNoHSquared = 1.0 - NoH * NoH;
+#endif
+
+    half a = NoH * roughness2;
+    half k = roughness2 / (oneMinusNoHSquared + a * a);
+    half d = k * k; // * (1.0 / M_PI); // Don't divide by M_PI because we don't divide diffuse as well
+    return SaturateMediump(d);
+}
+
+/// Evaluate Smith-GGX visibility function.
+half V_SmithGGXCorrelatedFast(half roughness2, half NoV, half NoL)
+{
+    half GGXV = NoL * (NoV * (1.0 - roughness2) + roughness2);
+    half GGXL = NoV * (NoL * (1.0 - roughness2) + roughness2);
+    return 0.5 / (GGXV + GGXL);
+}
+
+/// Evaluate Schlick Fresnel function.
+half3 F_Schlick(half3 specularColor, half LoH)
+{
+    half f = pow(1.0 - LoH, 5.0);
+    return vec3(f) + specularColor * (vec3(1.0) - f);
+}
+
+/// Calculate direct PBR lighting. Light attenuation is not applied.
+half3 BRDF_Direct_Specular(half3 specular, half roughness,
+    half3 normal, half3 halfVec, half NoH, half NoV, half NoL, half LoH)
+{
+    half roughness2 = roughness * roughness;
+    half D = D_GGX(roughness2, normal, halfVec, NoH);
+    half V = V_SmithGGXCorrelatedFast(roughness2, NoV, NoL);
+    half3 F = F_Schlick(specular, LoH);
+    return (D * V) * F;
+}
+
+/// Evaluate PBR lighting for direct light.
+half3 Direct_PBR(DirectLightData lightData,
+    half3 albedo, half3 specular, half roughness, half3 normal, half3 eyeVec)
+{
+    half3 halfVec = normalize(eyeVec + lightData.lightVec.xyz);
+    half NoL = PIXEL_ADJUST_NoL(dot(normal, lightData.lightVec.xyz));
+    half NoV = abs(dot(normal, eyeVec)) + 1e-5;
+    half NoH = clamp(dot(normal, halfVec), 0.0, 1.0);
+    half LoH = clamp(dot(lightData.lightVec.xyz, halfVec), 0.0, 1.0);
+
+    half attenuation = GetDirectLightAttenuation(lightData, NoL);
+    half3 brdf = BRDF_Direct_Specular(specular, roughness, normal, halfVec, NoH, NoV, NoL, LoH);
+    return attenuation * lightData.lightColor * (albedo + brdf);
+}
+
+#endif // URHO3D_PHYSICAL_MATERIAL
+
+#endif // URHO3D_HAS_PIXEL_LIGHT
 
 #endif // URHO3D_PIXEL_SHADER
 

@@ -2,7 +2,7 @@
 <material>
     <technique name="Techniques/NoTexture.xml" />
     <shader vsdefines="PBR" psdefines="PBR" />
-    <parameter name="MatDiffColor" value="1 1 1 1" />
+    <parameter name="MatDiffColor" value="0.98 0.86 0.57 1" />
     <parameter name="Roughness" value="1" />
     <parameter name="Metallic" value="1" />
 </material>

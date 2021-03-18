@@ -29,15 +29,6 @@ SAMPLER(9, samplerCube sLightCubeMap)
     SAMPLER(15, sampler3D sZoneVolumeMap)
 #endif
 
-#ifdef GL3
-    #define texture2D texture
-    #define texture2DProj textureProj
-    #define texture3D texture
-    #define textureCube texture
-    #define texture2DLod textureLod
-    #define texture2DLodOffset textureLodOffset
-#endif
-
 #ifdef URHO3D_MATERIAL_HAS_DIFFUSE
     #define DiffMap_ToGamma(color)  CONCATENATE_2(Texture_ToGamma_,  URHO3D_MATERIAL_DIFFUSE_HINT)(color)
     #define DiffMap_ToLinear(color) CONCATENATE_2(Texture_ToLinear_, URHO3D_MATERIAL_DIFFUSE_HINT)(color)

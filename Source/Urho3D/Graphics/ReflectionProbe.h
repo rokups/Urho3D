@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "../Math/SphericalHarmonics.h"
+
 namespace Urho3D
 {
 
@@ -34,6 +36,10 @@ struct ReflectionProbeData
 {
     /// Reflection map, should never be null.
     TextureCube* reflectionMap_{};
+    /// Roughness to LOD factor. Should be equal to log2(NumLODs - 1).
+    float roughnessToLODFactor_{};
+    /// Smallest LOD of reflection represented as SH. Used by GL ES to approximate textureCubeLod.
+    SphericalHarmonicsDot9 reflectionMapSH_;
 };
 
 }
