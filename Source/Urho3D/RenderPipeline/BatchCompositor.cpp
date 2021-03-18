@@ -81,8 +81,8 @@ void AddPipelineBatch(const BatchStateCreateKey& key, BatchStateCache& cache,
 
 BatchCompositorPass::BatchCompositorPass(RenderPipelineInterface* renderPipeline,
     DrawableProcessor* drawableProcessor, BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags,
-    unsigned overridePassIndex, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
-    : DrawableProcessorPass(renderPipeline, flags, overridePassIndex, unlitBasePassIndex, litBasePassIndex, lightPassIndex)
+    unsigned deferredPassIndex, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
+    : DrawableProcessorPass(renderPipeline, flags, deferredPassIndex, unlitBasePassIndex, litBasePassIndex, lightPassIndex)
     , workQueue_(GetSubsystem<WorkQueue>())
     , defaultMaterial_(GetSubsystem<Renderer>()->GetDefaultMaterial())
     , drawableProcessor_(drawableProcessor)
@@ -101,7 +101,7 @@ void BatchCompositorPass::ComposeBatches()
     });
 
     // Create missing pipeline states from main thread
-    ResolveDelayedBatches(OverrideSubpass, delayedOverrideBatches_, overrideCache_, overrideBatches_);
+    ResolveDelayedBatches(DeferredSubpass, delayedDeferredBatches_, deferredCache_, deferredBatches_);
     ResolveDelayedBatches(BaseSubpass, delayedUnlitBaseBatches_, unlitBaseCache_, baseBatches_);
     ResolveDelayedBatches(BaseSubpass, delayedLitBaseBatches_, litBaseCache_, baseBatches_);
     ResolveDelayedBatches(LightSubpass, delayedLightBatches_, lightCache_, lightBatches_);
@@ -113,11 +113,11 @@ void BatchCompositorPass::OnUpdateBegin(const CommonFrameInfo& frameInfo)
 {
     BaseClassName::OnUpdateBegin(frameInfo);
 
-    overrideBatches_.Clear();
+    deferredBatches_.Clear();
     baseBatches_.Clear();
     lightBatches_.Clear();
 
-    delayedOverrideBatches_.Clear();
+    delayedDeferredBatches_.Clear();
     delayedUnlitBaseBatches_.Clear();
     delayedLitBaseBatches_.Clear();
     delayedLightBatches_.Clear();
@@ -125,7 +125,7 @@ void BatchCompositorPass::OnUpdateBegin(const CommonFrameInfo& frameInfo)
 
 void BatchCompositorPass::OnPipelineStatesInvalidated()
 {
-    overrideCache_.Invalidate();
+    deferredCache_.Invalidate();
     unlitBaseCache_.Invalidate();
     litBaseCache_.Invalidate();
     lightCache_.Invalidate();
@@ -174,10 +174,10 @@ void BatchCompositorPass::ProcessGeometryBatch(const GeometryBatch& geometryBatc
     if (!InitializeKey(key, geometryBatch))
         return;
 
-    if (geometryBatch.overridePass_)
+    if (geometryBatch.deferredPass_)
     {
-        key.pass_ = geometryBatch.overridePass_;
-        AddPipelineBatch(key, overrideCache_, overrideBatches_, delayedOverrideBatches_);
+        key.pass_ = geometryBatch.deferredPass_;
+        AddPipelineBatch(key, deferredCache_, deferredBatches_, delayedDeferredBatches_);
         return;
     }
 

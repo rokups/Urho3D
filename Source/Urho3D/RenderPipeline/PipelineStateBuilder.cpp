@@ -311,7 +311,7 @@ void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPa
      const Material* material, const Pass* materialPass, const Drawable* drawable)
 {
     const DrawableProcessorPassFlags passFlags = compositorPass->GetFlags();
-    const bool isDeferred = subpassIndex == BatchCompositorPass::OverrideSubpass;
+    const bool isDeferred = subpassIndex == BatchCompositorPass::DeferredSubpass;
     if (subpassIndex == BatchCompositorPass::LightSubpass)
     {
         commonDefines_ += "URHO3D_ADDITIVE_LIGHT_PASS ";

@@ -43,7 +43,7 @@ class ScenePass : public BatchCompositorPass
 public:
     /// Construct pass with forward lighting.
     ScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
-        BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags, const ea::string& overridePass,
+        BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags, const ea::string& deferredPass,
         const ea::string& unlitBasePass, const ea::string& litBasePass, const ea::string& lightPass);
 
     /// Construct pass without forward lighting.
@@ -59,18 +59,18 @@ class URHO3D_API UnorderedScenePass : public ScenePass
 public:
     using ScenePass::ScenePass;
 
-    ea::span<const PipelineBatchByState> GetSortedOverrideBatches() const { return sortedOverrideBatches_; }
+    ea::span<const PipelineBatchByState> GetSortedDeferredBatches() const { return sortedDeferredBatches_; }
     ea::span<const PipelineBatchByState> GetSortedBaseBatches() const { return sortedBaseBatches_; }
     ea::span<const PipelineBatchByState> GetSortedLightBatches() const { return sortedLightBatches_; }
 
-    BatchRenderFlags GetOverrideRenderFlags() const;
+    BatchRenderFlags GetDeferredRenderFlags() const;
     BatchRenderFlags GetBaseRenderFlags() const;
     BatchRenderFlags GetLightRenderFlags() const;
 
 protected:
     void OnBatchesReady() override;
 
-    ea::vector<PipelineBatchByState> sortedOverrideBatches_;
+    ea::vector<PipelineBatchByState> sortedDeferredBatches_;
     ea::vector<PipelineBatchByState> sortedBaseBatches_;
     ea::vector<PipelineBatchByState> sortedLightBatches_;
 };

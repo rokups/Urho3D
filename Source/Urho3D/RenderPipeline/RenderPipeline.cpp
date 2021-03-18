@@ -178,7 +178,7 @@ void RenderPipeline::ApplySettings()
         }
     }
 
-    sceneProcessor_->SetPasses({ opaquePass_, alphaPass_ });
+    sceneProcessor_->SetPasses({ opaquePass_, alphaPass_, postOpaquePass_ });
 
     postProcessPasses_.clear();
 
@@ -261,6 +261,7 @@ bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
 
         alphaPass_ = sceneProcessor_->CreatePass<BackToFrontScenePass>(
             DrawableProcessorPassFlag::HasAmbientLighting, "", "alpha", "alpha", "litalpha");
+        postOpaquePass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(DrawableProcessorPassFlag::None, "postopaque");
     }
 
     frameInfo_.viewport_ = viewport;
@@ -370,7 +371,7 @@ void RenderPipeline::Render()
 
         instancingBuffer_->Begin();
         sceneBatchRenderer_->RenderBatches({ *drawQueue, *sceneProcessor_->GetFrameInfo().camera_ },
-            opaquePass_->GetOverrideRenderFlags(), opaquePass_->GetSortedOverrideBatches());
+            opaquePass_->GetDeferredRenderFlags(), opaquePass_->GetSortedDeferredBatches());
         instancingBuffer_->End();
 
         drawQueue->Execute();
@@ -411,6 +412,7 @@ void RenderPipeline::Render()
     sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetBaseRenderFlags(), opaquePass_->GetSortedBaseBatches());
     sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetLightRenderFlags(), opaquePass_->GetSortedLightBatches());
     sceneBatchRenderer_->RenderBatches(ctx, alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches());
+    sceneBatchRenderer_->RenderBatches(ctx, postOpaquePass_->GetBaseRenderFlags(), postOpaquePass_->GetSortedBaseBatches());
     instancingBuffer_->End();
     drawQueue->Execute();
 

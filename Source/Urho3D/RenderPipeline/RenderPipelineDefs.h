@@ -57,6 +57,7 @@ struct CommonFrameInfo
 /// Traits of scene pass.
 enum class DrawableProcessorPassFlag
 {
+    None = 0,
     HasAmbientLighting = 1 << 0,
     DisableInstancing = 1 << 1,
     DeferredLightMaskToStencil = 1 << 2,

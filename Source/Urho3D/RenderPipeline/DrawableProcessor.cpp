@@ -113,10 +113,10 @@ bool IsShadowCasterVisible(const BoundingBox& lightSpaceBoundingBox, Camera* sha
 }
 
 DrawableProcessorPass::DrawableProcessorPass(RenderPipelineInterface* renderPipeline, DrawableProcessorPassFlags flags,
-    unsigned overridePassIndex, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
+    unsigned deferredPassIndex, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex)
     : Object(renderPipeline->GetContext())
     , flags_(flags)
-    , overridePassIndex_(overridePassIndex)
+    , deferredPassIndex_(deferredPassIndex)
     , unlitBasePassIndex_(unlitBasePassIndex)
     , litBasePassIndex_(litBasePassIndex)
     , lightPassIndex_(lightPassIndex)
@@ -127,9 +127,9 @@ DrawableProcessorPass::DrawableProcessorPass(RenderPipelineInterface* renderPipe
 DrawableProcessorPass::AddBatchResult DrawableProcessorPass::AddBatch(unsigned threadIndex,
     Drawable* drawable, unsigned sourceBatchIndex, Technique* technique)
 {
-    if (Pass* overridePass = technique->GetPass(overridePassIndex_))
+    if (Pass* deferredPass = technique->GetPass(deferredPassIndex_))
     {
-        geometryBatches_.PushBack(threadIndex, { drawable, sourceBatchIndex, overridePass, nullptr, nullptr, nullptr });
+        geometryBatches_.PushBack(threadIndex, { drawable, sourceBatchIndex, deferredPass, nullptr, nullptr, nullptr });
         return { true, false };
     }
 

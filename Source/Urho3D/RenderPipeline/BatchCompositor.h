@@ -71,14 +71,14 @@ public:
     /// Subpass indices.
     enum : unsigned
     {
-        OverrideSubpass,
+        DeferredSubpass,
         BaseSubpass,
         LightSubpass,
     };
 
     BatchCompositorPass(RenderPipelineInterface* renderPipeline,
         DrawableProcessor* drawableProcessor, BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags,
-        unsigned overridePassIndex, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
+        unsigned deferredPassIndex, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
 
     void ComposeBatches();
 
@@ -100,7 +100,7 @@ protected:
     BatchStateCacheCallback* batchStateCacheCallback_{};
     /// @}
 
-    WorkQueueVector<PipelineBatch> overrideBatches_;
+    WorkQueueVector<PipelineBatch> deferredBatches_;
     WorkQueueVector<PipelineBatch> baseBatches_;
     WorkQueueVector<PipelineBatch> lightBatches_;
 
@@ -114,7 +114,7 @@ private:
 
     /// Pipeline state caches
     /// @{
-    BatchStateCache overrideCache_;
+    BatchStateCache deferredCache_;
     BatchStateCache unlitBaseCache_;
     BatchStateCache litBaseCache_;
     BatchStateCache lightCache_;
@@ -122,7 +122,7 @@ private:
 
     /// Batches whose processing is delayed due to missing pipeline state
     /// @{
-    WorkQueueVector<BatchStateCreateKey> delayedOverrideBatches_;
+    WorkQueueVector<BatchStateCreateKey> delayedDeferredBatches_;
     WorkQueueVector<BatchStateCreateKey> delayedUnlitBaseBatches_;
     WorkQueueVector<BatchStateCreateKey> delayedLitBaseBatches_;
     WorkQueueVector<BatchStateCreateKey> delayedLightBatches_;
