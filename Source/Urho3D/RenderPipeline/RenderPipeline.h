@@ -68,6 +68,7 @@ enum class PostProcessTonemapping
 
 struct PostProcessSettings
 {
+    bool autoExposure_{};
     PostProcessAntialiasing antialiasing_{};
     PostProcessTonemapping tonemapping_{};
     bool greyScale_{};

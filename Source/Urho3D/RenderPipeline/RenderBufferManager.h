@@ -47,6 +47,16 @@ struct DrawQuadParams
     ea::span<const ShaderParameterDesc> parameters_;
 };
 
+/// Controls how DrawTexture[Region] handles Gamma and Linear color space.
+enum class ColorSpaceTransition
+{
+    /// Write linear data to output texture. Output texture should not be sRGB.
+    ToLinear,
+    /// Write linear data to output texture if output is sRGB.
+    /// Write gamma data to output texture if output is not sRGB.
+    Automatic
+};
+
 /// Class that manages all render buffers within viewport and viewport itself.
 class URHO3D_API RenderBufferManager : public Object
 {
@@ -65,7 +75,7 @@ public:
     /// Invalid if SupportOutputColorReadWrite is not requested.
     void PrepareForColorReadWrite(bool synchronizeInputAndOutput);
 
-    /// Set depth-stencil and color buffers. Depth-stencil is required, color buffers are optional.
+    /// Set depth-stencil and color buffers. At least one color or depth-stencil buffer should be set.
     /// All render buffers should have same multisample levels.
     /// If rectangle is not specified, all render buffers should have same size and viewport rectanges.
     /// @{
@@ -120,6 +130,11 @@ public:
     /// Current secondary color render buffer is passed as diffuse texture input.
     void DrawFeedbackViewportQuad(PipelineState* pipelineState, ea::span<const ShaderResourceDesc> resources,
         ea::span<const ShaderParameterDesc> parameters, bool flipVertical = false);
+    /// Draw region of input texture into into currently bound render buffer. sRGB is taken into account.
+    void DrawTextureRegion(ColorSpaceTransition mode, Texture* sourceTexture,
+             const IntRect& sourceRect, bool flipVertical = false);
+    /// Draw input texture into into currently bound render buffer. sRGB is taken into account.
+    void DrawTexture(ColorSpaceTransition mode, Texture* sourceTexture, bool flipVertical = false);
 
     /// Return depth-stencil buffer. Stays the same during the frame.
     RenderBuffer* GetDepthStencilOutput() const { return depthStencilBuffer_; }
@@ -137,9 +152,8 @@ public:
     /// Return size of output region (not size of output texture itself).
     IntVector2 GetOutputSize() const { return viewportRect_.Size(); }
     Vector2 GetInvOutputSize() const { return Vector2::ONE / static_cast<Vector2>(GetOutputSize()); }
-    /// Return offset and scale used to convert clip space to UV space.
-    /// Ignores actual viewport rectangle.
-    Vector4 GetOutputClipToUVSpaceOffsetAndScale() const;
+    /// Return identity offset and scale used to convert clip space to UV space.
+    Vector4 GetDefaultClipToUVSpaceOffsetAndScale() const;
 
 private:
     /// RenderPipeline callbacks
@@ -182,6 +196,7 @@ private:
     ViewportRenderBufferFlags viewportFlags_;
     RenderBufferParams viewportParams_;
 
+    float timeStep_{};
     IntRect viewportRect_;
 
     RenderBuffer* depthStencilBuffer_{};

@@ -426,7 +426,7 @@ void Zone::UpdateCachedAmbientAndBackgroundLighting() const
         {
             const ea::string& zoneTextureName = zoneTexture_->GetName();
             auto cache = GetSubsystem<ResourceCache>();
-            ImageCube* zoneImage = !zoneTextureName.empty() ? cache->GetResource<ImageCube>(zoneTextureName) : nullptr;
+            SharedPtr<ImageCube> zoneImage = !zoneTextureName.empty() ? cache->GetTempResource<ImageCube>(zoneTextureName) : nullptr;
             if (zoneImage)
                 sh = SphericalHarmonicsDot9(zoneImage->CalculateSphericalHarmonics());
             else

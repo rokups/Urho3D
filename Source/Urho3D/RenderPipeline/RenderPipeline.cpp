@@ -114,6 +114,7 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, settings_.varianceShadowMapParams_, MarkSettingsDirty, BatchRendererSettings{}.varianceShadowMapParams_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("VSM Multi Sample", int, settings_.varianceShadowMapMultiSample_, MarkSettingsDirty, 1, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Gamma Correction", bool, settings_.gammaCorrection_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Post Process Auto Exposure", bool, settings_.postProcess_.autoExposure_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Post Process Antialiasing", settings_.postProcess_.antialiasing_, MarkSettingsDirty, postProcessAntialiasingNames, PostProcessAntialiasing::None, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Post Process Tonemapping", settings_.postProcess_.tonemapping_, MarkSettingsDirty, postProcessTonemappingNames, PostProcessTonemapping::None, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Post Process Grey Scale", bool, settings_.postProcess_.greyScale_, MarkSettingsDirty, false, AM_DEFAULT);
@@ -181,6 +182,12 @@ void RenderPipeline::ApplySettings()
     sceneProcessor_->SetPasses({ opaquePass_, alphaPass_, postOpaquePass_ });
 
     postProcessPasses_.clear();
+
+    if (settings_.postProcess_.autoExposure_)
+    {
+        auto pass = MakeShared<AutoExposurePostProcessPass>(this, renderBufferManager_);
+        postProcessPasses_.push_back(pass);
+    }
 
     switch (settings_.postProcess_.antialiasing_)
     {
@@ -337,6 +344,11 @@ void RenderPipeline::Render()
     {
         viewportFlags |= ViewportRenderBufferFlag::InheritMultiSampleLevel;
     }
+
+    // TODO(renderer): Refactor me
+    if (settings_.postProcess_.autoExposure_)
+        viewportParams.textureFormat_ = Graphics::GetRGBAFloat16Format();
+
     renderBufferManager_->RequestViewport(viewportFlags, viewportParams);
 
     OnRenderBegin(this, frameInfo_);
@@ -385,7 +397,7 @@ void RenderPipeline::Render()
         };
 
         const ShaderParameterDesc cameraParameters[] = {
-            { VSP_GBUFFEROFFSETS, renderBufferManager_->GetOutputClipToUVSpaceOffsetAndScale() },
+            { VSP_GBUFFEROFFSETS, renderBufferManager_->GetDefaultClipToUVSpaceOffsetAndScale() },
             { PSP_GBUFFERINVSIZE, renderBufferManager_->GetInvOutputSize() },
         };
 

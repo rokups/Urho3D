@@ -25,6 +25,10 @@
 #include "../Container/FlagSet.h"
 #include "../Core/Object.h"
 
+// TODO(renderer): Extract post-process effects to separate file(s)
+#include "../RenderPipeline/RenderBuffer.h"
+#include "../RenderPipeline/RenderBufferManager.h"
+
 namespace Urho3D
 {
 
@@ -72,6 +76,38 @@ protected:
 
     ea::vector<ShaderParameterDesc> shaderParameters_;
     ea::vector<ShaderResourceDesc> shaderResources_;
+};
+
+/// Auto-exposure pos-process.
+class URHO3D_API AutoExposurePostProcessPass
+    : public PostProcessPass
+{
+    URHO3D_OBJECT(AutoExposurePostProcessPass, PostProcessPass);
+
+public:
+    AutoExposurePostProcessPass(RenderPipelineInterface* renderPipeline, RenderBufferManager* renderBufferManager);
+
+    PostProcessPassFlags GetExecutionFlags() const override { return PostProcessPassFlag::NeedColorOutputReadAndWrite; }
+    void Execute() override;
+
+protected:
+    bool isFirstFrame_{ true };
+
+    SharedPtr<RenderBuffer> textureHDR128_;
+    SharedPtr<RenderBuffer> textureLum64_;
+    SharedPtr<RenderBuffer> textureLum16_;
+    SharedPtr<RenderBuffer> textureLum4_;
+    SharedPtr<RenderBuffer> textureLum1_;
+    SharedPtr<RenderBuffer> textureAdaptedLum_;
+    SharedPtr<RenderBuffer> texturePrevAdaptedLum_;
+
+    SharedPtr<PipelineState> pipelineStateLum64_;
+    SharedPtr<PipelineState> pipelineStateLum16_;
+    SharedPtr<PipelineState> pipelineStateLum4_;
+    SharedPtr<PipelineState> pipelineStateLum1_;
+    SharedPtr<PipelineState> pipelineStateAdaptedLum_;
+    SharedPtr<PipelineState> pipelineStateCommitLinear_;
+    SharedPtr<PipelineState> pipelineStateCommitGamma_;
 };
 
 }

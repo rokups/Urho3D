@@ -119,6 +119,7 @@ bool AreRenderBuffersCompatible(RenderBuffer* firstBuffer, RenderBuffer* secondB
 
 struct RenderSurfaceArray
 {
+    IntRect viewportRect_{};
     RenderSurface* depthStencil_{};
     RenderSurface* renderTargets_[MAX_RENDERTARGETS]{};
 };
@@ -126,9 +127,16 @@ struct RenderSurfaceArray
 ea::optional<RenderSurfaceArray> PrepareRenderSurfaces(bool ignoreRect,
     RenderBuffer* depthStencilBuffer, ea::span<RenderBuffer* const> colorBuffers, CubeMapFace face)
 {
-    if (!depthStencilBuffer)
+    if (!depthStencilBuffer && colorBuffers.empty())
     {
-        URHO3D_LOGERROR("Depth-stencil buffer is missing", MAX_RENDERTARGETS);
+        URHO3D_LOGERROR("Depth-stencil and color buffers are null");
+        return ea::nullopt;
+    }
+
+    auto nullColorBuffer = ea::find(colorBuffers.begin(), colorBuffers.end(), nullptr);
+    if (nullColorBuffer != colorBuffers.end())
+    {
+        URHO3D_LOGERROR("Color buffer {} is null", nullColorBuffer - colorBuffers.begin());
         return ea::nullopt;
     }
 
@@ -138,17 +146,32 @@ ea::optional<RenderSurfaceArray> PrepareRenderSurfaces(bool ignoreRect,
         return ea::nullopt;
     }
 
+    RenderBuffer* referenceBuffer = depthStencilBuffer ? depthStencilBuffer : colorBuffers[0];
     for (unsigned i = 0; i < colorBuffers.size(); ++i)
     {
-        if (!AreRenderBuffersCompatible(depthStencilBuffer, colorBuffers[i], ignoreRect))
+        if (!AreRenderBuffersCompatible(referenceBuffer, colorBuffers[i], ignoreRect))
         {
-            URHO3D_LOGERROR("Depth-stencil is incompatible with color render buffer #{}", i);
+            URHO3D_LOGERROR("Color render buffer #{} is incompatible with other buffers", i);
             return ea::nullopt;
         }
     }
 
     RenderSurfaceArray result;
-    result.depthStencil_ = depthStencilBuffer->GetRenderSurface(face);
+
+    if (depthStencilBuffer)
+    {
+        result.depthStencil_ = depthStencilBuffer->GetRenderSurface(face);
+        result.viewportRect_ = depthStencilBuffer->GetViewportRect();
+    }
+    else
+    {
+        // Use temporary dirty depth buffer
+        RenderBuffer* colorBuffer = colorBuffers[0];
+        auto renderer = colorBuffer->GetSubsystem<Renderer>();
+        result.depthStencil_ = renderer->GetDepthStencil(colorBuffer->GetRenderSurface(face));
+        result.viewportRect_ = colorBuffer->GetViewportRect();
+    }
+
     for (unsigned i = 0; i < colorBuffers.size(); ++i)
     {
         result.renderTargets_[i] = colorBuffers[i]->GetRenderSurface(face);
@@ -224,8 +247,8 @@ void RenderBufferManager::PrepareForColorReadWrite(bool synchronizeInputAndOutpu
 
     if (synchronizeInputAndOutput)
     {
-        // TODO(renderer): Implement me
-        assert(0);
+        SetRenderTargets(depthStencilBuffer_, { writeableColorBuffer_ });
+        DrawTexture(ColorSpaceTransition::Automatic, readableColorBuffer_->GetTexture2D());
     }
 }
 
@@ -241,7 +264,7 @@ void RenderBufferManager::SetRenderTargetsRect(const IntRect& viewportRect,
         SetRenderSurfaces(graphics_, *renderSurfaces);
 
         if (viewportRect == IntRect::ZERO)
-            graphics_->SetViewport(depthStencilBuffer->GetViewportRect());
+            graphics_->SetViewport(renderSurfaces->viewportRect_);
         else
             graphics_->SetViewport(viewportRect);
     }
@@ -333,7 +356,7 @@ void RenderBufferManager::ClearOutput(const Color& color, float depth, unsigned 
     ClearOutput(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, color, depth, stencil);
 }
 
-Vector4 RenderBufferManager::GetOutputClipToUVSpaceOffsetAndScale() const
+Vector4 RenderBufferManager::GetDefaultClipToUVSpaceOffsetAndScale() const
 {
     const IntVector2 size = GetOutputSize();
     return CalculateViewportOffsetAndScale(size, IntRect{ IntVector2::ZERO, size });
@@ -353,6 +376,7 @@ SharedPtr<PipelineState> RenderBufferManager::CreateQuadPipelineState(BlendMode 
     const ea::string& shaderName, const ea::string& shaderDefines)
 {
     ea::string defines = shaderDefines;
+    defines += " URHO3D_GEOMETRY_STATIC";
     if (graphics_->GetCaps().constantBuffersSupported_)
         defines += " URHO3D_USE_CBUFFERS";
 
@@ -366,6 +390,9 @@ SharedPtr<PipelineState> RenderBufferManager::CreateQuadPipelineState(BlendMode 
 
 void RenderBufferManager::DrawQuad(const DrawQuadParams& params, bool flipVertical)
 {
+    if (!params.pipelineState_->IsValid())
+        return;
+
     Geometry* quadGeometry = renderer_->GetQuadGeometry();
     Matrix3x4 modelMatrix = Matrix3x4::IDENTITY;
     Matrix4 projection = Matrix4::IDENTITY;
@@ -379,6 +406,12 @@ void RenderBufferManager::DrawQuad(const DrawQuadParams& params, bool flipVertic
 
     drawQueue_->Reset();
     drawQueue_->SetPipelineState(params.pipelineState_);
+
+    if (drawQueue_->BeginShaderParameterGroup(SP_FRAME))
+    {
+        drawQueue_->AddShaderParameter(VSP_DELTATIME, timeStep_);
+        drawQueue_->CommitShaderParameterGroup(SP_FRAME);
+    }
 
     if (drawQueue_->BeginShaderParameterGroup(SP_CAMERA))
     {
@@ -424,7 +457,7 @@ void RenderBufferManager::DrawViewportQuad(PipelineState* pipelineState, ea::spa
 {
     DrawQuadParams params;
     params.pipelineState_ = pipelineState;
-    params.clipToUVOffsetAndScale_ = GetOutputClipToUVSpaceOffsetAndScale();
+    params.clipToUVOffsetAndScale_ = GetDefaultClipToUVSpaceOffsetAndScale();
     params.invInputSize_ = GetInvOutputSize();
     params.resources_ = resources;
     params.parameters_ = parameters;
@@ -436,7 +469,7 @@ void RenderBufferManager::DrawFeedbackViewportQuad(PipelineState* pipelineState,
 {
     DrawQuadParams params;
     params.pipelineState_ = pipelineState;
-    params.clipToUVOffsetAndScale_ = GetOutputClipToUVSpaceOffsetAndScale();
+    params.clipToUVOffsetAndScale_ = GetDefaultClipToUVSpaceOffsetAndScale();
     params.invInputSize_ = GetInvOutputSize();
     params.bindSecondaryColorToDiffuse_ = true;
     params.resources_ = resources;
@@ -451,6 +484,7 @@ void RenderBufferManager::OnPipelineStatesInvalidated()
 
 void RenderBufferManager::OnRenderBegin(const CommonFrameInfo& frameInfo)
 {
+    timeStep_ = frameInfo.timeStep_;
     viewportRect_ = frameInfo.viewportRect_;
 
     // Get parameters of output render surface
@@ -565,43 +599,67 @@ void RenderBufferManager::InitializeCopyTexturePipelineState()
 void RenderBufferManager::CopyTextureRegion(Texture* sourceTexture, const IntRect& sourceRect,
     RenderSurface* destinationSurface, const IntRect& destinationRect, bool flipVertical)
 {
-    if (!sourceTexture->IsInstanceOf<Texture2D>())
-    {
-        URHO3D_LOGERROR("Copy region is supported only for Texture2D");
-        return;
-    }
-
-    static const char* shaderName = "v2/CopyFramebuffer";
-    if (!copyTexturePipelineState_ || !copyGammaToLinearTexturePipelineState_ || !copyLinearToGammaTexturePipelineState_)
-        InitializeCopyTexturePipelineState();
-
-    const bool isSRGBSource = sourceTexture->GetSRGB();
-    const bool isSRGBDestination = RenderSurface::GetSRGB(graphics_, destinationSurface);
-
-    DrawQuadParams callParams;
-    if (isSRGBSource && !isSRGBDestination)
-        callParams.pipelineState_ = copyLinearToGammaTexturePipelineState_;
-    else if (!isSRGBSource && isSRGBDestination)
-        callParams.pipelineState_ = copyGammaToLinearTexturePipelineState_;
-    else
-        callParams.pipelineState_ = copyTexturePipelineState_;
-
-    callParams.invInputSize_ = Vector2::ONE / static_cast<Vector2>(sourceTexture->GetSize());
-    callParams.clipToUVOffsetAndScale_ = CalculateViewportOffsetAndScale(sourceTexture->GetSize(), sourceRect);
-
-    const ShaderResourceDesc shaderResources[] = { { TU_DIFFUSE, sourceTexture } };
-    callParams.resources_ = shaderResources;
-
-    if (!callParams.pipelineState_->IsValid())
-        return;
-
     graphics_->SetRenderTarget(0, destinationSurface);
     for (unsigned i = 1; i < MAX_RENDERTARGETS; ++i)
         graphics_->ResetRenderTarget(i);
     graphics_->SetDepthStencil(renderer_->GetDepthStencil(destinationSurface));
     graphics_->SetViewport(destinationRect);
+    DrawTextureRegion(ColorSpaceTransition::Automatic, sourceTexture, sourceRect, flipVertical);
+}
+
+void RenderBufferManager::DrawTextureRegion(ColorSpaceTransition mode, Texture* sourceTexture,
+    const IntRect& sourceRect, bool flipVertical)
+{
+    if (!sourceTexture->IsInstanceOf<Texture2D>())
+    {
+        URHO3D_LOGERROR("Draw texture is supported only for Texture2D");
+        return;
+    }
+
+    if (!copyTexturePipelineState_ || !copyGammaToLinearTexturePipelineState_ || !copyLinearToGammaTexturePipelineState_)
+        InitializeCopyTexturePipelineState();
+
+    const bool isSRGBSource = sourceTexture->GetSRGB();
+    const bool isSRGBDestination = RenderSurface::GetSRGB(graphics_, graphics_->GetRenderTarget(0));
+
+    if (isSRGBDestination && mode == ColorSpaceTransition::ToLinear)
+    {
+        URHO3D_LOGERROR("Cannot write linear data to sRGB output texture");
+        return;
+    }
+
+    DrawQuadParams callParams;
+    if (mode == ColorSpaceTransition::ToLinear)
+    {
+        if (isSRGBSource)
+            callParams.pipelineState_ = copyTexturePipelineState_;
+        else
+            callParams.pipelineState_ = copyGammaToLinearTexturePipelineState_;
+    }
+    else
+    {
+        if (isSRGBSource && !isSRGBDestination)
+            callParams.pipelineState_ = copyLinearToGammaTexturePipelineState_;
+        else if (!isSRGBSource && isSRGBDestination)
+            callParams.pipelineState_ = copyGammaToLinearTexturePipelineState_;
+        else
+            callParams.pipelineState_ = copyTexturePipelineState_;
+    }
+
+    callParams.invInputSize_ = Vector2::ONE / static_cast<Vector2>(sourceTexture->GetSize());
+
+    const IntRect effectiveSourceRect = sourceRect != IntRect::ZERO ? sourceRect : sourceTexture->GetRect();
+    callParams.clipToUVOffsetAndScale_ = CalculateViewportOffsetAndScale(sourceTexture->GetSize(), effectiveSourceRect);
+
+    const ShaderResourceDesc shaderResources[] = { { TU_DIFFUSE, sourceTexture } };
+    callParams.resources_ = shaderResources;
 
     DrawQuad(callParams, flipVertical);
+}
+
+void RenderBufferManager::DrawTexture(ColorSpaceTransition mode, Texture* sourceTexture, bool flipVertical)
+{
+    DrawTextureRegion(mode, sourceTexture, IntRect::ZERO, flipVertical);
 }
 
 }

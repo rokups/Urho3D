@@ -355,8 +355,17 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernel
 
     // Negative lights will use subtract blending, so use absolute RGB values
     const float fade = GetLightFade(light_);
-    cookedParams_.effectiveColorInGammaSpace_ = fade * light_->GetEffectiveColor().Abs().ToVector3();
-    cookedParams_.effectiveColorInLinearSpace_ = fade * light_->GetEffectiveColor().Abs().GammaToLinear().ToVector3();
+    const Color effectiveColor = light_->GetEffectiveColor().Abs();
+    if (light_->GetUsePhysicalValues())
+    {
+        cookedParams_.effectiveColorInLinearSpace_ = fade * effectiveColor.ToVector3();
+        cookedParams_.effectiveColorInGammaSpace_ = fade * effectiveColor.LinearToGamma().ToVector3();
+    }
+    else
+    {
+        cookedParams_.effectiveColorInGammaSpace_ = fade * effectiveColor.ToVector3();
+        cookedParams_.effectiveColorInLinearSpace_ = fade * effectiveColor.GammaToLinear().ToVector3();
+    }
     cookedParams_.effectiveSpecularIntensity_ = fade * light_->GetEffectiveSpecularIntensity();
 
     // Setup vertex light parameters
