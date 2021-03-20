@@ -110,34 +110,67 @@ struct RenderBufferParams
     bool operator!=(const RenderBufferParams& rhs) const { return !(*this == rhs); }
 };
 
-/// Settings of render buffer manager.
-/*struct RenderBufferManagerSettings
+/// Color space of primary color outputs of render pipeline.
+/// Color buffer is guaranteed to have Red, Green and Blue channels regardless of this choice.
+enum class RenderPipelineColorSpace
 {
-    RenderBufferParams outputColorParams_;
-};*/
+    /// Low dynamic range lighting in Gamma space, trimmed to [0, 1].
+    GammaLDR,
+    /// Low dynamic range lighting in Linear space, trimmed to [0, 1].
+    LinearLDR,
+    /// High dynamic range lighting in Linear space. Should be tone mapped before frame end.
+    LinearHDR
+};
 
-/// Flags that define how primary viewport of RenderPipeline is managed.
-enum class ViewportRenderBufferFlag
+/// Rarely-changing settings of render buffer manager.
+struct RenderBufferManagerSettings
 {
-    /// Controls properties that can be inherited from render target
-    /// @{
-    InheritColorFormat = 1 << 0,
-    InheritSRGB = 1 << 1,
-    InheritMultiSampleLevel = 1 << 2,
-    InheritBilinearFiltering = 1 << 3,
-    /// @}
+    /// Whether to inherit multisample level from output render texture.
+    bool inheritMultiSampleLevel_{};
+    /// Multisample level of both output color buffers and depth buffer.
+    int multiSampleLevel_{ 1 };
+    /// Preferred color space of both output color buffers.
+    RenderPipelineColorSpace colorSpace_{};
+    /// Whether output color buffers are required to have at least bilinear filtering.
+    bool filteredColor_{};
+    /// Whether the depth-stencil buffer is required to have stencil.
+    bool stencilBuffer_{};
+    /// Whether the both of output color buffers should be usable with other render targets.
+    /// OpenGL backbuffer color cannot do that.
+    bool colorUsableWithMultipleRenderTargets_{};
 
-    /// Traits required from output color and depth-stencil buffers
+    /// Utility operators
     /// @{
-    IsReadableColor = 1 << 4,
-    IsReadableDepth = 1 << 5,
-    HasStencil = 1 << 6,
-    SupportOutputColorReadWrite = 1 << 7,
-    UsableWithMultipleRenderTargets = 1 << 8,
+    unsigned CalculatePipelineStateHash() const
+    {
+        unsigned hash = 0;
+        return hash;
+    }
+
+    bool operator==(const RenderBufferManagerSettings& rhs) const
+    {
+        return inheritMultiSampleLevel_ == rhs.inheritMultiSampleLevel_
+            && multiSampleLevel_ == rhs.multiSampleLevel_
+            && colorSpace_ == rhs.colorSpace_
+            && filteredColor_ == rhs.filteredColor_
+            && stencilBuffer_ == rhs.stencilBuffer_
+            && colorUsableWithMultipleRenderTargets_ == rhs.colorUsableWithMultipleRenderTargets_;
+    }
+
+    bool operator!=(const RenderBufferManagerSettings& rhs) const { return !(*this == rhs); }
     /// @}
 };
 
-URHO3D_FLAGSET(ViewportRenderBufferFlag, ViewportRenderBufferFlags);
+/// Frequently-changing settings of render buffer manager.
+struct RenderBufferManagerFrameSettings
+{
+    /// Whether the depth buffer should be readable.
+    bool readableDepth_{};
+    /// Whether the both of output color buffers should be readable.
+    bool readableColor_{};
+    /// Whether it's should be supported to read from and write to output color buffer simultaneously.
+    bool supportColorReadWrite_{};
+};
 
 /// Traits of post-processing pass
 enum class PostProcessPassFlag
@@ -280,7 +313,7 @@ enum class DrawableAmbientMode
 
 struct BatchRendererSettings
 {
-    bool gammaCorrection_{};
+    bool linearSpaceLighting_{};
     DrawableAmbientMode ambientMode_{ DrawableAmbientMode::Directional };
     Vector2 varianceShadowMapParams_{ 0.0000001f, 0.9f };
 
@@ -289,14 +322,14 @@ struct BatchRendererSettings
     unsigned CalculatePipelineStateHash() const
     {
         unsigned hash = 0;
-        CombineHash(hash, gammaCorrection_);
+        CombineHash(hash, linearSpaceLighting_);
         CombineHash(hash, MakeHash(ambientMode_));
         return hash;
     }
 
     bool operator==(const BatchRendererSettings& rhs) const
     {
-        return gammaCorrection_ == rhs.gammaCorrection_
+        return linearSpaceLighting_ == rhs.linearSpaceLighting_
             && ambientMode_ == rhs.ambientMode_
             && varianceShadowMapParams_ == rhs.varianceShadowMapParams_;
     }
@@ -397,33 +430,6 @@ struct SceneProcessorSettings
     }
 
     bool operator!=(const SceneProcessorSettings& rhs) const { return !(*this == rhs); }
-    /// @}
-};
-
-struct BaseRenderPipelineSettings
-    : public SceneProcessorSettings
-    , public ShadowMapAllocatorSettings
-    , public InstancingBufferSettings
-{
-    /// Utility operators
-    /// @{
-    unsigned CalculatePipelineStateHash() const
-    {
-        unsigned hash = 0;
-        CombineHash(hash, SceneProcessorSettings::CalculatePipelineStateHash());
-        CombineHash(hash, ShadowMapAllocatorSettings::CalculatePipelineStateHash());
-        CombineHash(hash, InstancingBufferSettings::CalculatePipelineStateHash());
-        return hash;
-    }
-
-    bool operator==(const BaseRenderPipelineSettings& rhs) const
-    {
-        return SceneProcessorSettings::operator==(rhs)
-            && ShadowMapAllocatorSettings::operator==(rhs)
-            && InstancingBufferSettings::operator==(rhs);
-    }
-
-    bool operator!=(const BaseRenderPipelineSettings& rhs) const { return !(*this == rhs); }
     /// @}
 };
 

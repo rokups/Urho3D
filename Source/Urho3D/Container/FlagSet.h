@@ -222,7 +222,7 @@ public:
 
     /// Set or unset specified subset of flags
     /// @{
-    void Assign(const Integer flags, bool enabled)
+    void Set(const Integer flags, bool enabled = true)
     {
         if (enabled)
             value_ |= flags;
@@ -230,9 +230,9 @@ public:
             value_ &= ~flags;
     }
 
-    void Assign(const Enum value, bool enabled)
+    void Set(const Enum value, bool enabled = true)
     {
-        Assign(static_cast<Integer>(value), enabled);
+        Set(static_cast<Integer>(value), enabled);
     }
     /// @}
 

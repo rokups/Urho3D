@@ -222,10 +222,16 @@ RenderBufferManager::RenderBufferManager(RenderPipelineInterface* renderPipeline
     viewportDepthBuffer_ = MakeShared<ViewportDepthStencilRenderBuffer>(renderPipeline_);
 }
 
-void RenderBufferManager::RequestViewport(ViewportRenderBufferFlags flags, const RenderBufferParams& params)
+void RenderBufferManager::SetSettings(const RenderBufferManagerSettings& settings)
 {
-    viewportFlags_ = flags;
-    viewportParams_ = params;
+    settings_ = settings;
+}
+
+void RenderBufferManager::SetFrameSettings(const RenderBufferManagerFrameSettings& frameSettings)
+{
+    frameSettings_ = frameSettings;
+    if (frameSettings_.supportColorReadWrite_)
+        frameSettings_.readableColor_ = true;
 }
 
 SharedPtr<RenderBuffer> RenderBufferManager::CreateColorBuffer(const RenderBufferParams& params, const Vector2& size)
@@ -235,9 +241,9 @@ SharedPtr<RenderBuffer> RenderBufferManager::CreateColorBuffer(const RenderBuffe
 
 void RenderBufferManager::PrepareForColorReadWrite(bool synchronizeInputAndOutput)
 {
-    if (!viewportFlags_.Test(ViewportRenderBufferFlag::SupportOutputColorReadWrite))
+    if (!frameSettings_.supportColorReadWrite_)
     {
-        URHO3D_LOGERROR("Cannot call PrepareForColorReadWrite if SupportOutputColorReadWrite flag is not set");
+        URHO3D_LOGERROR("Cannot call PrepareForColorReadWrite if 'supportColorReadWrite' flag is not set");
         assert(0);
         return;
     }
@@ -502,59 +508,57 @@ void RenderBufferManager::OnRenderBegin(const CommonFrameInfo& frameInfo)
     const bool isSimpleTextureOutput = outputTexture != nullptr && isFullRectOutput;
     const bool isBilinearFilteredOutput = outputTexture && outputTexture->GetFilterMode() != FILTER_NEAREST;
 
-    if (viewportFlags_.Test(ViewportRenderBufferFlag::InheritColorFormat))
-        viewportParams_.textureFormat_ = outputFormat;
-    if (viewportFlags_.Test(ViewportRenderBufferFlag::InheritSRGB))
-        viewportParams_.flags_.Assign(RenderBufferFlag::sRGB, isOutputSRGB);
-    if (viewportFlags_.Test(ViewportRenderBufferFlag::InheritBilinearFiltering))
-        viewportParams_.flags_.Assign(RenderBufferFlag::BilinearFiltering, isBilinearFilteredOutput);
-    if (viewportFlags_.Test(ViewportRenderBufferFlag::InheritMultiSampleLevel))
-        viewportParams_.multiSampleLevel_ = outputMultiSample;
+    // Determine output format
+    const bool needHDR = settings_.colorSpace_ == RenderPipelineColorSpace::LinearHDR;
+    const bool needSRGB = settings_.colorSpace_ == RenderPipelineColorSpace::LinearLDR;
 
-    if (previousViewportParams_ != viewportParams_)
+    RenderBufferParams viewportParams;
+    viewportParams.multiSampleLevel_ = settings_.inheritMultiSampleLevel_
+        ? outputMultiSample : settings_.multiSampleLevel_;
+    viewportParams.textureFormat_ = needHDR ? Graphics::GetRGBAFloat16Format() : Graphics::GetRGBFormat();
+    viewportParams.flags_.Set(RenderBufferFlag::sRGB, needSRGB);
+    viewportParams.flags_.Set(RenderBufferFlag::BilinearFiltering, settings_.filteredColor_ || isBilinearFilteredOutput);
+
+    if (previousViewportParams_ != viewportParams)
     {
-        previousViewportParams_ = viewportParams_;
+        previousViewportParams_ = viewportParams;
         ResetCachedRenderBuffers();
     }
 
     // Check if need to allocate secondary color buffer, substitute primary color buffer or substitute depth buffer
-    const bool needReadableColor = viewportFlags_.Test(ViewportRenderBufferFlag::IsReadableColor);
-    const bool needReadableDepth = viewportFlags_.Test(ViewportRenderBufferFlag::IsReadableDepth);
-    const bool needStencilBuffer = viewportFlags_.Test(ViewportRenderBufferFlag::HasStencil);
-    const bool needSimultaneousReadAndWrite = viewportFlags_.Test(ViewportRenderBufferFlag::SupportOutputColorReadWrite);
-    const bool needViewportMRT = viewportFlags_.Test(ViewportRenderBufferFlag::UsableWithMultipleRenderTargets);
+    const bool needSimpleTexture = frameSettings_.readableColor_ || frameSettings_.readableDepth_
+        || settings_.colorUsableWithMultipleRenderTargets_;
 
-    const bool isColorFormatMatching = IsColorFormatMatching(outputFormat, viewportParams_.textureFormat_);
-    const bool isColorSRGBMatching = isOutputSRGB == viewportParams_.flags_.Test(RenderBufferFlag::sRGB);
-    const bool isMultiSampleMatching = outputMultiSample == viewportParams_.multiSampleLevel_;
-    const bool isFilterMatching = isBilinearFilteredOutput == viewportParams_.flags_.Test(RenderBufferFlag::BilinearFiltering);
+    const bool isColorFormatMatching = IsColorFormatMatching(outputFormat, viewportParams.textureFormat_);
+    const bool isColorSRGBMatching = isOutputSRGB == viewportParams.flags_.Test(RenderBufferFlag::sRGB);
+    const bool isMultiSampleMatching = outputMultiSample == viewportParams.multiSampleLevel_;
+    const bool isFilterMatching = isBilinearFilteredOutput == viewportParams.flags_.Test(RenderBufferFlag::BilinearFiltering);
+    const bool isColorUsageMatching = isSimpleTextureOutput || !needSimpleTexture;
 
-    const bool needSecondaryBuffer = needSimultaneousReadAndWrite;
+    const bool needSecondaryBuffer = frameSettings_.supportColorReadWrite_;
     const bool needSubstitutePrimaryBuffer = !isColorFormatMatching
-        || !isColorSRGBMatching || !isMultiSampleMatching || !isFilterMatching
-        || ((needReadableColor || needReadableDepth || needSimultaneousReadAndWrite) && !isSimpleTextureOutput)
-        || (needViewportMRT && !isSimpleTextureOutput);
+        || !isColorSRGBMatching || !isMultiSampleMatching || !isFilterMatching || !isColorUsageMatching;
     const bool needSubstituteDepthBuffer = !isMultiSampleMatching || !outputDepthStencil.has_value()
         || ((needSecondaryBuffer || needSubstitutePrimaryBuffer) && outputDepthStencil.value() == nullptr)
-        || (needReadableDepth && (!outputHasReadableDepth || !isSimpleTextureOutput))
-        || (needStencilBuffer && !outputHasStencil);
+        || (frameSettings_.readableDepth_ && (!outputHasReadableDepth || !isSimpleTextureOutput))
+        || (settings_.stencilBuffer_ && !outputHasStencil);
 
     // Allocate substitute buffers if necessary
     if (needSubstitutePrimaryBuffer && !substituteRenderBuffers_[0])
     {
-        substituteRenderBuffers_[0] = MakeShared<TextureRenderBuffer>(renderPipeline_, viewportParams_);
+        substituteRenderBuffers_[0] = MakeShared<TextureRenderBuffer>(renderPipeline_, viewportParams);
     }
     if (needSecondaryBuffer && !substituteRenderBuffers_[1])
     {
-        substituteRenderBuffers_[1] = MakeShared<TextureRenderBuffer>(renderPipeline_, viewportParams_);
+        substituteRenderBuffers_[1] = MakeShared<TextureRenderBuffer>(renderPipeline_, viewportParams);
     }
     if (needSubstituteDepthBuffer && !substituteDepthBuffer_)
     {
-        RenderBufferParams depthBufferParams = viewportParams_;
+        RenderBufferParams depthBufferParams = viewportParams;
         depthBufferParams.flags_ |= RenderBufferFlag::Persistent;
-        if (needReadableDepth)
+        if (frameSettings_.readableDepth_)
         {
-            depthBufferParams.textureFormat_ = needStencilBuffer
+            depthBufferParams.textureFormat_ = settings_.stencilBuffer_
                 ? Graphics::GetReadableDepthStencilFormat()
                 : Graphics::GetReadableDepthFormat();
         }

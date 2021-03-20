@@ -63,6 +63,13 @@ namespace Urho3D
 namespace
 {
 
+static const ea::vector<ea::string> colorSpaceNames =
+{
+    "LDR Gamma Space",
+    "LDR Linear Space",
+    "HDR Linear Space",
+};
+
 static const ea::vector<ea::string> ambientModeNames =
 {
     "Constant",
@@ -103,21 +110,21 @@ void RenderPipeline::RegisterObject(Context* context)
 {
     context->RegisterFactory<RenderPipeline>();
 
-    URHO3D_ATTRIBUTE_EX("Max Vertex Lights", int, settings_.maxVertexLights_, MarkSettingsDirty, 4, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Max Pixel Lights", int, settings_.maxPixelLights_, MarkSettingsDirty, 4, AM_DEFAULT);
-    URHO3D_ENUM_ATTRIBUTE_EX("Ambient Mode", settings_.ambientMode_, MarkSettingsDirty, ambientModeNames, DrawableAmbientMode::Directional, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Enable Instancing", bool, settings_.enableInstancing_, MarkSettingsDirty, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Enable Shadow", bool, settings_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Deferred Lighting", bool, settings_.deferredLighting_, MarkSettingsDirty, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("PCF Kernel Size", unsigned, settings_.pcfKernelSize_, MarkSettingsDirty, 1, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Use Variance Shadow Maps", bool, settings_.enableVarianceShadowMaps_, MarkSettingsDirty, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, settings_.varianceShadowMapParams_, MarkSettingsDirty, BatchRendererSettings{}.varianceShadowMapParams_, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("VSM Multi Sample", int, settings_.varianceShadowMapMultiSample_, MarkSettingsDirty, 1, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Gamma Correction", bool, settings_.gammaCorrection_, MarkSettingsDirty, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Post Process Auto Exposure", bool, settings_.postProcess_.autoExposure_, MarkSettingsDirty, false, AM_DEFAULT);
-    URHO3D_ENUM_ATTRIBUTE_EX("Post Process Antialiasing", settings_.postProcess_.antialiasing_, MarkSettingsDirty, postProcessAntialiasingNames, PostProcessAntialiasing::None, AM_DEFAULT);
-    URHO3D_ENUM_ATTRIBUTE_EX("Post Process Tonemapping", settings_.postProcess_.tonemapping_, MarkSettingsDirty, postProcessTonemappingNames, PostProcessTonemapping::None, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Post Process Grey Scale", bool, settings_.postProcess_.greyScale_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Color Space", renderBufferManagerSettings_.colorSpace_, MarkSettingsDirty, colorSpaceNames, RenderPipelineColorSpace::GammaLDR, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Max Vertex Lights", int, sceneProcessorSettings_.maxVertexLights_, MarkSettingsDirty, 4, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Max Pixel Lights", int, sceneProcessorSettings_.maxPixelLights_, MarkSettingsDirty, 4, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Ambient Mode", sceneProcessorSettings_.ambientMode_, MarkSettingsDirty, ambientModeNames, DrawableAmbientMode::Directional, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Enable Instancing", bool, instancingBufferSettings_.enableInstancing_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Enable Shadow", bool, sceneProcessorSettings_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Deferred Lighting", bool, sceneProcessorSettings_.deferredLighting_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("PCF Kernel Size", unsigned, sceneProcessorSettings_.pcfKernelSize_, MarkSettingsDirty, 1, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Use Variance Shadow Maps", bool, shadowMapAllocatorSettings_.enableVarianceShadowMaps_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, sceneProcessorSettings_.varianceShadowMapParams_, MarkSettingsDirty, BatchRendererSettings{}.varianceShadowMapParams_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("VSM Multi Sample", int, shadowMapAllocatorSettings_.varianceShadowMapMultiSample_, MarkSettingsDirty, 1, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Post Process Auto Exposure", bool, postProcessSettings_.autoExposure_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Post Process Antialiasing", postProcessSettings_.antialiasing_, MarkSettingsDirty, postProcessAntialiasingNames, PostProcessAntialiasing::None, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Post Process Tonemapping", postProcessSettings_.tonemapping_, MarkSettingsDirty, postProcessTonemappingNames, PostProcessTonemapping::None, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Post Process Grey Scale", bool, postProcessSettings_.greyScale_, MarkSettingsDirty, false, AM_DEFAULT);
 }
 
 void RenderPipeline::ApplyAttributes()
@@ -126,39 +133,43 @@ void RenderPipeline::ApplyAttributes()
 
 void RenderPipeline::ValidateSettings()
 {
-    settings_.shadowAtlasPageSize_ = ea::min(settings_.shadowAtlasPageSize_, Graphics::GetCaps().maxRenderTargetSize_);
+    shadowMapAllocatorSettings_.shadowAtlasPageSize_ = ea::min(
+        shadowMapAllocatorSettings_.shadowAtlasPageSize_, Graphics::GetCaps().maxRenderTargetSize_);
 
-    if (settings_.deferredLighting_ && !graphics_->GetDeferredSupport()
+    if (sceneProcessorSettings_.deferredLighting_ && !graphics_->GetDeferredSupport()
         && !Graphics::GetReadableDepthStencilFormat())
-        settings_.deferredLighting_ = false;
+        sceneProcessorSettings_.deferredLighting_ = false;
 
-    if (!settings_.use16bitShadowMaps_ && !graphics_->GetHiresShadowMapFormat())
-        settings_.use16bitShadowMaps_ = true;
+    if (!shadowMapAllocatorSettings_.use16bitShadowMaps_ && !graphics_->GetHiresShadowMapFormat())
+        shadowMapAllocatorSettings_.use16bitShadowMaps_ = true;
 
-    if (settings_.enableInstancing_ && !graphics_->GetInstancingSupport())
-        settings_.enableInstancing_ = false;
+    if (instancingBufferSettings_.enableInstancing_ && !graphics_->GetInstancingSupport())
+        instancingBufferSettings_.enableInstancing_ = false;
 
-    if (settings_.enableInstancing_)
+    if (instancingBufferSettings_.enableInstancing_)
     {
-        settings_.firstInstancingTexCoord_ = 4;
-        settings_.numInstancingTexCoords_ = 3 +
-            (settings_.ambientMode_ == DrawableAmbientMode::Constant
+        instancingBufferSettings_.firstInstancingTexCoord_ = 4;
+        instancingBufferSettings_.numInstancingTexCoords_ = 3 +
+            (sceneProcessorSettings_.ambientMode_ == DrawableAmbientMode::Constant
             ? 0
-            : settings_.ambientMode_ == DrawableAmbientMode::Flat
+            : sceneProcessorSettings_.ambientMode_ == DrawableAmbientMode::Flat
             ? 1
             : 7);
     }
+
+    sceneProcessorSettings_.linearSpaceLighting_ =
+        renderBufferManagerSettings_.colorSpace_ != RenderPipelineColorSpace::GammaLDR;
 }
 
 void RenderPipeline::ApplySettings()
 {
-    sceneProcessor_->SetSettings(settings_);
-    instancingBuffer_->SetSettings(settings_);
-    shadowMapAllocator_->SetSettings(settings_);
+    sceneProcessor_->SetSettings(sceneProcessorSettings_);
+    instancingBuffer_->SetSettings(instancingBufferSettings_);
+    shadowMapAllocator_->SetSettings(shadowMapAllocatorSettings_);
 
-    if (!opaquePass_ || settings_.deferredLighting_ != deferred_.has_value())
+    if (!opaquePass_ || sceneProcessorSettings_.deferredLighting_ != deferred_.has_value())
     {
-        if (settings_.deferredLighting_)
+        if (sceneProcessorSettings_.deferredLighting_)
         {
             opaquePass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(
                 DrawableProcessorPassFlag::HasAmbientLighting | DrawableProcessorPassFlag::DeferredLightMaskToStencil,
@@ -183,13 +194,13 @@ void RenderPipeline::ApplySettings()
 
     postProcessPasses_.clear();
 
-    if (settings_.postProcess_.autoExposure_)
+    if (postProcessSettings_.autoExposure_)
     {
         auto pass = MakeShared<AutoExposurePostProcessPass>(this, renderBufferManager_);
         postProcessPasses_.push_back(pass);
     }
 
-    switch (settings_.postProcess_.antialiasing_)
+    switch (postProcessSettings_.antialiasing_)
     {
     case PostProcessAntialiasing::FXAA2:
     {
@@ -212,7 +223,7 @@ void RenderPipeline::ApplySettings()
         break;
     }
 
-    switch (settings_.postProcess_.tonemapping_)
+    switch (postProcessSettings_.tonemapping_)
     {
     case PostProcessTonemapping::ReinhardEq3:
     {
@@ -247,13 +258,23 @@ void RenderPipeline::ApplySettings()
         break;
     }
 
-    if (settings_.postProcess_.greyScale_)
+    if (postProcessSettings_.greyScale_)
     {
         auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
             PostProcessPassFlag::NeedColorOutputReadAndWrite,
             BLEND_REPLACE, "v2/PP_GreyScale", "");
         postProcessPasses_.push_back(pass);
     }
+
+    postProcessFlags_ = {};
+    for (PostProcessPass* postProcessPass : postProcessPasses_)
+        postProcessFlags_ |= postProcessPass->GetExecutionFlags();
+
+    renderBufferManagerSettings_.filteredColor_ = postProcessFlags_.Test(PostProcessPassFlag::NeedColorOutputBilinear);
+    renderBufferManagerSettings_.colorUsableWithMultipleRenderTargets_ = sceneProcessorSettings_.deferredLighting_;
+    renderBufferManagerSettings_.stencilBuffer_ = sceneProcessorSettings_.deferredLighting_;
+    renderBufferManagerSettings_.inheritMultiSampleLevel_ = !sceneProcessorSettings_.deferredLighting_;
+    renderBufferManager_->SetSettings(renderBufferManagerSettings_);
 }
 
 bool RenderPipeline::Define(RenderSurface* renderTarget, Viewport* viewport)
@@ -320,36 +341,10 @@ void RenderPipeline::Update(const FrameInfo& frameInfo)
 
 void RenderPipeline::Render()
 {
-    PostProcessPassFlags postProcessFlags;
-    for (PostProcessPass* postProcessPass : postProcessPasses_)
-        postProcessFlags |= postProcessPass->GetExecutionFlags();
-    const bool needColorOutputBilinear = postProcessFlags.Test(PostProcessPassFlag::NeedColorOutputBilinear);
-    const bool needColorOutputReadAndWrite = postProcessFlags.Test(PostProcessPassFlag::NeedColorOutputReadAndWrite);
-
-    RenderBufferParams viewportParams{ Graphics::GetRGBFormat() };
-
-    ViewportRenderBufferFlags viewportFlags;
-    viewportFlags.Assign(ViewportRenderBufferFlag::SupportOutputColorReadWrite, needColorOutputReadAndWrite);
-    viewportFlags.Assign(ViewportRenderBufferFlag::InheritBilinearFiltering, !needColorOutputBilinear);
-    viewportParams.flags_.Assign(RenderBufferFlag::sRGB, settings_.gammaCorrection_);
-    viewportParams.flags_.Assign(RenderBufferFlag::BilinearFiltering, needColorOutputBilinear);
-
-    if (settings_.deferredLighting_)
-    {
-        viewportFlags |= ViewportRenderBufferFlag::UsableWithMultipleRenderTargets;
-        viewportFlags |= ViewportRenderBufferFlag::IsReadableDepth;
-        viewportFlags |= ViewportRenderBufferFlag::HasStencil;
-    }
-    else
-    {
-        viewportFlags |= ViewportRenderBufferFlag::InheritMultiSampleLevel;
-    }
-
-    // TODO(renderer): Refactor me
-    if (settings_.postProcess_.autoExposure_)
-        viewportParams.textureFormat_ = Graphics::GetRGBAFloat16Format();
-
-    renderBufferManager_->RequestViewport(viewportFlags, viewportParams);
+    RenderBufferManagerFrameSettings frameSettings;
+    frameSettings.supportColorReadWrite_ = postProcessFlags_.Test(PostProcessPassFlag::NeedColorOutputReadAndWrite);
+    frameSettings.readableDepth_ = sceneProcessorSettings_.deferredLighting_;
+    renderBufferManager_->SetFrameSettings(frameSettings);
 
     OnRenderBegin(this, frameInfo_);
 
@@ -364,7 +359,7 @@ void RenderPipeline::Render()
 
     // TODO(renderer): Remove this guard
 #ifdef DESKTOP_GRAPHICS
-    if (settings_.deferredLighting_)
+    if (sceneProcessorSettings_.deferredLighting_)
     {
         // Draw deferred GBuffer
         renderBufferManager_->ClearColor(deferred_->albedoBuffer_, Color::TRANSPARENT_BLACK);
@@ -447,7 +442,10 @@ unsigned RenderPipeline::RecalculatePipelineStateHash() const
 {
     unsigned hash = 0;
     CombineHash(hash, sceneProcessor_->GetCameraProcessor()->GetPipelineStateHash());
-    CombineHash(hash, settings_.CalculatePipelineStateHash());
+    CombineHash(hash, renderBufferManagerSettings_.CalculatePipelineStateHash());
+    CombineHash(hash, sceneProcessorSettings_.CalculatePipelineStateHash());
+    CombineHash(hash, shadowMapAllocatorSettings_.CalculatePipelineStateHash());
+    CombineHash(hash, instancingBufferSettings_.CalculatePipelineStateHash());
     return hash;
 }
 

@@ -75,12 +75,6 @@ struct PostProcessSettings
 };
 
 ///
-struct RenderPipelineSettings : public BaseRenderPipelineSettings
-{
-    PostProcessSettings postProcess_;
-};
-
-///
 class URHO3D_API RenderPipeline
     : public PipelineStateTracker
     , public RenderPipelineInterface
@@ -121,7 +115,13 @@ private:
     WorkQueue* workQueue_{};
 
     bool settingsDirty_{ true };
-    RenderPipelineSettings settings_;
+    RenderBufferManagerSettings renderBufferManagerSettings_;
+    SceneProcessorSettings sceneProcessorSettings_;
+    ShadowMapAllocatorSettings shadowMapAllocatorSettings_;
+    InstancingBufferSettings instancingBufferSettings_;
+    PostProcessSettings postProcessSettings_;
+    PostProcessPassFlags postProcessFlags_;
+
     /// Previous pipeline state hash.
     unsigned oldPipelineStateHash_{};
 

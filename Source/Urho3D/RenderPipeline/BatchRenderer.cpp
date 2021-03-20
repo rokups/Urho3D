@@ -207,7 +207,7 @@ private:
         {
             const CookedLightParams& params = current_.vertexLights_[i] != M_MAX_UNSIGNED
                 ? lights_[current_.vertexLights_[i]]->GetParams() : nullVertexLight;
-            const Vector3& color = params.GetColor(settings_.gammaCorrection_);
+            const Vector3& color = params.GetColor(settings_.linearSpaceLighting_);
 
             current_.vertexLightsData_[i * 3] = { color, params.inverseRange_ };
             current_.vertexLightsData_[i * 3 + 1] = { params.direction_, params.spotCutoff_ };
@@ -238,7 +238,7 @@ private:
             if (settings_.ambientMode_ == DrawableAmbientMode::Flat)
             {
                 const Vector3 ambient = lightAccumulator->sphericalHarmonics_.EvaluateAverage();
-                if (settings_.gammaCorrection_)
+                if (settings_.linearSpaceLighting_)
                     object_.ambient_ = Vector4(ambient, 1.0f);
                 else
                     object_.ambient_ = Color(ambient).LinearToGamma().ToVector4();
@@ -399,7 +399,7 @@ private:
 
         const Color ambientColorGamma = camera_.GetEffectiveAmbientColor() * camera_.GetEffectiveAmbientBrightness();
         drawQueue_.AddShaderParameter(PSP_AMBIENTCOLOR,
-            settings_.gammaCorrection_ ? ambientColorGamma.GammaToLinear() : ambientColorGamma);
+            settings_.linearSpaceLighting_ ? ambientColorGamma.GammaToLinear() : ambientColorGamma);
         drawQueue_.AddShaderParameter(PSP_FOGCOLOR, camera_.GetEffectiveFogColor());
         drawQueue_.AddShaderParameter(PSP_FOGPARAMS, GetFogParameter(camera_));
     }
@@ -420,7 +420,7 @@ private:
         drawQueue_.AddShaderParameter(VSP_LIGHTPOS,
             Vector4{ params.position_, params.inverseRange_ });
         drawQueue_.AddShaderParameter(PSP_LIGHTCOLOR,
-            Vector4{ params.GetColor(settings_.gammaCorrection_), params.effectiveSpecularIntensity_ });
+            Vector4{ params.GetColor(settings_.linearSpaceLighting_), params.effectiveSpecularIntensity_ });
 
         drawQueue_.AddShaderParameter(PSP_LIGHTRAD, params.volumetricRadius_);
         drawQueue_.AddShaderParameter(PSP_LIGHTLENGTH, params.volumetricLength_);

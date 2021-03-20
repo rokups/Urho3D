@@ -64,10 +64,8 @@ class URHO3D_API RenderBufferManager : public Object
 
 public:
     explicit RenderBufferManager(RenderPipelineInterface* renderPipeline);
-
-    /// Request certain behaviour from output color and depth-stencil buffers.
-    /// This call is lightweight, it's fine to call it on every frame.
-    void RequestViewport(ViewportRenderBufferFlags flags, const RenderBufferParams& params);
+    void SetSettings(const RenderBufferManagerSettings& settings);
+    void SetFrameSettings(const RenderBufferManagerFrameSettings& frameSettings);
 
     SharedPtr<RenderBuffer> CreateColorBuffer(const RenderBufferParams& params, const Vector2& size = Vector2::ONE);
 
@@ -178,6 +176,8 @@ private:
 
     /// Cached between frames
     /// @{
+    RenderBufferManagerSettings settings_;
+
     SharedPtr<RenderBuffer> viewportColorBuffer_;
     SharedPtr<RenderBuffer> viewportDepthBuffer_;
 
@@ -193,8 +193,7 @@ private:
 
     /// State of current frame
     /// @{
-    ViewportRenderBufferFlags viewportFlags_;
-    RenderBufferParams viewportParams_;
+    RenderBufferManagerFrameSettings frameSettings_;
 
     float timeStep_{};
     IntRect viewportRect_;

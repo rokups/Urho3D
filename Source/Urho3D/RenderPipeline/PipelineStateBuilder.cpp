@@ -176,7 +176,7 @@ void PipelineStateBuilder::ApplyCommonDefines(const Pass* materialPass)
     if (graphics_->GetCaps().constantBuffersSupported_)
         commonDefines_ += "URHO3D_USE_CBUFFERS ";
 
-    if (sceneProcessor_->GetSettings().gammaCorrection_)
+    if (sceneProcessor_->GetSettings().linearSpaceLighting_)
         commonDefines_ += "URHO3D_GAMMA_CORRECTION ";
 
     vertexDefines_ += materialPass->GetEffectiveVertexShaderDefines();
