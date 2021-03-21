@@ -48,6 +48,7 @@
 #include "../RmlUI/RmlFile.h"
 #include "../RmlUI/RmlEventListeners.h"
 #include "../RmlUI/RmlCanvasComponent.h"
+#include "../RmlUI/RmlSerializableInspector.h"
 #include "../RmlUI/RmlUIComponent.h"
 
 #include <atomic>
@@ -711,6 +712,7 @@ void RegisterRmlUILibrary(Context* context)
     context->RegisterFactory<RmlUI>();
     RmlUIComponent::RegisterObject(context);
     RmlCanvasComponent::RegisterObject(context);
+    RmlSerializableInspector::RegisterObject(context);
 }
 
 }

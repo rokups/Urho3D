@@ -26,7 +26,12 @@
 #include <Urho3D/Input/Input.h>
 #include <Urho3D/Input/InputEvents.h>
 #include <Urho3D/IO/FileSystem.h>
+#include <Urho3D/RenderPipeline/RenderPipeline.h>
 #include <Urho3D/Resource/ResourceCache.h>
+#if URHO3D_RMLUI
+#include <Urho3D/RmlUI/RmlSerializableInspector.h>
+#include <Urho3D/RmlUI/RmlUI.h>
+#endif
 #include <Urho3D/UI/Font.h>
 #include <Urho3D/UI/Button.h>
 #include <Urho3D/UI/ListView.h>
@@ -170,6 +175,8 @@ void SamplesManager::Start()
     // Register an object factory for our custom Rotator component so that we can create them to scene nodes
     context_->RegisterFactory<Rotator>();
 
+    inspectorNode_ = MakeShared<Node>(context_);
+
     input->SetMouseMode(MM_FREE);
     input->SetMouseVisible(true);
 
@@ -181,6 +188,14 @@ void SamplesManager::Start()
     SubscribeToEvent(E_KEYUP, [this](StringHash, VariantMap& args) { OnKeyPress(args); });
     SubscribeToEvent(E_JOYSTICKBUTTONDOWN, [this](StringHash, VariantMap& args) { OnButtonPress(args); });
     SubscribeToEvent(E_BEGINFRAME, [this](StringHash, VariantMap& args) { OnFrameStart(); });
+
+#if URHO3D_RMLUI
+    auto* rmlUi = context_->GetSubsystem<RmlUI>();
+    rmlUi->LoadFont("Fonts/NotoSans-Condensed.ttf", false);
+    rmlUi->LoadFont("Fonts/NotoSans-CondensedBold.ttf", false);
+    rmlUi->LoadFont("Fonts/NotoSans-CondensedBoldItalic.ttf", false);
+    rmlUi->LoadFont("Fonts/NotoSans-CondensedItalic.ttf", false);
+#endif
 
     ui->GetRoot()->SetDefaultStyle(context_->GetSubsystem<ResourceCache>()->GetResource<XMLFile>("UI/DefaultStyle.xml"));
 
@@ -450,6 +465,34 @@ void SamplesManager::OnKeyPress(VariantMap& args)
     if (key == KEY_ESCAPE)
         isClosing_ = true;
 
+#if URHO3D_RMLUI
+    if (key == KEY_I)
+    {
+        auto* renderer = GetSubsystem<Renderer>();
+        auto* input = GetSubsystem<Input>();
+        Viewport* viewport = renderer ? renderer->GetViewport(0) : nullptr;
+        RenderPipeline* renderPipeline = viewport ? viewport->GetRenderPipeline() : nullptr;
+
+        if (inspectorNode_->HasComponent<RmlSerializableInspector>())
+        {
+            inspectorNode_->RemoveComponent<RmlSerializableInspector>();
+
+            input->SetMouseVisible(oldMouseVisible_);
+            input->SetMouseMode(oldMouseMode_);
+        }
+        else if (renderPipeline)
+        {
+            auto inspector = inspectorNode_->CreateComponent<RmlSerializableInspector>();
+            inspector->Connect(renderPipeline);
+
+            oldMouseVisible_ = input->IsMouseVisible();
+            oldMouseMode_ = input->GetMouseMode();
+            input->SetMouseVisible(true);
+            input->SetMouseMode(MM_ABSOLUTE);
+        }
+    }
+#endif
+
     if (runningSample_)
         return;
 
@@ -490,7 +533,6 @@ void SamplesManager::OnKeyPress(VariantMap& args)
         if (nextSelection)
             nextSelection->SetSelected(true);
     }
-
 }
 
 void SamplesManager::OnFrameStart()

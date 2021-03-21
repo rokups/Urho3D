@@ -65,9 +65,9 @@ namespace
 
 static const ea::vector<ea::string> colorSpaceNames =
 {
-    "LDR Gamma Space",
-    "LDR Linear Space",
-    "HDR Linear Space",
+    "LDR Gamma",
+    "LDR Linear",
+    "HDR Linear",
 };
 
 static const ea::vector<ea::string> ambientModeNames =
