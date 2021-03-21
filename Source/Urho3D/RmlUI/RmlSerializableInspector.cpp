@@ -45,6 +45,7 @@ struct RmlSerializableAttribute
     WeakPtr<Serializable> serializable_;
     unsigned index_{};
     Rml::String name_;
+    Rml::String enumSelector_;
     Rml::StringList enumNames_;
     int type_{}; // AttributeType
 
@@ -155,6 +156,11 @@ void RmlSerializableInspector::Connect(Serializable* serializable)
             attribute.type_ = AttributeType_Enum;
             for (unsigned i = 0; attributeInfo.enumNames_[i] != nullptr; ++i)
                 attribute.enumNames_.push_back(attributeInfo.enumNames_[i]);
+
+            attribute.enumSelector_ = "<select data-value='attribute.value'>";
+            for (const auto& option : attribute.enumNames_)
+                attribute.enumSelector_ += Format("<option value='{}'>{}</option>", option, option);
+            attribute.enumSelector_ += "</select>";
         }
 
         if (attribute.type_ != AttributeType_Undefined)
@@ -184,7 +190,7 @@ void RmlSerializableInspector::OnNodeSet(Node* node)
         {
             attributeHandle.RegisterMember("name", &RmlSerializableAttribute::name_);
             attributeHandle.RegisterMember("type", &RmlSerializableAttribute::type_);
-            attributeHandle.RegisterMember("enum_names", &RmlSerializableAttribute::enumNames_);
+            attributeHandle.RegisterMember("enum_selector", &RmlSerializableAttribute::enumSelector_);
             attributeHandle.RegisterMemberFunc("value", &RmlSerializableAttribute::GetValue, &RmlSerializableAttribute::SetValue);
         }
         constructor.RegisterArray<ea::vector<RmlSerializableAttribute>>();

@@ -15,15 +15,8 @@
         </div>
         <div data-for="attribute : attributes">
             <input type="checkbox" value="value" data-if="attribute.type == 1" data-checked="attribute.value"/>
-            <!--select data-if="attribute.type == 3" data-value="attribute.value">
-                <option data-for="enum_name : attribute.enum_names" data-attr-value="enum_name">{{enum_name}}</option>
-            </select-->
+            <span data-if="attribute.type == 3" data-rml="attribute.enum_selector"></span>
             <span>{{attribute.name}}</span>
-            <form data-if="attribute.type == 3">
-                <div data-for="enum_name : attribute.enum_names">
-                    <input type="radio" data-attr-name="attribute.name" data-attr-value="enum_name" data-checked="attribute.value"/>{{enum_name}}<br/>
-                </div>
-            </form>
         </div>
     </div>
     <handle size_target="#document" class="resize-handle"></handle>
