@@ -145,6 +145,21 @@ SurfaceData GetCommonSurfaceData()
     result.eyeVec = normalize(vEyeVec);
 #endif
 
+    // Apply specular antialiasing
+    // TODO(renderer): Implement for actual specular too, make optional
+#ifdef URHO3D_PHYSICAL_MATERIAL
+    half3 dNdx = dFdx(result.normal);
+    half3 dNdy = dFdy(result.normal);
+    const half specularAntiAliasingVariance = 0.15f;
+    const half specularAntiAliasingThreshold = 0.2f;
+    half variance = specularAntiAliasingVariance * max(dot(dNdx, dNdx), dot(dNdy, dNdy));
+
+    half roughness = roughnessMetallic.x * roughnessMetallic.x;
+    half kernelRoughness = min(2.0 * variance, specularAntiAliasingThreshold);
+    half squareRoughness = min(1.0, roughness * roughness + kernelRoughness);
+    roughnessMetallic.x = sqrt(sqrt(squareRoughness));
+#endif
+
     // Evaluate reflection vector
 #ifdef URHO3D_REFLECTION_MAPPING
     result.reflectionVec = reflect(-result.eyeVec, result.normal);

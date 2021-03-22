@@ -40,6 +40,7 @@
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/BatchRenderer.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
+#include "../RenderPipeline/ToneMappingPass.h"
 #include "../Scene/Scene.h"
 
 #include <EASTL/fixed_vector.h>
@@ -84,11 +85,11 @@ static const ea::vector<ea::string> postProcessAntialiasingNames =
     "FXAA3"
 };
 
-static const ea::vector<ea::string> postProcessTonemappingNames =
+static const ea::vector<ea::string> toneMappingModeNames =
 {
     "None",
-    "ReinhardEq3",
-    "ReinhardEq4",
+    "Reinhard",
+    "ReinhardWhite",
     "Uncharted2",
 };
 
@@ -121,9 +122,12 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("Use Variance Shadow Maps", bool, shadowMapAllocatorSettings_.enableVarianceShadowMaps_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, sceneProcessorSettings_.varianceShadowMapParams_, MarkSettingsDirty, BatchRendererSettings{}.varianceShadowMapParams_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("VSM Multi Sample", int, shadowMapAllocatorSettings_.varianceShadowMapMultiSample_, MarkSettingsDirty, 1, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Post Process Auto Exposure", bool, postProcessSettings_.autoExposure_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Tone Mapping Mode", toneMappingSettings_.mode_, MarkSettingsDirty, toneMappingModeNames, ToneMappingMode::None, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Auto Exposure", bool, toneMappingSettings_.autoExposure_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Min Exposure", float, toneMappingSettings_.minExposure_, MarkSettingsDirty, ToneMappingPassSettings{}.minExposure_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Max Exposure", float, toneMappingSettings_.maxExposure_, MarkSettingsDirty, ToneMappingPassSettings{}.maxExposure_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Adapt Rate", float, toneMappingSettings_.adaptRate_, MarkSettingsDirty, ToneMappingPassSettings{}.adaptRate_, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Post Process Antialiasing", postProcessSettings_.antialiasing_, MarkSettingsDirty, postProcessAntialiasingNames, PostProcessAntialiasing::None, AM_DEFAULT);
-    URHO3D_ENUM_ATTRIBUTE_EX("Post Process Tonemapping", postProcessSettings_.tonemapping_, MarkSettingsDirty, postProcessTonemappingNames, PostProcessTonemapping::None, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Post Process Grey Scale", bool, postProcessSettings_.greyScale_, MarkSettingsDirty, false, AM_DEFAULT);
 }
 
@@ -193,6 +197,13 @@ void RenderPipeline::ApplySettings()
     sceneProcessor_->SetPasses({ opaquePass_, alphaPass_, postOpaquePass_ });
 
     postProcessPasses_.clear();
+
+    if (renderBufferManagerSettings_.colorSpace_ == RenderPipelineColorSpace::LinearHDR)
+    {
+        auto pass = MakeShared<ToneMappingPass>(this, renderBufferManager_);
+        pass->SetSettings(toneMappingSettings_);
+        postProcessPasses_.push_back(pass);
+    }
 
     if (postProcessSettings_.autoExposure_)
     {
@@ -354,7 +365,10 @@ void RenderPipeline::Render()
     sceneProcessor_->RenderShadowMaps();
 
     auto sceneBatchRenderer_ = sceneProcessor_->GetBatchRenderer();
-    const Color fogColor = sceneProcessor_->GetFrameInfo().camera_->GetEffectiveFogColor();
+    const Color fogColorInGammaSpace = sceneProcessor_->GetFrameInfo().camera_->GetEffectiveFogColor();
+    const Color effectiveFogColor = sceneProcessorSettings_.linearSpaceLighting_
+        ? fogColorInGammaSpace.GammaToLinear()
+        : fogColorInGammaSpace;
     auto drawQueue = renderer_->GetDefaultDrawQueue();
 
     // TODO(renderer): Remove this guard
@@ -364,7 +378,7 @@ void RenderPipeline::Render()
         // Draw deferred GBuffer
         renderBufferManager_->ClearColor(deferred_->albedoBuffer_, Color::TRANSPARENT_BLACK);
         renderBufferManager_->ClearColor(deferred_->specularBuffer_, Color::TRANSPARENT_BLACK);
-        renderBufferManager_->ClearOutput(fogColor, 1.0f, 0);
+        renderBufferManager_->ClearOutput(effectiveFogColor, 1.0f, 0);
 
         RenderBuffer* const gBuffer[] = {
             renderBufferManager_->GetColorOutput(),
@@ -409,7 +423,7 @@ void RenderPipeline::Render()
     else
 #endif
     {
-        renderBufferManager_->ClearOutput(fogColor, 1.0f, 0);
+        renderBufferManager_->ClearOutput(effectiveFogColor, 1.0f, 0);
         renderBufferManager_->SetOutputRenderTargers();
     }
 

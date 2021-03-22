@@ -121,6 +121,7 @@ private:
     InstancingBufferSettings instancingBufferSettings_;
     PostProcessSettings postProcessSettings_;
     PostProcessPassFlags postProcessFlags_;
+    ToneMappingPassSettings toneMappingSettings_;
 
     /// Previous pipeline state hash.
     unsigned oldPipelineStateHash_{};

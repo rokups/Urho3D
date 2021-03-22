@@ -433,4 +433,35 @@ struct SceneProcessorSettings
     /// @}
 };
 
+enum class ToneMappingMode
+{
+    None,
+    Reinhard,
+    ReinhardWhite,
+    Uncharted2,
+};
+
+struct ToneMappingPassSettings
+{
+    ToneMappingMode mode_{};
+    bool autoExposure_{};
+    float minExposure_{ 1.0f };
+    float maxExposure_{ 3.0f };
+    float adaptRate_{ 0.6f };
+
+    /// Utility operators
+    /// @{
+    bool operator==(const ToneMappingPassSettings& rhs) const
+    {
+        return mode_ == rhs.mode_
+            && autoExposure_ == rhs.autoExposure_
+            && minExposure_ == rhs.minExposure_
+            && maxExposure_ == rhs.maxExposure_
+            && adaptRate_ == rhs.adaptRate_;
+    }
+
+    bool operator!=(const ToneMappingPassSettings& rhs) const { return !(*this == rhs); }
+    /// @}
+};
+
 }
