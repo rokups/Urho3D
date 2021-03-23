@@ -37,8 +37,9 @@ void main()
     #ifdef URHO3D_HAS_PIXEL_LIGHT
         DirectLightData lightData = GetForwardDirectLightData();
         #ifdef URHO3D_PHYSICAL_MATERIAL
+            vec3 halfVec = normalize(surfaceData.eyeVec + lightData.lightVec.xyz);
             finalColor += Direct_PBR(lightData, surfaceData.albedo.rgb, surfaceData.specular, surfaceData.roughness,
-                surfaceData.normal, surfaceData.eyeVec);
+                surfaceData.normal, surfaceData.eyeVec, halfVec);
         #else
             #ifdef URHO3D_LIGHT_HAS_SPECULAR
                 finalColor += GetBlinnPhongDiffuseSpecular(lightData, surfaceData.normal, surfaceData.albedo.rgb,

@@ -503,9 +503,11 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernel
     if (light_->GetLightType() == LIGHT_DIRECTIONAL)
     {
         const float biasAutoAdjust = light_->GetShadowCascade().biasAutoAdjust_;
+        const float fisrtSplitDepthRange = splits_[0].GetShadowCamera()->GetFarClip();
         for (unsigned i = 1; i < numActiveSplits_; ++i)
         {
-            const float splitScale = ea::max(1.0f, splits_[i].GetCascadeZRange().second / splits_[0].GetCascadeZRange().second);
+            const float splitDepthRange = splits_[i].GetShadowCamera()->GetFarClip();
+            const float splitScale = ea::max(1.0f, splitDepthRange / fisrtSplitDepthRange);
             const float multiplier = 1.0f + (splitScale - 1.0f) * biasAutoAdjust;
             cookedParams_.shadowDepthBiasMultiplier_[i] = SnapRound(multiplier, 0.1f);
         }

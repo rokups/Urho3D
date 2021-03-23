@@ -101,9 +101,8 @@ half3 BRDF_Direct_Specular(half3 specular, half roughness,
 
 /// Evaluate PBR lighting for direct light.
 half3 Direct_PBR(DirectLightData lightData,
-    half3 albedo, half3 specular, half roughness, half3 normal, half3 eyeVec)
+    half3 albedo, half3 specular, half roughness, half3 normal, half3 eyeVec, half3 halfVec)
 {
-    half3 halfVec = normalize(eyeVec + lightData.lightVec.xyz);
     half NoL = PIXEL_ADJUST_NoL(dot(normal, lightData.lightVec.xyz));
     half NoV = abs(dot(normal, eyeVec)) + 1e-5;
     half NoH = clamp(dot(normal, halfVec), 0.0, 1.0);
