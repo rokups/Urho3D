@@ -11,34 +11,34 @@
 struct SurfaceData
 {
     /// Fog factor. 0 - fog color, 1 - material color.
-    float fogFactor;
+    fixed fogFactor;
     /// Albedo color and alpha channel.
-    vec4 albedo;
+    half4 albedo;
     /// Specular color.
-    vec3 specular;
+    half3 specular;
     /// Emission color.
-    vec3 emission;
+    half3 emission;
 #ifdef URHO3D_PHYSICAL_MATERIAL
     /// PBR roughness factor.
-    float roughness;
+    half roughness;
 #endif
 #ifdef URHO3D_AMBIENT_PASS
     /// Ambient lighting for surface, including global ambient, vertex lights and lightmaps.
-    vec3 ambientLighting;
+    half3 ambientLighting;
 #endif
     /// Occlusion factor.
-    float occlusion;
+    half occlusion;
 #ifdef URHO3D_PIXEL_NEED_NORMAL
     /// Normal.
-    vec3 normal;
+    half3 normal;
 #endif
 #ifdef URHO3D_PIXEL_NEED_EYE_VECTOR
     /// Vector from surface to eye in world space.
-    vec3 eyeVec;
+    half3 eyeVec;
 #endif
 #ifdef URHO3D_REFLECTION_MAPPING
     /// Vector from surface to reflection.
-    vec3 reflectionVec;
+    half3 reflectionVec;
     /// Reflection data from cubemap, prefetched.
     half4 reflectionColorRaw;
 #endif

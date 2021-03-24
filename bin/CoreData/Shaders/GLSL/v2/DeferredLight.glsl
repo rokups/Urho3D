@@ -10,6 +10,7 @@
 #include "_Shadow.glsl"
 #include "_Fog.glsl"
 #include "_DeferredLighting.glsl"
+#include "_BRDF.glsl"
 
 VERTEX_OUTPUT(vec4 vScreenPos)
 VERTEX_OUTPUT(vec3 vFarRay)
@@ -45,15 +46,33 @@ void main()
     worldPos.xyz += cCameraPos;
 
     vec3 normal = normalize(normalInput.rgb * 2.0 - 1.0);
-    float specularPower = (1.0 - specularInput.a) * 255;
+    #ifdef URHO3D_PHYSICAL_MATERIAL
+        float roughness = specularInput.a;
+    #else
+        float specularPower = (1.0 - specularInput.a) * 255;
+    #endif
 
     DirectLightData lightData = GetDeferredDirectLightData(worldPos, depth);
-    #ifdef URHO3D_LIGHT_HAS_SPECULAR
-        vec3 finalColor = GetBlinnPhongDiffuseSpecular(lightData, normal, albedoInput.rgb,
-            specularInput.rgb, eyeVec, specularPower);
-    #else
-        vec3 finalColor = GetBlinnPhongDiffuse(lightData, normal, albedoInput.rgb);
+
+    #if defined(URHO3D_PHYSICAL_MATERIAL) || defined(URHO3D_LIGHT_HAS_SPECULAR)
+        half3 halfVec = normalize(eyeVec + lightData.lightVec.xyz);
     #endif
+
+    #ifdef URHO3D_PHYSICAL_MATERIAL
+        half3 lightColor = Direct_PBR(lightData.lightColor, albedoInput.rgb, specularInput.rgb, roughness,
+            lightData.lightVec.xyz, normal, eyeVec, halfVec);
+    #else
+        #ifdef URHO3D_LIGHT_HAS_SPECULAR
+            half3 lightColor = Direct_SimpleSpecular(lightData.lightColor,
+                albedoInput.rgb, specularInput.rgb,
+                lightData.lightVec.xyz, normal, halfVec, specularPower);
+        #else
+            half3 lightColor = Direct_Simple(lightData.lightColor,
+                albedoInput.rgb, lightData.lightVec.xyz, normal);
+        #endif
+    #endif
+
+    vec3 finalColor = lightColor * GetDirectLightAttenuation(lightData);
     gl_FragColor = vec4(finalColor, 0.0);
 }
 #endif

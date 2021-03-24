@@ -3,6 +3,7 @@
 
 #extension GL_ARB_shading_language_420pack: enable
 #extension GL_EXT_shader_texture_lod: enable
+#extension GL_OES_standard_derivatives : enable
 
 // =================================== Constants ===================================
 
@@ -48,7 +49,7 @@
 // #define TRANSLUCENT
 // #define VOLUMETRIC
 
-/// Whether to use PBR material.
+/// Whether to use physiclally based material.
 // #define PBR
 
 // =================================== Deprecated external defines ===================================
@@ -69,9 +70,9 @@
     #define URHO3D_PIXEL_SHADER
 #endif
 
-// URHO3D_IS_LIT: Whether there's lighting in any form applied to geometry.
-// URHO3D_HAS_PIXEL_LIGHT: Whether there's per-pixel lighting from directional, point or spot light source.
-// URHO3D_NORMAL_MAPPING: Whether to apply normal mapping.
+/// URHO3D_IS_LIT: Whether there's lighting in any form applied to geometry.
+/// URHO3D_HAS_PIXEL_LIGHT: Whether there's per-pixel lighting from directional, point or spot light source.
+/// URHO3D_NORMAL_MAPPING: Whether to apply normal mapping.
 #if !defined(UNLIT) && !defined(URHO3D_SHADOW_PASS)
     #define URHO3D_IS_LIT
 
@@ -84,7 +85,13 @@
     #endif
 #endif
 
-// URHO3D_PHYSICAL_MATERIAL: Whether to use PBR material. Treat specular map as Roughness+Metallic map.
+/// URHO3D_PHYSICAL_MATERIAL: Whether to use physiclally based material.
+/// Implies URHO3D_LIGHT_HAS_SPECULAR.
+/// Implies URHO3D_REFLECTION_MAPPING.
+/// Changes semantics of specular texture:
+/// - sSpecMap.r: Roughness;
+/// - sSpecMap.g: Metallic factor;
+/// - sSpecMap.a: Occlusion.
 #if defined(URHO3D_IS_LIT) && defined(PBR)
     #define URHO3D_PHYSICAL_MATERIAL
     #ifndef URHO3D_LIGHT_HAS_SPECULAR
@@ -92,42 +99,48 @@
     #endif
 #endif
 
-// URHO3D_REFLECTION_MAPPING: Whether to apply reflections from environment cubemap
+/// URHO3D_REFLECTION_MAPPING: Whether to apply reflections from environment cubemap
 #if defined(URHO3D_AMBIENT_PASS) && (defined(ENVCUBEMAP) || defined(URHO3D_PHYSICAL_MATERIAL))
     #define URHO3D_REFLECTION_MAPPING
 #endif
 
-// =================================== Vertex output ===================================
+// =================================== Vertex output configuration ===================================
 
+// URHO3D_PIXEL_NEED_EYE_VECTOR is implied by:
+// - Specular lighting;
+// - Reflection mapping.
 #if defined(URHO3D_REFLECTION_MAPPING) || defined(URHO3D_LIGHT_HAS_SPECULAR)
     #ifndef URHO3D_PIXEL_NEED_EYE_VECTOR
         #define URHO3D_PIXEL_NEED_EYE_VECTOR
     #endif
 #endif
 
-// Request normal if has pixel lighting or if deferred
 // TODO(renderer): Don't do it for particles?
+// URHO3D_PIXEL_NEED_NORMAL is implied by:
+// - Per-pixel lighting;
+// - Geometry buffer rendering for lit geometry;
+// - Reflection mapping.
 #if defined(URHO3D_HAS_PIXEL_LIGHT) || (defined(URHO3D_IS_LIT) && defined(URHO3D_GBUFFER_PASS)) || defined(URHO3D_REFLECTION_MAPPING)
     #ifndef URHO3D_PIXEL_NEED_NORMAL
         #define URHO3D_PIXEL_NEED_NORMAL
     #endif
 #endif
 
-// Request tangent if normal mapping is enabled
+// URHO3D_PIXEL_NEED_TANGENT is implied by normal mapping.
 #if defined(URHO3D_NORMAL_MAPPING)
     #ifndef URHO3D_PIXEL_NEED_TANGENT
         #define URHO3D_PIXEL_NEED_TANGENT
     #endif
 #endif
 
-// Request vertex color if not shadow pass
+// URHO3D_PIXEL_NEED_COLOR is implied by URHO3D_VERTEX_HAS_COLOR.
 #if defined(URHO3D_VERTEX_HAS_COLOR) && !defined(URHO3D_SHADOW_PASS)
     #ifndef URHO3D_PIXEL_NEED_COLOR
         #define URHO3D_PIXEL_NEED_COLOR
     #endif
 #endif
 
-// =================================== Vertex input ===================================
+// =================================== Vertex input configuration ===================================
 
 #ifdef URHO3D_VERTEX_SHADER
     /// URHO3D_VERTEX_NORMAL_AVAILABLE: Whether vertex normal in object space is available.
@@ -146,6 +159,10 @@
         #endif
     #endif
 
+    // URHO3D_VERTEX_NEED_NORMAL is implied by:
+    // - URHO3D_PIXEL_NEED_NORMAL;
+    // - Any kind of lighting;
+    // - Shadow normal bias.
     #ifdef URHO3D_VERTEX_NORMAL_AVAILABLE
         #if defined(URHO3D_PIXEL_NEED_NORMAL) || defined(URHO3D_IS_LIT) || defined(URHO3D_SHADOW_NORMAL_OFFSET)
             #ifndef URHO3D_VERTEX_NEED_NORMAL
@@ -154,6 +171,7 @@
         #endif
     #endif
 
+    // URHO3D_VERTEX_NEED_TANGENT is implied by URHO3D_PIXEL_NEED_TANGENT.
     #ifdef URHO3D_VERTEX_TANGENT_AVAILABLE
         #if defined(URHO3D_PIXEL_NEED_TANGENT)
             #ifndef URHO3D_VERTEX_NEED_TANGENT
@@ -162,7 +180,7 @@
         #endif
     #endif
 
-    // Disable shadow normal offset if there's no normal
+    // URHO3D_SHADOW_NORMAL_OFFSET is forcibly disabled if vertex normal is not available.
     #if defined(URHO3D_SHADOW_NORMAL_OFFSET) && !defined(URHO3D_VERTEX_NORMAL_AVAILABLE)
         #undef URHO3D_SHADOW_NORMAL_OFFSET
     #endif
@@ -171,23 +189,20 @@
 // =================================== Light configuration ===================================
 
 #if defined(URHO3D_IS_LIT)
+    // TODO(renderer): Handle this for pixel lights too
     // URHO3D_SURFACE_ONE_SIDED: Normal is clamped when calculating lighting. Ignored in deferred rendering.
     // URHO3D_SURFACE_TWO_SIDED: Normal is mirrored when calculating lighting. Ignored in deferred rendering.
     // URHO3D_SURFACE_VOLUMETRIC: Normal is ignored when calculating lighting. Ignored in deferred rendering.
     // VERTEX_ADJUST_NoL: Adjust N dot L for vertex normal.
-    // PIXEL_ADJUST_NoL: Adjust N dot L for pixel normal.
     #if defined(VOLUMETRIC)
         #define URHO3D_SURFACE_VOLUMETRIC
         #define VERTEX_ADJUST_NoL(NdotL) 1.0
-        #define PIXEL_ADJUST_NoL(NdotL) 1.0
     #elif defined(TRANSLUCENT)
         #define URHO3D_SURFACE_TWO_SIDED
         #define VERTEX_ADJUST_NoL(NdotL) abs(NdotL)
-        #define PIXEL_ADJUST_NoL(NdotL) max(0.0, NdotL)
     #else
         #define URHO3D_SURFACE_ONE_SIDED
         #define VERTEX_ADJUST_NoL(NdotL) max(0.0, NdotL)
-        #define PIXEL_ADJUST_NoL(NdotL) max(0.0, NdotL)
     #endif
 #endif
 
@@ -202,14 +217,13 @@
 
 // =================================== Platform configuration ===================================
 
-// Helper utility to generate names
+/// Generates identifier from two parts.
 #define _CONCATENATE_2(x, y) x##y
 #define CONCATENATE_2(x, y) _CONCATENATE_2(x, y)
 
-// URHO3D_VERTEX_SHADER: Defined for vertex shader
-// VERTEX_INPUT: Declare vertex input variable
-// VERTEX_OUTPUT: Declare vertex output variable
-#ifdef URHO3D_VERTEX_SHADER
+/// VERTEX_INPUT: Declare vertex input variable;
+/// VERTEX_OUTPUT: Declare vertex output variable.
+#if defined(URHO3D_VERTEX_SHADER)
     #ifdef GL3
         #define VERTEX_INPUT(decl) in decl;
         #define VERTEX_OUTPUT(decl) out decl;
@@ -217,11 +231,7 @@
         #define VERTEX_INPUT(decl) attribute decl;
         #define VERTEX_OUTPUT(decl) varying decl;
     #endif
-#endif
-
-// URHO3D_PIXEL_SHADER: Defined for pixel shader
-// VERTEX_OUTPUT: Declared vertex shader output
-#ifdef URHO3D_PIXEL_SHADER
+#elif defined(URHO3D_PIXEL_SHADER)
     #ifdef GL3
         #define VERTEX_OUTPUT(decl) in decl;
     #else
@@ -229,10 +239,10 @@
     #endif
 #endif
 
-// UNIFORM_BUFFER_BEGIN: Begin of uniform buffer declaration
-// UNIFORM_BUFFER_END: End of uniform buffer declaration
-// UNIFORM: Declares scalar, vector or matrix uniform
-// SAMPLER: Declares texture sampler
+/// UNIFORM_BUFFER_BEGIN: Begin of uniform buffer declaration;
+/// UNIFORM_BUFFER_END: End of uniform buffer declaration;
+/// UNIFORM: Declares scalar, vector or matrix uniform;
+/// SAMPLER: Declares texture sampler.
 #ifdef URHO3D_USE_CBUFFERS
     #ifdef GL_ARB_shading_language_420pack
         #define _URHO3D_LAYOUT(index) layout(binding=index)
@@ -251,8 +261,8 @@
     #define SAMPLER(index, decl) uniform decl;
 #endif
 
-// INSTANCE_BUFFER_BEGIN: Begin of uniform buffer or group of per-instance attributes
-// INSTANCE_BUFFER_END: End of uniform buffer or instance attributes
+/// INSTANCE_BUFFER_BEGIN: Begin of uniform buffer or group of per-instance attributes
+/// INSTANCE_BUFFER_END: End of uniform buffer or instance attributes
 #ifdef URHO3D_VERTEX_SHADER
     #ifdef URHO3D_INSTANCING
         #define INSTANCE_BUFFER_BEGIN(index, name)
@@ -263,19 +273,19 @@
     #endif
 #endif
 
-// UNIFORM_VERTEX: Declares uniform that is used only by vertex shader and may have high precision on GL ES
+/// UNIFORM_VERTEX: Declares uniform that is used only by vertex shader and may have high precision on GL ES
 #if defined(GL_ES) && !defined(URHO3D_USE_CBUFFERS) && defined(URHO3D_PIXEL_SHADER)
     #define UNIFORM_VERTEX(decl)
 #else
     #define UNIFORM_VERTEX(decl) UNIFORM(decl)
 #endif
 
-// URHO3D_FLIP_FRAMEBUFFER: Whether to flip framebuffer on rendering
+/// URHO3D_FLIP_FRAMEBUFFER: Whether to flip framebuffer on rendering
 #ifdef D3D11
     #define URHO3D_FLIP_FRAMEBUFFER
 #endif
 
-// ivec4_attrib: Compatible ivec4 vertex attribite. Cast to ivec4 before use.
+/// ivec4_attrib: Compatible ivec4 vertex attribite. Cast to ivec4 before use.
 #ifdef D3D11
     #define ivec4_attrib ivec4
 #else
@@ -293,12 +303,13 @@
     #define texture2DLodOffset textureLodOffset
 #endif
 
-// Disable precision modifiers if not GL ES
 #ifndef GL_ES
+    // Disable precision modifiers if not GL ES
     #define highp
     #define mediump
     #define lowp
 #else
+    // Use max available precision by default
     #if defined(GL_FRAGMENT_PRECISION_HIGH) || !defined(URHO3D_PIXEL_SHADER)
         precision highp float;
     #else
@@ -311,6 +322,11 @@
 #define half2 mediump vec2
 #define half3 mediump vec3
 #define half4 mediump vec4
+#define fixed  lowp float
+#define fixed2 lowp vec2
+#define fixed3 lowp vec3
+#define fixed4 lowp vec4
+
 // TODO(renderer): Get rid of optional_highp
 #define optional_highp
 

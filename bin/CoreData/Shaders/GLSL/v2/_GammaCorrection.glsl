@@ -1,25 +1,29 @@
 #ifndef _GAMMA_CORRECTION_GLSL_
 #define _GAMMA_CORRECTION_GLSL_
 
+#ifndef _CONFIG_GLSL_
+    #error Include "_Config.glsl" before "_GammaCorrection.glsl"
+#endif
+
 /// Convert color from gamma to linear space.
-vec3 GammaToLinearSpace(vec3 color)
+half3 GammaToLinearSpace(half3 color)
 {
     return color * (color * (color * 0.305306011 + 0.682171111) + 0.012522878);
 }
 
 /// Convert color from gamma to linear space (with alpha).
-vec4 GammaToLinearSpaceAlpha(vec4 color) { return vec4(GammaToLinearSpace(color.rgb), color.a); }
+half4 GammaToLinearSpaceAlpha(half4 color) { return vec4(GammaToLinearSpace(color.rgb), color.a); }
 
 /// Convert color from linear to gamma space.
-vec3 LinearToGammaSpace(vec3 color)
+half3 LinearToGammaSpace(half3 color)
 {
     const float p = 0.416666667;
-    color = max(color, vec3(0.0, 0.0, 0.0));
-    return max(1.055 * pow(color, vec3(p, p, p)) - 0.055, 0.0);
+    color = max(color, half3(0.0, 0.0, 0.0));
+    return max(1.055 * pow(color, half3(p, p, p)) - 0.055, 0.0);
 }
 
 /// Convert color from linear to gamma space (with alpha).
-vec4 LinearToGammaSpaceAlpha(vec4 color) { return vec4(LinearToGammaSpace(color.rgb), color.a); }
+half4 LinearToGammaSpaceAlpha(half4 color) { return vec4(LinearToGammaSpace(color.rgb), color.a); }
 
 /// Convert from and to light space.
 #ifdef URHO3D_GAMMA_CORRECTION
@@ -50,7 +54,6 @@ vec4 LinearToGammaSpaceAlpha(vec4 color) { return vec4(LinearToGammaSpace(color.
 
 /// Utilities to read textures in given color space. Suffix is texture mode hint that equals to min(isLinear + sRGB, 1).
 /// @{
-
 #define Texture_ToGamma_0(color) (color)
 #define Texture_ToGamma_1(color) LinearToGammaSpaceAlpha(color)
 #define Texture_ToLinear_0(color) GammaToLinearSpaceAlpha(color)
@@ -63,7 +66,6 @@ vec4 LinearToGammaSpaceAlpha(vec4 color) { return vec4(LinearToGammaSpace(color.
     #define Texture_ToLight_0(color) Texture_ToGamma_0(color)
     #define Texture_ToLight_1(color) Texture_ToGamma_1(color)
 #endif
-
 /// @}
 
 #endif // _GAMMA_CORRECTION_GLSL_

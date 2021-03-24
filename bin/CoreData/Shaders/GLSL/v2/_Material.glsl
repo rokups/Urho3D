@@ -4,19 +4,19 @@
 /// Common material includes
 /// @{
 #include "_Config.glsl"
+#include "_SurfaceData.glsl"
+#include "_GammaCorrection.glsl"
+
 #include "_Uniforms.glsl"
 #include "_Samplers.glsl"
 #include "_VertexLayout.glsl"
 #include "_PixelOutput.glsl"
 
 #include "_VertexTransform.glsl"
-#include "_GammaCorrection.glsl"
 #include "_IndirectLighting.glsl"
 #include "_DirectLighting.glsl"
 #include "_Shadow.glsl"
 #include "_Fog.glsl"
-
-#include "_SurfaceData.glsl"
 /// @}
 
 /// Common vertex output for any material

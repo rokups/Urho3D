@@ -39,18 +39,25 @@ void main()
 #else
     #ifdef URHO3D_HAS_PIXEL_LIGHT
         DirectLightData lightData = GetForwardDirectLightData();
+
+        #if defined(URHO3D_PHYSICAL_MATERIAL) || defined(URHO3D_LIGHT_HAS_SPECULAR)
+            half3 halfVec = normalize(surfaceData.eyeVec + lightData.lightVec.xyz);
+        #endif
+
         #ifdef URHO3D_PHYSICAL_MATERIAL
-            vec3 halfVec = normalize(surfaceData.eyeVec + lightData.lightVec.xyz);
-            finalColor += Direct_PBR(lightData, surfaceData.albedo.rgb, surfaceData.specular, surfaceData.roughness,
-                surfaceData.normal, surfaceData.eyeVec, halfVec);
+            half3 lightColor = Direct_PBR(lightData.lightColor, surfaceData.albedo.rgb, surfaceData.specular, surfaceData.roughness,
+                lightData.lightVec.xyz, surfaceData.normal, surfaceData.eyeVec, halfVec);
         #else
             #ifdef URHO3D_LIGHT_HAS_SPECULAR
-                finalColor += GetBlinnPhongDiffuseSpecular(lightData, surfaceData.normal, surfaceData.albedo.rgb,
-                    surfaceData.specular, surfaceData.eyeVec, cMatSpecColor.a);
+                half3 lightColor = Direct_SimpleSpecular(lightData.lightColor,
+                    surfaceData.albedo.rgb, surfaceData.specular,
+                    lightData.lightVec.xyz, surfaceData.normal, halfVec, cMatSpecColor.a);
             #else
-                finalColor += GetBlinnPhongDiffuse(lightData, surfaceData.normal, surfaceData.albedo.rgb);
+                half3 lightColor = Direct_Simple(lightData.lightColor,
+                    surfaceData.albedo.rgb, lightData.lightVec.xyz, surfaceData.normal);
             #endif
         #endif
+        finalColor += lightColor * GetDirectLightAttenuation(lightData);
     #endif
 
     gl_FragColor = vec4(ApplyFog(finalColor, surfaceData.fogFactor), surfaceData.albedo.a);

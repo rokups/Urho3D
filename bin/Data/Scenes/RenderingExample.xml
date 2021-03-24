@@ -321,7 +321,7 @@
 			<attribute name="Variables" />
 			<component type="StaticModel" id="38">
 				<attribute name="Model" value="Model;Models/PlaneTess.mdl" />
-				<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+				<attribute name="Material" value="Material;Materials/Constant/GlossyWhite.xml" />
 			</component>
 		</node>
 		<node id="53">
@@ -342,7 +342,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="48">
 					<attribute name="Model" value="Model;Models/Torus.mdl" />
-					<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/GlossyWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -356,7 +356,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="49">
 					<attribute name="Model" value="Model;Models/Torus.mdl" />
-					<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/GlossyWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -370,7 +370,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="50">
 					<attribute name="Model" value="Model;Models/Torus.mdl" />
-					<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/GlossyWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -384,7 +384,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="51">
 					<attribute name="Model" value="Model;Models/Torus.mdl" />
-					<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/GlossyWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -398,7 +398,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="52">
 					<attribute name="Model" value="Model;Models/Torus.mdl" />
-					<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/GlossyWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -412,7 +412,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="53">
 					<attribute name="Model" value="Model;Models/Torus.mdl" />
-					<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/GlossyWhite.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -876,7 +876,7 @@
 			<attribute name="Variables" />
 			<component type="StaticModel" id="162">
 				<attribute name="Model" value="Model;Models/PlaneTess.mdl" />
-				<attribute name="Material" value="Material;Materials/DefaultWhite.xml" />
+				<attribute name="Material" value="Material;Materials/Constant/GlossyWhite.xml" />
 			</component>
 		</node>
 		<node id="173">
