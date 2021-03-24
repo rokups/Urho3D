@@ -58,19 +58,9 @@ enum class PostProcessAntialiasing
     FXAA3
 };
 
-enum class PostProcessTonemapping
-{
-    None,
-    ReinhardEq3,
-    ReinhardEq4,
-    Uncharted2,
-};
-
 struct PostProcessSettings
 {
-    bool autoExposure_{};
     PostProcessAntialiasing antialiasing_{};
-    PostProcessTonemapping tonemapping_{};
     bool greyScale_{};
 };
 

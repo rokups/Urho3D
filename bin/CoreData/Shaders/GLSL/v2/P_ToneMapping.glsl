@@ -13,9 +13,9 @@ VERTEX_OUTPUT(vec2 vScreenPos);
 #ifdef URHO3D_PIXEL_SHADER
 
 UNIFORM_BUFFER_BEGIN(6, Custom)
-    UNIFORM(half2 cInputInvSize)
-    UNIFORM(half2 cMinMaxExposure)
-    UNIFORM(half cAdaptRate)
+    UNIFORM(vec2 cInputInvSize)
+    UNIFORM(vec2 cMinMaxExposure)
+    UNIFORM(float cAdaptRate)
 UNIFORM_BUFFER_END()
 
 float GatherAvgLum(sampler2D texSampler, vec2 texCoord)
@@ -38,17 +38,19 @@ float GetExposure(float ev100)
     return 1.0 / (pow(2.0, ev100) * 1.2);
 }
 
+/// Unchared2 tone mapping
 vec3 Reinhard(vec3 x)
 {
     return x / (1.0 + x);
 }
 
+/// Unchared2 tone mapping with white point
 vec3 ReinhardWhite(vec3 x, float white)
 {
     return x * (1.0 + x / white) / (1.0 + x);
 }
 
-// Unchared2 tone mapping (See http://filmicgames.com)
+/// Unchared2 tone mapping
 vec3 Uncharted2(vec3 x)
 {
     const float A = 0.15;
@@ -103,7 +105,7 @@ void main()
     gl_FragColor.r = previousLuminance + (currentLuminance - previousLuminance) * (1.0 - exp(-cDeltaTime * cAdaptRate));
 #endif
 
-#ifdef EXPOSE
+#ifdef TONEMAP
     vec3 color = texture2D(sDiffMap, vScreenPos).rgb;
 
     #ifdef AUTOEXPOSURE

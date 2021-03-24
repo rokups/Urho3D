@@ -70,13 +70,13 @@ void ToneMappingPass::InitializeTextures()
 void ToneMappingPass::InitializeStates()
 {
     pipelineStates_ = CachedStates{};
-    pipelineStates_->lum64_ = renderBufferManager_->CreateQuadPipelineState(BLEND_REPLACE, "v2/P_AutoExposure", "LUMINANCE64");
-    pipelineStates_->lum16_ = renderBufferManager_->CreateQuadPipelineState(BLEND_REPLACE, "v2/P_AutoExposure", "LUMINANCE16");
-    pipelineStates_->lum4_ = renderBufferManager_->CreateQuadPipelineState(BLEND_REPLACE, "v2/P_AutoExposure", "LUMINANCE4");
-    pipelineStates_->lum1_ = renderBufferManager_->CreateQuadPipelineState(BLEND_REPLACE, "v2/P_AutoExposure", "LUMINANCE1");
-    pipelineStates_->adaptedLum_ = renderBufferManager_->CreateQuadPipelineState(BLEND_REPLACE, "v2/P_AutoExposure", "ADAPTLUMINANCE");
+    pipelineStates_->lum64_ = renderBufferManager_->CreateQuadPipelineState(BLEND_REPLACE, "v2/P_ToneMapping", "LUMINANCE64");
+    pipelineStates_->lum16_ = renderBufferManager_->CreateQuadPipelineState(BLEND_REPLACE, "v2/P_ToneMapping", "LUMINANCE16");
+    pipelineStates_->lum4_ = renderBufferManager_->CreateQuadPipelineState(BLEND_REPLACE, "v2/P_ToneMapping", "LUMINANCE4");
+    pipelineStates_->lum1_ = renderBufferManager_->CreateQuadPipelineState(BLEND_REPLACE, "v2/P_ToneMapping", "LUMINANCE1");
+    pipelineStates_->adaptedLum_ = renderBufferManager_->CreateQuadPipelineState(BLEND_REPLACE, "v2/P_ToneMapping", "ADAPTLUMINANCE");
 
-    ea::string toneMappingDefines = "EXPOSE ";
+    ea::string toneMappingDefines = "TONEMAP ";
     switch (settings_.mode_)
     {
     case ToneMappingMode::Reinhard:
@@ -95,7 +95,7 @@ void ToneMappingPass::InitializeStates()
         toneMappingDefines += "AUTOEXPOSURE ";
 
     pipelineStates_->toneMapping_  = renderBufferManager_->CreateQuadPipelineState(
-        BLEND_REPLACE, "v2/P_AutoExposure", toneMappingDefines);
+        BLEND_REPLACE, "v2/P_ToneMapping", toneMappingDefines);
 }
 
 void ToneMappingPass::EvaluateDownsampledColorBuffer()

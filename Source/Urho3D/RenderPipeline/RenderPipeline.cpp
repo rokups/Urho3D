@@ -205,12 +205,6 @@ void RenderPipeline::ApplySettings()
         postProcessPasses_.push_back(pass);
     }
 
-    if (postProcessSettings_.autoExposure_)
-    {
-        auto pass = MakeShared<AutoExposurePostProcessPass>(this, renderBufferManager_);
-        postProcessPasses_.push_back(pass);
-    }
-
     switch (postProcessSettings_.antialiasing_)
     {
     case PostProcessAntialiasing::FXAA2:
@@ -227,41 +221,6 @@ void RenderPipeline::ApplySettings()
         auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
             PostProcessPassFlag::NeedColorOutputReadAndWrite | PostProcessPassFlag::NeedColorOutputBilinear,
             BLEND_REPLACE, "v2/PP_FXAA3", "FXAA_QUALITY_PRESET=12");
-        postProcessPasses_.push_back(pass);
-        break;
-    }
-    default:
-        break;
-    }
-
-    switch (postProcessSettings_.tonemapping_)
-    {
-    case PostProcessTonemapping::ReinhardEq3:
-    {
-        auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
-            PostProcessPassFlag::NeedColorOutputReadAndWrite,
-            BLEND_REPLACE, "v2/PP_Tonemap", "REINHARDEQ3");
-        pass->AddShaderParameter("TonemapExposureBias", 1.0f);
-        postProcessPasses_.push_back(pass);
-        break;
-    }
-    case PostProcessTonemapping::ReinhardEq4:
-    {
-        auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
-            PostProcessPassFlag::NeedColorOutputReadAndWrite,
-            BLEND_REPLACE, "v2/PP_Tonemap", "REINHARDEQ4");
-        pass->AddShaderParameter("TonemapExposureBias", 1.0f);
-        pass->AddShaderParameter("TonemapMaxWhite", 8.0f);
-        postProcessPasses_.push_back(pass);
-        break;
-    }
-    case PostProcessTonemapping::Uncharted2:
-    {
-        auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
-            PostProcessPassFlag::NeedColorOutputReadAndWrite,
-            BLEND_REPLACE, "v2/PP_Tonemap", "UNCHARTED2");
-        pass->AddShaderParameter("TonemapExposureBias", 1.0f);
-        pass->AddShaderParameter("TonemapMaxWhite", 4.0f);
         postProcessPasses_.push_back(pass);
         break;
     }
