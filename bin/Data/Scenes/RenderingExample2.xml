@@ -14,8 +14,8 @@
 	<attribute name="Lightmaps" value="Texture2D" />
 	<component type="Octree" id="1" />
 	<component type="EditorSceneSettings" id="16777216">
-		<attribute name="Camera Position" value="-0.154833 3.47244 7.07073" />
-		<attribute name="Camera Rotation" value="0.929455 0.362393 0.0647392 -0.0243732" />
+		<attribute name="Camera Position" value="-0.989132 2.55076 10.6577" />
+		<attribute name="Camera Rotation" value="0.00383557 0.00138592 0.990509 -0.137391" />
 	</component>
 	<node id="2">
 		<attribute name="Is Enabled" value="true" />

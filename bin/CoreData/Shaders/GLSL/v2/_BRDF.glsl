@@ -41,7 +41,7 @@ half3 Indirect_PBR(SurfaceData surfaceData, half NoV)
     half3 brdf = BRDF_IndirectSpecular(surfaceData.specular, surfaceData.roughness, NoV);
 
     half3 diffuse = surfaceData.ambientLighting * surfaceData.albedo.rgb;
-    half3 specular = M_PI * GammaToLinearSpace(surfaceData.reflectionColorRaw.rgb);
+    half3 specular = GammaToLinearSpace(surfaceData.reflectionColorRaw.rgb);
     #ifndef URHO3D_GAMMA_CORRECTION
         specular = sqrt(specular);
     #endif

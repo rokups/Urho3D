@@ -1056,7 +1056,7 @@
 			<attribute name="Variables" />
 			<component type="StaticModel" id="174">
 				<attribute name="Model" value="Model;Models/TeaPot.mdl" />
-				<attribute name="Material" value="Material;Materials/Constant/DefaultMirror.xml;Materials/Constant/DefaultMirror.xml" />
+				<attribute name="Material" value="Material;Materials/Constant/Mirror.xml;Materials/Constant/Mirror.xml" />
 			</component>
 		</node>
 		<node id="188">
@@ -1069,7 +1069,7 @@
 			<attribute name="Variables" />
 			<component type="StaticModel" id="175">
 				<attribute name="Model" value="Model;Models/Sphere.mdl" />
-				<attribute name="Material" value="Material;Materials/Constant/DefaultMirror.xml" />
+				<attribute name="Material" value="Material;Materials/Constant/Mirror.xml" />
 			</component>
 		</node>
 		<node id="189">
@@ -1082,7 +1082,7 @@
 			<attribute name="Variables" />
 			<component type="StaticModel" id="176">
 				<attribute name="Model" value="Model;Models/Torus.mdl" />
-				<attribute name="Material" value="Material;Materials/Constant/DefaultMirror.xml" />
+				<attribute name="Material" value="Material;Materials/Constant/Mirror.xml" />
 			</component>
 		</node>
 	</node>
