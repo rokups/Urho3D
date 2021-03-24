@@ -1,11 +1,19 @@
+/// _BRDF.glsl
+/// [Pixel Shader only]
+/// [Lit material only]
+/// Generalized functions used to calculate high-frequency surface lighting.
+/// Independent from actual light types and properties.
+/// Low-frequency lighting from spherical harmonics and lightmaps is not processed here.
 #ifndef _BRDF_GLSL_
 #define _BRDF_GLSL_
+
+#ifdef URHO3D_PIXEL_SHADER
+
+#ifdef URHO3D_IS_LIT
 
 #ifndef _GAMMA_CORRECTION_GLSL_
     #error Include "_GammaCorrection.glsl" before "_BRDF.glsl"
 #endif
-
-#ifdef URHO3D_PIXEL_SHADER
 
 #ifdef URHO3D_AMBIENT_PASS
 
@@ -19,7 +27,7 @@ half3 Indirect_Simple(SurfaceData surfaceData)
     half3 result = surfaceData.emission;
     result += surfaceData.ambientLighting * surfaceData.albedo.rgb;
 #ifdef URHO3D_REFLECTION_MAPPING
-    result += GammaToLightSpace(cMatEnvMapColor * surfaceData.reflectionColorRaw.rgb);
+    result += GammaToLightSpace(surfaceData.reflectionColorRaw.rgb);
 #endif
     result *= surfaceData.occlusion;
     return result;
@@ -66,7 +74,7 @@ half3 Indirect_PBR(SurfaceData surfaceData, half NoV)
 /// Evaluate Blinn–Phong BRDF.
 half BRDF_Direct_BlinnPhongSpecular(half3 normal, half3 halfVec, half specularPower)
 {
-    return pow(max(dot(normal, halfVec), 0.0), specularPower) * cLightColor.a;
+    return pow(max(dot(normal, halfVec), 0.0), specularPower);
 }
 
 /// Evaluate simple directional lighting without specular.
@@ -78,11 +86,11 @@ half3 Direct_Simple(half3 lightColor, half3 albedo, half3 lightVec, half3 normal
 
 /// Evaluate simple directional lighting with Blinn-Phong specular.
 half3 Direct_SimpleSpecular(half3 lightColor, half3 albedo, half3 specular,
-    half3 lightVec, half3 normal, half3 halfVec, half specularPower)
+    half3 lightVec, half3 normal, half3 halfVec, half specularPower, half specularIntensity)
 {
     half NoL = max(dot(normal, lightVec), 0.0);
     float brdf = BRDF_Direct_BlinnPhongSpecular(normal, halfVec, specularPower);
-    return NoL * lightColor * (albedo + specular * brdf);
+    return NoL * lightColor * (albedo + specular * (brdf * specularIntensity));
 }
 
 #ifdef URHO3D_PHYSICAL_MATERIAL
@@ -145,6 +153,8 @@ half3 Direct_PBR(half3 lightColor, half3 albedo, half3 specular, half roughness,
 #endif // URHO3D_PHYSICAL_MATERIAL
 
 #endif // URHO3D_HAS_PIXEL_LIGHT
+
+#endif // URHO3D_IS_LIT
 
 #endif // URHO3D_PIXEL_SHADER
 

@@ -78,6 +78,13 @@ static const ea::vector<ea::string> ambientModeNames =
     "Directional",
 };
 
+static const ea::vector<ea::string> directLightingModeNames =
+{
+    "Forward",
+    "Deferred Blinn-Phong",
+    "Deferred PBR",
+};
+
 static const ea::vector<ea::string> postProcessAntialiasingNames =
 {
     "None",
@@ -117,7 +124,8 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ENUM_ATTRIBUTE_EX("Ambient Mode", sceneProcessorSettings_.ambientMode_, MarkSettingsDirty, ambientModeNames, DrawableAmbientMode::Directional, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Enable Instancing", bool, instancingBufferSettings_.enableInstancing_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Enable Shadow", bool, sceneProcessorSettings_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Deferred Lighting", bool, sceneProcessorSettings_.deferredLighting_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Lighting Mode", sceneProcessorSettings_.lightingMode_, MarkSettingsDirty, directLightingModeNames, DirectLightingMode::Forward, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Specular Anti-Aliasing", bool, sceneProcessorSettings_.specularAntiAliasing_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("PCF Kernel Size", unsigned, sceneProcessorSettings_.pcfKernelSize_, MarkSettingsDirty, 1, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Use Variance Shadow Maps", bool, shadowMapAllocatorSettings_.enableVarianceShadowMaps_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, sceneProcessorSettings_.varianceShadowMapParams_, MarkSettingsDirty, BatchRendererSettings{}.varianceShadowMapParams_, AM_DEFAULT);
@@ -140,9 +148,9 @@ void RenderPipeline::ValidateSettings()
     shadowMapAllocatorSettings_.shadowAtlasPageSize_ = ea::min(
         shadowMapAllocatorSettings_.shadowAtlasPageSize_, Graphics::GetCaps().maxRenderTargetSize_);
 
-    if (sceneProcessorSettings_.deferredLighting_ && !graphics_->GetDeferredSupport()
+    if (sceneProcessorSettings_.IsDeferredLighting() && !graphics_->GetDeferredSupport()
         && !Graphics::GetReadableDepthStencilFormat())
-        sceneProcessorSettings_.deferredLighting_ = false;
+        sceneProcessorSettings_.lightingMode_ = DirectLightingMode::Forward;
 
     if (!shadowMapAllocatorSettings_.use16bitShadowMaps_ && !graphics_->GetHiresShadowMapFormat())
         shadowMapAllocatorSettings_.use16bitShadowMaps_ = true;
@@ -171,9 +179,9 @@ void RenderPipeline::ApplySettings()
     instancingBuffer_->SetSettings(instancingBufferSettings_);
     shadowMapAllocator_->SetSettings(shadowMapAllocatorSettings_);
 
-    if (!opaquePass_ || sceneProcessorSettings_.deferredLighting_ != deferred_.has_value())
+    if (!opaquePass_ || sceneProcessorSettings_.IsDeferredLighting() != deferred_.has_value())
     {
-        if (sceneProcessorSettings_.deferredLighting_)
+        if (sceneProcessorSettings_.IsDeferredLighting())
         {
             opaquePass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(
                 DrawableProcessorPassFlag::HasAmbientLighting | DrawableProcessorPassFlag::DeferredLightMaskToStencil,
@@ -240,10 +248,11 @@ void RenderPipeline::ApplySettings()
     for (PostProcessPass* postProcessPass : postProcessPasses_)
         postProcessFlags_ |= postProcessPass->GetExecutionFlags();
 
+    const bool isDeferredLighting = sceneProcessorSettings_.IsDeferredLighting();
     renderBufferManagerSettings_.filteredColor_ = postProcessFlags_.Test(PostProcessPassFlag::NeedColorOutputBilinear);
-    renderBufferManagerSettings_.colorUsableWithMultipleRenderTargets_ = sceneProcessorSettings_.deferredLighting_;
-    renderBufferManagerSettings_.stencilBuffer_ = sceneProcessorSettings_.deferredLighting_;
-    renderBufferManagerSettings_.inheritMultiSampleLevel_ = !sceneProcessorSettings_.deferredLighting_;
+    renderBufferManagerSettings_.colorUsableWithMultipleRenderTargets_ = isDeferredLighting;
+    renderBufferManagerSettings_.stencilBuffer_ = isDeferredLighting;
+    renderBufferManagerSettings_.inheritMultiSampleLevel_ = !isDeferredLighting;
     renderBufferManager_->SetSettings(renderBufferManagerSettings_);
 }
 
@@ -313,7 +322,7 @@ void RenderPipeline::Render()
 {
     RenderBufferManagerFrameSettings frameSettings;
     frameSettings.supportColorReadWrite_ = postProcessFlags_.Test(PostProcessPassFlag::NeedColorOutputReadAndWrite);
-    frameSettings.readableDepth_ = sceneProcessorSettings_.deferredLighting_;
+    frameSettings.readableDepth_ = sceneProcessorSettings_.IsDeferredLighting();
     renderBufferManager_->SetFrameSettings(frameSettings);
 
     OnRenderBegin(this, frameInfo_);
@@ -332,7 +341,7 @@ void RenderPipeline::Render()
 
     // TODO(renderer): Remove this guard
 #ifdef DESKTOP_GRAPHICS
-    if (sceneProcessorSettings_.deferredLighting_)
+    if (sceneProcessorSettings_.IsDeferredLighting())
     {
         // Draw deferred GBuffer
         renderBufferManager_->ClearColor(deferred_->albedoBuffer_, Color::TRANSPARENT_BLACK);

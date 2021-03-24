@@ -1,3 +1,7 @@
+/// _Config.glsl
+/// Global configuration management, platform compatibility utilities,
+/// global constants and helper functions.
+/// Should be included before any other shader code.
 #ifndef _CONFIG_GLSL_
 #define _CONFIG_GLSL_
 
@@ -5,12 +9,12 @@
 #extension GL_EXT_shader_texture_lod: enable
 #extension GL_OES_standard_derivatives : enable
 
-// =================================== Constants ===================================
+/// =================================== Constants ===================================
 
 #define M_PI 3.14159265358979323846
 #define M_EPSILON 0.0001
 
-// =================================== External defines ===================================
+/// =================================== External defines ===================================
 
 /// Whether vertex shader needs world-space normal.
 // #define URHO3D_VERTEX_NEED_NORMAL
@@ -52,13 +56,15 @@
 /// Whether to use physiclally based material.
 // #define PBR
 
-// =================================== Deprecated external defines ===================================
+/// =================================== Deprecated external defines ===================================
 
 // #define NOUV
 // #define AMBIENT
 // #define DEFERRED
+// #define METALLIC
+// #define ROUGHNESS
 
-// =================================== Global configuration ===================================
+/// =================================== Global configuration ===================================
 
 /// URHO3D_VERTEX_SHADER: Defined for vertex shader only.
 #ifdef COMPILEVS
@@ -99,48 +105,53 @@
     #endif
 #endif
 
-/// URHO3D_REFLECTION_MAPPING: Whether to apply reflections from environment cubemap
+/// URHO3D_REFLECTION_MAPPING: Whether to apply reflections from environment cubemap.
 #if defined(URHO3D_AMBIENT_PASS) && (defined(ENVCUBEMAP) || defined(URHO3D_PHYSICAL_MATERIAL))
     #define URHO3D_REFLECTION_MAPPING
 #endif
 
+/// URHO3D_SPECULAR_ANTIALIASING is disabled if derivatives are not supported.
+#if defined(GL_ES) && !defined(GL_OES_standard_derivatives)
+    #undef URHO3D_SPECULAR_ANTIALIASING
+#endif
+
 // =================================== Vertex output configuration ===================================
 
-// URHO3D_PIXEL_NEED_EYE_VECTOR is implied by:
-// - Specular lighting;
-// - Reflection mapping.
+/// URHO3D_PIXEL_NEED_EYE_VECTOR is implied by:
+/// - Specular lighting;
+/// - Reflection mapping.
 #if defined(URHO3D_REFLECTION_MAPPING) || defined(URHO3D_LIGHT_HAS_SPECULAR)
     #ifndef URHO3D_PIXEL_NEED_EYE_VECTOR
         #define URHO3D_PIXEL_NEED_EYE_VECTOR
     #endif
 #endif
 
-// TODO(renderer): Don't do it for particles?
-// URHO3D_PIXEL_NEED_NORMAL is implied by:
-// - Per-pixel lighting;
-// - Geometry buffer rendering for lit geometry;
-// - Reflection mapping.
+/// TODO(renderer): Don't do it for particles?
+/// URHO3D_PIXEL_NEED_NORMAL is implied by:
+/// - Per-pixel lighting;
+/// - Geometry buffer rendering for lit geometry;
+/// - Reflection mapping.
 #if defined(URHO3D_HAS_PIXEL_LIGHT) || (defined(URHO3D_IS_LIT) && defined(URHO3D_GBUFFER_PASS)) || defined(URHO3D_REFLECTION_MAPPING)
     #ifndef URHO3D_PIXEL_NEED_NORMAL
         #define URHO3D_PIXEL_NEED_NORMAL
     #endif
 #endif
 
-// URHO3D_PIXEL_NEED_TANGENT is implied by normal mapping.
+/// URHO3D_PIXEL_NEED_TANGENT is implied by normal mapping.
 #if defined(URHO3D_NORMAL_MAPPING)
     #ifndef URHO3D_PIXEL_NEED_TANGENT
         #define URHO3D_PIXEL_NEED_TANGENT
     #endif
 #endif
 
-// URHO3D_PIXEL_NEED_COLOR is implied by URHO3D_VERTEX_HAS_COLOR.
+/// URHO3D_PIXEL_NEED_COLOR is implied by URHO3D_VERTEX_HAS_COLOR.
 #if defined(URHO3D_VERTEX_HAS_COLOR) && !defined(URHO3D_SHADOW_PASS)
     #ifndef URHO3D_PIXEL_NEED_COLOR
         #define URHO3D_PIXEL_NEED_COLOR
     #endif
 #endif
 
-// =================================== Vertex input configuration ===================================
+/// =================================== Vertex input configuration ===================================
 
 #ifdef URHO3D_VERTEX_SHADER
     /// URHO3D_VERTEX_NORMAL_AVAILABLE: Whether vertex normal in object space is available.
@@ -159,10 +170,10 @@
         #endif
     #endif
 
-    // URHO3D_VERTEX_NEED_NORMAL is implied by:
-    // - URHO3D_PIXEL_NEED_NORMAL;
-    // - Any kind of lighting;
-    // - Shadow normal bias.
+    /// URHO3D_VERTEX_NEED_NORMAL is implied by:
+    /// - URHO3D_PIXEL_NEED_NORMAL;
+    /// - Any kind of lighting;
+    /// - Shadow normal bias.
     #ifdef URHO3D_VERTEX_NORMAL_AVAILABLE
         #if defined(URHO3D_PIXEL_NEED_NORMAL) || defined(URHO3D_IS_LIT) || defined(URHO3D_SHADOW_NORMAL_OFFSET)
             #ifndef URHO3D_VERTEX_NEED_NORMAL
@@ -171,7 +182,7 @@
         #endif
     #endif
 
-    // URHO3D_VERTEX_NEED_TANGENT is implied by URHO3D_PIXEL_NEED_TANGENT.
+    /// URHO3D_VERTEX_NEED_TANGENT is implied by URHO3D_PIXEL_NEED_TANGENT.
     #ifdef URHO3D_VERTEX_TANGENT_AVAILABLE
         #if defined(URHO3D_PIXEL_NEED_TANGENT)
             #ifndef URHO3D_VERTEX_NEED_TANGENT
@@ -180,20 +191,20 @@
         #endif
     #endif
 
-    // URHO3D_SHADOW_NORMAL_OFFSET is forcibly disabled if vertex normal is not available.
+    /// URHO3D_SHADOW_NORMAL_OFFSET is disabled if vertex normal is not available.
     #if defined(URHO3D_SHADOW_NORMAL_OFFSET) && !defined(URHO3D_VERTEX_NORMAL_AVAILABLE)
         #undef URHO3D_SHADOW_NORMAL_OFFSET
     #endif
 #endif // URHO3D_VERTEX_SHADER
 
-// =================================== Light configuration ===================================
+/// =================================== Light configuration ===================================
 
 #if defined(URHO3D_IS_LIT)
     // TODO(renderer): Handle this for pixel lights too
-    // URHO3D_SURFACE_ONE_SIDED: Normal is clamped when calculating lighting. Ignored in deferred rendering.
-    // URHO3D_SURFACE_TWO_SIDED: Normal is mirrored when calculating lighting. Ignored in deferred rendering.
-    // URHO3D_SURFACE_VOLUMETRIC: Normal is ignored when calculating lighting. Ignored in deferred rendering.
-    // VERTEX_ADJUST_NoL: Adjust N dot L for vertex normal.
+    /// URHO3D_SURFACE_ONE_SIDED: Normal is clamped when calculating lighting. Ignored in deferred rendering.
+    /// URHO3D_SURFACE_TWO_SIDED: Normal is mirrored when calculating lighting. Ignored in deferred rendering.
+    /// URHO3D_SURFACE_VOLUMETRIC: Normal is ignored when calculating lighting. Ignored in deferred rendering.
+    /// VERTEX_ADJUST_NoL: Adjust N dot L for vertex normal.
     #if defined(VOLUMETRIC)
         #define URHO3D_SURFACE_VOLUMETRIC
         #define VERTEX_ADJUST_NoL(NdotL) 1.0
@@ -215,7 +226,7 @@
     #endif
 #endif
 
-// =================================== Platform configuration ===================================
+/// =================================== Platform configuration ===================================
 
 /// Generates identifier from two parts.
 #define _CONCATENATE_2(x, y) x##y
@@ -273,13 +284,6 @@
     #endif
 #endif
 
-/// UNIFORM_VERTEX: Declares uniform that is used only by vertex shader and may have high precision on GL ES
-#if defined(GL_ES) && !defined(URHO3D_USE_CBUFFERS) && defined(URHO3D_PIXEL_SHADER)
-    #define UNIFORM_VERTEX(decl)
-#else
-    #define UNIFORM_VERTEX(decl) UNIFORM(decl)
-#endif
-
 /// URHO3D_FLIP_FRAMEBUFFER: Whether to flip framebuffer on rendering
 #ifdef D3D11
     #define URHO3D_FLIP_FRAMEBUFFER
@@ -303,21 +307,25 @@
     #define texture2DLodOffset textureLodOffset
 #endif
 
+/// UNIFORM_HIGHP: Uniform with max precision, undefined if not supported.
 #ifndef GL_ES
-    // Disable precision modifiers if not GL ES
+    /// Disable precision modifiers if not GL ES
     #define highp
     #define mediump
     #define lowp
+    #define UNIFORM_HIGHP(decl) UNIFORM(decl)
 #else
-    // Use max available precision by default
+    /// Use max available precision by default
     #if defined(GL_FRAGMENT_PRECISION_HIGH) || !defined(URHO3D_PIXEL_SHADER)
         precision highp float;
+        #define UNIFORM_HIGHP(decl) UNIFORM(decl)
     #else
         precision mediump float;
+        #define UNIFORM_HIGHP(decl)
     #endif
 #endif
 
-// Define shortcuts for precision-qualified types
+/// Define shortcuts for precision-qualified types
 #define half  mediump float
 #define half2 mediump vec2
 #define half3 mediump vec3

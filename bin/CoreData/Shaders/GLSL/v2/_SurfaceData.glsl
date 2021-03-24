@@ -1,3 +1,7 @@
+/// _SurfaceData.glsl
+/// [Pixel Shader only]
+/// Defines SurfaceData which contains common data used for lighting calculation and color evaluation.
+/// Aggergates input from vertex shader and bound textures.
 #ifndef _SURFACE_DATA_GLSL_
 #define _SURFACE_DATA_GLSL_
 
@@ -7,7 +11,6 @@
 
 #ifdef URHO3D_PIXEL_SHADER
 
-/// Common pixel input for any material.
 struct SurfaceData
 {
     /// Fog factor. 0 - fog color, 1 - material color.

@@ -1040,7 +1040,7 @@
 	</node>
 	<node id="186">
 		<attribute name="Is Enabled" value="true" />
-		<attribute name="Name" value="Mirror" />
+		<attribute name="Name" value="Mirror Materials" />
 		<attribute name="Tags" />
 		<attribute name="Position" value="10 0 -5" />
 		<attribute name="Rotation" value="1 0 0 0" />

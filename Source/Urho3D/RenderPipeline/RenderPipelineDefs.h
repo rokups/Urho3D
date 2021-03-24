@@ -316,6 +316,7 @@ struct BatchRendererSettings
     bool linearSpaceLighting_{};
     DrawableAmbientMode ambientMode_{ DrawableAmbientMode::Directional };
     Vector2 varianceShadowMapParams_{ 0.0000001f, 0.9f };
+    bool specularAntiAliasing_{};
 
     /// Utility operators
     /// @{
@@ -324,6 +325,7 @@ struct BatchRendererSettings
         unsigned hash = 0;
         CombineHash(hash, linearSpaceLighting_);
         CombineHash(hash, MakeHash(ambientMode_));
+        CombineHash(hash, specularAntiAliasing_);
         return hash;
     }
 
@@ -331,7 +333,8 @@ struct BatchRendererSettings
     {
         return linearSpaceLighting_ == rhs.linearSpaceLighting_
             && ambientMode_ == rhs.ambientMode_
-            && varianceShadowMapParams_ == rhs.varianceShadowMapParams_;
+            && varianceShadowMapParams_ == rhs.varianceShadowMapParams_
+            && specularAntiAliasing_ == rhs.specularAntiAliasing_;
     }
 
     bool operator!=(const BatchRendererSettings& rhs) const { return !(*this == rhs); }
@@ -393,19 +396,38 @@ struct OcclusionBufferSettings
     /// @}
 };
 
+enum class DirectLightingMode
+{
+    Forward,
+    DeferredBlinnPhong,
+    DeferredPBR
+};
+
 struct SceneProcessorSettings
     : public DrawableProcessorSettings
     , public OcclusionBufferSettings
     , public BatchRendererSettings
 {
     bool enableShadows_{ true };
-    bool deferredLighting_{ false };
+    DirectLightingMode lightingMode_{};
     unsigned directionalShadowSize_{ 1024 };
     unsigned spotShadowSize_{ 1024 };
     unsigned pointShadowSize_{ 256 };
 
     /// Utility operators
     /// @{
+    bool IsDeferredLighting() const
+    {
+        switch (lightingMode_)
+        {
+        case DirectLightingMode::DeferredBlinnPhong:
+        case DirectLightingMode::DeferredPBR:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     unsigned CalculatePipelineStateHash() const
     {
         unsigned hash = 0;
@@ -413,7 +435,7 @@ struct SceneProcessorSettings
         CombineHash(hash, OcclusionBufferSettings::CalculatePipelineStateHash());
         CombineHash(hash, BatchRendererSettings::CalculatePipelineStateHash());
         CombineHash(hash, enableShadows_);
-        CombineHash(hash, deferredLighting_);
+        CombineHash(hash, MakeHash(lightingMode_));
         return hash;
     }
 
@@ -423,7 +445,7 @@ struct SceneProcessorSettings
             && OcclusionBufferSettings::operator==(rhs)
             && BatchRendererSettings::operator==(rhs)
             && enableShadows_ == rhs.enableShadows_
-            && deferredLighting_ == rhs.deferredLighting_
+            && lightingMode_ == rhs.lightingMode_
             && directionalShadowSize_ == rhs.directionalShadowSize_
             && spotShadowSize_ == rhs.spotShadowSize_
             && pointShadowSize_ == rhs.pointShadowSize_;

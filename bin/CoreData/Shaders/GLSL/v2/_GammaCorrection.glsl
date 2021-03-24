@@ -1,3 +1,7 @@
+/// _GammaCorrection.glsl
+/// Utilities used to convert from light to gamma color space and vice versa.
+/// Utilities to convert from/to light space configured by URHO3D_GAMMA_CORRECTION.
+/// Utilities to sample texture contents based on texture properties.
 #ifndef _GAMMA_CORRECTION_GLSL_
 #define _GAMMA_CORRECTION_GLSL_
 

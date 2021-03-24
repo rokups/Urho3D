@@ -51,7 +51,7 @@ void main()
             #ifdef URHO3D_LIGHT_HAS_SPECULAR
                 half3 lightColor = Direct_SimpleSpecular(lightData.lightColor,
                     surfaceData.albedo.rgb, surfaceData.specular,
-                    lightData.lightVec.xyz, surfaceData.normal, halfVec, cMatSpecColor.a);
+                    lightData.lightVec.xyz, surfaceData.normal, halfVec, cMatSpecColor.a, cLightColor.a);
             #else
                 half3 lightColor = Direct_Simple(lightData.lightColor,
                     surfaceData.albedo.rgb, lightData.lightVec.xyz, surfaceData.normal);

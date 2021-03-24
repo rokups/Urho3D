@@ -179,6 +179,9 @@ void PipelineStateBuilder::ApplyCommonDefines(const Pass* materialPass)
     if (sceneProcessor_->GetSettings().linearSpaceLighting_)
         commonDefines_ += "URHO3D_GAMMA_CORRECTION ";
 
+    if (sceneProcessor_->GetSettings().specularAntiAliasing_)
+        commonDefines_ += "URHO3D_SPECULAR_ANTIALIASING ";
+
     vertexDefines_ += materialPass->GetEffectiveVertexShaderDefines();
     vertexDefines_ += " ";
     pixelDefines_ += materialPass->GetEffectivePixelShaderDefines();
@@ -281,6 +284,9 @@ void PipelineStateBuilder::ApplyLightVolumePass(const LightProcessor* lightProce
 
     if (cameraProcessor_->IsCameraOrthographic())
         commonDefines_ += "URHO3D_ORTHOGRAPHIC_DEPTH ORTHO ";
+
+    if (sceneProcessor_->GetSettings().lightingMode_ == DirectLightingMode::DeferredPBR)
+        commonDefines_ += "URHO3D_PHYSICAL_MATERIAL ";
 
     if (light->GetLightType() != LIGHT_DIRECTIONAL)
     {

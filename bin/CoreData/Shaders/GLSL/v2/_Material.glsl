@@ -4,8 +4,9 @@
 /// Common material includes
 /// @{
 #include "_Config.glsl"
-#include "_SurfaceData.glsl"
 #include "_GammaCorrection.glsl"
+#include "_SurfaceData.glsl"
+#include "_BRDF.glsl"
 
 #include "_Uniforms.glsl"
 #include "_Samplers.glsl"
@@ -147,7 +148,7 @@ SurfaceData GetCommonSurfaceData()
 
     // Apply specular antialiasing
     // TODO(renderer): Implement for actual specular too, make optional
-#ifdef URHO3D_PHYSICAL_MATERIAL
+#if defined(URHO3D_SPECULAR_ANTIALIASING) && defined(URHO3D_PHYSICAL_MATERIAL)
     half3 dNdx = dFdx(result.normal);
     half3 dNdy = dFdy(result.normal);
     const half specularAntiAliasingVariance = 0.15f;
@@ -160,7 +161,7 @@ SurfaceData GetCommonSurfaceData()
     roughnessMetallic.x = sqrt(sqrt(squareRoughness));
 #endif
 
-    // Evaluate reflection vector
+    // Evaluate reflection vector and pre-fetch cube map
 #ifdef URHO3D_REFLECTION_MAPPING
     result.reflectionVec = reflect(-result.eyeVec, result.normal);
     #ifdef URHO3D_PHYSICAL_MATERIAL
@@ -239,6 +240,11 @@ SurfaceData GetCommonSurfaceData()
     #ifdef URHO3D_HAS_LIGHTMAP
         result.ambientLighting += 2.0 * texture2D(sEmissiveMap, vTexCoord2).rgb;
     #endif
+#endif
+
+    // Apply material reflection
+#if defined(URHO3D_REFLECTION_MAPPING) && !defined(URHO3D_PHYSICAL_MATERIAL)
+    result.reflectionColorRaw.rgb *= cMatEnvMapColor;
 #endif
 
     return result;

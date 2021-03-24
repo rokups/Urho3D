@@ -1,102 +1,142 @@
+/// _Uniforms.glsl
+/// Uniforms provied by the engine or standard material uniforms.
 #ifndef _UNIFORMS_GLSL_
 #define _UNIFORMS_GLSL_
 
+#ifndef _CONFIG_GLSL_
+    #error Include "_Config.glsl" before "_Uniforms.glsl"
+#endif
+
 UNIFORM_BUFFER_BEGIN(0, Frame)
-    UNIFORM(mediump float cDeltaTime)
-    UNIFORM(mediump float cElapsedTime)
+    /// Time elapsed since previous frame.
+    UNIFORM_HIGHP(float cDeltaTime)
+    /// Time elapsed since scene started updating. Avoid using it.
+    UNIFORM_HIGHP(float cElapsedTime)
 UNIFORM_BUFFER_END()
 
 UNIFORM_BUFFER_BEGIN(1, Camera)
-    UNIFORM(mediump vec3 cCameraPos) // TODO(renderer): Increase precision
-    UNIFORM(mediump float cNearClip)
-    UNIFORM(mediump float cFarClip)
-    UNIFORM_VERTEX(highp float cNormalOffsetScale)
-    UNIFORM(mediump vec4 cDepthMode)
-    UNIFORM(mediump vec3 cFrustumSize)
-    UNIFORM(mediump vec4 cGBufferOffsets)
-    UNIFORM_VERTEX(highp mat4 cView)
-    UNIFORM_VERTEX(highp mat4 cViewInv)
-    UNIFORM_VERTEX(highp mat4 cViewProj)
-    UNIFORM_VERTEX(highp vec4 cClipPlane)
-    UNIFORM(mediump vec4 cDepthReconstruct)
-    UNIFORM(mediump vec2 cGBufferInvSize)
-    UNIFORM(mediump vec4 cAmbientColor)
-    UNIFORM(mediump vec4 cFogParams)
-    UNIFORM(mediump vec3 cFogColor)
+    /// World to view space matrix.
+    UNIFORM_HIGHP(mat4 cView)
+    /// Inversed world to view space matrix.
+    UNIFORM_HIGHP(mat4 cViewInv)
+    /// World to clip space matrix.
+    UNIFORM_HIGHP(mat4 cViewProj)
+    /// Clip plane.
+    UNIFORM_HIGHP(vec4 cClipPlane)
+    /// Camera position in world space.
+    UNIFORM_HIGHP(vec3 cCameraPos)
+    /// Near clip distance of camera.
+    UNIFORM_HIGHP(float cNearClip)
+    /// Far clip distance of camera.
+    UNIFORM_HIGHP(float cFarClip)
+    UNIFORM_HIGHP(vec4 cDepthMode)
+    UNIFORM_HIGHP(vec3 cFrustumSize)
+    UNIFORM_HIGHP(vec4 cGBufferOffsets)
+    UNIFORM_HIGHP(vec4 cDepthReconstruct)
+    UNIFORM_HIGHP(vec2 cGBufferInvSize)
+    /// Constant ambient color in current color space.
+    UNIFORM(half4 cAmbientColor)
+    UNIFORM(half4 cFogParams)
+    /// Color of fog.
+    UNIFORM(half3 cFogColor)
+    /// Scale of normal shadow bias.
+    UNIFORM(half cNormalOffsetScale)
 UNIFORM_BUFFER_END()
 
+/// Zone: Reflection probe parameters.
+/// Disabled if pass has no ambient lighting.
+#ifdef URHO3D_AMBIENT_PASS
 UNIFORM_BUFFER_BEGIN(2, Zone)
-    UNIFORM(mediump half cRoughnessToLODFactor)
+    /// Multiplier used to convert roughness factor to LOD of reflection cubemap.
+    UNIFORM(half cRoughnessToLODFactor)
 UNIFORM_BUFFER_END()
+#endif
 
 UNIFORM_BUFFER_BEGIN(3, Light)
-    UNIFORM(mediump vec4 cLightPos) // TODO(renderer): Increase precision
-    UNIFORM(mediump vec3 cLightDir)
-    UNIFORM(mediump vec2 cSpotAngle)
+    /// Light position in world space.
+    UNIFORM_HIGHP(vec4 cLightPos)
+    /// Light direction in world space.
+    UNIFORM(half3 cLightDir)
+    /// x: cos(spotAngle / 2);
+    /// y: 1 / (1 - x).
+    UNIFORM(half2 cSpotAngle)
 #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
-    UNIFORM(mediump mat4 cLightShapeMatrix)
+    /// Matrix from world to light texture space.
+    UNIFORM_HIGHP(mat4 cLightShapeMatrix)
 #endif
 #ifdef URHO3D_NUM_VERTEX_LIGHTS
-    UNIFORM_VERTEX(highp vec4 cVertexLights[URHO3D_NUM_VERTEX_LIGHTS * 3])
+    /// Vertex lights data:
+    /// [0].rgb: Light color in current color space;
+    /// [0].a: Inverse range;
+    /// [1].xyz: Light direction in world space;
+    /// [1].w: Same as cSpotAngle.x;
+    /// [2].xyz: Light position in world space;
+    UNIFORM_HIGHP(vec4 cVertexLights[URHO3D_NUM_VERTEX_LIGHTS * 3])
 #endif
-    UNIFORM(mediump mat4 cLightMatrices[4])
-
-    UNIFORM(mediump vec4 cLightColor)
-    UNIFORM(mediump vec4 cShadowCubeAdjust)
-    UNIFORM(mediump vec2 cShadowCubeUVBias)
-    UNIFORM(mediump vec4 cShadowDepthFade)
-    UNIFORM(mediump vec2 cShadowIntensity)
-    UNIFORM(mediump vec2 cShadowMapInvSize)
-    UNIFORM(mediump vec4 cShadowSplits)
-#ifdef VSM_SHADOW
-    UNIFORM(mediump vec2 cVSMShadowParams)
+    /// For directional and spot lights: Matrices from world to shadow texture space.
+    /// For point lights: unused.
+    UNIFORM_HIGHP(mat4 cLightMatrices[4])
+    /// Light color in current color space.
+    UNIFORM(half4 cLightColor)
+    UNIFORM(half4 cShadowCubeAdjust)
+    UNIFORM(half2 cShadowCubeUVBias)
+    UNIFORM(half4 cShadowDepthFade)
+    UNIFORM(half2 cShadowIntensity)
+    UNIFORM(half2 cShadowMapInvSize)
+    UNIFORM(half4 cShadowSplits)
+#ifdef URHO3D_VARIANCE_SHADOW_MAP
+    UNIFORM(half2 cVSMShadowParams)
 #endif
-#ifdef PBR
-    UNIFORM(mediump float cLightRad)
-    UNIFORM(mediump float cLightLength)
+#ifdef URHO3D_PHYSICAL_MATERIAL
+    UNIFORM(half cLightRad)
+    UNIFORM(half cLightLength)
 #endif
 UNIFORM_BUFFER_END()
 
 #ifndef CUSTOM_MATERIAL_CBUFFER
 UNIFORM_BUFFER_BEGIN(4, Material)
-    UNIFORM(mediump vec4 cUOffset)
-    UNIFORM(mediump vec4 cVOffset)
-    UNIFORM(mediump vec4 cLMOffset)
+    UNIFORM(half4 cUOffset)
+    UNIFORM(half4 cVOffset)
+    /// xy: Scale applied to lightmap UVs;
+    /// zw: Offset applied to lightmap UVs.
+    UNIFORM(half4 cLMOffset)
 
-    UNIFORM(mediump vec4 cMatDiffColor)
-    UNIFORM(mediump vec3 cMatEmissiveColor)
-    UNIFORM(mediump vec3 cMatEnvMapColor)
-    UNIFORM(mediump vec4 cMatSpecColor)
+    UNIFORM(half4 cMatDiffColor)
+    UNIFORM(half3 cMatEmissiveColor)
+    UNIFORM(half3 cMatEnvMapColor)
+    UNIFORM(half4 cMatSpecColor)
 #ifdef PBR
-    UNIFORM(mediump float cRoughness)
-    UNIFORM(mediump float cMetallic)
+    UNIFORM(half cRoughness)
+    UNIFORM(half cMetallic)
 #endif
 UNIFORM_BUFFER_END()
 #endif
 
-// Object: Per-instance data
+/// Object: Per-instance constants
 #ifdef URHO3D_VERTEX_SHADER
 INSTANCE_BUFFER_BEGIN(5, Object)
-    // Model-to-world transform matrix
+    /// Object to world space matrix.
     #ifdef URHO3D_INSTANCING
-        VERTEX_INPUT(highp vec4 iTexCoord4)
-        VERTEX_INPUT(highp vec4 iTexCoord5)
-        VERTEX_INPUT(highp vec4 iTexCoord6)
+        VERTEX_INPUT(vec4 iTexCoord4)
+        VERTEX_INPUT(vec4 iTexCoord5)
+        VERTEX_INPUT(vec4 iTexCoord6)
         #define cModel mat4(iTexCoord4, iTexCoord5, iTexCoord6, vec4(0.0, 0.0, 0.0, 1.0))
     #else
-        UNIFORM(highp mat4 cModel)
+        UNIFORM_HIGHP(mat4 cModel)
     #endif
 
-    // Per-object ambient lighting
+    /// Per-object ambient lighting.
+    /// If constant, in current color space.
+    /// If spherical harmonics, in linear space.
     #ifdef URHO3D_INSTANCING
         #if defined(URHO3D_AMBIENT_DIRECTIONAL)
-            VERTEX_INPUT(mediump vec4 iTexCoord7)
-            VERTEX_INPUT(mediump vec4 iTexCoord8)
-            VERTEX_INPUT(mediump vec4 iTexCoord9)
-            VERTEX_INPUT(mediump vec4 iTexCoord10)
-            VERTEX_INPUT(mediump vec4 iTexCoord11)
-            VERTEX_INPUT(mediump vec4 iTexCoord12)
-            VERTEX_INPUT(mediump vec4 iTexCoord13)
+            VERTEX_INPUT(half4 iTexCoord7)
+            VERTEX_INPUT(half4 iTexCoord8)
+            VERTEX_INPUT(half4 iTexCoord9)
+            VERTEX_INPUT(half4 iTexCoord10)
+            VERTEX_INPUT(half4 iTexCoord11)
+            VERTEX_INPUT(half4 iTexCoord12)
+            VERTEX_INPUT(half4 iTexCoord13)
             #define cSHAr iTexCoord7
             #define cSHAg iTexCoord8
             #define cSHAb iTexCoord9
@@ -105,31 +145,34 @@ INSTANCE_BUFFER_BEGIN(5, Object)
             #define cSHBb iTexCoord12
             #define cSHC  iTexCoord13
         #elif defined(URHO3D_AMBIENT_FLAT)
-            VERTEX_INPUT(mediump vec4 iTexCoord7)
+            VERTEX_INPUT(half4 iTexCoord7)
             #define cAmbient iTexCoord7
         #endif
     #else
         #if defined(URHO3D_AMBIENT_DIRECTIONAL)
-            UNIFORM(mediump vec4 cSHAr)
-            UNIFORM(mediump vec4 cSHAg)
-            UNIFORM(mediump vec4 cSHAb)
-            UNIFORM(mediump vec4 cSHBr)
-            UNIFORM(mediump vec4 cSHBg)
-            UNIFORM(mediump vec4 cSHBb)
-            UNIFORM(mediump vec4 cSHC)
+            UNIFORM(half4 cSHAr)
+            UNIFORM(half4 cSHAg)
+            UNIFORM(half4 cSHAb)
+            UNIFORM(half4 cSHBr)
+            UNIFORM(half4 cSHBg)
+            UNIFORM(half4 cSHBb)
+            UNIFORM(half4 cSHC)
         #elif defined(URHO3D_AMBIENT_FLAT)
-            UNIFORM(mediump vec4 cAmbient)
+            UNIFORM(half4 cAmbient)
         #endif
     #endif
 
-    // Instancing is not supported for these geometry types:
-    #ifdef URHO3D_GEOMETRY_BILLBOARD
-        UNIFORM(mediump mat3 cBillboardRot)
-    #endif
-    #ifdef URHO3D_GEOMETRY_SKINNED
-        UNIFORM(highp vec4 cSkinMatrices[MAXBONES * 3])
-    #endif
-
+    /// Non-instantiable parameters:
+    /// @{
+#ifdef URHO3D_GEOMETRY_BILLBOARD
+    /// Rotation of billboard plane in world space.
+    UNIFORM(mediump mat3 cBillboardRot)
+#endif
+#ifdef URHO3D_GEOMETRY_SKINNED
+    /// Object to world space matrices for each bone.
+    UNIFORM_HIGHP(vec4 cSkinMatrices[MAXBONES * 3])
+#endif
+    /// @}
 INSTANCE_BUFFER_END()
 #endif // URHO3D_VERTEX_SHADER
 

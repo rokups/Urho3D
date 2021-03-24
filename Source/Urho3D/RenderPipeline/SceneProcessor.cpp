@@ -314,7 +314,7 @@ void SceneProcessor::Update()
     batchCompositor_->ComposeSceneBatches();
     if (settings_.enableShadows_)
         batchCompositor_->ComposeShadowBatches();
-    if (settings_.deferredLighting_)
+    if (settings_.IsDeferredLighting())
         batchCompositor_->ComposeLightVolumeBatches();
 }
 
