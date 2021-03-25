@@ -38,7 +38,7 @@
 namespace Urho3D
 {
 
-class RenderPipeline;
+class RenderPipelineView;
 class Geometry;
 class Drawable;
 class Light;
@@ -633,7 +633,7 @@ private:
     /// Views that have been processed this frame.
     ea::vector<WeakPtr<View> > views_;
     /// Render pipeline views that have been processed this frame.
-    ea::vector<WeakPtr<RenderPipeline> > renderPipelineViews_;
+    ea::vector<WeakPtr<RenderPipelineView> > renderPipelineViews_;
     /// Prepared views by culling camera.
     ea::unordered_map<Camera*, WeakPtr<View> > preparedViews_;
     /// Octrees that have been updated during the frame.

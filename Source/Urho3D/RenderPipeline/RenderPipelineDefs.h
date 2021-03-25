@@ -26,7 +26,6 @@
 #include "../Core/Signal.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Math/Vector2.h"
-#include "../Scene/Serializable.h"
 
 namespace Urho3D
 {
@@ -203,12 +202,9 @@ public:
 
 /// Base interface of render pipeline required by Render Pipeline classes.
 class URHO3D_API RenderPipelineInterface
-    : public Serializable
 {
-    URHO3D_OBJECT(RenderPipelineInterface, Serializable);
-
 public:
-    using Serializable::Serializable;
+    virtual Context* GetContext() const = 0;
 
     /// Callbacks
     /// @{

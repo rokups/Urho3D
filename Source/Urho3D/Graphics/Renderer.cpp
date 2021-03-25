@@ -808,7 +808,7 @@ void Renderer::Render()
     }
 
     // Render custom views.
-    for (RenderPipeline* renderPipelineView : renderPipelineViews_)
+    for (RenderPipelineView* renderPipelineView : renderPipelineViews_)
     {
         PrepareViewRender();
         renderPipelineView->Render();
@@ -1574,19 +1574,20 @@ void Renderer::UpdateQueuedViewport(unsigned index)
         return;
 
     // (Re)allocate the view structure if necessary
-    if (!viewport->GetView() || resetViews_)
+    const bool isInitialized = viewport->GetView() || viewport->GetRenderPipelineView();
+    if (!isInitialized || resetViews_)
         viewport->AllocateView();
 
-    RenderPipeline* renderPipeline = viewport->GetRenderPipeline();
+    RenderPipelineView* renderPipelineView = viewport->GetRenderPipelineView();
     View* view = viewport->GetView();
-    assert(view || renderPipeline);
+    assert(view || renderPipelineView);
 
-    if (renderPipeline)
+    if (renderPipelineView)
     {
-        if (!renderPipeline->Define(renderTarget, viewport))
+        if (!renderPipelineView->Define(renderTarget, viewport))
             return;
 
-        renderPipelineViews_.push_back(WeakPtr<RenderPipeline>(renderPipeline));
+        renderPipelineViews_.push_back(WeakPtr<RenderPipelineView>(renderPipelineView));
     }
     else
     {
@@ -1624,9 +1625,9 @@ void Renderer::UpdateQueuedViewport(unsigned index)
 
     // Update view. This may queue further views. View will send update begin/end events once its state is set
     ResetShadowMapAllocations(); // Each view can reuse the same shadow maps
-    if (renderPipeline)
+    if (renderPipelineView)
     {
-        renderPipeline->Update(frame_);
+        renderPipelineView->Update(frame_);
     }
     else
     {

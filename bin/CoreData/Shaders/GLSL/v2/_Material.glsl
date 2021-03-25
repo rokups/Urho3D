@@ -207,10 +207,14 @@ SurfaceData GetCommonSurfaceData()
 #endif
 
     // Evaluate emission
-#if defined(URHO3D_MATERIAL_HAS_EMISSIVE) && !defined(AO) && !defined(URHO3D_HAS_LIGHTMAP)
-    result.emission = cMatEmissiveColor * texture2D(sEmissiveMap, vTexCoord).rgb;
+#ifndef URHO3D_HAS_LIGHTMAP
+    #if defined(URHO3D_MATERIAL_HAS_EMISSIVE) && !defined(AO)
+        result.emission = cMatEmissiveColor * texture2D(sEmissiveMap, vTexCoord).rgb;
+    #else
+        result.emission = cMatEmissiveColor;
+    #endif
 #else
-    result.emission = cMatEmissiveColor;
+    result.emission = vec3(0.0);
 #endif
 
     // Evaluate specular and/or PBR properties

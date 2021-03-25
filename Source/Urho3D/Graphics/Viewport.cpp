@@ -75,11 +75,6 @@ void Viewport::RegisterObject(Context* context)
     context->RegisterFactory<Viewport>();
 }
 
-void Viewport::SetRenderPipeline(RenderPipeline* pipeline)
-{
-    renderPipeline_ = pipeline;
-}
-
 void Viewport::SetScene(Scene* scene)
 {
     scene_ = scene;
@@ -107,10 +102,6 @@ void Viewport::SetDrawDebug(bool enable)
 
 void Viewport::SetRenderPath(RenderPath* renderPath)
 {
-#if !defined(URHO3D_D3D9) && !defined(URHO3D_LEGACY_RENDERER)
-    SetRenderPipeline(MakeShared<RenderPipeline>(context_));
-#endif
-
     if (renderPath)
         renderPath_ = renderPath;
     else
@@ -171,6 +162,13 @@ Camera* Viewport::GetCullCamera() const
 View* Viewport::GetView() const
 {
     return view_;
+}
+
+RenderPipelineView* Viewport::GetRenderPipelineView() const
+{
+    if (renderPipelineComponent_ && renderPipelineComponent_->GetScene() == scene_)
+        return renderPipeline_;
+    return nullptr;
 }
 
 RenderPath* Viewport::GetRenderPath() const
@@ -252,6 +250,24 @@ Vector3 Viewport::ScreenToWorldPoint(int x, int y, float depth) const
 
 void Viewport::AllocateView()
 {
+#if !defined(URHO3D_D3D9) && !defined(URHO3D_LEGACY_RENDERER)
+    if (!GetRenderPipelineView())
+    {
+        renderPipelineComponent_ = nullptr;
+        renderPipeline_ = nullptr;
+    }
+
+    if (!renderPipelineComponent_ && scene_)
+    {
+        renderPipelineComponent_ = scene_->GetDerivedComponent<RenderPipeline>();
+        if (!renderPipelineComponent_)
+            renderPipelineComponent_ = scene_->CreateComponent<RenderPipeline>();
+    }
+
+    if (!renderPipeline_ && renderPipelineComponent_)
+        renderPipeline_ = renderPipelineComponent_->Instantiate();
+#endif
+
     if (!renderPipeline_)
         view_ = MakeShared<View>(context_);
 }

@@ -39,17 +39,10 @@
 namespace Urho3D
 {
 
-class Camera;
-class RenderPath;
+class RenderPipeline;
 class RenderSurface;
-class Scene;
-class XMLFile;
-class View;
 class Viewport;
 class ShadowMapAllocator;
-class DrawableProcessor;
-class SceneBatchCollector;
-class BatchRenderer;
 
 enum class PostProcessAntialiasing
 {
@@ -58,65 +51,65 @@ enum class PostProcessAntialiasing
     FXAA3
 };
 
-struct PostProcessSettings
+struct RenderPipelineSettings
 {
+    RenderBufferManagerSettings renderBufferManager_;
+    SceneProcessorSettings sceneProcessor_;
+    ShadowMapAllocatorSettings shadowMapAllocator_;
+    InstancingBufferSettings instancingBuffer_;
+
+    ToneMappingPassSettings toneMapping_;
     PostProcessAntialiasing antialiasing_{};
     bool greyScale_{};
 };
 
 ///
-class URHO3D_API RenderPipeline
-    : public PipelineStateTracker
+class URHO3D_API RenderPipelineView
+    : public Object
     , public RenderPipelineInterface
 {
-    URHO3D_OBJECT(RenderPipeline, RenderPipelineInterface);
+    URHO3D_OBJECT(RenderPipelineView, Object);
 
 public:
-    /// Construct with defaults.
-    RenderPipeline(Context* context);
-    /// Destruct.
-    ~RenderPipeline() override;
+    explicit RenderPipelineView(RenderPipeline* renderPipeline);
+    ~RenderPipelineView() override;
 
-    /// Register object with the engine.
-    static void RegisterObject(Context* context);
-    /// Apply attribute changes that can not be applied immediately. Called after scene load or a network update.
-    void ApplyAttributes() override;
+    /// Implement RenderPipelineInterface
+    /// @{
+    Context* GetContext() const override { return BaseClassName::GetContext(); }
+    /// @}
 
-    /// Define all dependencies.
+    RenderPipeline* GetRenderPipeline() const { return renderPipeline_; }
+    const RenderPipelineSettings& GetSettings() const { return settings_; }
+    void SetSettings(const RenderPipelineSettings& settings);
+
+    /// Rendering
+    /// @{
     bool Define(RenderSurface* renderTarget, Viewport* viewport);
-
-    /// Update.
     void Update(const FrameInfo& frameInfo);
-
-    /// Render.
     void Render();
+    /// @}
 
 protected:
-    /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
-    unsigned RecalculatePipelineStateHash() const override;
+    unsigned RecalculatePipelineStateHash() const;
 
-    void MarkSettingsDirty() { settingsDirty_ = true; }
     void ValidateSettings();
     void ApplySettings();
 
 private:
-    Graphics* graphics_{};
-    Renderer* renderer_{};
-    WorkQueue* workQueue_{};
+    RenderPipeline* const renderPipeline_{};
+    Graphics* const graphics_{};
+    Renderer* const renderer_{};
 
-    bool settingsDirty_{ true };
-    RenderBufferManagerSettings renderBufferManagerSettings_;
-    SceneProcessorSettings sceneProcessorSettings_;
-    ShadowMapAllocatorSettings shadowMapAllocatorSettings_;
-    InstancingBufferSettings instancingBufferSettings_;
-    PostProcessSettings postProcessSettings_;
-    PostProcessPassFlags postProcessFlags_;
-    ToneMappingPassSettings toneMappingSettings_;
+    RenderPipelineSettings settings_;
+    unsigned settingsPipelineStateHash_{};
+    bool settingsDirty_{};
 
     /// Previous pipeline state hash.
     unsigned oldPipelineStateHash_{};
 
     CommonFrameInfo frameInfo_;
+    PostProcessPassFlags postProcessFlags_;
 
     SharedPtr<RenderBufferManager> renderBufferManager_;
     SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
@@ -136,6 +129,36 @@ private:
     ea::optional<DeferredLightingData> deferred_;
 
     ea::vector<SharedPtr<PostProcessPass>> postProcessPasses_;
+};
+
+///
+class URHO3D_API RenderPipeline
+    : public Component
+{
+    URHO3D_OBJECT(RenderPipeline, Component);
+
+public:
+    RenderPipeline(Context* context);
+    ~RenderPipeline() override;
+
+    static void RegisterObject(Context* context);
+
+    /// Properties
+    /// @{
+    const RenderPipelineSettings& GetSettings() const { return settings_; }
+    void SetSettings(const RenderPipelineSettings& settings);
+    /// @}
+
+    /// Create new instance of render pipeline.
+    SharedPtr<RenderPipelineView> Instantiate();
+
+    /// Invoked when settings change.
+    Signal<void(const RenderPipelineSettings&)> OnSettingsChanged;
+
+private:
+    void MarkSettingsDirty();
+
+    RenderPipelineSettings settings_;
 };
 
 }

@@ -471,7 +471,7 @@ void SamplesManager::OnKeyPress(VariantMap& args)
         auto* renderer = GetSubsystem<Renderer>();
         auto* input = GetSubsystem<Input>();
         Viewport* viewport = renderer ? renderer->GetViewport(0) : nullptr;
-        RenderPipeline* renderPipeline = viewport ? viewport->GetRenderPipeline() : nullptr;
+        RenderPipelineView* renderPipelineView = viewport ? viewport->GetRenderPipelineView() : nullptr;
 
         if (inspectorNode_->HasComponent<RmlSerializableInspector>())
         {
@@ -480,10 +480,10 @@ void SamplesManager::OnKeyPress(VariantMap& args)
             input->SetMouseVisible(oldMouseVisible_);
             input->SetMouseMode(oldMouseMode_);
         }
-        else if (renderPipeline)
+        else if (renderPipelineView)
         {
             auto inspector = inspectorNode_->CreateComponent<RmlSerializableInspector>();
-            inspector->Connect(renderPipeline);
+            inspector->Connect(renderPipelineView->GetRenderPipeline());
 
             oldMouseVisible_ = input->IsMouseVisible();
             oldMouseMode_ = input->GetMouseMode();
