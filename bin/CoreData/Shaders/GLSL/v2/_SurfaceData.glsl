@@ -17,6 +17,8 @@ struct SurfaceData
     fixed fogFactor;
     /// Albedo color and alpha channel.
     half4 albedo;
+
+#ifdef URHO3D_IS_LIT
     /// Specular color.
     half3 specular;
     /// Emission color.
@@ -45,6 +47,7 @@ struct SurfaceData
     /// Reflection data from cubemap, prefetched.
     half4 reflectionColorRaw;
 #endif
+#endif // URHO3D_IS_LIT
 };
 
 #endif // URHO3D_PIXEL_SHADER

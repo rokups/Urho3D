@@ -1,5 +1,4 @@
 #include "_Material.glsl"
-#include "_BRDF.glsl"
 
 #ifdef URHO3D_VERTEX_SHADER
 void main()

@@ -1,67 +1,25 @@
-#include "Uniforms.glsl"
-#include "_Samplers.glsl"
-#include "Transform.glsl"
-#include "ScreenPos.glsl"
-#include "Fog.glsl"
+#include "_Material.glsl"
 
-varying vec2 vTexCoord;
-varying vec4 vWorldPos;
-#ifdef VERTEXCOLOR
-    varying vec4 vColor;
+#ifdef URHO3D_VERTEX_SHADER
+void main()
+{
+    VertexTransform vertexTransform = GetVertexTransform();
+    FillCommonVertexOutput(vertexTransform, GetTransformedTexCoord());
+}
 #endif
 
-void VS()
+#ifdef URHO3D_PIXEL_SHADER
+void main()
 {
-    mat4 modelMatrix = iModelMatrix;
-    vec3 worldPos = GetWorldPos(modelMatrix);
-    gl_Position = GetClipPos(worldPos);
-    #ifdef NOUV
-        vTexCoord = vec2(0.0, 0.0);
-    #else
-        vTexCoord = GetTexCoord(iTexCoord);
-    #endif
-    vWorldPos = vec4(worldPos, GetDepth(gl_Position));
+    SurfaceData surfaceData = GetCommonSurfaceData();
 
-    #ifdef VERTEXCOLOR
-        vColor = iColor;
-    #endif
-
+#ifdef URHO3D_GBUFFER_PASS
+    gl_FragData[0] = vec4(ApplyFog(surfaceData.albedo.rgb, surfaceData.fogFactor), 1.0);
+    gl_FragData[1] = vec4(0.0, 0.0, 0.0, 0.0);
+    gl_FragData[2] = vec4(0.0, 0.0, 0.0, 0.0);
+    gl_FragData[3] = vec4(0.5, 0.5, 0.5, 0.0);
+#else
+    gl_FragColor = vec4(ApplyFog(surfaceData.albedo.rgb, surfaceData.fogFactor), surfaceData.albedo.a);
+#endif
 }
-
-void PS()
-{
-    // Get material diffuse albedo
-    #ifdef DIFFMAP
-        vec4 diffColor = cMatDiffColor * texture2D(sDiffMap, vTexCoord);
-        #ifdef ALPHAMASK
-            if (diffColor.a < 0.5)
-                discard;
-        #endif
-    #else
-        vec4 diffColor = cMatDiffColor;
-    #endif
-
-    #ifdef VERTEXCOLOR
-        diffColor *= vColor;
-    #endif
-
-    // Get fog factor
-    #ifdef HEIGHTFOG
-        float fogFactor = GetHeightFogFactor(vWorldPos.w, vWorldPos.y);
-    #else
-        float fogFactor = GetFogFactor(vWorldPos.w);
-    #endif
-
-    #if defined(PREPASS)
-        // Fill light pre-pass G-Buffer
-        gl_FragData[0] = vec4(0.5, 0.5, 0.5, 1.0);
-        gl_FragData[1] = vec4(EncodeDepth(vWorldPos.w), 0.0);
-    #elif defined(DEFERRED)
-        gl_FragData[0] = vec4(GetFog(diffColor.rgb, fogFactor), diffColor.a);
-        gl_FragData[1] = vec4(0.0, 0.0, 0.0, 0.0);
-        gl_FragData[2] = vec4(0.5, 0.5, 0.5, 1.0);
-        gl_FragData[3] = vec4(EncodeDepth(vWorldPos.w), 0.0);
-    #else
-        gl_FragColor = vec4(GetFog(diffColor.rgb, fogFactor), diffColor.a);
-    #endif
-}
+#endif

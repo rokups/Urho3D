@@ -25,41 +25,43 @@
 VERTEX_OUTPUT(float vWorldDepth)
 VERTEX_OUTPUT(vec2 vTexCoord)
 
-#ifdef URHO3D_HAS_LIGHTMAP
-    VERTEX_OUTPUT(vec2 vTexCoord2)
-#endif
+#ifdef URHO3D_IS_LIT
+    #ifdef URHO3D_HAS_LIGHTMAP
+        VERTEX_OUTPUT(vec2 vTexCoord2)
+    #endif
 
-#ifdef URHO3D_PIXEL_NEED_COLOR
-    VERTEX_OUTPUT(vec4 vColor)
-#endif
+    #ifdef URHO3D_PIXEL_NEED_COLOR
+        VERTEX_OUTPUT(vec4 vColor)
+    #endif
 
-#ifdef URHO3D_PIXEL_NEED_NORMAL
-    VERTEX_OUTPUT(vec3 vNormal)
-#endif
+    #ifdef URHO3D_PIXEL_NEED_NORMAL
+        VERTEX_OUTPUT(vec3 vNormal)
+    #endif
 
-#ifdef URHO3D_PIXEL_NEED_TANGENT
-    VERTEX_OUTPUT(vec4 vTangent)
-    VERTEX_OUTPUT(vec2 vBitangentXY)
-#endif
+    #ifdef URHO3D_PIXEL_NEED_TANGENT
+        VERTEX_OUTPUT(vec4 vTangent)
+        VERTEX_OUTPUT(vec2 vBitangentXY)
+    #endif
 
-#ifdef URHO3D_HAS_PIXEL_LIGHT
-    VERTEX_OUTPUT(vec3 vLightVec)
-#endif
+    #ifdef URHO3D_HAS_PIXEL_LIGHT
+        VERTEX_OUTPUT(vec3 vLightVec)
+    #endif
 
-#ifdef URHO3D_PIXEL_NEED_EYE_VECTOR
-    VERTEX_OUTPUT(vec3 vEyeVec)
-#endif
+    #ifdef URHO3D_PIXEL_NEED_EYE_VECTOR
+        VERTEX_OUTPUT(vec3 vEyeVec)
+    #endif
 
-#ifdef URHO3D_AMBIENT_PASS
-    VERTEX_OUTPUT(vec3 vAmbientAndVertexLigthing)
-#endif
+    #ifdef URHO3D_AMBIENT_PASS
+        VERTEX_OUTPUT(vec3 vAmbientAndVertexLigthing)
+    #endif
 
-#ifdef URHO3D_HAS_SHADOW
-    VERTEX_OUTPUT(optional_highp vec4 vShadowPos[URHO3D_SHADOW_NUM_CASCADES])
-#endif
+    #ifdef URHO3D_HAS_SHADOW
+        VERTEX_OUTPUT(optional_highp vec4 vShadowPos[URHO3D_SHADOW_NUM_CASCADES])
+    #endif
 
-#ifdef URHO3D_LIGHT_CUSTOM_SHAPE
-    VERTEX_OUTPUT(vec4 vShapePos)
+    #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
+        VERTEX_OUTPUT(vec4 vShapePos)
+    #endif
 #endif
 /// @}
 
@@ -71,6 +73,8 @@ void FillCommonVertexOutput(VertexTransform vertexTransform, vec2 uv)
     gl_Position = WorldToClipSpace(vertexTransform.position.xyz);
     vWorldDepth = GetDepth(gl_Position);
     vTexCoord = uv;
+
+#ifdef URHO3D_IS_LIT
 
 #ifdef URHO3D_HAS_LIGHTMAP
     vTexCoord2 = GetLightMapTexCoord();
@@ -108,6 +112,8 @@ void FillCommonVertexOutput(VertexTransform vertexTransform, vec2 uv)
 #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
     vShapePos = vertexTransform.position * cLightShapeMatrix;
 #endif
+
+#endif // URHO3D_IS_LIT
 }
 
 #endif
@@ -117,6 +123,10 @@ void FillCommonVertexOutput(VertexTransform vertexTransform, vec2 uv)
 /// Return common surface data in pixel shader.
 SurfaceData GetCommonSurfaceData()
 {
+    SurfaceData result;
+
+#ifdef URHO3D_IS_LIT
+
     // Fetch PBR parameters
 #ifdef URHO3D_PHYSICAL_MATERIAL
     // TODO(renderer): Add occlusion
@@ -128,8 +138,6 @@ SurfaceData GetCommonSurfaceData()
     const vec2 minRougnessMetallic = vec2(0.089, 0.00);
     roughnessMetallic = max(roughnessMetallic, minRougnessMetallic);
 #endif
-
-    SurfaceData result;
 
     // Evaluate normal
 #ifdef URHO3D_PIXEL_NEED_NORMAL
@@ -181,6 +189,8 @@ SurfaceData GetCommonSurfaceData()
     #endif
 #endif
 
+#endif // URHO3D_IS_LIT
+
     // Evaluate fog
     result.fogFactor = GetFogFactor(vWorldDepth);
 
@@ -205,6 +215,8 @@ SurfaceData GetCommonSurfaceData()
 #else
     result.albedo = GammaToLightSpaceAlpha(result.albedo);
 #endif
+
+#ifdef URHO3D_IS_LIT
 
     // Evaluate emission
 #ifndef URHO3D_HAS_LIGHTMAP
@@ -250,6 +262,8 @@ SurfaceData GetCommonSurfaceData()
 #if defined(URHO3D_REFLECTION_MAPPING) && !defined(URHO3D_PHYSICAL_MATERIAL)
     result.reflectionColorRaw.rgb *= cMatEnvMapColor;
 #endif
+
+#endif // URHO3D_IS_LIT
 
     return result;
 }

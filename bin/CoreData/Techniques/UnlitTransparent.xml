@@ -1,0 +1,5 @@
+<technique vs="Unlit" ps="Unlit">
+    <pass name="alpha" depthwrite="false" blend="alpha" />
+    <pass name="depth" vs="Depth" ps="Depth" />
+    <pass name="shadow" vs="Shadow" ps="Shadow" />
+</technique>

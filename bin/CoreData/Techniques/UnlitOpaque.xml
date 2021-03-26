@@ -1,0 +1,6 @@
+<technique vs="Unlit" ps="Unlit" >
+    <pass name="base" />
+    <pass name="deferred" />
+    <pass name="depth" vs="Depth" ps="Depth" />
+    <pass name="shadow" vs="Shadow" ps="Shadow" />
+</technique>
