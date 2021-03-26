@@ -100,21 +100,19 @@ struct PipelineBatchByState
         if (!batch->pipelineState_)
             return;
 
-        const SourceBatch& sourceBatch = batch->GetSourceBatch();
-
         // Calculate primary key
         primaryKey_ |= (batch->material_->GetRenderOrder() & RenderOrderMask) << RenderOrderOffset;
         primaryKey_ |= (batch->pipelineState_->GetShaderID() & ShaderProgramMask) << ShaderProgramOffset;
         primaryKey_ |= (batch->pipelineState_->GetObjectID() & PipelineStateMask) << PipelineStateOffset;
         primaryKey_ |= (batch->material_->GetObjectID() & MaterialMask) << MaterialOffset;
-        primaryKey_ |= (sourceBatch.lightmapIndex_ & LightmapMask) << LightmapOffset;
+        primaryKey_ |= (batch->lightmapIndex_ & LightmapMask) << LightmapOffset;
         primaryKey_ |= (batch->pixelLightIndex_ & PixelLightMask) << PixelLightOffset;
 
         // Calculate secondary key
         secondaryKey_ |= (batch->geometry_->GetObjectID() & GeometryMask) << GeometryOffset;
         secondaryKey_ |= (batch->vertexLightsHash_ & VertexLightsMask) << VertexLightsOffset;
 
-        distance_ = sourceBatch.distance_;
+        distance_ = batch->distance_;
     }
 
     /// Compare sorted batches.
@@ -146,8 +144,7 @@ struct PipelineBatchBackToFront
         : renderOrder_(batch->material_->GetRenderOrder())
         , pipelineBatch_(batch)
     {
-        const SourceBatch& sourceBatch = batch->GetSourceBatch();
-        distance_ = sourceBatch.distance_;
+        distance_ = batch->distance_;
     }
 
     /// Compare sorted batches.

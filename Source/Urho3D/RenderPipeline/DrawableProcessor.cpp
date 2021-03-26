@@ -301,7 +301,7 @@ void DrawableProcessor::QueueDrawableGeometryUpdate(unsigned threadIndex, Drawab
     const UpdateGeometryType updateGeometryType = drawable->GetUpdateGeometryType();
     if (updateGeometryType == UPDATE_MAIN_THREAD)
         nonThreadedGeometryUpdates_.PushBack(threadIndex, drawable);
-    else
+    else if (updateGeometryType == UPDATE_WORKER_THREAD)
         threadedGeometryUpdates_.PushBack(threadIndex, drawable);
 }
 

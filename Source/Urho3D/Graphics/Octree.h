@@ -169,15 +169,16 @@ protected:
 class URHO3D_API ZoneLookupIndex
 {
 public:
-    /// Construct.
     explicit ZoneLookupIndex(Context* context);
-    /// Add zone.
+
+    /// @name Manage zones
+    /// @{
     void AddZone(Zone* zone);
-    /// Update zone parameters.
     void UpdateZone(Zone* zone);
-    /// Remove zone.
     void RemoveZone(Zone* zone);
-    /// Commit all updates.
+    /// @}
+
+    /// Commit all updates. Called on every frame.
     void Commit();
 
     /// Query zone for given position and mask.

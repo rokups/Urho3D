@@ -200,31 +200,16 @@ void Zone::SetAmbientGradient(bool enable)
 
 const ReflectionProbeData* Zone::GetReflectionProbe() const
 {
-    if (reflectionProbeData_.IsInvalidated())
-    {
-        ReflectionProbeData data;
-        data.reflectionMap_ = zoneTexture_ ? zoneTexture_->Cast<TextureCube>() : nullptr;
-        auto renderer = GetSubsystem<Renderer>();
-        if (!data.reflectionMap_ && renderer)
-            data.reflectionMap_ = renderer->GetBlackCubeMap();
-        data.roughnessToLODFactor_ = data.reflectionMap_ ? LogBaseTwo(data.reflectionMap_->GetWidth()) : 1.0f;
-        UpdateCachedAmbientAndBackgroundLighting();
-        data.reflectionMapSH_ = cachedTextureLighting_.Get();
-        reflectionProbeData_.Restore(data);
-    }
     return &reflectionProbeData_.Get();
 }
 
 const Vector3 Zone::GetAmbientLighting() const
 {
-    if (cachedAmbientLighting_.IsInvalidated())
-        cachedAmbientLighting_.Restore((ambientColor_ * ambientBrightness_).GammaToLinear().ToVector3());
     return cachedAmbientLighting_.Get();
 }
 
 const SphericalHarmonicsDot9 Zone::GetAmbientAndBackgroundLighting() const
 {
-    UpdateCachedAmbientAndBackgroundLighting();
     return cachedAmbientAndBackgroundLighting_.Get();
 }
 
@@ -411,13 +396,7 @@ void Zone::ClearDrawablesZone()
     lastAmbientEndZone_.Reset();
 }
 
-void Zone::MarkCachedAmbientDirty()
-{
-    cachedAmbientLighting_.Invalidate();
-    cachedAmbientAndBackgroundLighting_.Invalidate();
-}
-
-void Zone::UpdateCachedAmbientAndBackgroundLighting() const
+void Zone::UpdateCachedData()
 {
     if (cachedTextureLighting_.IsInvalidated())
     {
@@ -426,13 +405,20 @@ void Zone::UpdateCachedAmbientAndBackgroundLighting() const
         {
             const ea::string& zoneTextureName = zoneTexture_->GetName();
             auto cache = GetSubsystem<ResourceCache>();
-            SharedPtr<ImageCube> zoneImage = !zoneTextureName.empty() ? cache->GetTempResource<ImageCube>(zoneTextureName) : nullptr;
+            auto zoneImage = !zoneTextureName.empty() ? cache->GetResource<ImageCube>(zoneTextureName) : nullptr;
             if (zoneImage)
                 sh = SphericalHarmonicsDot9(zoneImage->CalculateSphericalHarmonics());
             else
-                URHO3D_LOGWARNING("Cannot extract spherical harmonics from Zone texture without corresponding resource in cache");
+                URHO3D_LOGWARNING(
+                    "Cannot extract spherical harmonics from Zone texture without corresponding resource in cache");
         }
+
         cachedTextureLighting_.Restore(sh);
+    }
+
+    if (cachedAmbientLighting_.IsInvalidated())
+    {
+        cachedAmbientLighting_.Restore((ambientColor_ * ambientBrightness_).GammaToLinear().ToVector3());
     }
 
     if (cachedAmbientAndBackgroundLighting_.IsInvalidated())
@@ -443,6 +429,25 @@ void Zone::UpdateCachedAmbientAndBackgroundLighting() const
 
         cachedAmbientAndBackgroundLighting_.Restore(sh);
     }
+
+    if (reflectionProbeData_.IsInvalidated())
+    {
+        ReflectionProbeData data;
+        data.reflectionMap_ = zoneTexture_ ? zoneTexture_->Cast<TextureCube>() : nullptr;
+        auto renderer = GetSubsystem<Renderer>();
+        if (!data.reflectionMap_ && renderer)
+            data.reflectionMap_ = renderer->GetBlackCubeMap();
+        data.roughnessToLODFactor_ = data.reflectionMap_ ? LogBaseTwo(data.reflectionMap_->GetWidth()) : 1.0f;
+        data.reflectionMapSH_ = cachedTextureLighting_.Get();
+
+        reflectionProbeData_.Restore(data);
+    }
+}
+
+void Zone::MarkCachedAmbientDirty()
+{
+    cachedAmbientLighting_.Invalidate();
+    cachedAmbientAndBackgroundLighting_.Invalidate();
 }
 
 }

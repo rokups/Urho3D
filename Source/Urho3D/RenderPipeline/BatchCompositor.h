@@ -52,6 +52,8 @@ struct PipelineBatch
     unsigned pixelLightIndex_{ M_MAX_UNSIGNED };
     unsigned vertexLightsHash_{};
     unsigned sourceBatchIndex_{};
+    unsigned lightmapIndex_{};
+    float distance_{};
     GeometryType geometryType_{};
 
     /// Return source batch.

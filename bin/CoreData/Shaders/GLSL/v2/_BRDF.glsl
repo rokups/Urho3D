@@ -24,13 +24,11 @@
 /// Calculate simple indirect lighting: ambient and reflection. Also includes emission.
 half3 Indirect_Simple(SurfaceData surfaceData)
 {
-    half3 result = surfaceData.emission;
-    result += surfaceData.ambientLighting * surfaceData.albedo.rgb;
+    half3 diffuseAndSpecular = surfaceData.ambientLighting * surfaceData.albedo.rgb;
 #ifdef URHO3D_REFLECTION_MAPPING
-    result += GammaToLightSpace(surfaceData.reflectionColorRaw.rgb);
+    diffuseAndSpecular += GammaToLightSpace(surfaceData.reflectionColorRaw.rgb);
 #endif
-    result *= surfaceData.occlusion;
-    return result;
+    return surfaceData.emission + surfaceData.occlusion * diffuseAndSpecular;
 }
 
 #ifdef URHO3D_PHYSICAL_MATERIAL

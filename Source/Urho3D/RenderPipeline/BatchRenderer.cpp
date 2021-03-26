@@ -148,11 +148,8 @@ private:
         current_.pipelineState_ = pipelineBatch.pipelineState_;
 
         const float constantDepthBias = current_.pipelineState_->GetDesc().constantDepthBias_;
-        if (current_.constantDepthBias_ != constantDepthBias)
-        {
-            current_.constantDepthBias_ = constantDepthBias;
-            dirty_.cameraConstants_ = true;
-        }
+        dirty_.cameraConstants_ = current_.constantDepthBias_ != constantDepthBias;
+        current_.constantDepthBias_ = constantDepthBias;
 
         dirty_.material_ = current_.material_ != pipelineBatch.material_;
         current_.material_ = pipelineBatch.material_;
@@ -259,19 +256,18 @@ private:
     /// @{
     void UpdateDirtyConstants()
     {
-        if (drawQueue_.BeginShaderParameterGroup(SP_FRAME, dirty_.frameConstants_))
+        if (drawQueue_.BeginShaderParameterGroup(SP_FRAME, false))
         {
             AddFrameConstants();
             drawQueue_.CommitShaderParameterGroup(SP_FRAME);
-            dirty_.frameConstants_ = false;
         }
 
         if (drawQueue_.BeginShaderParameterGroup(SP_CAMERA, dirty_.cameraConstants_))
         {
             AddCameraConstants(current_.constantDepthBias_);
             drawQueue_.CommitShaderParameterGroup(SP_CAMERA);
-            dirty_.cameraConstants_ = false;
         }
+        dirty_.cameraConstants_ = false;
 
         if (enabled_.ambientLighting_)
         {
@@ -302,9 +298,9 @@ private:
                 if (current_.pixelLightEnabled_)
                     AddPixelLightConstants(*current_.pixelLightParams_);
                 drawQueue_.CommitShaderParameterGroup(SP_LIGHT);
-                dirty_.pixelLightConstants_ = false;
-                dirty_.vertexLightConstants_ = false;
             }
+            dirty_.pixelLightConstants_ = false;
+            dirty_.vertexLightConstants_ = false;
         }
 
         if (drawQueue_.BeginShaderParameterGroup(SP_MATERIAL, dirty_.material_ || dirty_.lightmapConstants_))
@@ -317,8 +313,8 @@ private:
                 drawQueue_.AddShaderParameter(VSP_LMOFFSET, *current_.lightmapScaleOffset_);
 
             drawQueue_.CommitShaderParameterGroup(SP_MATERIAL);
-            dirty_.lightmapConstants_ = false;
         }
+        dirty_.lightmapConstants_ = false;
     }
 
     void UpdateDirtyResources()
@@ -632,9 +628,8 @@ private:
         }
         /// @}
 
-        /// Should be cleared in corresponding constant filler
+        /// Cleared automatically
         /// @{
-        bool frameConstants_{ true };
         bool cameraConstants_{ true };
         bool pixelLightConstants_{};
         bool vertexLightConstants_{};
@@ -642,8 +637,7 @@ private:
 
         bool IsConstantsDirty() const
         {
-            return frameConstants_ || cameraConstants_
-                || pixelLightConstants_ || vertexLightConstants_ || lightmapConstants_;
+            return cameraConstants_ || pixelLightConstants_ || vertexLightConstants_ || lightmapConstants_;
         }
         /// @}
 

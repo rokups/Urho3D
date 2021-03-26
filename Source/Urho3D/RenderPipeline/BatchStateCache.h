@@ -35,6 +35,7 @@ class Material;
 class Pass;
 class Drawable;
 class LightProcessor;
+struct SourceBatch;
 
 /// Key used to lookup cached pipeline states for PipelineBatch.
 ///
@@ -83,6 +84,7 @@ struct BatchStateLookupKey
 struct BatchStateCreateKey : public BatchStateLookupKey
 {
     Drawable* drawable_{};
+    const SourceBatch* sourceBatch_{};
     unsigned sourceBatchIndex_{};
     LightProcessor* pixelLight_{};
     unsigned pixelLightIndex_{};

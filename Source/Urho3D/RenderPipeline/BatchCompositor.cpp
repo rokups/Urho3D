@@ -56,6 +56,8 @@ PipelineBatch CreatePipelineBatch(const BatchStateCreateKey& key,
     batch.drawableIndex_ = key.drawable_->GetDrawableIndex();
     batch.sourceBatchIndex_ = key.sourceBatchIndex_;
     batch.geometryType_ = key.geometryType_;
+    batch.lightmapIndex_ = key.sourceBatch_ ? key.sourceBatch_->lightmapIndex_ : 0;
+    batch.distance_ = key.sourceBatch_ ? key.sourceBatch_->distance_ : 0.0f;
     batch.drawable_ = key.drawable_;
     batch.geometry_ = key.geometry_;
     batch.material_ = key.material_;
@@ -152,6 +154,7 @@ bool BatchCompositorPass::InitializeKey(BatchStateCreateKey& key, const Geometry
     key.pass_ = nullptr;
 
     key.drawable_ = geometryBatch.geometry_;
+    key.sourceBatch_ = &sourceBatch;
     key.sourceBatchIndex_ = geometryBatch.sourceBatchIndex_;
     key.pixelLight_ = nullptr;
     key.pixelLightIndex_ = M_MAX_UNSIGNED;

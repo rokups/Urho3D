@@ -408,24 +408,28 @@ void ZoneLookupIndex::RemoveZone(Zone* zone)
 
 void ZoneLookupIndex::Commit()
 {
-    if (!zonesDirty_)
-        return;
-    zonesDirty_ = false;
-
-    // Sort zones by priority from high to low
-    const auto greaterPriority = [](Zone* lhs, Zone* rhs) { return lhs->GetPriority() > rhs->GetPriority(); };
-    ea::sort(zones_.begin(), zones_.end(), greaterPriority);
-
-    // Update cached data
-    zonesData_.resize(zones_.size());
-    for (unsigned i = 0; i < zones_.size(); ++i)
+    if (zonesDirty_)
     {
-        Zone* zone = zones_[i];
-        ZoneData& data = zonesData_[i];
-        data.zoneMask_ = zone->GetZoneMask();
-        data.boundingBox_ = zone->GetBoundingBox();
-        data.inverseWorldTransform_ = zone->GetInverseWorldTransform();
+        zonesDirty_ = false;
+
+        // Sort zones by priority from high to low
+        const auto greaterPriority = [](Zone* lhs, Zone* rhs) { return lhs->GetPriority() > rhs->GetPriority(); };
+        ea::sort(zones_.begin(), zones_.end(), greaterPriority);
+
+        // Update cached data
+        zonesData_.resize(zones_.size());
+        for (unsigned i = 0; i < zones_.size(); ++i)
+        {
+            Zone* zone = zones_[i];
+            ZoneData& data = zonesData_[i];
+            data.zoneMask_ = zone->GetZoneMask();
+            data.boundingBox_ = zone->GetBoundingBox();
+            data.inverseWorldTransform_ = zone->GetInverseWorldTransform();
+        }
     }
+
+    for (Zone* zone : zones_)
+        zone->UpdateCachedData();
 }
 
 CachedDrawableZone ZoneLookupIndex::QueryZone(const Vector3& position, unsigned zoneMask) const

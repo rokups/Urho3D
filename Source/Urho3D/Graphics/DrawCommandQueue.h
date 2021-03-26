@@ -129,9 +129,19 @@ public:
     {
         if (useConstantBuffers_)
         {
-            // Allocate new block if buffer layout is different or new data arrived
             const unsigned groupLayoutHash = constantBuffers_.currentLayout_->GetConstantBufferHash(group);
-            if (groupLayoutHash != 0 && (differentFromPrevious || groupLayoutHash != constantBuffers_.currentHashes_[group]))
+
+            // If constant buffer for this group is currently disabled...
+            if (groupLayoutHash == 0)
+            {
+                // If contents changed, forget cached constant buffer
+                if (differentFromPrevious)
+                    constantBuffers_.currentHashes_[group] = 0;
+                return false;
+            }
+
+            // If data and/or layout changed, rebuild block
+            if (differentFromPrevious || groupLayoutHash != constantBuffers_.currentHashes_[group])
             {
                 const unsigned size = constantBuffers_.currentLayout_->GetConstantBufferSize(group);
                 const auto& refAndData = constantBuffers_.collection_.AddBlock(size);
@@ -142,6 +152,7 @@ public:
                 constantBuffers_.currentGroup_ = group;
                 return true;
             }
+
             return false;
         }
         else

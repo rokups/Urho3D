@@ -164,6 +164,8 @@ public:
     /// Return zone texture attribute.
     ResourceRef GetZoneTextureAttr() const;
 
+    /// Internal. Update all cached variables.
+    void UpdateCachedData();
     /// Internal. Clear zone reference from drawables inside the bounding box.
     void ClearDrawablesZone();
 
@@ -180,7 +182,6 @@ protected:
     void MarkNodeDirty() { OnMarkedDirty(node_); }
     // TODO(renderer): Call this when texture is reloaded
     void MarkCachedAmbientDirty();
-    void UpdateCachedAmbientAndBackgroundLighting() const;
 
     /// Cached inverse world transform matrix.
     mutable Matrix3x4 inverseWorld_;
