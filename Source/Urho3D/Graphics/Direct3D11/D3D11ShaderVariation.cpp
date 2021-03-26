@@ -490,7 +490,7 @@ void ShaderVariation::CalculateConstantBufferSizes()
             unsigned oldSize = constantBufferSizes_[i->second.buffer_];
             unsigned paramEnd = i->second.offset_ + i->second.size_;
             if (paramEnd > oldSize)
-                constantBufferSizes_[i->second.buffer_] = paramEnd;
+                constantBufferSizes_[i->second.buffer_] = (paramEnd + 15) / 16 * 16;
         }
     }
 }

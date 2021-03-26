@@ -6,8 +6,6 @@
 
 // Adapted for Urho3D from http://timothylottes.blogspot.com/2011/04/nvidia-fxaa-ii-for-console.html
 
-#define URHO3D_GEOMETRY_STATIC
-
 #include "_Config.glsl"
 #include "_Uniforms.glsl"
 #include "_VertexLayout.glsl"

@@ -170,7 +170,7 @@ public:
     {
         if (useConstantBuffers_)
         {
-            const auto paramInfo = constantBuffers_.currentLayout_->GetConstantBufferParameter(name);
+            const auto& paramInfo = constantBuffers_.currentLayout_->GetConstantBufferParameter(name);
             if (paramInfo.offset_ != M_MAX_UNSIGNED)
             {
                 // TODO(renderer): Profile performance impact

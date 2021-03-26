@@ -1,5 +1,3 @@
-#define URHO3D_GEOMETRY_STATIC
-
 #include "_Config.glsl"
 #include "_Uniforms.glsl"
 #include "_VertexLayout.glsl"
