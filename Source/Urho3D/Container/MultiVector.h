@@ -162,6 +162,14 @@ public:
             inner.clear();
     }
 
+    /// Emplace element at the back of specified outer vector.
+    template <class ... Args>
+    T& EmplaceBack(unsigned outerIndex, Args&& ... args)
+    {
+        auto& inner = outer_[outerIndex];
+        return inner.emplace_back(std::forward<Args>(args)...);
+    }
+
     /// Push element into back of specified outer vector. Return index of added element.
     Index PushBack(unsigned outerIndex, const T& value)
     {

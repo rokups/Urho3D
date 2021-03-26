@@ -343,9 +343,9 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
         bool needAmbient = false;
 
         const auto& sourceBatches = drawable->GetBatches();
-        for (unsigned i = 0; i < sourceBatches.size(); ++i)
+        for (unsigned sourceBatchIndex = 0; sourceBatchIndex < sourceBatches.size(); ++sourceBatchIndex)
         {
-            const SourceBatch& sourceBatch = sourceBatches[i];
+            const SourceBatch& sourceBatch = sourceBatches[sourceBatchIndex];
 
             // Find current technique
             Material* material = sourceBatch.material_ ? sourceBatch.material_ : defaultMaterial_;
@@ -356,7 +356,8 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
             // Update scene passes
             for (DrawableProcessorPass* pass : passes_)
             {
-                const DrawableProcessorPass::AddBatchResult result = pass->AddBatch(threadIndex, drawable, i, technique);
+                const DrawableProcessorPass::AddBatchResult result = pass->AddBatch(
+                    threadIndex, drawable, sourceBatchIndex, technique);
                 if (result.forwardLitAdded_)
                     isForwardLit = true;
                 if (result.added_ && pass->GetFlags().Test(DrawableProcessorPassFlag::HasAmbientLighting))

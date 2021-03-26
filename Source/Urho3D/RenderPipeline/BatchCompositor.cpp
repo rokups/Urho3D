@@ -37,46 +37,21 @@ namespace Urho3D
 namespace
 {
 
-/// Batch creation tag.
-enum class CreateBatchTag
-{
-    /// Create batch as is.
-    Default,
-    /// Override light index to invalid.
-    Unlit
-};
-
-/// Create batch. TODO(renderer): Use constexpr if
-PipelineBatch CreatePipelineBatch(const BatchStateCreateKey& key,
-    PipelineState* pipelineState, CreateBatchTag tag = CreateBatchTag::Default)
-{
-    PipelineBatch batch;
-    batch.pixelLightIndex_ = tag == CreateBatchTag::Unlit ? M_MAX_UNSIGNED : key.pixelLightIndex_;
-    batch.vertexLightsHash_ = tag == CreateBatchTag::Unlit ? 0 : key.vertexLightsHash_;
-    batch.drawableIndex_ = key.drawable_->GetDrawableIndex();
-    batch.sourceBatchIndex_ = key.sourceBatchIndex_;
-    batch.geometryType_ = key.geometryType_;
-    batch.lightmapIndex_ = key.sourceBatch_ ? key.sourceBatch_->lightmapIndex_ : 0;
-    batch.distance_ = key.sourceBatch_ ? key.sourceBatch_->distance_ : 0.0f;
-    batch.drawable_ = key.drawable_;
-    batch.geometry_ = key.geometry_;
-    batch.material_ = key.material_;
-    batch.pipelineState_ = pipelineState;
-    return batch;
-}
-
 /// Add batch or delayed batch.
-void AddPipelineBatch(const BatchStateCreateKey& key, BatchStateCache& cache,
-    WorkQueueVector<PipelineBatch>& batches, WorkQueueVector<BatchStateCreateKey>& delayedBatches)
+void AddPipelineBatch(const PipelineBatchDesc& desc, BatchStateCache& cache,
+    WorkQueueVector<PipelineBatch>& batches, WorkQueueVector<PipelineBatchDesc>& delayedBatches)
 {
-    PipelineState* pipelineState = cache.GetPipelineState(key);
+    PipelineState* pipelineState = cache.GetPipelineState(desc.GetKey());
     if (pipelineState)
     {
         if (pipelineState->IsValid())
-            batches.Insert(CreatePipelineBatch(key, pipelineState));
+        {
+            PipelineBatch& pipelineBatch = batches.Emplace(desc);
+            pipelineBatch.pipelineState_ = pipelineState;
+        }
     }
     else
-        delayedBatches.Insert(key);
+        delayedBatches.Insert(desc);
 }
 
 }
@@ -133,67 +108,30 @@ void BatchCompositorPass::OnPipelineStatesInvalidated()
     lightCache_.Invalidate();
 }
 
-bool BatchCompositorPass::InitializeKey(BatchStateCreateKey& key, const GeometryBatch& geometryBatch) const
-{
-    const auto& sourceBatches = geometryBatch.geometry_->GetBatches();
-    if (geometryBatch.sourceBatchIndex_ >= sourceBatches.size())
-    {
-        // TODO(renderer): Consider removing this check, it should never happen
-        URHO3D_LOGERROR("Unexpected source batch index {} for geometry '{}'",
-            geometryBatch.sourceBatchIndex_, geometryBatch.geometry_->GetNode()->GetName());
-        return false;
-    }
-
-    const SourceBatch& sourceBatch = sourceBatches[geometryBatch.sourceBatchIndex_];
-
-    key.drawableHash_ = geometryBatch.geometry_->GetPipelineStateHash();
-    key.pixelLightHash_ = 0;
-    key.geometryType_ = sourceBatch.geometryType_;
-    key.geometry_ = sourceBatch.geometry_;
-    key.material_ = sourceBatch.material_ ? sourceBatch.material_.Get() : defaultMaterial_;
-    key.pass_ = nullptr;
-
-    key.drawable_ = geometryBatch.geometry_;
-    key.sourceBatch_ = &sourceBatch;
-    key.sourceBatchIndex_ = geometryBatch.sourceBatchIndex_;
-    key.pixelLight_ = nullptr;
-    key.pixelLightIndex_ = M_MAX_UNSIGNED;
-    key.vertexLightsHash_ = 0;
-    return true;
-}
-
-void BatchCompositorPass::InitializeKeyLight(BatchStateCreateKey& key,
-    unsigned lightIndex, unsigned vertexLightsHash) const
-{
-    key.pixelLight_ = drawableProcessor_->GetLightProcessor(lightIndex);
-    key.pixelLightHash_ = key.pixelLight_->GetForwardLitHash();
-    key.pixelLightIndex_ = lightIndex;
-    key.vertexLightsHash_ = vertexLightsHash;
-}
-
 void BatchCompositorPass::ProcessGeometryBatch(const GeometryBatch& geometryBatch)
 {
-    BatchStateCreateKey key;
-    if (!InitializeKey(key, geometryBatch))
+    // Skip invalid batches. It may happen if UpdateGeometry removed some source batches.
+    PipelineBatchDesc desc(geometryBatch.geometry_, geometryBatch.sourceBatchIndex_, geometryBatch.deferredPass_);
+    if (!desc.geometry_)
         return;
 
-    if (geometryBatch.deferredPass_)
+    if (!desc.material_)
+        desc.material_ = defaultMaterial_;
+
+    // Always add deferred batch if possible.
+    if (desc.pass_)
     {
-        key.pass_ = geometryBatch.deferredPass_;
-        AddPipelineBatch(key, deferredCache_, deferredBatches_, delayedDeferredBatches_);
+        AddPipelineBatch(desc, deferredCache_, deferredBatches_, delayedDeferredBatches_);
         return;
     }
 
     // Process forward lighting if applicable
-    bool hasLitBase = false;
-    unsigned vertexLightsHash = 0;
+    unsigned litBaseLightIndex = M_MAX_UNSIGNED;
     if (geometryBatch.lightPass_)
     {
-        const unsigned drawableIndex = key.drawable_->GetDrawableIndex();
+        const unsigned drawableIndex = desc.drawable_->GetDrawableIndex();
         const LightAccumulator& lightAccumulator = drawableProcessor_->GetGeometryLighting(drawableIndex);
-
         const auto pixelLights = lightAccumulator.GetPixelLights();
-        vertexLightsHash = lightAccumulator.GetVertexLightsHash();
 
         // Add lit base batch if supported and first light is directional (to reduce shader permutations).
         if (geometryBatch.litBasePass_ && !pixelLights.empty())
@@ -202,50 +140,55 @@ void BatchCompositorPass::ProcessGeometryBatch(const GeometryBatch& geometryBatc
             // TODO(renderer): Make this check optional
             const Light* firstLight = drawableProcessor_->GetLight(firstLightIndex);
             if (firstLight->GetLightType() == LIGHT_DIRECTIONAL)
-            {
-                hasLitBase = true;
-
-                key.pass_ = geometryBatch.litBasePass_;
-                InitializeKeyLight(key, firstLightIndex, vertexLightsHash);
-                AddPipelineBatch(key, litBaseCache_, baseBatches_, delayedLitBaseBatches_);
-            }
+                litBaseLightIndex = firstLightIndex;
         }
 
         // Add light batches
-        key.pass_ = geometryBatch.lightPass_;
+        desc.pass_ = geometryBatch.lightPass_;
+        const bool hasLitBase = litBaseLightIndex != M_MAX_UNSIGNED;
         for (unsigned i = hasLitBase ? 1 : 0; i < pixelLights.size(); ++i)
         {
             const unsigned lightIndex = pixelLights[i].second;
-            InitializeKeyLight(key, lightIndex, 0);
-            AddPipelineBatch(key, lightCache_, lightBatches_, delayedLightBatches_);
+            LightProcessor* light = drawableProcessor_->GetLightProcessor(lightIndex);
+            desc.InitializeLitBatch(light, lightIndex, light->GetForwardLitHash());
+            AddPipelineBatch(desc, lightCache_, lightBatches_, delayedLightBatches_);
         }
+
+        // Initialize vertex lights after all light batches
+        desc.vertexLightsHash_ = lightAccumulator.GetVertexLightsHash();
     }
 
     // Add base pass if needed
-    if (!hasLitBase)
+    if (litBaseLightIndex != M_MAX_UNSIGNED)
     {
-        key.pixelLightHash_ = 0;
-        key.pixelLight_ = nullptr;
-        key.pixelLightIndex_ = M_MAX_UNSIGNED;
-
-        key.pass_ = geometryBatch.unlitBasePass_;
-        key.vertexLightsHash_ = vertexLightsHash;
-        AddPipelineBatch(key, unlitBaseCache_, baseBatches_, delayedUnlitBaseBatches_);
+        LightProcessor* light = drawableProcessor_->GetLightProcessor(litBaseLightIndex);
+        desc.InitializeLitBatch(light, litBaseLightIndex, light->GetForwardLitHash());
+        desc.pass_ = geometryBatch.litBasePass_;
+        AddPipelineBatch(desc, litBaseCache_, baseBatches_, delayedLitBaseBatches_);
+    }
+    else
+    {
+        desc.InitializeLitBatch(nullptr, M_MAX_UNSIGNED, 0);
+        desc.pass_ = geometryBatch.unlitBasePass_;
+        AddPipelineBatch(desc, unlitBaseCache_, baseBatches_, delayedUnlitBaseBatches_);
     }
 }
 
-void BatchCompositorPass::ResolveDelayedBatches(unsigned index, const WorkQueueVector<BatchStateCreateKey>& delayedBatches,
+void BatchCompositorPass::ResolveDelayedBatches(unsigned index, const WorkQueueVector<PipelineBatchDesc>& delayedBatches,
     BatchStateCache& cache, WorkQueueVector<PipelineBatch>& batches)
 {
     BatchStateCreateContext ctx;
     ctx.pass_ = this;
     ctx.subpassIndex_ = index;
 
-    for (const BatchStateCreateKey& key : delayedBatches)
+    for (const PipelineBatchDesc& desc : delayedBatches)
     {
-        PipelineState* pipelineState = cache.GetOrCreatePipelineState(key, ctx, batchStateCacheCallback_);
+        PipelineState* pipelineState = cache.GetOrCreatePipelineState(desc.GetKey(), ctx, batchStateCacheCallback_);
         if (pipelineState && pipelineState->IsValid())
-            batches.Insert(CreatePipelineBatch(key, pipelineState));
+        {
+            PipelineBatch& pipelineBatch = batches.Emplace(desc);
+            pipelineBatch.pipelineState_ = pipelineState;
+        }
     }
 }
 
@@ -313,22 +256,23 @@ void BatchCompositor::ComposeLightVolumeBatches()
         if (!lightProcessor->HasLitGeometries())
             continue;
 
-        BatchStateCreateKey key;
-        key.drawableHash_ = 0;
-        key.sourceBatchIndex_ = M_MAX_UNSIGNED;
-        key.pixelLightHash_ = lightProcessor->GetLightVolumeHash();
-        key.geometryType_ = GEOM_STATIC_NOINSTANCING;
-        key.geometry_ = renderer_->GetLightGeometry(lightProcessor->GetLight());
-        key.material_ = defaultMaterial_;
-        key.pass_ = lightVolumePass_;
-        key.drawable_ = lightProcessor->GetLight();
-        key.pixelLight_ = lightProcessor;
-        key.pixelLightIndex_ = lightIndex;
-        key.vertexLightsHash_ = 0;
+        PipelineBatchDesc desc;
+        desc.InitializeLitBatch(lightProcessor, lightIndex, lightProcessor->GetLightVolumeHash());
+        desc.drawableHash_ = 0;
+        desc.sourceBatchIndex_ = M_MAX_UNSIGNED;
+        desc.geometryType_ = GEOM_STATIC_NOINSTANCING;
+        desc.geometry_ = renderer_->GetLightGeometry(lightProcessor->GetLight());
+        desc.material_ = defaultMaterial_;
+        desc.pass_ = lightVolumePass_;
+        desc.drawable_ = lightProcessor->GetLight();
+        desc.vertexLightsHash_ = 0;
 
-        PipelineState* pipelineState = lightVolumeCache_.GetOrCreatePipelineState(key, ctx, batchStateCacheCallback_);
+        PipelineState* pipelineState = lightVolumeCache_.GetOrCreatePipelineState(desc.GetKey(), ctx, batchStateCacheCallback_);
         if (pipelineState && pipelineState->IsValid())
-            lightVolumeBatches_.push_back(CreatePipelineBatch(key, pipelineState));
+        {
+            PipelineBatch& pipelineBatch = lightVolumeBatches_.emplace_back(desc);
+            pipelineBatch.pipelineState_ = pipelineState;
+        }
     }
 
     SortBatches(sortedLightVolumeBatches_, lightVolumeBatches_);
@@ -382,28 +326,21 @@ void BatchCompositor::BeginShadowBatchesComposition(unsigned lightIndex, ShadowS
             if (!pass)
                 continue;
 
-            BatchStateCreateKey key;
-            key.drawableHash_ = drawable->GetPipelineStateHash();
-            key.pixelLightHash_ = lightHash;
-            key.geometryType_ = sourceBatch.geometryType_;
-            key.geometry_ = sourceBatch.geometry_;
-            key.material_ = sourceBatch.material_ ? sourceBatch.material_.Get() : defaultMaterial_;
-            key.pass_ = pass;
+            PipelineBatchDesc desc(drawable, j, pass);
+            desc.material_ = material;
+            desc.InitializeShadowBatch(lightProcessor, lightIndex, lightHash);
 
-            key.drawable_ = drawable;
-            key.sourceBatchIndex_ = j;
-            key.pixelLight_ = lightProcessor;
-            key.pixelLightIndex_ = lightIndex;
-            key.vertexLightsHash_ = 0;
-
-            PipelineState* pipelineState = shadowCache_.GetPipelineState(key);
+            PipelineState* pipelineState = shadowCache_.GetPipelineState(desc.GetKey());
             if (pipelineState)
             {
                 if (pipelineState->IsValid())
-                    shadowBatches.push_back(CreatePipelineBatch(key, pipelineState, CreateBatchTag::Unlit));
+                {
+                    PipelineBatch& pipelineBatch = shadowBatches.emplace_back(desc);
+                    pipelineBatch.pipelineState_ = pipelineState;
+                }
             }
             else
-                delayedShadowBatches_.PushBack(threadIndex, { splitProcessor, key });
+                delayedShadowBatches_.PushBack(threadIndex, { splitProcessor, desc });
         }
     }
 }
@@ -416,12 +353,15 @@ void BatchCompositor::FinalizeShadowBatchesComposition()
 
     for (const auto& splitAndKey : delayedShadowBatches_)
     {
-        const BatchStateCreateKey& key = splitAndKey.second;
+        const PipelineBatchDesc& desc = splitAndKey.second;
         ShadowSplitProcessor& split = *splitAndKey.first;
         ctx.shadowSplitIndex_ = split.GetSplitIndex();
-        PipelineState* pipelineState = shadowCache_.GetOrCreatePipelineState(key, ctx, batchStateCacheCallback_);
+        PipelineState* pipelineState = shadowCache_.GetOrCreatePipelineState(desc.GetKey(), ctx, batchStateCacheCallback_);
         if (pipelineState && pipelineState->IsValid())
-            split.GetMutableShadowBatches().push_back(CreatePipelineBatch(key, pipelineState, CreateBatchTag::Unlit));
+        {
+            PipelineBatch& pipelineBatch = split.GetMutableShadowBatches().emplace_back(desc);
+            pipelineBatch.pipelineState_ = pipelineState;
+        }
     }
 }
 

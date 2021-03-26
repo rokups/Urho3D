@@ -56,11 +56,78 @@ struct PipelineBatch
     float distance_{};
     GeometryType geometryType_{};
 
-    /// Return source batch.
     const SourceBatch& GetSourceBatch() const
     {
         static const SourceBatch defaultSourceBatch;
         return sourceBatchIndex_ != M_MAX_UNSIGNED ? drawable_->GetBatches()[sourceBatchIndex_] : defaultSourceBatch;
+    }
+
+    PipelineBatch() = default;
+    PipelineBatch(Drawable* drawable, unsigned sourceBatchIndex)
+    {
+        drawable_ = drawable;
+        drawableIndex_ = drawable_->GetDrawableIndex();
+        sourceBatchIndex_ = sourceBatchIndex;
+
+        const SourceBatch& sourceBatch = GetSourceBatch();
+        geometry_ = sourceBatch.geometry_;
+        material_ = sourceBatch.material_;
+        lightmapIndex_ = sourceBatch.lightmapIndex_;
+        distance_ = sourceBatch.distance_;
+        geometryType_ = sourceBatch.geometryType_;
+    }
+};
+
+/// Information needed to fully create PipelineBatch.
+struct PipelineBatchDesc : public PipelineBatch
+{
+    Pass* pass_{};
+    unsigned drawableHash_{};
+    /// Light that contributes to pipeline state.
+    /// For scene batches: per-pixel forward light applied to object.
+    /// For shadow batches: owner shadow split.
+    /// @{
+    LightProcessor* pixelLightForPipelineState_{};
+    unsigned pixelLightForPipelineStateIndex_{};
+    unsigned pixelLightForPipelineStateHash_{};
+    /// @}
+
+    PipelineBatchDesc() = default;
+    PipelineBatchDesc(Drawable* drawable, unsigned sourceBatchIndex, Pass* pass)
+        : PipelineBatch(drawable, sourceBatchIndex)
+        , pass_(pass)
+        , drawableHash_(drawable->GetPipelineStateHash())
+    {
+    }
+
+    void InitializeShadowBatch(LightProcessor* light, unsigned lightIndex, unsigned lightHash)
+    {
+        pixelLightForPipelineState_ = light;
+        pixelLightForPipelineStateIndex_ = lightIndex;
+        pixelLightForPipelineStateHash_ = lightHash;
+    }
+
+    void InitializeLitBatch(LightProcessor* light, unsigned lightIndex, unsigned lightHash)
+    {
+        pixelLightIndex_ = lightIndex;
+        pixelLightForPipelineState_ = light;
+        pixelLightForPipelineStateIndex_ = lightIndex;
+        pixelLightForPipelineStateHash_ = lightHash;
+    }
+
+    BatchStateCreateKey GetKey() const
+    {
+        BatchStateCreateKey key;
+        key.drawableHash_ = drawableHash_;
+        key.pixelLightHash_ = pixelLightForPipelineStateHash_;
+        key.geometryType_ = geometryType_;
+        key.geometry_ = geometry_;
+        key.material_ = material_;
+        key.pass_ = pass_;
+        key.drawable_ = drawable_;
+        key.pixelLight_ = pixelLightForPipelineState_;
+        key.pixelLightIndex_ = pixelLightForPipelineStateIndex_;
+        return key;
     }
 };
 
@@ -107,11 +174,10 @@ protected:
     WorkQueueVector<PipelineBatch> lightBatches_;
 
 private:
-    bool InitializeKey(BatchStateCreateKey& key, const GeometryBatch& geometryBatch) const;
-    void InitializeKeyLight(BatchStateCreateKey& key, unsigned lightIndex, unsigned vertexLightsHash) const;
+    bool PreparePipelineBatch(PipelineBatchDesc& key, const GeometryBatch& geometryBatch) const;
 
     void ProcessGeometryBatch(const GeometryBatch& geometryBatch);
-    void ResolveDelayedBatches(unsigned index, const WorkQueueVector<BatchStateCreateKey>& delayedBatches,
+    void ResolveDelayedBatches(unsigned index, const WorkQueueVector<PipelineBatchDesc>& delayedBatches,
         BatchStateCache& cache, WorkQueueVector<PipelineBatch>& batches);
 
     /// Pipeline state caches
@@ -124,10 +190,10 @@ private:
 
     /// Batches whose processing is delayed due to missing pipeline state
     /// @{
-    WorkQueueVector<BatchStateCreateKey> delayedDeferredBatches_;
-    WorkQueueVector<BatchStateCreateKey> delayedUnlitBaseBatches_;
-    WorkQueueVector<BatchStateCreateKey> delayedLitBaseBatches_;
-    WorkQueueVector<BatchStateCreateKey> delayedLightBatches_;
+    WorkQueueVector<PipelineBatchDesc> delayedDeferredBatches_;
+    WorkQueueVector<PipelineBatchDesc> delayedUnlitBaseBatches_;
+    WorkQueueVector<PipelineBatchDesc> delayedLitBaseBatches_;
+    WorkQueueVector<PipelineBatchDesc> delayedLightBatches_;
     /// @}
 };
 
@@ -218,7 +284,7 @@ private:
     BatchStateCache lightVolumeCache_;
     /// @}
 
-    WorkQueueVector<ea::pair<ShadowSplitProcessor*, BatchStateCreateKey>> delayedShadowBatches_;
+    WorkQueueVector<ea::pair<ShadowSplitProcessor*, PipelineBatchDesc>> delayedShadowBatches_;
     ea::vector<PipelineBatch> lightVolumeBatches_;
     ea::vector<PipelineBatchByState> sortedLightVolumeBatches_;
 };

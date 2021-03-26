@@ -183,6 +183,14 @@ public:
         const unsigned threadIndex = WorkQueue::GetThreadIndex();
         return this->PushBack(threadIndex, value);
     }
+
+    /// Emplace element. Thread-safe as long as called from WorkQueue threads (or main thread).
+    template <class ... Args>
+    T& Emplace(Args&& ... args)
+    {
+        const unsigned threadIndex = WorkQueue::GetThreadIndex();
+        return this->EmplaceBack(threadIndex, std::forward<Args>(args)...);
+    }
 };
 
 /// Process arbitrary array in multiple threads. Callback is copied internally.

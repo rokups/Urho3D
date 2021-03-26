@@ -84,11 +84,8 @@ struct BatchStateLookupKey
 struct BatchStateCreateKey : public BatchStateLookupKey
 {
     Drawable* drawable_{};
-    const SourceBatch* sourceBatch_{};
-    unsigned sourceBatchIndex_{};
     LightProcessor* pixelLight_{};
     unsigned pixelLightIndex_{};
-    unsigned vertexLightsHash_{};
 };
 
 /// Pipeline state cache entry. May be invalid.
