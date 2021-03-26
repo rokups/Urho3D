@@ -205,7 +205,7 @@ void RenderPipelineView::ApplySettings()
     {
         auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
             PostProcessPassFlag::NeedColorOutputReadAndWrite | PostProcessPassFlag::NeedColorOutputBilinear,
-            BLEND_REPLACE, "v2/PP_FXAA2", "");
+            BLEND_REPLACE, "v2/P_FXAA2", "");
         pass->AddShaderParameter("FXAAParams", Vector3(0.4f, 0.5f, 0.75f));
         postProcessPasses_.push_back(pass);
         break;
@@ -214,7 +214,7 @@ void RenderPipelineView::ApplySettings()
     {
         auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
             PostProcessPassFlag::NeedColorOutputReadAndWrite | PostProcessPassFlag::NeedColorOutputBilinear,
-            BLEND_REPLACE, "v2/PP_FXAA3", "FXAA_QUALITY_PRESET=12");
+            BLEND_REPLACE, "v2/P_FXAA3", "FXAA_QUALITY_PRESET=12");
         postProcessPasses_.push_back(pass);
         break;
     }
@@ -226,7 +226,7 @@ void RenderPipelineView::ApplySettings()
     {
         auto pass = MakeShared<SimplePostProcessPass>(this, renderBufferManager_,
             PostProcessPassFlag::NeedColorOutputReadAndWrite,
-            BLEND_REPLACE, "v2/PP_GreyScale", "");
+            BLEND_REPLACE, "v2/P_GreyScale", "");
         postProcessPasses_.push_back(pass);
     }
 

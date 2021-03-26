@@ -5,8 +5,6 @@
 #include "_VertexScreenPos.glsl"
 #include "_PixelOutput.glsl"
 #include "_Samplers.glsl"
-#include "Lighting.glsl"
-
 
 VERTEX_OUTPUT(vec2 vScreenPos);
 
@@ -22,8 +20,10 @@ void main()
 #ifdef URHO3D_PIXEL_SHADER
 void main()
 {
+    const vec3 IntensityWeights = vec3(0.299, 0.587, 0.114);
+
     vec3 rgb = texture2D(sDiffMap, vScreenPos).rgb;
-    float intensity = GetIntensity(rgb);
+    float intensity = dot(rgb, IntensityWeights);
     gl_FragColor = vec4(intensity, intensity, intensity, 1.0);
 }
 #endif
