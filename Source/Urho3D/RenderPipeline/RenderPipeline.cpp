@@ -71,6 +71,13 @@ static const ea::vector<ea::string> colorSpaceNames =
     "HDR Linear",
 };
 
+static const ea::vector<ea::string> materialQualityNames =
+{
+    "Low",
+    "Medium",
+    "High",
+};
+
 static const ea::vector<ea::string> ambientModeNames =
 {
     "Constant",
@@ -421,6 +428,7 @@ void RenderPipeline::RegisterObject(Context* context)
     context->RegisterFactory<RenderPipeline>();
 
     URHO3D_ENUM_ATTRIBUTE_EX("Color Space", settings_.renderBufferManager_.colorSpace_, MarkSettingsDirty, colorSpaceNames, RenderPipelineColorSpace::GammaLDR, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Material Quality", settings_.sceneProcessor_.materialQuality_, MarkSettingsDirty, materialQualityNames, SceneProcessorSettings{}.materialQuality_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Max Vertex Lights", int, settings_.sceneProcessor_.maxVertexLights_, MarkSettingsDirty, 4, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Max Pixel Lights", int, settings_.sceneProcessor_.maxPixelLights_, MarkSettingsDirty, 4, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Ambient Mode", settings_.sceneProcessor_.ambientMode_, MarkSettingsDirty, ambientModeNames, DrawableAmbientMode::Directional, AM_DEFAULT);
@@ -432,6 +440,7 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("Use Variance Shadow Maps", bool, settings_.shadowMapAllocator_.enableVarianceShadowMaps_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, settings_.sceneProcessor_.varianceShadowMapParams_, MarkSettingsDirty, BatchRendererSettings{}.varianceShadowMapParams_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("VSM Multi Sample", int, settings_.shadowMapAllocator_.varianceShadowMapMultiSample_, MarkSettingsDirty, 1, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("16-bit Shadow Maps", bool, settings_.shadowMapAllocator_.use16bitShadowMaps_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Tone Mapping Mode", settings_.toneMapping_.mode_, MarkSettingsDirty, toneMappingModeNames, ToneMappingMode::None, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Auto Exposure", bool, settings_.toneMapping_.autoExposure_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Min Exposure", float, settings_.toneMapping_.minExposure_, MarkSettingsDirty, ToneMappingPassSettings{}.minExposure_, AM_DEFAULT);
