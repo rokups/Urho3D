@@ -190,7 +190,8 @@ void PipelineStateBuilder::ApplyCommonDefines(const Pass* materialPass)
 
 void PipelineStateBuilder::ApplyGeometry(Geometry* geometry, GeometryType geometryType, bool useInstancingBuffer)
 {
-    if (!useInstancingBuffer || !instancingBuffer_->IsEnabled())
+    const bool isInstancingSupported = geometryType == GEOM_STATIC || geometryType == GEOM_INSTANCED;
+    if (!useInstancingBuffer || !instancingBuffer_->IsEnabled() || !isInstancingSupported)
         desc_.InitializeInputLayoutAndPrimitiveType(geometry);
     else
     {

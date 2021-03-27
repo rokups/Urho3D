@@ -2,7 +2,7 @@
 #define _DIRECT_LIGHTING_GLSL_
 
 #ifndef _UNIFORMS_GLSL_
-    #error Include "_Uniforms.glsl" before "_DirectLighting.glsl"
+    #error Include _Uniforms.glsl before _DirectLighting.glsl
 #endif
 
 /// Return eye vector, not normalized.

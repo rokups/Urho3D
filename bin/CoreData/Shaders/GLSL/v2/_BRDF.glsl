@@ -12,13 +12,13 @@
 #ifdef URHO3D_IS_LIT
 
 #ifndef _GAMMA_CORRECTION_GLSL_
-    #error Include "_GammaCorrection.glsl" before "_BRDF.glsl"
+    #error Include _GammaCorrection.glsl before _BRDF.glsl
 #endif
 
 #ifdef URHO3D_AMBIENT_PASS
 
 #ifndef _SURFACE_DATA_GLSL_
-    #error Include "_SurfaceData.glsl" before "_BRDF.glsl"
+    #error Include _SurfaceData.glsl before _BRDF.glsl
 #endif
 
 /// Calculate simple indirect lighting: ambient and reflection. Also includes emission.
@@ -69,7 +69,7 @@ half3 Indirect_PBR(SurfaceData surfaceData, half NoV)
 
 #ifdef URHO3D_HAS_PIXEL_LIGHT
 
-/// Evaluate Blinn–Phong BRDF.
+/// Evaluate Blinn-Phong BRDF.
 half BRDF_Direct_BlinnPhongSpecular(half3 normal, half3 halfVec, half specularPower)
 {
     return pow(max(dot(normal, halfVec), 0.0), specularPower);
@@ -105,7 +105,8 @@ half D_GGX(half roughness2, half3 normal, half3 halfVec, half NoH)
 
     half a = NoH * roughness2;
     half k = roughness2 / (oneMinusNoHSquared + a * a);
-    half d = k * k; // * (1.0 / M_PI); // Don't divide by M_PI because we don't divide diffuse as well
+    // Don't divide by M_PI because we don't divide diffuse as well
+    half d = k * k; // * (1.0 / M_PI);
     return SaturateMediump(d);
 }
 

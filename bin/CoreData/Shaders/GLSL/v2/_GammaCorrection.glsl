@@ -6,7 +6,7 @@
 #define _GAMMA_CORRECTION_GLSL_
 
 #ifndef _CONFIG_GLSL_
-    #error Include "_Config.glsl" before "_GammaCorrection.glsl"
+    #error Include _Config.glsl before _GammaCorrection.glsl
 #endif
 
 /// Convert color from gamma to linear space.
@@ -22,8 +22,8 @@ half4 GammaToLinearSpaceAlpha(half4 color) { return vec4(GammaToLinearSpace(colo
 half3 LinearToGammaSpace(half3 color)
 {
     const float p = 0.416666667;
-    color = max(color, half3(0.0, 0.0, 0.0));
-    return max(1.055 * pow(color, half3(p, p, p)) - 0.055, 0.0);
+    color = max(color, vec3(0.0, 0.0, 0.0));
+    return max(1.055 * pow(color, vec3(p, p, p)) - 0.055, 0.0);
 }
 
 /// Convert color from linear to gamma space (with alpha).

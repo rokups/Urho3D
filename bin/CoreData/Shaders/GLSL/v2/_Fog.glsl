@@ -2,7 +2,7 @@
 #define _FOG_GLSL_
 
 #ifndef _UNIFORMS_GLSL_
-    #error Include "_Uniforms.glsl" before "_Fog.glsl"
+    #error Include _Uniforms.glsl before _Fog.glsl
 #endif
 
 /// Evaluate fog factor for given texel depth, in units

@@ -6,7 +6,7 @@
 #define _SURFACE_DATA_GLSL_
 
 #ifndef _CONFIG_GLSL_
-    #error Include "_Config.glsl" before "_SurfaceData.glsl"
+    #error Include _Config.glsl before _SurfaceData.glsl
 #endif
 
 #ifdef URHO3D_PIXEL_SHADER

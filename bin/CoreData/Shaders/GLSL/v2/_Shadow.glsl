@@ -2,11 +2,11 @@
 #define _SHADOW_GLSL_
 
 #ifndef _CONFIG_GLSL_
-    #error Include "_Config.glsl" before "_Shadow.glsl"
+    #error Include _Config.glsl before _Shadow.glsl
 #endif
 
 #ifndef _SAMPLERS_GLSL_
-    #error Include "_Samplers.glsl" before "_Shadow.glsl"
+    #error Include _Samplers.glsl before _Shadow.glsl
 #endif
 
 #ifdef URHO3D_HAS_SHADOW
@@ -88,7 +88,7 @@ vec3 DirectionToUV(vec3 vec, vec2 bias)
         #if defined(GL3)
             return textureProj(sShadowMap, shadowPos);
         #elif defined(GL_ES)
-            return texture2DProj(sShadowMap, shadowPos).r * shadowPos.w > shadowPos.z;
+            return texture2DProj(sShadowMap, shadowPos).r * shadowPos.w > shadowPos.z ? 1.0 : 0.0;
         #else
             return shadow2DProj(sShadowMap, shadowPos).r;
         #endif

@@ -228,10 +228,6 @@
 
 /// =================================== Platform configuration ===================================
 
-/// Generates identifier from two parts.
-#define _CONCATENATE_2(x, y) x##y
-#define CONCATENATE_2(x, y) _CONCATENATE_2(x, y)
-
 /// VERTEX_INPUT: Declare vertex input variable;
 /// VERTEX_OUTPUT: Declare vertex output variable.
 #if defined(URHO3D_VERTEX_SHADER)
@@ -308,20 +304,24 @@
 #endif
 
 /// UNIFORM_HIGHP: Uniform with max precision, undefined if not supported.
+/// SAMPLER_HIGHP: Sampler with max precision, mediump if not supported.
 #ifndef GL_ES
     /// Disable precision modifiers if not GL ES
     #define highp
     #define mediump
     #define lowp
     #define UNIFORM_HIGHP(decl) UNIFORM(decl)
+    #define SAMPLER_HIGHP(index, decl) SAMPLER(index, decl)
 #else
     /// Use max available precision by default
     #if defined(GL_FRAGMENT_PRECISION_HIGH) || !defined(URHO3D_PIXEL_SHADER)
         precision highp float;
         #define UNIFORM_HIGHP(decl) UNIFORM(decl)
+        #define SAMPLER_HIGHP(index, decl) SAMPLER(index, highp decl)
     #else
         precision mediump float;
         #define UNIFORM_HIGHP(decl)
+        #define SAMPLER_HIGHP(index, decl) SAMPLER(index, mediump decl)
     #endif
 #endif
 

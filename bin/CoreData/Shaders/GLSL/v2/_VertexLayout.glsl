@@ -2,7 +2,7 @@
 #define _VERTEX_LAYOUT_GLSL_
 
 #ifndef _CONFIG_GLSL_
-    #error Include "_Config.glsl" before "_VertexLayout.glsl"
+    #error Include _Config.glsl before _VertexLayout.glsl
 #endif
 
 #ifdef URHO3D_VERTEX_SHADER

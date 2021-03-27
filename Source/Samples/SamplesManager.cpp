@@ -131,6 +131,7 @@
 #if URHO3D_RMLUI
 #include "107_HelloRmlUI/HelloRmlUI.h"
 #endif
+#include "108_RenderingShowcase/RenderingShowcase.h"
 #include "Rotator.h"
 
 #include "SamplesManager.h"
@@ -323,6 +324,7 @@ void SamplesManager::Start()
 #if URHO3D_RMLUI
     RegisterSample<HelloRmlUI>();
 #endif
+    RegisterSample<RenderingShowcase>();
 
     if (!startSample_.empty())
         StartSample(startSample_);

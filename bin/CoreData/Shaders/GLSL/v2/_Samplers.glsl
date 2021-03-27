@@ -2,7 +2,7 @@
 #define _SAMPLERS_GLSL_
 
 #ifndef _CONFIG_GLSL_
-    #error Include "_Config.glsl" before "_Samplers.glsl"
+    #error Include _Config.glsl before _Samplers.glsl
 #endif
 
 #ifdef URHO3D_PIXEL_SHADER
@@ -17,10 +17,10 @@ SAMPLER(4, samplerCube sEnvCubeMap)
 SAMPLER(8, sampler2D sLightRampMap)
 SAMPLER(9, sampler2D sLightSpotMap)
 SAMPLER(9, samplerCube sLightCubeMap)
-#ifdef URHO3D_VARIANCE_SHADOW_MAP
-    SAMPLER(10, optional_highp sampler2D sShadowMap)
+#if defined(URHO3D_VARIANCE_SHADOW_MAP) || defined(GL_ES)
+    SAMPLER_HIGHP(10, sampler2D sShadowMap)
 #else
-    SAMPLER(10, optional_highp sampler2DShadow sShadowMap)
+    SAMPLER_HIGHP(10, sampler2DShadow sShadowMap)
 #endif
 #ifndef GL_ES
     SAMPLER(5, sampler3D sVolumeMap)
@@ -30,9 +30,15 @@ SAMPLER(9, samplerCube sLightCubeMap)
 #endif
 
 #ifdef URHO3D_MATERIAL_HAS_DIFFUSE
-    #define DiffMap_ToGamma(color)  CONCATENATE_2(Texture_ToGamma_,  URHO3D_MATERIAL_DIFFUSE_HINT)(color)
-    #define DiffMap_ToLinear(color) CONCATENATE_2(Texture_ToLinear_, URHO3D_MATERIAL_DIFFUSE_HINT)(color)
-    #define DiffMap_ToLight(color)  CONCATENATE_2(Texture_ToLight_,  URHO3D_MATERIAL_DIFFUSE_HINT)(color)
+    #if URHO3D_MATERIAL_DIFFUSE_HINT == 0
+        #define DiffMap_ToGamma(color)  Texture_ToGamma_0(color)
+        #define DiffMap_ToLinear(color) Texture_ToLinear_0(color)
+        #define DiffMap_ToLight(color)  Texture_ToLight_0(color)
+    #elif URHO3D_MATERIAL_DIFFUSE_HINT == 1
+        #define DiffMap_ToGamma(color)  Texture_ToGamma_1(color)
+        #define DiffMap_ToLinear(color) Texture_ToLinear_1(color)
+        #define DiffMap_ToLight(color)  Texture_ToLight_1(color)
+    #endif
 #endif
 
 vec3 DecodeNormal(vec4 normalInput)

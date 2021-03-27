@@ -159,8 +159,8 @@ SurfaceData GetCommonSurfaceData()
 #if defined(URHO3D_SPECULAR_ANTIALIASING) && defined(URHO3D_PHYSICAL_MATERIAL)
     half3 dNdx = dFdx(result.normal);
     half3 dNdy = dFdy(result.normal);
-    const half specularAntiAliasingVariance = 0.15f;
-    const half specularAntiAliasingThreshold = 0.2f;
+    const half specularAntiAliasingVariance = 0.15;
+    const half specularAntiAliasingThreshold = 0.2;
     half variance = specularAntiAliasingVariance * max(dot(dNdx, dNdx), dot(dNdy, dNdy));
 
     half roughness = roughnessMetallic.x * roughnessMetallic.x;

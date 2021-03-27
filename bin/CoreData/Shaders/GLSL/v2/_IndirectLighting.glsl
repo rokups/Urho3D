@@ -2,7 +2,7 @@
 #define _INDIRECT_LIGHTING_GLSL_
 
 #ifndef _GAMMA_CORRECTION_GLSL_
-    #error Include "_GammaCorrection.glsl" before "_IndirectLighting.glsl"
+    #error Include _GammaCorrection.glsl before _IndirectLighting.glsl
 #endif
 
 #ifdef URHO3D_VERTEX_SHADER

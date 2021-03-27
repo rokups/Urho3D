@@ -2,11 +2,11 @@
 #define _DEFERRED_LIGHTING_GLSL_
 
 #ifndef _DIRECT_LIGHTING_GLSL_
-    #error Include "_DirectLighting.glsl" before "_DeferredLighting.glsl"
+    #error Include _DirectLighting.glsl before _DeferredLighting.glsl
 #endif
 
 #ifndef _VERTEX_SCREEN_POS_GLSL_
-    #error Include "_VertexScreenPos.glsl" before "_DeferredLighting.glsl"
+    #error Include _VertexScreenPos.glsl before _DeferredLighting.glsl
 #endif
 
 #ifdef URHO3D_VERTEX_SHADER

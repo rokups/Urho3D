@@ -2789,13 +2789,14 @@ unsigned Graphics::GetFormat(const ea::string& formatName)
 
 void Graphics::CheckFeatureSupport()
 {
+    caps.maxNumRenderTargets_ = 1;
+    caps.globalUniformsSupported_ = true;
+
     // Check supported features: light pre-pass, deferred rendering and hardware depth texture
     lightPrepassSupport_ = false;
     deferredSupport_ = false;
 
 #ifndef GL_ES_VERSION_2_0
-    caps.maxNumRenderTargets_ = 1;
-    caps.globalUniformsSupported_ = true;
     if (gl3Support)
     {
         // Work around GLEW failure to check extensions properly from a GL3 context

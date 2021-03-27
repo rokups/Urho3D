@@ -273,9 +273,9 @@ public:
 private:
     /// GPUObject callbacks
     /// @{
-    virtual void OnDeviceLost();
-    virtual void OnDeviceReset();
-    virtual void Release();
+    void OnDeviceLost() override;
+    void OnDeviceReset() override;
+    void Release() override;
     /// @}
 
     void HandleResourceReload(StringHash eventType, VariantMap& eventData);

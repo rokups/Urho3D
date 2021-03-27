@@ -4,7 +4,7 @@
 #define _UNIFORMS_GLSL_
 
 #ifndef _CONFIG_GLSL_
-    #error Include "_Config.glsl" before "_Uniforms.glsl"
+    #error Include _Config.glsl before _Uniforms.glsl
 #endif
 
 UNIFORM_BUFFER_BEGIN(0, Frame)

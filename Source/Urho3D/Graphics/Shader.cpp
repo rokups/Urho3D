@@ -211,6 +211,7 @@ void Shader::ProcessSource(ea::string& code, Deserializer& source)
     while (!source.IsEof())
     {
         ea::string line = source.ReadLine();
+        line.ltrim();
 
         if (line.starts_with("#include"))
         {
@@ -227,8 +228,14 @@ void Shader::ProcessSource(ea::string& code, Deserializer& source)
         }
         else
         {
-            code += line;
-            code += "\n";
+            const bool isComment = line.length() >= 2 && line[0] == '/' && line[1] == '/';
+            const bool isLineContinuation = line.length() >= 1 && line.back() == '\\';
+            if (isLineContinuation)
+                line.erase(line.end() - 1);
+            if (!isComment)
+                code += line;
+            if (!isLineContinuation)
+                code += "\n";
         }
         ++currentLine;
     }
