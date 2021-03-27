@@ -100,7 +100,7 @@ vec3 DirectionToUV(vec3 vec, vec2 bias)
             textureProjOffset(sShadowMap, (shadowPos), ivec2(dx, dy))
     #else
         #define SampleShadowOffset(shadowPos, identity, dx, dy) \
-            SampleShadow((shadowPos) + vec4(identity.x * dx, identity.y * dy, 0.0, 0.0))
+            SampleShadow((shadowPos) + vec4(identity.x * float(dx), identity.y * float(dy), 0.0, 0.0))
     #endif
 
     /// Return UV coordinate offset corresponding to one texel
