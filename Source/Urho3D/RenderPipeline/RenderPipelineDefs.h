@@ -481,4 +481,57 @@ struct ToneMappingPassSettings
     /// @}
 };
 
+/// Post-processing antialiasing mode.
+enum class PostProcessAntialiasing
+{
+    None,
+    FXAA2,
+    FXAA3
+};
+
+/// Settings of default render pipeline.
+struct RenderPipelineSettings
+{
+    RenderBufferManagerSettings renderBufferManager_;
+    SceneProcessorSettings sceneProcessor_;
+    ShadowMapAllocatorSettings shadowMapAllocator_;
+    InstancingBufferSettings instancingBuffer_;
+
+    /// Post-processing settings
+    /// @{
+    ToneMappingPassSettings toneMapping_;
+    PostProcessAntialiasing antialiasing_{};
+    bool greyScale_{};
+    /// @}
+
+    /// Utility operators
+    /// @{
+    unsigned CalculatePipelineStateHash() const
+    {
+        unsigned hash = 0;
+        CombineHash(hash, renderBufferManager_.CalculatePipelineStateHash());
+        CombineHash(hash, sceneProcessor_.CalculatePipelineStateHash());
+        CombineHash(hash, shadowMapAllocator_.CalculatePipelineStateHash());
+        CombineHash(hash, instancingBuffer_.CalculatePipelineStateHash());
+        return hash;
+    }
+
+    bool operator==(const RenderPipelineSettings& rhs) const
+    {
+        return renderBufferManager_ == rhs.renderBufferManager_
+            && sceneProcessor_ == rhs.sceneProcessor_
+            && shadowMapAllocator_ == rhs.shadowMapAllocator_
+            && instancingBuffer_ == rhs.instancingBuffer_
+            && toneMapping_ == rhs.toneMapping_
+            && antialiasing_ == rhs.antialiasing_
+            && greyScale_ == rhs.greyScale_;
+    }
+
+    bool operator!=(const RenderPipelineSettings& rhs) const { return !(*this == rhs); }
+    /// @}
+
+    /// Validate settings and adjust to closest valid option.
+    void Validate(Context* context);
+};
+
 }

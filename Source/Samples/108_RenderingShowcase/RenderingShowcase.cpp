@@ -44,6 +44,8 @@
 
 RenderingShowcase::RenderingShowcase(Context* context) : Sample(context)
 {
+    sceneNames_.push_back("Scenes/RenderingExample.xml");
+    sceneNames_.push_back("Scenes/RenderingExample2.xml");
 }
 
 void RenderingShowcase::Start()
@@ -51,8 +53,9 @@ void RenderingShowcase::Start()
     // Execute base class startup
     Sample::Start();
 
-    // Create the scene content
+    // Create scene content
     CreateScene();
+    SetupSelectedScene();
 
     // Create the UI content
     CreateInstructions();
@@ -87,21 +90,26 @@ void RenderingShowcase::CreateInstructions()
 
 void RenderingShowcase::CreateScene()
 {
-    auto* cache = GetSubsystem<ResourceCache>();
+    scene_ = MakeShared<Scene>(context_);
+    cameraScene_ = MakeShared<Scene>(context_);
 
-    scene_ = new Scene(context_);
+    // Create the camera (not included in the scene file)
+    cameraNode_ = cameraScene_->CreateChild("Camera");
+    cameraNode_->CreateComponent<Camera>();
+}
+
+void RenderingShowcase::SetupSelectedScene()
+{
+    auto* cache = GetSubsystem<ResourceCache>();
 
     // Load scene content prepared in the editor (XML format). GetFile() returns an open file from the resource system
     // which scene.LoadXML() will read
-    SharedPtr<File> file = cache->GetFile("Scenes/RenderingExample.xml");
+    SharedPtr<File> file = cache->GetFile(sceneNames_[sceneIndex_]);
     scene_->LoadXML(*file);
 
-    // Create the camera (not included in the scene file)
-    cameraNode_ = scene_->CreateChild("Camera");
-    cameraNode_->CreateComponent<Camera>();
+    cameraNode_->SetPosition({ 0.0f, 4.0f, 8.0f });
+    cameraNode_->LookAt(Vector3::ZERO);
 
-    //cameraNode_->SetPosition(sphereWithDynamicMatNode->GetPosition() + Vector3(2.0f, 2.0f, 2.0f));
-    //cameraNode_->LookAt(sphereWithDynamicMatNode->GetPosition());
     yaw_ = cameraNode_->GetRotation().YawAngle();
     pitch_ = cameraNode_->GetRotation().PitchAngle();
 }
@@ -161,4 +169,12 @@ void RenderingShowcase::HandleUpdate(StringHash eventType, VariantMap& eventData
 
     // Move the camera, scale movement with time step
     MoveCamera(timeStep);
+
+    // Update scene
+    auto* input = GetSubsystem<Input>();
+    if (sceneNames_.size() > 1 && input->GetKeyPress(KEY_TAB))
+    {
+        sceneIndex_ = (sceneIndex_ + 1) % sceneNames_.size();
+        SetupSelectedScene();
+    }
 }

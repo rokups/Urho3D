@@ -47,8 +47,10 @@ public:
     void Start() override;
 
 private:
-    /// Construct the scene content.
+    /// Setup shared scene objects.
     void CreateScene();
+    /// Setup currently selected scene.
+    void SetupSelectedScene();
     /// Set up a viewport for displaying the scene.
     void SetupViewport();
     /// Subscribe to application-wide logic update event.
@@ -59,4 +61,11 @@ private:
     void HandleUpdate(StringHash eventType, VariantMap& eventData);
     /// Construct an instruction text to the UI.
     void CreateInstructions();
+
+    /// Scene that owns camera.
+    SharedPtr<Scene> cameraScene_;
+    /// Index of currently rendered scene.
+    unsigned sceneIndex_{};
+    /// List of all available scenes.
+    ea::vector<ea::string> sceneNames_;
 };

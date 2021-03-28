@@ -126,44 +126,9 @@ RenderPipelineView::~RenderPipelineView()
 void RenderPipelineView::SetSettings(const RenderPipelineSettings& settings)
 {
     settings_ = settings;
-    ValidateSettings();
+    settings_.Validate(context_);
     settingsDirty_ = true;
-
-    settingsPipelineStateHash_ = 0;
-    CombineHash(settingsPipelineStateHash_, settings_.renderBufferManager_.CalculatePipelineStateHash());
-    CombineHash(settingsPipelineStateHash_, settings_.sceneProcessor_.CalculatePipelineStateHash());
-    CombineHash(settingsPipelineStateHash_, settings_.shadowMapAllocator_.CalculatePipelineStateHash());
-    CombineHash(settingsPipelineStateHash_, settings_.instancingBuffer_.CalculatePipelineStateHash());
-}
-
-void RenderPipelineView::ValidateSettings()
-{
-    settings_.shadowMapAllocator_.shadowAtlasPageSize_ = ea::min(
-        settings_.shadowMapAllocator_.shadowAtlasPageSize_, Graphics::GetCaps().maxRenderTargetSize_);
-
-    if (settings_.sceneProcessor_.IsDeferredLighting() && !graphics_->GetDeferredSupport()
-        && !Graphics::GetReadableDepthStencilFormat())
-        settings_.sceneProcessor_.lightingMode_ = DirectLightingMode::Forward;
-
-    if (!settings_.shadowMapAllocator_.use16bitShadowMaps_ && !graphics_->GetHiresShadowMapFormat())
-        settings_.shadowMapAllocator_.use16bitShadowMaps_ = true;
-
-    if (settings_.instancingBuffer_.enableInstancing_ && !graphics_->GetInstancingSupport())
-        settings_.instancingBuffer_.enableInstancing_ = false;
-
-    if (settings_.instancingBuffer_.enableInstancing_)
-    {
-        settings_.instancingBuffer_.firstInstancingTexCoord_ = 4;
-        settings_.instancingBuffer_.numInstancingTexCoords_ = 3 +
-            (settings_.sceneProcessor_.ambientMode_ == DrawableAmbientMode::Constant
-            ? 0
-            : settings_.sceneProcessor_.ambientMode_ == DrawableAmbientMode::Flat
-            ? 1
-            : 7);
-    }
-
-    settings_.sceneProcessor_.linearSpaceLighting_ =
-        settings_.renderBufferManager_.colorSpace_ != RenderPipelineColorSpace::GammaLDR;
+    settingsPipelineStateHash_ = settings_.CalculatePipelineStateHash();
 }
 
 void RenderPipelineView::ApplySettings()
@@ -453,6 +418,7 @@ void RenderPipeline::RegisterObject(Context* context)
 void RenderPipeline::SetSettings(const RenderPipelineSettings& settings)
 {
     settings_ = settings;
+    settings_.Validate(context_);
     MarkSettingsDirty();
 }
 
@@ -463,6 +429,7 @@ SharedPtr<RenderPipelineView> RenderPipeline::Instantiate()
 
 void RenderPipeline::MarkSettingsDirty()
 {
+    settings_.Validate(context_);
     OnSettingsChanged(this, settings_);
 }
 

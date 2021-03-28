@@ -85,8 +85,6 @@ struct PipelineBatchByState
     unsigned long long primaryKey_{};
     /// Secondary sorting value.
     unsigned long long secondaryKey_{};
-    /// Sorting distance.
-    float distance_{};
     /// Batch to be sorted.
     const PipelineBatch* pipelineBatch_{};
 
@@ -97,9 +95,6 @@ struct PipelineBatchByState
     explicit PipelineBatchByState(const PipelineBatch* batch)
         : pipelineBatch_(batch)
     {
-        if (!batch->pipelineState_)
-            return;
-
         // Calculate primary key
         primaryKey_ |= (batch->material_->GetRenderOrder() & RenderOrderMask) << RenderOrderOffset;
         primaryKey_ |= (batch->pipelineState_->GetShaderID() & ShaderProgramMask) << ShaderProgramOffset;
@@ -111,8 +106,6 @@ struct PipelineBatchByState
         // Calculate secondary key
         secondaryKey_ |= (batch->geometry_->GetObjectID() & GeometryMask) << GeometryOffset;
         secondaryKey_ |= (batch->vertexLightsHash_ & VertexLightsMask) << VertexLightsOffset;
-
-        distance_ = batch->distance_;
     }
 
     /// Compare sorted batches.
@@ -120,9 +113,7 @@ struct PipelineBatchByState
     {
         if (primaryKey_ != rhs.primaryKey_)
             return primaryKey_ < rhs.primaryKey_;
-        if (secondaryKey_ != rhs.secondaryKey_)
-            return secondaryKey_ < rhs.secondaryKey_;
-        return distance_ > rhs.distance_;
+        return secondaryKey_ < rhs.secondaryKey_;
     }
 };
 

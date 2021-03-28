@@ -442,7 +442,7 @@ CachedDrawableZone ZoneLookupIndex::QueryZone(const Vector3& position, unsigned 
     for (unsigned i = 0; i < numZones; ++i)
     {
         const ZoneData& data = zonesData_[i];
-        if (data.zoneMask_ & zoneMask == 0)
+        if ((data.zoneMask_ & zoneMask) == 0)
             continue;
 
         const Vector3 localPosition = data.inverseWorldTransform_ * position;

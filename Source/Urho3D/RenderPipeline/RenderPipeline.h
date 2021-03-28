@@ -44,25 +44,6 @@ class RenderSurface;
 class Viewport;
 class ShadowMapAllocator;
 
-enum class PostProcessAntialiasing
-{
-    None,
-    FXAA2,
-    FXAA3
-};
-
-struct RenderPipelineSettings
-{
-    RenderBufferManagerSettings renderBufferManager_;
-    SceneProcessorSettings sceneProcessor_;
-    ShadowMapAllocatorSettings shadowMapAllocator_;
-    InstancingBufferSettings instancingBuffer_;
-
-    ToneMappingPassSettings toneMapping_;
-    PostProcessAntialiasing antialiasing_{};
-    bool greyScale_{};
-};
-
 ///
 class URHO3D_API RenderPipelineView
     : public Object
@@ -92,8 +73,6 @@ public:
 
 protected:
     unsigned RecalculatePipelineStateHash() const;
-
-    void ValidateSettings();
     void ApplySettings();
 
 private:
