@@ -261,6 +261,7 @@ bool Engine::Initialize(const VariantMap& parameters)
         graphics->SetWindowIcon(cache->GetResource<Image>(GetParameter(parameters, EP_WINDOW_ICON, EMPTY_STRING).GetString()));
         graphics->SetFlushGPU(GetParameter(parameters, EP_FLUSH_GPU, false).GetBool());
         graphics->SetOrientations(GetParameter(parameters, EP_ORIENTATIONS, "LandscapeLeft LandscapeRight").GetString());
+        graphics->SetShaderValidationEnabled(GetParameter(parameters, EP_VALIDATE_SHADERS, false).GetBool());
 
 #ifdef URHO3D_OPENGL
         if (HasParameter(parameters, EP_FORCE_GL2))
@@ -915,6 +916,7 @@ void Engine::DefineParameters(CLI::App& commandLine, VariantMap& engineParameter
     };
 
     addFlag("--headless", EP_HEADLESS, true, "Do not initialize graphics subsystem");
+    addFlag("--validate-shaders", EP_VALIDATE_SHADERS, true, "Validate shaders before submitting them to GAPI");
     addFlag("--nolimit", EP_FRAME_LIMITER, false, "Disable frame limiter");
     addFlag("--flushgpu", EP_FLUSH_GPU, true, "Enable GPU flushing");
     addFlag("--gl2", EP_FORCE_GL2, true, "Force OpenGL2");

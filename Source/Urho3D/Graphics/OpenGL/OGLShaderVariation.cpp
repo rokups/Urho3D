@@ -36,24 +36,6 @@
 namespace Urho3D
 {
 
-ea::array<bool, 128> GenerateAllowedCharacterMask()
-{
-    ea::array<bool, 128> result;
-    // Allow letters, numbers and whitespace
-    for (unsigned ch = 0; ch < 128; ++ch)
-        result[ch] = std::isalnum(ch) || std::isspace(ch);
-    // Allow specific symbols (see https://www.khronos.org/files/opengles_shading_language.pdf)
-    const char specialSymbols[] = {
-        '_', '.', '+', '-', '/', '*', '%',
-        '<', '>', '[', ']', '(', ')', '{', '}',
-        '^', '|', '&', '~', '=', '!', ':', ';', ',', '?',
-        '#'
-    };
-    for (char ch : specialSymbols)
-        result[ch] = true;
-    return result;
-};
-
 const char* ShaderVariation::elementSemanticNames[] =
 {
     "POS",
@@ -199,18 +181,6 @@ bool ShaderVariation::Create()
         shaderCode += (originalShaderCode.c_str() + verEnd);
     else
         shaderCode += originalShaderCode;
-
-    // Check for invalid characters
-    static const auto characterMask = GenerateAllowedCharacterMask();
-    const auto isAllowed = [](char ch) { return ch >= 0 && ch <= 127 && characterMask[ch]; };
-    const auto badCharacterIter = ea::find_if_not(shaderCode.begin(), shaderCode.end(), isAllowed);
-    if (badCharacterIter != shaderCode.end())
-    {
-        const unsigned snippetSize = ea::min<unsigned>(16, shaderCode.end() - badCharacterIter);
-        const ea::string snippet(badCharacterIter, badCharacterIter + snippetSize);
-        URHO3D_LOGWARNING("Unexpected character '{}' (code {}) in shader code: {}",
-            *badCharacterIter, static_cast<unsigned>(static_cast<unsigned char>(*badCharacterIter)), snippet);
-    }
 
     const char* shaderCStr = shaderCode.c_str();
     glShaderSource(object_.name_, 1, &shaderCStr, nullptr);

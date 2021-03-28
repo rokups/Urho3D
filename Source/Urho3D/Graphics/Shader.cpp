@@ -38,6 +38,36 @@
 namespace Urho3D
 {
 
+ea::array<bool, 128> GenerateAllowedCharacterMask()
+{
+    ea::array<bool, 128> result;
+    // Allow letters, numbers and whitespace
+    for (unsigned ch = 0; ch < 128; ++ch)
+        result[ch] = std::isalnum(ch) || std::isspace(ch);
+    // Allow specific symbols (see https://www.khronos.org/files/opengles_shading_language.pdf)
+    const char specialSymbols[] = {
+        '_', '.', '+', '-', '/', '*', '%',
+        '<', '>', '[', ']', '(', ')', '{', '}',
+        '^', '|', '&', '~', '=', '!', ':', ';', ',', '?',
+        '#'
+    };
+    for (char ch : specialSymbols)
+        result[ch] = true;
+    return result;
+};
+
+template <class Iter, class Value>
+Iter FindNth(Iter begin, Iter end, const Value& value, unsigned count)
+{
+    auto iter = ea::find(begin, end, value);
+    while (count > 0 && iter != end)
+    {
+        iter = ea::find(ea::next(iter), end, value);
+        --count;
+    }
+    return iter;
+}
+
 void CommentOutFunction(ea::string& code, const ea::string& signature)
 {
     unsigned startPos = code.find(signature);
@@ -103,6 +133,25 @@ bool Shader::BeginLoad(Deserializer& source)
     timeStamp_ = 0;
     ea::string shaderCode;
     ProcessSource(shaderCode, source);
+
+    // Validate shader code
+    if (graphics->IsShaderValidationEnabled())
+    {
+        static const auto characterMask = GenerateAllowedCharacterMask();
+        static const unsigned maxSnippetSize = 5;
+
+        const auto isAllowed = [](char ch) { return ch >= 0 && ch <= 127 && characterMask[ch]; };
+        const auto badCharacterIter = ea::find_if_not(shaderCode.begin(), shaderCode.end(), isAllowed);
+        if (badCharacterIter != shaderCode.end())
+        {
+            const auto snippetEnd = FindNth(badCharacterIter, shaderCode.end(), '\n', maxSnippetSize / 2);
+            const auto snippetBegin = FindNth(
+                ea::make_reverse_iterator(badCharacterIter), shaderCode.rend(), '\n', maxSnippetSize / 2).base();
+            const ea::string snippet(snippetBegin, snippetEnd);
+            URHO3D_LOGWARNING("Unexpected character #{} '{}' in shader code:\n{}",
+                static_cast<unsigned>(static_cast<unsigned char>(*badCharacterIter)), *badCharacterIter, snippet);
+        }
+    }
 
     // Comment out the unneeded shader function
     vsSourceCode_ = shaderCode;
@@ -183,6 +232,7 @@ unsigned Shader::GetShaderDefinesHash(const char* defines) const
 void Shader::ProcessSource(ea::string& code, Deserializer& source)
 {
     auto* cache = GetSubsystem<ResourceCache>();
+    auto* graphics = GetSubsystem<Graphics>();
     const ea::string& fileName = source.GetName();
     const bool isGLSL = IsGLSL();
 
@@ -211,7 +261,6 @@ void Shader::ProcessSource(ea::string& code, Deserializer& source)
     while (!source.IsEof())
     {
         ea::string line = source.ReadLine();
-        line.ltrim();
 
         if (line.starts_with("#include"))
         {
@@ -228,12 +277,14 @@ void Shader::ProcessSource(ea::string& code, Deserializer& source)
         }
         else
         {
-            const bool isComment = line.length() >= 2 && line[0] == '/' && line[1] == '/';
             const bool isLineContinuation = line.length() >= 1 && line.back() == '\\';
             if (isLineContinuation)
                 line.erase(line.end() - 1);
-            if (!isComment)
+
+            // If shader validation is enabled, trim comments manually to avoid validating comment contents
+            if (!graphics->IsShaderValidationEnabled() || !line.trimmed().starts_with("//"))
                 code += line;
+
             if (!isLineContinuation)
                 code += "\n";
         }

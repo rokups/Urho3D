@@ -187,6 +187,8 @@ public:
     /// Destruct. Release the Direct3D11 device and close the window.
     ~Graphics() override;
 
+    /// Set whether shaders are checked for invalid symbols.
+    void SetShaderValidationEnabled(bool enabled) { validateShaders_ = enabled; }
     /// Set external window handle. Only effective before setting the initial screen mode.
     void SetExternalWindow(void* window);
     /// Set window title.
@@ -384,6 +386,9 @@ public:
 
     /// Return graphics implementation, which holds the actual API-specific resources.
     GraphicsImpl* GetImpl() const { return impl_; }
+
+    /// Return whether shader validation is enabled.
+    bool IsShaderValidationEnabled() const { return validateShaders_; }
 
     /// Return OS-specific external window handle. Null if not in use.
     void* GetExternalWindow() const { return externalWindow_; }
@@ -842,6 +847,8 @@ private:
     IntVector2 position_;
     /// Screen mode parameters.
     ScreenModeParams screenParams_;
+    /// Whether the shader validation is enabled.
+    bool validateShaders_{};
     /// Flush GPU command buffer flag.
     bool flushGPU_{};
     /// Force OpenGL 2 flag. Only used on OpenGL.

@@ -39,6 +39,7 @@ static const ea::string EP_FORCE_GL2 = "ForceGL2";
 static const ea::string EP_FRAME_LIMITER = "FrameLimiter";
 static const ea::string EP_FULL_SCREEN = "FullScreen";
 static const ea::string EP_HEADLESS = "Headless";
+static const ea::string EP_VALIDATE_SHADERS = "ValidateShaders";
 static const ea::string EP_HIGH_DPI = "HighDPI";
 static const ea::string EP_LOG_LEVEL = "LogLevel";
 static const ea::string EP_LOG_NAME = "LogName";
