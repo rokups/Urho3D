@@ -97,9 +97,6 @@
 #include "39_CrowdNavigation/CrowdNavigation.h"
 #endif
 #include "40_Localization/L10n.h"
-#if !__EMSCRIPTEN__
-#include "42_PBRMaterials/PBRMaterials.h"
-#endif
 #if URHO3D_NETWORK
 #include "43_HttpRequestDemo/HttpRequestDemo.h"
 #endif
@@ -290,9 +287,6 @@ void SamplesManager::Start()
     RegisterSample<CrowdNavigation>();
 #endif
     RegisterSample<L10n>();
-#if !__EMSCRIPTEN__
-    RegisterSample<PBRMaterials>();
-#endif
 #if URHO3D_NETWORK
     RegisterSample<HttpRequestDemo>();
 #endif
