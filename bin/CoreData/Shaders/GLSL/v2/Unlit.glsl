@@ -1,3 +1,4 @@
+#define UNLIT
 #include "_Material.glsl"
 
 #ifdef URHO3D_VERTEX_SHADER

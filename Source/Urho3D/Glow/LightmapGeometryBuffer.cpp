@@ -39,7 +39,7 @@
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Terrain.h"
 #include "../Graphics/TerrainPatch.h"
-#include "../Graphics/View.h"
+#include "../RenderPipeline/LightmapRenderPipeline.h"
 #include "../Resource/ResourceCache.h"
 #include "../Resource/XMLFile.h"
 #include "../Scene/Node.h"
@@ -466,12 +466,6 @@ LightmapChartGeometryBuffer BakeLightmapGeometryBuffer(const LightmapGeometryBak
 
     LightmapChartGeometryBuffer geometryBuffer{ bakingScene.index_, bakingScene.lightmapSize_ };
 
-    // Get render surface
-    const int textureSize = static_cast<int>(geometryBuffer.lightmapSize_);
-    Texture* renderTexture = renderer->GetScreenBuffer(
-        textureSize, textureSize, Graphics::GetRGBAFormat(), 1, true, false, false, false);
-    RenderSurface* renderSurface = static_cast<Texture2D*>(renderTexture)->GetRenderSurface();
-
     // Setup viewport
     Viewport viewport(context);
     viewport.SetCamera(bakingScene.camera_);
@@ -480,30 +474,28 @@ LightmapChartGeometryBuffer BakeLightmapGeometryBuffer(const LightmapGeometryBak
     viewport.SetScene(bakingScene.scene_);
 
     // Render scene
-    View view(context);
-    view.Define(renderSurface, &viewport);
-    view.Update(FrameInfo());
-    view.Render();
+    LightmapRenderPipelineView view(context);
+    view.RenderGeometryBuffer(&viewport, static_cast<int>(geometryBuffer.lightmapSize_));
 
     // Store results
-    ReadTextureRGBA32Float(view.GetExtraRenderTarget("position"), buffer);
+    ReadTextureRGBA32Float(view.GetPositionBuffer(), buffer);
     ea::transform(buffer.begin(), buffer.end(), geometryBuffer.positions_.begin(), ExtractVector3FromVector4);
     ea::transform(buffer.begin(), buffer.end(), geometryBuffer.geometryIds_.begin(), ExtractUintFromVector4);
 
-    ReadTextureRGBA32Float(view.GetExtraRenderTarget("smoothposition"), buffer);
+    ReadTextureRGBA32Float(view.GetSmoothPositionBuffer(), buffer);
     ea::transform(buffer.begin(), buffer.end(), geometryBuffer.smoothPositions_.begin(), ExtractVector3FromVector4);
     ea::transform(buffer.begin(), buffer.end(), geometryBuffer.texelRadiuses_.begin(), ExtractFloatFromVector4);
 
-    ReadTextureRGBA32Float(view.GetExtraRenderTarget("facenormal"), buffer);
+    ReadTextureRGBA32Float(view.GetFaceNormalBuffer(), buffer);
     ea::transform(buffer.begin(), buffer.end(), geometryBuffer.faceNormals_.begin(), ExtractVector3FromVector4);
 
-    ReadTextureRGBA32Float(view.GetExtraRenderTarget("smoothnormal"), buffer);
+    ReadTextureRGBA32Float(view.GetSmoothNormalBuffer(), buffer);
     ea::transform(buffer.begin(), buffer.end(), geometryBuffer.smoothNormals_.begin(), ExtractVector3FromVector4);
 
-    ReadTextureRGBA32Float(view.GetExtraRenderTarget("albedo"), buffer);
+    ReadTextureRGBA32Float(view.GetAlbedoBuffer(), buffer);
     ea::transform(buffer.begin(), buffer.end(), geometryBuffer.albedo_.begin(), ExtractVector3FromVector4);
 
-    ReadTextureRGBA32Float(view.GetExtraRenderTarget("emission"), buffer);
+    ReadTextureRGBA32Float(view.GetEmissionBuffer(), buffer);
     ea::transform(buffer.begin(), buffer.end(), geometryBuffer.emission_.begin(), ExtractVector3FromVector4);
 
     graphics->EndFrame();

@@ -1,50 +1,65 @@
-#define MRT_COUNT 6
-#include "Uniforms.glsl"
+#define NUM_RENDER_TARGETS 6
+#define URHO3D_PIXEL_NEED_NORMAL
+#define URHO3D_GAMMA_CORRECTION
+#define CUSTOM_MATERIAL_CBUFFER
+
+#include "_Config.glsl"
+#include "_GammaCorrection.glsl"
+
+UNIFORM_BUFFER_BEGIN(4, Material)
+    UNIFORM(float cLightmapLayer)
+    UNIFORM(float cLightmapGeometry)
+    UNIFORM(vec2 cLightmapPositionBias)
+
+    UNIFORM(vec4 cUOffset)
+    UNIFORM(vec4 cVOffset)
+    UNIFORM(vec4 cLMOffset)
+
+    UNIFORM(vec4 cMatDiffColor)
+    UNIFORM(vec3 cMatEmissiveColor)
+UNIFORM_BUFFER_END()
+
+#include "_Uniforms.glsl"
 #include "_Samplers.glsl"
-#include "Transform.glsl"
-#include "ScreenPos.glsl"
+#include "_VertexLayout.glsl"
+#include "_PixelOutput.glsl"
 
-#if !defined(GL3) || !defined(USE_CBUFFERS)
+#include "_VertexTransform.glsl"
 
-uniform float cLightmapLayer;
-uniform float cLightmapGeometry;
-uniform vec2 cLightmapPositionBias;
+VERTEX_OUTPUT(vec2 vTexCoord)
+VERTEX_OUTPUT(vec3 vNormal)
+VERTEX_OUTPUT(vec3 vWorldPos)
+VERTEX_OUTPUT(vec4 vMetadata)
 
-#else
-
-uniform LightmapVS
+#ifdef URHO3D_VERTEX_SHADER
+void main()
 {
-    float cLightmapLayer;
-    float cLightmapGeometry;
-    vec2 cLightmapPositionBias;
-}
-
-#endif
-
-varying vec2 vTexCoord;
-varying vec3 vNormal;
-varying vec4 vWorldPos;
-varying vec4 vMetadata;
-
-void VS()
-{
-    mat4 modelMatrix = iModelMatrix;
-    vec3 worldPos = GetWorldPos(modelMatrix);
+    VertexTransform vertexTransform = GetVertexTransform();
     vec2 lightmapUV = iTexCoord1 * cLMOffset.xy + cLMOffset.zw;
 
-    gl_Position = vec4(lightmapUV * vec2(2, 2) + vec2(-1, -1), cLightmapLayer, 1);
-    vNormal = GetWorldNormal(modelMatrix);
-    vWorldPos = vec4(worldPos, 1.0);
-    vMetadata = vec4(cLightmapGeometry, cLightmapPositionBias.x, cLightmapPositionBias.y, 0.0);
-    vTexCoord = GetTexCoord(iTexCoord);
-}
+#ifdef URHO3D_FLIP_FRAMEBUFFER
+    const vec4 scaleOffset = vec4(2, -2, -1, 1);
+#else
+    const vec4 scaleOffset = vec4(2, 2, -1, -1);
+#endif
 
-void PS()
+    gl_Position = vec4(lightmapUV * scaleOffset.xy + scaleOffset.zw, cLightmapLayer, 1);
+    vNormal = vertexTransform.normal;
+    vWorldPos = vertexTransform.position.xyz;
+    vMetadata = vec4(cLightmapGeometry, cLightmapPositionBias.x, cLightmapPositionBias.y, 0.0);
+    vTexCoord = GetTransformedTexCoord();
+}
+#endif
+
+#ifdef URHO3D_PIXEL_SHADER
+void main()
 {
-    vec4 diffColor = cMatDiffColor;
-    #ifdef DIFFMAP
-        diffColor *= texture2D(sDiffMap, vTexCoord.xy);
-    #endif
+#ifdef URHO3D_MATERIAL_HAS_DIFFUSE
+    vec4 albedoInput = texture2D(sDiffMap, vTexCoord);
+    vec4 albedo = DiffMap_ToLight(cMatDiffColor * albedoInput);
+#else
+    vec4 albedo = GammaToLightSpaceAlpha(cMatDiffColor);
+#endif
 
     vec3 emissiveColor = cMatEmissiveColor;
     #ifdef EMISSIVEMAP
@@ -60,7 +75,7 @@ void PS()
         faceNormal *= -1.0;
 
     vec3 dPmax = max(abs(dPdx), abs(dPdy));
-    float texelRadius = max(dPmax.x, max(dPmax.y, dPmax.z)) * 1.4142135 * 0.5;
+    float texelRadius = max(dPmax.x, max(dPmax.y, dPmax.z)) * (1.4142135 * 0.5);
 
     float scaledBias = vMetadata.y;
     float constBias = vMetadata.z;
@@ -71,6 +86,7 @@ void PS()
     gl_FragData[1] = vec4(position, texelRadius);
     gl_FragData[2] = vec4(faceNormal, 1.0);
     gl_FragData[3] = vec4(normal, 1.0);
-    gl_FragData[4] = vec4(diffColor.rgb * diffColor.a, 1.0);
+    gl_FragData[4] = vec4(albedo.rgb * albedo.a, 1.0);
     gl_FragData[5] = vec4(emissiveColor.rgb, 1.0);
 }
+#endif

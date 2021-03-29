@@ -14,9 +14,11 @@
 #include "_PixelOutput.glsl"
 
 #include "_VertexTransform.glsl"
+#ifdef URHO3D_IS_LIT
 #include "_IndirectLighting.glsl"
 #include "_DirectLighting.glsl"
 #include "_Shadow.glsl"
+#endif
 #include "_Fog.glsl"
 /// @}
 
@@ -25,13 +27,13 @@
 VERTEX_OUTPUT(float vWorldDepth)
 VERTEX_OUTPUT(vec2 vTexCoord)
 
+#ifdef URHO3D_PIXEL_NEED_COLOR
+    VERTEX_OUTPUT(vec4 vColor)
+#endif
+
 #ifdef URHO3D_IS_LIT
     #ifdef URHO3D_HAS_LIGHTMAP
         VERTEX_OUTPUT(vec2 vTexCoord2)
-    #endif
-
-    #ifdef URHO3D_PIXEL_NEED_COLOR
-        VERTEX_OUTPUT(vec4 vColor)
     #endif
 
     #ifdef URHO3D_PIXEL_NEED_NORMAL
@@ -74,14 +76,14 @@ void FillCommonVertexOutput(VertexTransform vertexTransform, vec2 uv)
     vWorldDepth = GetDepth(gl_Position);
     vTexCoord = uv;
 
+#ifdef URHO3D_PIXEL_NEED_COLOR
+    vColor = iColor;
+#endif
+
 #ifdef URHO3D_IS_LIT
 
 #ifdef URHO3D_HAS_LIGHTMAP
     vTexCoord2 = GetLightMapTexCoord();
-#endif
-
-#ifdef URHO3D_PIXEL_NEED_COLOR
-    vColor = iColor;
 #endif
 
 #ifdef URHO3D_PIXEL_NEED_NORMAL

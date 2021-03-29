@@ -74,9 +74,6 @@ void CameraProcessor::UpdateCamera(const FrameInfo& frameInfo, Camera* camera)
     Zone* cameraZone = frameInfo.octree_->QueryZone(cameraPosition, camera->GetZoneMask()).zone_;
     camera->SetZone(cameraZone);
 
-    if (flipCameraForRendering_)
-        camera->SetFlipVertical(!camera->GetFlipVertical());
-
     if (camera->GetAutoAspectRatio())
         camera->SetAspectRatioInternal(static_cast<float>(frameInfo.viewSize_.x_) / frameInfo.viewSize_.y_);
 }
@@ -96,6 +93,15 @@ void CameraProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
     {
         if (camera)
             UpdateCamera(frameInfo, camera);
+    }
+}
+
+void CameraProcessor::OnRenderBegin(const FrameInfo& frameInfo)
+{
+    for (Camera* camera : cameras_)
+    {
+        if (camera && flipCameraForRendering_)
+            camera->SetFlipVertical(!camera->GetFlipVertical());
     }
 }
 

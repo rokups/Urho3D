@@ -196,6 +196,7 @@ SceneProcessor::SceneProcessor(RenderPipelineInterface* renderPipeline, const ea
     , batchStateCacheCallback_(pipelineStateBuilder_)
 {
     renderPipeline_->OnUpdateBegin.Subscribe(this, &SceneProcessor::OnUpdateBegin);
+    renderPipeline_->OnRenderBegin.Subscribe(this, &SceneProcessor::OnRenderBegin);
     renderPipeline_->OnRenderEnd.Subscribe(this, &SceneProcessor::OnRenderEnd);
 }
 
@@ -361,6 +362,11 @@ void SceneProcessor::OnUpdateBegin(const CommonFrameInfo& frameInfo)
 
     cameraProcessor_->OnUpdateBegin(frameInfo_);
     drawableProcessor_->OnUpdateBegin(frameInfo_);
+}
+
+void SceneProcessor::OnRenderBegin(const CommonFrameInfo& frameInfo)
+{
+    cameraProcessor_->OnRenderBegin(frameInfo_);
 }
 
 void SceneProcessor::OnRenderEnd(const CommonFrameInfo& frameInfo)

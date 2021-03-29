@@ -33,7 +33,7 @@
 #include "../Graphics/Octree.h"
 #include "../Graphics/StaticModel.h"
 #include "../Graphics/VertexBuffer.h"
-#include "../Graphics/View.h"
+#include "../RenderPipeline/RenderPipeline.h"
 #include "../Resource/ResourceCache.h"
 #include "../Scene/Scene.h"
 
@@ -137,7 +137,7 @@ SharedPtr<Scene> CreateStitchingScene(Context* context,
 }
 
 /// Create View and Viewport for stitching.
-ea::pair<SharedPtr<View>, SharedPtr<Viewport>> CreateStitchingViewAndViewport(
+ea::pair<RenderPipelineView*, SharedPtr<Viewport>> CreateStitchingViewAndViewport(
     Scene* scene, RenderPath* renderPath, Texture2D* outputTexture)
 {
     Context* context = scene->GetContext();
@@ -146,11 +146,11 @@ ea::pair<SharedPtr<View>, SharedPtr<Viewport>> CreateStitchingViewAndViewport(
     auto viewport = MakeShared<Viewport>(context);
     viewport->SetCamera(scene->GetComponent<Camera>(true));
     viewport->SetRect(IntRect::ZERO);
-    viewport->SetRenderPath(renderPath);
     viewport->SetScene(scene);
+    viewport->AllocateView();
 
     // Setup scene
-    auto view = MakeShared<View>(context);
+    RenderPipelineView* view = viewport->GetRenderPipelineView();
     view->Define(outputTexture->GetRenderSurface(), viewport);
     view->Update({});
 
@@ -211,8 +211,8 @@ void StitchTextureSeams(LightmapStitchingContext& stitchingContext,
     // Prepare for ping-pong
     Texture2D* currentTexture = stitchingContext.pongTexture_;
     Texture2D* swapTexture = stitchingContext.pingTexture_;
-    View* currentView = pingViewViewport.first;
-    View* swapView = pongViewViewport.first;
+    RenderPipelineView* currentView = pingViewViewport.first;
+    RenderPipelineView* swapView = pongViewViewport.first;
 
     const int size = static_cast<int>(stitchingContext.lightmapSize_);
     currentTexture->SetData(0, 0, 0, size, size, buffer.data());

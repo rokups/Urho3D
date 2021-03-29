@@ -49,6 +49,7 @@ public:
     /// Callbacks from SceneProcessor
     /// @{
     void OnUpdateBegin(const FrameInfo& frameInfo);
+    void OnRenderBegin(const FrameInfo& frameInfo);
     void OnRenderEnd(const FrameInfo& frameInfo);
     /// @}
 

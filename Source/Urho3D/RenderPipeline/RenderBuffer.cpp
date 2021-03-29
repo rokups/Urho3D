@@ -110,7 +110,14 @@ TextureRenderBuffer::TextureRenderBuffer(RenderPipelineInterface* renderPipeline
         sizeMultiplier_ = size;
 
     const bool isPersistent = params.flags_.Test(RenderBufferFlag::Persistent);
-    if (isPersistent)
+    auto graphics = GetSubsystem<Graphics>();
+    const bool isDepthStencil = params_.textureFormat_ == graphics->GetDepthStencilFormat()
+        || params_.textureFormat_ == graphics->GetReadableDepthFormat()
+        || params_.textureFormat_ == graphics->GetReadableDepthStencilFormat()
+        || params_.textureFormat_ == graphics->GetShadowMapFormat()
+        || params_.textureFormat_ == graphics->GetHiresShadowMapFormat();
+
+    if (isPersistent || isDepthStencil)
         persistenceKey_ = GetObjectID();
 }
 

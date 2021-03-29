@@ -101,6 +101,7 @@ private:
     /// Callbacks from RenderPipeline
     /// @{
     void OnUpdateBegin(const CommonFrameInfo& frameInfo);
+    void OnRenderBegin(const CommonFrameInfo& frameInfo);
     void OnRenderEnd(const CommonFrameInfo& frameInfo);
     /// @}
 

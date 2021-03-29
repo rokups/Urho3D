@@ -280,7 +280,7 @@
     #endif
 #endif
 
-/// URHO3D_FLIP_FRAMEBUFFER: Whether to flip framebuffer on rendering
+/// URHO3D_FLIP_FRAMEBUFFER: Whether Y axis of clip space is the opposite of Y axis of render target texture.
 #ifdef D3D11
     #define URHO3D_FLIP_FRAMEBUFFER
 #endif

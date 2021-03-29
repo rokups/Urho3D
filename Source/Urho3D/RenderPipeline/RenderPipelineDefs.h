@@ -273,7 +273,7 @@ struct DrawableProcessorSettings
 
 struct InstancingBufferSettings
 {
-    bool enableInstancing_{ true };
+    bool enableInstancing_{};
     unsigned firstInstancingTexCoord_{};
     unsigned numInstancingTexCoords_{};
 
