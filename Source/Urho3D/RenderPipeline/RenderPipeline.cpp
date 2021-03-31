@@ -382,6 +382,9 @@ unsigned RenderPipelineView::RecalculatePipelineStateHash() const
 RenderPipeline::RenderPipeline(Context* context)
     : Component(context)
 {
+    // Enable instancing by default for default render pipeline
+    settings_.instancingBuffer_.enableInstancing_ = true;
+    settings_.Validate(context_);
 }
 
 RenderPipeline::~RenderPipeline()

@@ -59,6 +59,8 @@ public:
     void SetAmbientBrightness(float brightness);
     /// Set background brightness.
     void SetBackgroundBrightness(float brightness);
+    /// Set the background is considered static by lightmapper.
+    void SetBackgroundStatic(bool isStatic);
     /// Set fog color.
     /// @property
     void SetFogColor(const Color& color);
@@ -100,6 +102,12 @@ public:
 
     /// Return ambient brightness.
     float GetAmbientBrightness() const { return ambientBrightness_; }
+
+    /// Return background brightness.
+    float GetBackgroundBrightness() const { return backgroundBrightness_; }
+
+    /// Return whether the background is static.
+    float IsBackgroundStatic() const { return backgroundStatic_; }
 
     /// Return reflection probe data. Pointer is valid until Zone is destroyed.
     const ReflectionProbeData* GetReflectionProbe() const;
@@ -201,6 +209,8 @@ protected:
     float ambientBrightness_{ 1.0f };
     /// Background brightness.
     float backgroundBrightness_{ 0.0f };
+    /// Whether the background is static.
+    bool backgroundStatic_{};
     /// Cached ambient start color.
     Color ambientStartColor_;
     /// Cached ambient end color.

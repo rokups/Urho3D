@@ -387,7 +387,7 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
 
             // Apply ambient from Zone
             const CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
-            if (!gi_ || !gi_->GetBackgroundStatic())
+            if (!cachedZone.zone_->IsBackgroundStatic())
                 lightAccumulator.sphericalHarmonics_ += cachedZone.zone_->GetAmbientAndBackgroundLighting();
             else
                 lightAccumulator.sphericalHarmonics_ += cachedZone.zone_->GetAmbientLighting();

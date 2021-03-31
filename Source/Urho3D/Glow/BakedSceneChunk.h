@@ -40,6 +40,7 @@ struct BakedSceneChunk
     ea::vector<unsigned> lightmaps_;
     /// Direct lightmaps required to bake this chunk.
     ea::vector<unsigned> requiredDirectLightmaps_;
+
     /// Raytracer scene.
     SharedPtr<RaytracerScene> raytracerScene_;
     /// Geometry buffers.

@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "../Graphics/Drawable.h"
 #include "../Math/BoundingBox.h"
 #include "../Math/SphericalHarmonics.h"
 #include "../Scene/Component.h"
@@ -84,6 +85,8 @@ struct LightProbeCollection
 {
     /// World-space positions of light probes.
     ea::vector<Vector3> worldPositions_;
+    /// Light masks of light probes.
+    ea::vector<unsigned> lightMasks_;
 
     /// First light probe owned by corresponding group.
     ea::vector<unsigned> offsets_;
@@ -116,6 +119,7 @@ struct LightProbeCollection
     void Clear()
     {
         worldPositions_.clear();
+        lightMasks_.clear();
         offsets_.clear();
         counts_.clear();
         bakedDataFiles_.clear();
@@ -163,14 +167,15 @@ public:
     /// Reload baked light probes data.
     void ReloadBakedData();
 
-    /// Set whether the auto placement enabled.
+    /// Attributes
+    /// @{
     void SetAutoPlacementEnabled(bool enabled);
-    /// Return auto placement step.
     bool GetAutoPlacementEnabled() const { return autoPlacementEnabled_; }
-    /// Set auto placement step.
     void SetAutoPlacementStep(float step);
-    /// Return auto placement step.
     float GetAutoPlacementStep() const { return autoPlacementStep_; }
+    void SetLightMask(unsigned lightMask) { lightMask_ = lightMask; }
+    unsigned GetLightMask() const { return lightMask_; }
+    /// @}
 
     /// Set light probes.
     void SetLightProbes(const LightProbeVector& lightProbes);
@@ -206,6 +211,8 @@ protected:
     /// Bounding box in local space.
     BoundingBox localBoundingBox_;
 
+    /// Light mask of light probe group.
+    unsigned lightMask_{ DEFAULT_LIGHTMASK };
     /// Whether the auto placement is enabled.
     bool autoPlacementEnabled_{ true };
     /// Automatic placement step.

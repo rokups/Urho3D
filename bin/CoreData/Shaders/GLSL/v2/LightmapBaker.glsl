@@ -1,6 +1,5 @@
 #define NUM_RENDER_TARGETS 6
 #define URHO3D_PIXEL_NEED_NORMAL
-#define URHO3D_GAMMA_CORRECTION
 #define CUSTOM_MATERIAL_CBUFFER
 
 #include "_Config.glsl"
@@ -56,9 +55,9 @@ void main()
 {
 #ifdef URHO3D_MATERIAL_HAS_DIFFUSE
     vec4 albedoInput = texture2D(sDiffMap, vTexCoord);
-    vec4 albedo = DiffMap_ToLight(cMatDiffColor * albedoInput);
+    vec4 albedo = DiffMap_ToLinear(cMatDiffColor * albedoInput);
 #else
-    vec4 albedo = GammaToLightSpaceAlpha(cMatDiffColor);
+    vec4 albedo = GammaToLinearSpaceAlpha(cMatDiffColor);
 #endif
 
     vec3 emissiveColor = cMatEmissiveColor;

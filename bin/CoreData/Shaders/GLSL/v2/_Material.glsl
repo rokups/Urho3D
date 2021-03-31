@@ -256,7 +256,7 @@ SurfaceData GetCommonSurfaceData()
 #ifdef URHO3D_AMBIENT_PASS
     result.ambientLighting = vAmbientAndVertexLigthing;
     #ifdef URHO3D_HAS_LIGHTMAP
-        result.ambientLighting += 2.0 * texture2D(sEmissiveMap, vTexCoord2).rgb;
+        result.ambientLighting += GammaToLightSpace(2.0 * texture2D(sEmissiveMap, vTexCoord2).rgb);
     #endif
 #endif
 

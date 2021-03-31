@@ -79,6 +79,7 @@ void Zone::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("Ambient Color", Color, ambientColor_, MarkCachedAmbientDirty, DEFAULT_AMBIENT_COLOR, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Ambient Brightness", float, ambientBrightness_, MarkCachedAmbientDirty, 1.0f, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Background Brightness", float, backgroundBrightness_, MarkCachedAmbientDirty, 0.0f, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Is Background Static", bool, backgroundStatic_, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Fog Color", Color, fogColor_, MarkCachedAmbientDirty, DEFAULT_FOG_COLOR, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Fog Start", float, fogStart_, DEFAULT_FOG_START, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Fog End", float, fogEnd_, DEFAULT_FOG_END, AM_DEFAULT);
@@ -127,6 +128,11 @@ void Zone::SetBackgroundBrightness(float brightness)
     backgroundBrightness_ = brightness;
     MarkNetworkUpdate();
     MarkCachedAmbientDirty();
+}
+
+void Zone::SetBackgroundStatic(bool isStatic)
+{
+    backgroundStatic_ = isStatic;
 }
 
 void Zone::SetFogColor(const Color& color)
@@ -423,7 +429,10 @@ void Zone::UpdateCachedData()
 
     if (cachedAmbientAndBackgroundLighting_.IsInvalidated())
     {
-        SphericalHarmonicsDot9 sh = zoneTexture_ ? cachedTextureLighting_.Get() : SphericalHarmonicsDot9(fogColor_);
+        SphericalHarmonicsDot9 sh = zoneTexture_
+            ? cachedTextureLighting_.Get()
+            : SphericalHarmonicsDot9(fogColor_.GammaToLinear());
+
         sh *= backgroundBrightness_;
         sh += GetAmbientLighting();
 

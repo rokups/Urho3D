@@ -112,23 +112,20 @@ struct LightmapChartGeometryBuffer
     /// Size of lightmap chart.
     unsigned lightmapSize_{};
 
-    /// Positions as is.
+    /// Geometry buffer
+    /// @{
     ea::vector<Vector3> positions_;
-    /// Smooth positions after Phong tesselation.
-    // TODO: Implement
-    ea::vector<Vector3> smoothPositions_;
-    /// Smooth normals used in rendering.
+    ea::vector<Vector3> smoothPositions_; // TODO: Implement
     ea::vector<Vector3> smoothNormals_;
-    /// Face normals, calculated from positions.
     ea::vector<Vector3> faceNormals_;
-    /// Geometry IDs.
     ea::vector<unsigned> geometryIds_;
-    /// Radiuses of texels.
+    ea::vector<unsigned> lightMasks_;
+    ea::vector<unsigned> backgroundIds_;
     ea::vector<float> texelRadiuses_;
-    /// Albedo values.
     ea::vector<Vector3> albedo_;
-    /// Emission values.
     ea::vector<Vector3> emission_;
+    /// @}
+
     /// Lightmap seams.
     LightmapSeamVector seams_;
 
@@ -143,6 +140,8 @@ struct LightmapChartGeometryBuffer
         , smoothNormals_(lightmapSize_ * lightmapSize_)
         , faceNormals_(lightmapSize_ * lightmapSize_)
         , geometryIds_(lightmapSize_ * lightmapSize_)
+        , lightMasks_(lightmapSize_ * lightmapSize_)
+        , backgroundIds_(lightmapSize_ * lightmapSize_)
         , texelRadiuses_(lightmapSize_ * lightmapSize_)
         , albedo_(lightmapSize_ * lightmapSize_)
         , emission_(lightmapSize_ * lightmapSize_)

@@ -24,7 +24,12 @@
 
 #include "../Glow/BakedSceneChunk.h"
 
+#include "../Glow/Helpers.h"
 #include "../Glow/LightTracer.h"
+#include "../Graphics/Drawable.h"
+#include "../Graphics/Terrain.h"
+#include "../Graphics/TerrainPatch.h"
+#include "../Graphics/Zone.h"
 #include "../IO/Log.h"
 
 #include <EASTL/sort.h>
@@ -225,16 +230,9 @@ BakedSceneChunk CreateBakedSceneChunk(Context* context,
     LightProbeCollection lightProbesCollection;
     LightProbeGroup::CollectLightProbes(lightProbeGroupsInChunk, lightProbesCollection, nullptr);
 
-    // Create scene for raytracing
-    RaytracingBackground raytracingBackground;
-    raytracingBackground.lightIntensity_ =
-        settings.properties_.backgroundColor_ * settings.properties_.backgroundBrightness_;
-    raytracingBackground.backgroundImage_ = settings.properties_.backgroundImage_;
-    raytracingBackground.backgroundImageBrightness_ = settings.properties_.backgroundBrightness_;
-
     const unsigned uvChannel = settings.geometryBufferBaking_.uvChannel_;
     const SharedPtr<RaytracerScene> raytracerScene = CreateRaytracingScene(
-        context, geometriesInChunk, uvChannel, raytracingBackground);
+        context, geometriesInChunk, uvChannel, collector.GetBackgrounds());
 
     // Match raytracer geometries and geometry buffer
     ea::vector<unsigned> geometryBufferToRaytracerGeometry = CreateGeometryMapping(
@@ -245,6 +243,37 @@ BakedSceneChunk CreateBakedSceneChunk(Context* context,
     {
         PreprocessGeometryBuffer(geometryBuffer, *raytracerScene, geometryBufferToRaytracerGeometry,
             settings.geometryBufferPreprocessing_);
+
+        ParallelFor(geometryBuffer.positions_.size(), settings.geometryBufferPreprocessing_.numTasks_,
+            [&](unsigned fromIndex, unsigned toIndex)
+        {
+            for (unsigned i = fromIndex; i < toIndex; ++i)
+            {
+                const unsigned geometryId = geometryBuffer.geometryIds_[i];
+                if (!geometryId)
+                    continue;
+
+                const unsigned objectIndex = geometryBakingScenes.idToObject_[geometryId].objectIndex_;
+                Component* geometry = uniqueGeometries[objectIndex];
+
+                if (auto terrain = dynamic_cast<Terrain*>(geometry))
+                {
+                    // Use effective light mask of central patch for terrain
+                    const IntVector2 numPatches = terrain->GetNumPatches();
+                    const IntVector2 patchIndex = VectorMin(numPatches / 2, numPatches - IntVector2::ONE);
+                    Drawable* drawable = terrain->GetPatch(patchIndex.x_, patchIndex.y_);
+                    Zone* zone = drawable->GetMutableCachedZone().zone_;
+                    geometryBuffer.lightMasks_[i] = drawable->GetLightMaskInZone();
+                    geometryBuffer.backgroundIds_[i] = collector.GetZoneBackground(chunk, zone);
+                }
+                else if (auto drawable = dynamic_cast<Drawable*>(geometry))
+                {
+                    Zone* zone = drawable->GetMutableCachedZone().zone_;
+                    geometryBuffer.lightMasks_[i] = drawable->GetLightMaskInZone();
+                    geometryBuffer.backgroundIds_[i] = collector.GetZoneBackground(chunk, zone);
+                }
+            }
+        });
     }
 
     // Create baked chunk

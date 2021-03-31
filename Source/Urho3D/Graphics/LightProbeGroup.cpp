@@ -85,6 +85,7 @@ void LightProbeGroup::RegisterObject(Context* context)
     context->RegisterFactory<LightProbeGroup>(SCENE_CATEGORY);
 
     URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Light Mask", unsigned, lightMask_, DEFAULT_LIGHTMASK, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Auto Placement", GetAutoPlacementEnabled, SetAutoPlacementEnabled, bool, true, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Auto Placement Step", GetAutoPlacementStep, SetAutoPlacementStep, float, 1.0f, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Local Bounding Box Min", Vector3, localBoundingBox_.min_, Vector3::ZERO, AM_DEFAULT | AM_NOEDIT);
@@ -144,6 +145,7 @@ void LightProbeGroup::CollectLightProbes(const ea::vector<LightProbeGroup*>& lig
         {
             const Vector3 worldPosition = node->LocalToWorld(probe.position_);
             collection.worldPositions_.push_back(worldPosition);
+            collection.lightMasks_.push_back(group->lightMask_);
         }
 
         // Store baked data

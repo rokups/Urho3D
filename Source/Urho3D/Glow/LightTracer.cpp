@@ -386,6 +386,7 @@ struct ChartDirectTracingKernel
     bool bakeDirect_{};
     /// Whether to bake direct light for indirect lighting.
     bool bakeIndirect_{};
+    unsigned lightMask_{};
 
     /// Current smooth interpolated normal.
     Vector3 currentSmoothNormal_;
@@ -418,7 +419,8 @@ struct ChartDirectTracingKernel
     bool BeginElement(unsigned elementIndex, DirectTracingContextForCharts& rayContext, Vector3& position)
     {
         const unsigned geometryId = geometryBuffer_->geometryIds_[elementIndex];
-        if (!geometryId)
+        const unsigned objectLightMask = geometryBuffer_->lightMasks_[elementIndex];
+        if (!geometryId || (objectLightMask & lightMask_) == 0)
             return false;
 
         // Initialize per-element data in ray context
@@ -480,6 +482,7 @@ struct LightProbeDirectTracingKernel
     unsigned numSamples_{ 1 };
     /// Whether to bake direct light for direct lighting itself.
     bool bakeDirect_{};
+    unsigned lightMask_{};
 
     /// Accumulated light SH.
     SphericalHarmonicsColor9 accumulatedLightSH_;
@@ -506,6 +509,10 @@ struct LightProbeDirectTracingKernel
     /// Begin tracing element.
     bool BeginElement(unsigned elementIndex, DirectTracingContextForLightProbes& /*rayContext*/, Vector3& position)
     {
+        const unsigned probeLightMask = collection_->lightMasks_[elementIndex];
+        if ((probeLightMask & lightMask_) == 0)
+            return false;
+
         position = collection_->worldPositions_[elementIndex];
 
         accumulatedLightSH_ = {};
@@ -648,6 +655,7 @@ struct ChartIndirectTracingKernel
     Vector3 currentSmoothNormal_;
     /// Current geometry ID.
     unsigned currentGeometryId_;
+    unsigned currentBackgroundIndex_{};
 
     /// Accumulated indirect light value.
     Vector4 accumulatedIndirectLight_;
@@ -669,8 +677,10 @@ struct ChartIndirectTracingKernel
             return false;
 
         currentPosition_ = geometryBuffer_->positions_[elementIndex];
+        currentFaceNormal_ = geometryBuffer_->faceNormals_[elementIndex];
         currentSmoothNormal_ = geometryBuffer_->smoothNormals_[elementIndex];
         currentGeometryId_ = geometryId;
+        currentBackgroundIndex_ = geometryBuffer_->backgroundIds_[elementIndex];
 
         // Fallback to light probes if has LODs
         const unsigned raytracerGeometryId = (*geometryBufferToRaytracer_)[geometryId];
@@ -689,6 +699,8 @@ struct ChartIndirectTracingKernel
 
         return true;
     };
+
+    unsigned GetElementBackgroundIndex() const { return currentBackgroundIndex_; }
 
     /// Begin sample. Return position, normal and initial ray direction.
     void BeginSample(unsigned /*sampleIndex*/,
@@ -748,6 +760,8 @@ struct LightProbeIndirectTracingKernel
         return true;
     };
 
+    unsigned GetElementBackgroundIndex() const { return 0; }
+
     /// Begin sample. Return position, normal and initial ray direction.
     void BeginSample(unsigned /*sampleIndex*/,
         Vector3& position, Vector3& faceNormal, Vector3& smoothNormal, Vector3& rayDirection, Vector3& albedo)
@@ -791,7 +805,7 @@ void TraceIndirectLight(T sharedKernel, const ea::vector<const LightmapChartBake
         RTCScene scene = raytracerScene.GetEmbreeScene();
         const float maxDistance = raytracerScene.GetMaxDistance();
         const auto& geometryIndex = raytracerScene.GetGeometries();
-        const RaytracingBackground& background = raytracerScene.GetBackground();
+        const auto& backgrounds = raytracerScene.GetBackgrounds();
 
         Vector3 albedo[IndirectLightTracingSettings::MaxBounces];
         Vector3 incomingSamples[IndirectLightTracingSettings::MaxBounces];
@@ -813,6 +827,8 @@ void TraceIndirectLight(T sharedKernel, const ea::vector<const LightmapChartBake
         {
             if (!kernel.BeginElement(elementIndex))
                 continue;
+
+            const BakedSceneBackground& background = (*backgrounds)[kernel.GetElementBackgroundIndex()];
 
             for (unsigned sampleIndex = 0; sampleIndex < kernel.GetNumSamples(); ++sampleIndex)
             {
@@ -839,7 +855,7 @@ void TraceIndirectLight(T sharedKernel, const ea::vector<const LightmapChartBake
                     // If hit background, pick light and break
                     if (rayHit.hit.geomID == RTC_INVALID_GEOMETRY_ID)
                     {
-                        incomingSamples[bounceIndex] = background.SampleBackground(currentRayDirection);
+                        incomingSamples[bounceIndex] = background.SampleLinear(currentRayDirection);
                         incomingFactors[bounceIndex] = 1.0f;
                         ++numBounces;
                         break;
@@ -1037,7 +1053,8 @@ void BakeDirectLightForCharts(LightmapChartBakedDirect& bakedDirect, const Light
     const bool bakeIndirect = true;
     const unsigned numSamples = CalculateNumSamples(light, settings.maxSamples_);
     const ChartDirectTracingKernel kernel{ &bakedDirect, &geometryBuffer, &geometryBufferToRaytracer,
-        &raytracerScene.GetGeometries(), &settings, light.indirectBrightness_, numSamples, bakeDirect, bakeIndirect };
+        &raytracerScene.GetGeometries(), &settings, light.indirectBrightness_, numSamples,
+        bakeDirect, bakeIndirect, light.lightMask_ };
 
     if (light.lightType_ == LIGHT_DIRECTIONAL)
     {
@@ -1065,7 +1082,7 @@ void BakeDirectLightForLightProbes(
     const bool bakeDirect = light.lightMode_ == LM_BAKED;
     const unsigned numSamples = CalculateNumSamples(light, settings.maxSamples_);
     const LightProbeDirectTracingKernel kernel{ &collection, &bakedData, &settings,
-        &raytracerScene.GetGeometries(), numSamples, bakeDirect };
+        &raytracerScene.GetGeometries(), numSamples, bakeDirect, light.lightMask_ };
 
     if (light.lightType_ == LIGHT_DIRECTIONAL)
     {

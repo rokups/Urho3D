@@ -217,7 +217,10 @@ void LightBaker::Update()
     if (state_ == InternalState::ScheduledSync || state_ == InternalState::ScheduledAsync)
     {
 #if URHO3D_GLOW
-        UpdateSettings();
+        if (!UpdateSettings())
+        {
+            return;
+        }
 
         auto taskData = ea::make_shared<TaskData>();
         taskData->weakSelf_ = this;
