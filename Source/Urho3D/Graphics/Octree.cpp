@@ -219,8 +219,11 @@ void Octant::ResetOctree()
     octree_ = nullptr;
 
     // The whole octree is being destroyed, just detach the drawables
-    for (auto i = drawables_.begin(); i != drawables_.end(); ++i)
-        (*i)->SetOctant(nullptr);
+    for (Drawable* drawable : drawables_)
+    {
+        drawable->SetOctant(nullptr);
+        drawable->SetDrawableIndex(M_MAX_UNSIGNED);
+    }
 
     for (auto& child : children_)
     {

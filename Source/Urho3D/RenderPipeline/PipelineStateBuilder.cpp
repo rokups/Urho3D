@@ -190,7 +190,7 @@ void PipelineStateBuilder::ApplyCommonDefines(const Pass* materialPass)
 
 void PipelineStateBuilder::ApplyGeometry(Geometry* geometry, GeometryType geometryType, bool useInstancingBuffer)
 {
-    const bool isInstancingSupported = geometryType == GEOM_STATIC || geometryType == GEOM_INSTANCED;
+    const bool isInstancingSupported = (geometryType == GEOM_STATIC || geometryType == GEOM_INSTANCED) && geometry->GetIndexBuffer();
     if (!useInstancingBuffer || !instancingBuffer_->IsEnabled() || !isInstancingSupported)
         desc_.InitializeInputLayoutAndPrimitiveType(geometry);
     else
@@ -356,8 +356,15 @@ void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPa
         pixelDefines_ += "URHO3D_MATERIAL_HAS_NORMAL ";
     if (material->GetTexture(TU_SPECULAR))
         pixelDefines_ += "URHO3D_MATERIAL_HAS_SPECULAR ";
-    if (material->GetTexture(TU_EMISSIVE))
+    if (Texture* emissiveTexture = material->GetTexture(TU_EMISSIVE))
+    {
         pixelDefines_ += "URHO3D_MATERIAL_HAS_EMISSIVE ";
+        // TODO(renderer): Throttle logging
+        const int hint = GetTextureColorSpaceHint(emissiveTexture->GetLinear(), emissiveTexture->GetSRGB());
+        if (hint > 1)
+            URHO3D_LOGWARNING("Texture {} cannot be both sRGB and Linear", emissiveTexture->GetName());
+        pixelDefines_ += Format("URHO3D_MATERIAL_EMISSIVE_HINT={} ", ea::min(1, hint));
+    }
 
     desc_.depthWriteEnabled_ = materialPass->GetDepthWrite();
     desc_.depthCompareFunction_ = materialPass->GetDepthTestMode();

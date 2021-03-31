@@ -30,6 +30,7 @@ namespace Urho3D
 class Drawable;
 class Node;
 class Scene;
+class StaticModel;
 class Zone;
 
 }
@@ -64,8 +65,12 @@ private:
 
     /// Scene that owns camera.
     SharedPtr<Scene> cameraScene_;
-    /// Index of currently rendered scene.
+    /// Probe object.
+    SharedPtr<StaticModel> probeObject_;
+    /// Index of currently rendered scene, i.e. outer index of sceneNames_.
     unsigned sceneIndex_{};
+    /// Index of current scene rendering mode, i.e. inner index of sceneNames_.
+    unsigned sceneMode_{};
     /// List of all available scenes.
-    ea::vector<ea::string> sceneNames_;
+    ea::vector<ea::vector<ea::string>> sceneNames_;
 };

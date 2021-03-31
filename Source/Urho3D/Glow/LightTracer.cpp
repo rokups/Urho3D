@@ -461,8 +461,9 @@ struct ChartDirectTracingKernel
 
         if (bakeIndirect_)
         {
+            // Instead of dividing direct light by pi, we multiply it here
             const Vector3& albedo = geometryBuffer_->albedo_[elementIndex];
-            bakedDirect_->surfaceLight_[elementIndex] += indirectBrightness_ * albedo * directLight;
+            bakedDirect_->surfaceLight_[elementIndex] += M_PI * indirectBrightness_ * albedo * directLight;
         }
     }
 };

@@ -223,9 +223,9 @@ SurfaceData GetCommonSurfaceData()
     // Evaluate emission
 #ifndef URHO3D_HAS_LIGHTMAP
     #if defined(URHO3D_MATERIAL_HAS_EMISSIVE) && !defined(AO)
-        result.emission = cMatEmissiveColor * texture2D(sEmissiveMap, vTexCoord).rgb;
+        result.emission = EmissiveMap_ToLight(cMatEmissiveColor.rgbb * texture2D(sEmissiveMap, vTexCoord)).rgb;
     #else
-        result.emission = cMatEmissiveColor;
+        result.emission = GammaToLightSpace(cMatEmissiveColor);
     #endif
 #else
     result.emission = vec3(0.0);

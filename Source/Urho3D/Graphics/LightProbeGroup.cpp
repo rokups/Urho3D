@@ -137,7 +137,6 @@ void LightProbeGroup::CollectLightProbes(const ea::vector<LightProbeGroup*>& lig
 
         collection.offsets_.push_back(offset);
         collection.counts_.push_back(probes.size());
-        collection.bakedDataFiles_.push_back(group->GetBakedDataFileRef().name_);
         collection.names_.push_back(node->GetName());
         offset += probes.size();
 
@@ -169,14 +168,10 @@ void LightProbeGroup::CollectLightProbes(Scene* scene,
     CollectLightProbes(lightProbeGroups, collection, bakedData, reload);
 }
 
-bool LightProbeGroup::SaveLightProbesBakedData(Context* context,
+bool LightProbeGroup::SaveLightProbesBakedData(Context* context, const ea::string& fileName,
     const LightProbeCollection& collection, const LightProbeCollectionBakedData& bakedData, unsigned index)
 {
     if (index >= collection.GetNumGroups())
-        return false;
-
-    const ea::string fileName = collection.bakedDataFiles_[index];
-    if (fileName.empty())
         return false;
 
     const unsigned offset = collection.offsets_[index];

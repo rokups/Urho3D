@@ -24,6 +24,8 @@
 #include <Urho3D/Engine/Engine.h>
 #include <Urho3D/Graphics/Camera.h>
 #include <Urho3D/Graphics/Graphics.h>
+#include <Urho3D/Graphics/Model.h>
+#include <Urho3D/Graphics/Octree.h>
 #include <Urho3D/Graphics/RenderPath.h>
 #include <Urho3D/Graphics/StaticModel.h>
 #include <Urho3D/Graphics/Zone.h>
@@ -44,8 +46,8 @@
 
 RenderingShowcase::RenderingShowcase(Context* context) : Sample(context)
 {
-    sceneNames_.push_back("Scenes/RenderingExample.xml");
-    sceneNames_.push_back("Scenes/RenderingExample2.xml");
+    sceneNames_.push_back({ "Scenes/RenderingExample.xml" });
+    sceneNames_.push_back({ "Scenes/RenderingExample2.xml" });
 }
 
 void RenderingShowcase::Start()
@@ -77,8 +79,8 @@ void RenderingShowcase::CreateInstructions()
 
     // Construct new Text object, set string to display and font to use
     auto* instructionText = ui->GetRoot()->CreateChild<Text>();
-    instructionText->SetText("Press Tab to switch scene\n"
-        "Hold RMB and use WASD keys and mouse to move");
+    instructionText->SetText("Press Tab to switch scene. Press Q to switch scene mode. \n"
+        "Press F to toggle probe object. Use WASD keys and mouse to move.");
     instructionText->SetFont(cache->GetResource<Font>("Fonts/Anonymous Pro.ttf"), 15);
     instructionText->SetTextAlignment(HA_CENTER);
 
@@ -90,21 +92,33 @@ void RenderingShowcase::CreateInstructions()
 
 void RenderingShowcase::CreateScene()
 {
+    auto* cache = GetSubsystem<ResourceCache>();
+
     scene_ = MakeShared<Scene>(context_);
     cameraScene_ = MakeShared<Scene>(context_);
 
     // Create the camera (not included in the scene file)
     cameraNode_ = cameraScene_->CreateChild("Camera");
     cameraNode_->CreateComponent<Camera>();
+
+    Node* probeObjectNode = cameraNode_->CreateChild();
+    probeObjectNode->SetPosition({ 0.0f, 0.0f, 1.0f });
+    probeObjectNode->SetScale(0.5f);
+
+    probeObject_ = probeObjectNode->CreateComponent<StaticModel>();
+    probeObject_->SetModel(cache->GetResource<Model>("Models/Teapot.mdl"));
+    probeObject_->SetCastShadows(true);
 }
 
 void RenderingShowcase::SetupSelectedScene()
 {
     auto* cache = GetSubsystem<ResourceCache>();
 
+    const bool isProbeObjectVisible = probeObject_->IsInOctree();
+
     // Load scene content prepared in the editor (XML format). GetFile() returns an open file from the resource system
     // which scene.LoadXML() will read
-    SharedPtr<File> file = cache->GetFile(sceneNames_[sceneIndex_]);
+    SharedPtr<File> file = cache->GetFile(sceneNames_[sceneIndex_][sceneMode_]);
     scene_->LoadXML(*file);
 
     cameraNode_->SetPosition({ 0.0f, 4.0f, 8.0f });
@@ -112,6 +126,9 @@ void RenderingShowcase::SetupSelectedScene()
 
     yaw_ = cameraNode_->GetRotation().YawAngle();
     pitch_ = cameraNode_->GetRotation().PitchAngle();
+
+    if (isProbeObjectVisible)
+        scene_->GetComponent<Octree>()->AddManualDrawable(probeObject_);
 }
 
 void RenderingShowcase::SetupViewport()
@@ -170,11 +187,33 @@ void RenderingShowcase::HandleUpdate(StringHash eventType, VariantMap& eventData
     // Move the camera, scale movement with time step
     MoveCamera(timeStep);
 
+    // Keep probe object orientation
+    probeObject_->GetNode()->SetWorldRotation(Quaternion::IDENTITY);
+
     // Update scene
     auto* input = GetSubsystem<Input>();
     if (sceneNames_.size() > 1 && input->GetKeyPress(KEY_TAB))
     {
         sceneIndex_ = (sceneIndex_ + 1) % sceneNames_.size();
+        sceneMode_ = 0;
         SetupSelectedScene();
+    }
+
+    // Update scene mode
+    if (sceneNames_[sceneIndex_].size() > 1 && input->GetKeyPress(KEY_Q))
+    {
+        sceneMode_ = (sceneMode_ + 1) % sceneNames_[sceneIndex_].size();
+        SetupSelectedScene();
+    }
+
+    // Update probe object
+    if (input->GetKeyPress(KEY_F))
+    {
+        const bool isProbeObjectVisible = probeObject_->IsInOctree();
+        auto* octree = scene_->GetComponent<Octree>();
+        if (isProbeObjectVisible)
+            octree->RemoveManualDrawable(probeObject_);
+        else
+            octree->AddManualDrawable(probeObject_);
     }
 }

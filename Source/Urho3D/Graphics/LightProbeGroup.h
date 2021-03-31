@@ -90,8 +90,6 @@ struct LightProbeCollection
     ea::vector<unsigned> offsets_;
     /// Number of light probes owned by corresponding group.
     ea::vector<unsigned> counts_;
-    /// Baked data file for corresponding group.
-    ea::vector<ea::string> bakedDataFiles_;
     /// Group names.
     ea::vector<ea::string> names_;
 
@@ -119,7 +117,6 @@ struct LightProbeCollection
         worldPositions_.clear();
         offsets_.clear();
         counts_.clear();
-        bakedDataFiles_.clear();
         names_.clear();
     }
 };
@@ -151,7 +148,7 @@ public:
     static void CollectLightProbes(Scene* scene,
         LightProbeCollection& collection, LightProbeCollectionBakedData* bakedData, bool reload = false);
     /// Save light probes baked data for specific element. Return false if failed.
-    static bool SaveLightProbesBakedData(Context* context,
+    static bool SaveLightProbesBakedData(Context* context, const ea::string& fileName,
         const LightProbeCollection& collection, const LightProbeCollectionBakedData& bakedData, unsigned index);
 
     /// Return bounding box in local space.

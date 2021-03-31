@@ -206,8 +206,9 @@ struct IncrementalLightBaker::Impl
             {
                 LightProbeGroup* group = uniqueLightProbes[i];
                 const ea::string fileName = GetLightProbeBakedDataFileName(chunk, i);
+                const ea::string resourceName = GetResourceName(context_->GetSubsystem<ResourceCache>(), fileName);
                 fileSystem->CreateDirsRecursive(GetPath(fileName));
-                group->SetBakedDataFileRef({ BinaryFile::GetTypeStatic(), fileName });
+                group->SetBakedDataFileRef({ BinaryFile::GetTypeStatic(), resourceName });
             }
 
             // Update base index
@@ -370,7 +371,8 @@ struct IncrementalLightBaker::Impl
             // Save light probes
             for (unsigned groupIndex = 0; groupIndex < bakedChunk->numUniqueLightProbes_; ++groupIndex)
             {
-                if (!LightProbeGroup::SaveLightProbesBakedData(context_,
+                const ea::string fileName = GetLightProbeBakedDataFileName(chunk, groupIndex);
+                if (!LightProbeGroup::SaveLightProbesBakedData(context_, fileName,
                     bakedChunk->lightProbesCollection_, lightProbesBakedData, groupIndex))
                 {
                     const ea::string groupName = groupIndex < bakedChunk->lightProbesCollection_.GetNumGroups()

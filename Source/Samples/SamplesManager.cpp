@@ -571,6 +571,11 @@ void SamplesManager::OnFrameStart()
             context_->GetSubsystem<Engine>()->Exit();
 #endif
         }
+
+#if URHO3D_RMLUI
+        // Always close inspector
+        inspectorNode_->RemoveComponent<RmlSerializableInspector>();
+#endif
     }
 }
 

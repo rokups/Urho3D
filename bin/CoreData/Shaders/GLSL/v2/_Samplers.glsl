@@ -41,6 +41,18 @@ SAMPLER(9, samplerCube sLightCubeMap)
     #endif
 #endif
 
+#ifdef URHO3D_MATERIAL_HAS_EMISSIVE
+    #if URHO3D_MATERIAL_EMISSIVE_HINT == 0
+        #define EmissiveMap_ToGamma(color)  Texture_ToGamma_0(color)
+        #define EmissiveMap_ToLinear(color) Texture_ToLinear_0(color)
+        #define EmissiveMap_ToLight(color)  Texture_ToLight_0(color)
+    #elif URHO3D_MATERIAL_EMISSIVE_HINT == 1
+        #define EmissiveMap_ToGamma(color)  Texture_ToGamma_1(color)
+        #define EmissiveMap_ToLinear(color) Texture_ToLinear_1(color)
+        #define EmissiveMap_ToLight(color)  Texture_ToLight_1(color)
+    #endif
+#endif
+
 vec3 DecodeNormal(vec4 normalInput)
 {
     #ifdef PACKEDNORMAL

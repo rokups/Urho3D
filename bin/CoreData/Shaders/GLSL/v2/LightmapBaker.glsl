@@ -60,10 +60,12 @@ void main()
     vec4 albedo = GammaToLinearSpaceAlpha(cMatDiffColor);
 #endif
 
-    vec3 emissiveColor = cMatEmissiveColor;
-    #ifdef EMISSIVEMAP
-        emissiveColor *= texture2D(sEmissiveMap, vTexCoord.xy).rgb;
-    #endif
+#ifdef URHO3D_MATERIAL_HAS_EMISSIVE
+    vec4 emissiveInput = texture2D(sEmissiveMap, vTexCoord);
+    vec3 emissive = EmissiveMap_ToLinear(cMatEmissiveColor.rgbb * emissiveInput).rgb;
+#else
+    vec3 emissive = GammaToLinearSpace(cMatEmissiveColor);
+#endif
 
     vec3 normal = normalize(vNormal);
 
@@ -86,6 +88,6 @@ void main()
     gl_FragData[2] = vec4(faceNormal, 1.0);
     gl_FragData[3] = vec4(normal, 1.0);
     gl_FragData[4] = vec4(albedo.rgb * albedo.a, 1.0);
-    gl_FragData[5] = vec4(emissiveColor.rgb, 1.0);
+    gl_FragData[5] = vec4(emissive, 1.0);
 }
 #endif
