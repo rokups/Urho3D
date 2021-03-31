@@ -64,6 +64,8 @@ public:
     virtual void CommitGeometries(const IntVector3& chunkIndex) = 0;
     /// Return unique light probe groups within chunk. Order of groups must stay the same for each call.
     virtual ea::vector<LightProbeGroup*> GetUniqueLightProbeGroups(const IntVector3& chunkIndex) = 0;
+    /// Return zone that corresponds to light probe group within chunk.
+    virtual Zone* GetLightProbeGroupZone(const IntVector3& chunkIndex, LightProbeGroup* lightProbeGroup) = 0;
     /// Return background index for zone within chunk.
     virtual unsigned GetZoneBackground(const IntVector3& chunkIndex, Zone* zone) = 0;
 
@@ -97,6 +99,7 @@ public:
     ea::vector<Component*> GetUniqueGeometries(const IntVector3& chunkIndex) override;
     void CommitGeometries(const IntVector3& chunkIndex) override;
     ea::vector<LightProbeGroup*> GetUniqueLightProbeGroups(const IntVector3& chunkIndex) override;
+    Zone* GetLightProbeGroupZone(const IntVector3& chunkIndex, LightProbeGroup* lightProbeGroup) override;
     unsigned GetZoneBackground(const IntVector3& chunkIndex, Zone* zone) override;
 
     BoundingBox GetChunkBoundingBox(const IntVector3& chunkIndex) override;

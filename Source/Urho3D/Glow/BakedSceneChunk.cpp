@@ -227,8 +227,22 @@ BakedSceneChunk CreateBakedSceneChunk(Context* context,
         geometryBakingScenes.bakingScenes_);
 
     // Collect light probes, unique are first
-    LightProbeCollection lightProbesCollection;
+    LightProbeCollectionForBaking lightProbesCollection;
     LightProbeGroup::CollectLightProbes(lightProbeGroupsInChunk, lightProbesCollection, nullptr);
+
+    // Fill baking info for light probes
+    for (unsigned i = 0; i < lightProbeGroupsInChunk.size(); ++i)
+    {
+        LightProbeGroup* lightProbeGroup = lightProbeGroupsInChunk[i];
+        Zone* zone = collector.GetLightProbeGroupZone(chunk, lightProbeGroup);
+
+        const unsigned numProbes = lightProbesCollection.counts_[i];
+        const unsigned lightMask = zone->GetLightMask() & lightProbeGroup->GetLightMask();
+        const unsigned backgroundId = collector.GetZoneBackground(chunk, zone);
+
+        lightProbesCollection.lightMasks_.insert(lightProbesCollection.lightMasks_.end(), numProbes, lightMask);
+        lightProbesCollection.backgroundIds_.insert(lightProbesCollection.backgroundIds_.end(), numProbes, backgroundId);
+    }
 
     const unsigned uvChannel = settings.geometryBufferBaking_.uvChannel_;
     const SharedPtr<RaytracerScene> raytracerScene = CreateRaytracingScene(

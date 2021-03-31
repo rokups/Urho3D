@@ -20,10 +20,10 @@
 // THE SOFTWARE.
 //
 
+#include "../Glow/BakedSceneChunk.h"
 #include "../Glow/Helpers.h"
 #include "../Glow/RaytracerScene.h"
 #include "../Glow/LightTracer.h"
-#include "../Graphics/LightProbeGroup.h"
 #include "../IO/Log.h"
 #include "../Math/TetrahedralMesh.h"
 
@@ -471,7 +471,7 @@ struct ChartDirectTracingKernel
 struct LightProbeDirectTracingKernel
 {
     /// Light probes collection.
-    const LightProbeCollection* collection_{};
+    const LightProbeCollectionForBaking* collection_{};
     /// Light probes baked data.
     LightProbeCollectionBakedData* bakedData_{};
     /// Settings.
@@ -730,7 +730,7 @@ struct ChartIndirectTracingKernel
 struct LightProbeIndirectTracingKernel
 {
     /// Light probes collection.
-    const LightProbeCollection* collection_{};
+    const LightProbeCollectionForBaking* collection_{};
     /// Light probes baked data.
     LightProbeCollectionBakedData* bakedData_{};
     /// Settings.
@@ -738,6 +738,7 @@ struct LightProbeIndirectTracingKernel
 
     /// Current position.
     Vector3 currentPosition_;
+    unsigned backgroundId_{};
 
     /// Current sample direction.
     Vector3 currentSampleDirection_;
@@ -755,12 +756,13 @@ struct LightProbeIndirectTracingKernel
     bool BeginElement(unsigned elementIndex)
     {
         currentPosition_ = collection_->worldPositions_[elementIndex];
+        backgroundId_ = collection_->backgroundIds_[elementIndex];
 
         accumulatedLightSH_ = {};
         return true;
     };
 
-    unsigned GetElementBackgroundIndex() const { return 0; }
+    unsigned GetElementBackgroundIndex() const { return backgroundId_; }
 
     /// Begin sample. Return position, normal and initial ray direction.
     void BeginSample(unsigned /*sampleIndex*/,
@@ -784,7 +786,7 @@ struct LightProbeIndirectTracingKernel
     /// End tracing element.
     void EndElement(unsigned elementIndex)
     {
-        const float weight = M_PI / GetNumSamples();
+        const float weight = 4.0f * M_PI / GetNumSamples();
         const SphericalHarmonicsDot9 sh{ accumulatedLightSH_ * weight };
         bakedData_->sphericalHarmonics_[elementIndex] += sh;
     }
@@ -1076,7 +1078,7 @@ void BakeDirectLightForCharts(LightmapChartBakedDirect& bakedDirect, const Light
 }
 
 void BakeDirectLightForLightProbes(
-    LightProbeCollectionBakedData& bakedData, const LightProbeCollection& collection,
+    LightProbeCollectionBakedData& bakedData, const LightProbeCollectionForBaking& collection,
     const RaytracerScene& raytracerScene, const BakedLight& light, const DirectLightTracingSettings& settings)
 {
     const bool bakeDirect = light.lightMode_ == LM_BAKED;
@@ -1118,7 +1120,7 @@ void BakeIndirectLightForCharts(LightmapChartBakedIndirect& bakedIndirect,
 }
 
 void BakeIndirectLightForLightProbes(
-    LightProbeCollectionBakedData& bakedData, const LightProbeCollection& collection,
+    LightProbeCollectionBakedData& bakedData, const LightProbeCollectionForBaking& collection,
     const ea::vector<const LightmapChartBakedDirect*>& bakedDirect,
     const RaytracerScene& raytracerScene, const IndirectLightTracingSettings& settings)
 {

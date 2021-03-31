@@ -233,6 +233,11 @@ ea::vector<LightProbeGroup*> DefaultBakedSceneCollector::GetUniqueLightProbeGrou
     return {};
 }
 
+Zone* DefaultBakedSceneCollector::GetLightProbeGroupZone(const IntVector3& chunkIndex, LightProbeGroup* lightProbeGroup)
+{
+    return octree_->QueryZone(lightProbeGroup->GetWorldBoundingBox().Center(), lightProbeGroup->GetZoneMask()).zone_;
+}
+
 unsigned DefaultBakedSceneCollector::GetZoneBackground(const IntVector3& chunkIndex, Zone* zone)
 {
     auto iter = zoneToBackgroundMap_.find(zone);

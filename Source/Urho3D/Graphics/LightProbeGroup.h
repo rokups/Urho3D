@@ -85,8 +85,6 @@ struct LightProbeCollection
 {
     /// World-space positions of light probes.
     ea::vector<Vector3> worldPositions_;
-    /// Light masks of light probes.
-    ea::vector<unsigned> lightMasks_;
 
     /// First light probe owned by corresponding group.
     ea::vector<unsigned> offsets_;
@@ -119,7 +117,6 @@ struct LightProbeCollection
     void Clear()
     {
         worldPositions_.clear();
-        lightMasks_.clear();
         offsets_.clear();
         counts_.clear();
         bakedDataFiles_.clear();
@@ -175,6 +172,8 @@ public:
     float GetAutoPlacementStep() const { return autoPlacementStep_; }
     void SetLightMask(unsigned lightMask) { lightMask_ = lightMask; }
     unsigned GetLightMask() const { return lightMask_; }
+    void SetZoneMask(unsigned zoneMask) { zoneMask_ = zoneMask; }
+    unsigned GetZoneMask() const { return zoneMask_; }
     /// @}
 
     /// Set light probes.
@@ -213,6 +212,8 @@ protected:
 
     /// Light mask of light probe group.
     unsigned lightMask_{ DEFAULT_LIGHTMASK };
+    /// Zone mask of light probe group.
+    unsigned zoneMask_{ DEFAULT_ZONEMASK };
     /// Whether the auto placement is enabled.
     bool autoPlacementEnabled_{ true };
     /// Automatic placement step.
