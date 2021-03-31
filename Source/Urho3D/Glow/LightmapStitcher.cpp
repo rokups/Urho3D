@@ -138,7 +138,7 @@ SharedPtr<Scene> CreateStitchingScene(Context* context,
 
 /// Create View and Viewport for stitching.
 ea::pair<RenderPipelineView*, SharedPtr<Viewport>> CreateStitchingViewAndViewport(
-    Scene* scene, RenderPath* renderPath, Texture2D* outputTexture)
+    Scene* scene, Texture2D* outputTexture)
 {
     Context* context = scene->GetContext();
 
@@ -196,11 +196,10 @@ void StitchTextureSeams(LightmapStitchingContext& stitchingContext,
     const float texelSize = 1.0f / stitchingContext.lightmapSize_;
 
     // Initialize scenes and render path
-    SharedPtr<RenderPath> renderPath = LoadRenderPath(context, settings.renderPathName_);
     auto pingScene = CreateStitchingScene(context, settings, stitchingContext.pongTexture_, seamsModel, texelSize);
     auto pongScene = CreateStitchingScene(context, settings, stitchingContext.pingTexture_, seamsModel, texelSize);
-    auto pingViewViewport = CreateStitchingViewAndViewport(pingScene, renderPath, stitchingContext.pingTexture_);
-    auto pongViewViewport = CreateStitchingViewAndViewport(pongScene, renderPath, stitchingContext.pongTexture_);
+    auto pingViewViewport = CreateStitchingViewAndViewport(pingScene, stitchingContext.pingTexture_);
+    auto pongViewViewport = CreateStitchingViewAndViewport(pongScene, stitchingContext.pongTexture_);
 
     if (!graphics->BeginFrame())
     {

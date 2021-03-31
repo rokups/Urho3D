@@ -61,16 +61,6 @@ void ParallelFor(unsigned count, unsigned numTasks, const T& callback)
         task.wait();
 }
 
-/// Load render path.
-inline SharedPtr<RenderPath> LoadRenderPath(Context* context, const ea::string& renderPathName)
-{
-    auto renderPath = MakeShared<RenderPath>();
-    auto renderPathXml = context->GetSubsystem<ResourceCache>()->GetResource<XMLFile>(renderPathName);
-    if (!renderPath->Load(renderPathXml))
-        return nullptr;
-    return renderPath;
-}
-
 /// Return whether the material is opaque.
 inline bool IsMaterialOpaque(const Material* material)
 {

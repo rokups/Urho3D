@@ -148,8 +148,6 @@ struct LightmapStitchingSettings
     unsigned numIterations_{ 8 };
     /// Blend factor.
     float blendFactor_{ 0.5f };
-    /// Render path used for stitching.
-    ea::string renderPathName_{ "RenderPaths/Forward.xml" };
     /// Model used for background during stitching.
     ea::string stitchBackgroundModelName_{ "Models/Plane.mdl" };
     /// Technique used for background during stitching.
@@ -163,12 +161,6 @@ struct LightCalculationProperties
 {
     /// Emission light brightness multiplier.
     float emissionBrightness_{ 1.0f };
-    /// Background light color.
-    Vector3 backgroundColor_{};
-    /// Background light brightness multiplier.
-    float backgroundBrightness_{ 1.0f };
-    /// Background cubemap.
-    SharedPtr<ImageCube> backgroundImage_{};
 };
 
 /// Incremental light baker settings.

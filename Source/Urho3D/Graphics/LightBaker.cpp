@@ -172,7 +172,6 @@ bool LightBaker::UpdateSettings()
     auto octree = scene->GetComponent<Octree>();
     auto gi = scene->GetComponent<GlobalIllumination>();
     Zone* zone = octree->GetBackgroundZone();
-    Skybox* skybox = octree->GetSkybox();
 
     if (!gi)
     {
@@ -192,22 +191,6 @@ bool LightBaker::UpdateSettings()
     settings_.indirectProbesTracing_.numTasks_ = numTasks;
 
     settings_.properties_.emissionBrightness_ = gi->GetEmissionBrightness();
-    settings_.properties_.backgroundImage_ = nullptr;
-    if (gi->GetBackgroundStatic())
-    {
-        settings_.properties_.backgroundColor_ = zone->GetFogColor().ToVector3();
-        settings_.properties_.backgroundBrightness_ = gi->GetBackgroundBrightness();
-        if (skybox)
-        {
-            if (auto image = skybox->GetImage())
-                settings_.properties_.backgroundImage_ = image->GetDecompressedImage();
-        }
-    }
-    else
-    {
-        settings_.properties_.backgroundColor_ = Vector3::ZERO;
-        settings_.properties_.backgroundBrightness_ = 0.0f;
-    }
     return true;
 }
 

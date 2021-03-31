@@ -84,8 +84,6 @@ struct LightmapGeometryBakingScene
     SharedPtr<Scene> scene_;
     /// Baking camera.
     Camera* camera_{};
-    /// Baking render path.
-    SharedPtr<RenderPath> renderPath_;
     /// Lightmap seams.
     LightmapSeamVector seams_;
 };

@@ -30,7 +30,6 @@ namespace Urho3D
 {
 
 class Octree;
-class Skybox;
 class Zone;
 
 static const int NUM_OCTANTS = 8;
@@ -254,8 +253,6 @@ public:
     CachedDrawableZone QueryZone(const Vector3& drawablePosition, unsigned zoneMask) const;
     /// Return background zone (arbitrary zone with 0 priority or lower). Zones with positive priority are ignored.
     Zone* GetBackgroundZone() const;
-    /// Return active Skybox. Behavior is underfined if there are multiple active skyboxes.
-    Skybox* GetSkybox(unsigned viewMask = DEFAULT_VIEWMASK) const;
 
     /// Return root octant.
     const Octant* GetRootOctant() const { return &rootOctant_; }

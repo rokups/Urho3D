@@ -308,14 +308,6 @@ LightmapGeometryBakingScenesArray GenerateLightmapGeometryBakingScenes(
     const Vector2 texelSize{ 1.0f / lightmapSize, 1.0f / lightmapSize };
     const Vector2 scaledAndConstBias{ settings.scaledPositionBias_, settings.constantPositionBias_ };
 
-    // Load resources
-    SharedPtr<RenderPath> renderPath = LoadRenderPath(context, settings.renderPathName_);
-    if (!renderPath)
-    {
-        URHO3D_LOGERROR("Cannot load render path \"{}\"", settings.renderPathName_);
-        return {};
-    }
-
     Material* bakingMaterial = context->GetSubsystem<ResourceCache>()->GetResource<Material>(settings.materialName_);
     if (!bakingMaterial)
     {
@@ -383,8 +375,6 @@ LightmapGeometryBakingScenesArray GenerateLightmapGeometryBakingScenes(
             bakingScene.camera_->SetFarClip(M_LARGE_VALUE * 2);
             bakingScene.camera_->SetOrthographic(true);
             bakingScene.camera_->SetOrthoSize(M_LARGE_VALUE * 2);
-
-            bakingScene.renderPath_ = renderPath;
         }
 
         if (auto staticModel = dynamic_cast<StaticModel*>(geometry))
@@ -470,7 +460,6 @@ LightmapChartGeometryBuffer BakeLightmapGeometryBuffer(const LightmapGeometryBak
     Viewport viewport(context);
     viewport.SetCamera(bakingScene.camera_);
     viewport.SetRect(IntRect::ZERO);
-    viewport.SetRenderPath(bakingScene.renderPath_);
     viewport.SetScene(bakingScene.scene_);
 
     // Render scene
