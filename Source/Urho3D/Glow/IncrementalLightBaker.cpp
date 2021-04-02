@@ -184,6 +184,9 @@ struct IncrementalLightBaker::Impl
     /// Generate charts and allocate light probes.
     void GenerateChartsAndUpdateScene()
     {
+        auto cache = context_->GetSubsystem<ResourceCache>();
+        auto fileSystem = context_->GetSubsystem<FileSystem>();
+
         numLightmapCharts_ = 0;
 
         for (const IntVector3& chunk : chunks_)
@@ -206,7 +209,7 @@ struct IncrementalLightBaker::Impl
             {
                 LightProbeGroup* group = uniqueLightProbes[i];
                 const ea::string fileName = GetLightProbeBakedDataFileName(chunk, i);
-                const ea::string resourceName = GetResourceName(context_->GetSubsystem<ResourceCache>(), fileName);
+                const ea::string resourceName = GetResourceName(cache, fileName);
                 fileSystem->CreateDirsRecursive(GetPath(fileName));
                 group->SetBakedDataFileRef({ BinaryFile::GetTypeStatic(), resourceName });
             }
@@ -220,7 +223,17 @@ struct IncrementalLightBaker::Impl
         for (unsigned i = 0; i < numLightmapCharts_; ++i)
         {
             const ea::string fileName = GetLightmapFileName(i);
-            const ea::string resourceName = GetResourceName(context_->GetSubsystem<ResourceCache>(), fileName);
+            const ea::string resourceName = GetResourceName(cache, fileName);
+
+            fileSystem->CreateDirsRecursive(GetPath(fileName));
+            if (!fileSystem->FileExists(fileName))
+            {
+                Image placeholderImage(context_);
+                placeholderImage.SetSize(1, 1, 4);
+                placeholderImage.SetPixel(0, 0, Color::BLACK);
+                placeholderImage.SaveFile(fileName);
+            }
+
             if (resourceName.empty())
             {
                 URHO3D_LOGWARNING("Cannot find resource name for lightmap \"{}\", absolute path is used", fileName);

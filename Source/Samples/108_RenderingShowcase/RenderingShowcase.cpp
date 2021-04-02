@@ -46,8 +46,9 @@
 
 RenderingShowcase::RenderingShowcase(Context* context) : Sample(context)
 {
-    sceneNames_.push_back({ "Scenes/RenderingExample.xml" });
-    sceneNames_.push_back({ "Scenes/RenderingExample2.xml" });
+    sceneNames_.push_back({ "0" });
+    sceneNames_.push_back({ "1" });
+    sceneNames_.push_back({ "2_Dynamic", "2_BakedDirect", "2_BakedIndirect", "2_BakedDirectIndirect" });
 }
 
 void RenderingShowcase::Start()
@@ -110,7 +111,7 @@ void RenderingShowcase::CreateScene()
     probeObject_->SetCastShadows(true);
 }
 
-void RenderingShowcase::SetupSelectedScene()
+void RenderingShowcase::SetupSelectedScene(bool resetCamera)
 {
     auto* cache = GetSubsystem<ResourceCache>();
 
@@ -118,14 +119,18 @@ void RenderingShowcase::SetupSelectedScene()
 
     // Load scene content prepared in the editor (XML format). GetFile() returns an open file from the resource system
     // which scene.LoadXML() will read
-    SharedPtr<File> file = cache->GetFile(sceneNames_[sceneIndex_][sceneMode_]);
+    const ea::string fileName = Format("Scenes/RenderingShowcase_{}.xml", sceneNames_[sceneIndex_][sceneMode_]);
+    SharedPtr<File> file = cache->GetFile(fileName);
     scene_->LoadXML(*file);
 
-    cameraNode_->SetPosition({ 0.0f, 4.0f, 8.0f });
-    cameraNode_->LookAt(Vector3::ZERO);
+    if (resetCamera)
+    {
+        cameraNode_->SetPosition({ 0.0f, 4.0f, 8.0f });
+        cameraNode_->LookAt(Vector3::ZERO);
 
-    yaw_ = cameraNode_->GetRotation().YawAngle();
-    pitch_ = cameraNode_->GetRotation().PitchAngle();
+        yaw_ = cameraNode_->GetRotation().YawAngle();
+        pitch_ = cameraNode_->GetRotation().PitchAngle();
+    }
 
     if (isProbeObjectVisible)
         scene_->GetComponent<Octree>()->AddManualDrawable(probeObject_);
@@ -203,7 +208,7 @@ void RenderingShowcase::HandleUpdate(StringHash eventType, VariantMap& eventData
     if (sceneNames_[sceneIndex_].size() > 1 && input->GetKeyPress(KEY_Q))
     {
         sceneMode_ = (sceneMode_ + 1) % sceneNames_[sceneIndex_].size();
-        SetupSelectedScene();
+        SetupSelectedScene(false);
     }
 
     // Update probe object

@@ -51,7 +51,7 @@ private:
     /// Setup shared scene objects.
     void CreateScene();
     /// Setup currently selected scene.
-    void SetupSelectedScene();
+    void SetupSelectedScene(bool resetCamera = true);
     /// Set up a viewport for displaying the scene.
     void SetupViewport();
     /// Subscribe to application-wide logic update event.
@@ -62,6 +62,27 @@ private:
     void HandleUpdate(StringHash eventType, VariantMap& eventData);
     /// Construct an instruction text to the UI.
     void CreateInstructions();
+    /// Return XML patch instructions for screen joystick layout for a specific sample app, if any.
+    ea::string GetScreenJoystickPatchString() const override { return
+        "<patch>"
+        "    <remove sel=\"/element/element[./attribute[@name='Name' and @value='Button0']]/attribute[@name='Is Visible']\" />"
+        "    <replace sel=\"/element/element[./attribute[@name='Name' and @value='Button0']]/element[./attribute[@name='Name' and @value='Label']]/attribute[@name='Text']/@value\">Next Mode</replace>"
+        "    <add sel=\"/element/element[./attribute[@name='Name' and @value='Button0']]\">"
+        "        <element type=\"Text\">"
+        "            <attribute name=\"Name\" value=\"KeyBinding\" />"
+        "            <attribute name=\"Text\" value=\"Q\" />"
+        "        </element>"
+        "    </add>"
+        "    <remove sel=\"/element/element[./attribute[@name='Name' and @value='Button1']]/attribute[@name='Is Visible']\" />"
+        "    <replace sel=\"/element/element[./attribute[@name='Name' and @value='Button1']]/element[./attribute[@name='Name' and @value='Label']]/attribute[@name='Text']/@value\">Next Scene</replace>"
+        "    <add sel=\"/element/element[./attribute[@name='Name' and @value='Button1']]\">"
+        "        <element type=\"Text\">"
+        "            <attribute name=\"Name\" value=\"KeyBinding\" />"
+        "            <attribute name=\"Text\" value=\"TAB\" />"
+        "        </element>"
+        "    </add>"
+        "</patch>";
+    }
 
     /// Scene that owns camera.
     SharedPtr<Scene> cameraScene_;
