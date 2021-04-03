@@ -151,6 +151,11 @@ SurfaceData GetCommonSurfaceData()
     #endif
 #endif
 
+    // Flip normal for two-sided surfaces
+#ifdef URHO3D_SURFACE_TWO_SIDED
+    result.normal *= gl_FrontFacing ? 1.0 : -1.0;
+#endif
+
     // Evaluate eye vector
 #ifdef URHO3D_PIXEL_NEED_EYE_VECTOR
     result.eyeVec = normalize(vEyeVec);

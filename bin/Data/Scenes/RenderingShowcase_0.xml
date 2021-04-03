@@ -5,17 +5,17 @@
 	<attribute name="Smoothing Constant" value="50.000000" />
 	<attribute name="Snap Threshold" value="5.000000" />
 	<attribute name="Elapsed Time" value="0.000000" />
-	<attribute name="Next Replicated Node ID" value="426" />
-	<attribute name="Next Replicated Component ID" value="408" />
-	<attribute name="Next Local Node ID" value="16777254" />
-	<attribute name="Next Local Component ID" value="16777276" />
+	<attribute name="Next Replicated Node ID" value="514" />
+	<attribute name="Next Replicated Component ID" value="495" />
+	<attribute name="Next Local Node ID" value="16777260" />
+	<attribute name="Next Local Component ID" value="16777285" />
 	<attribute name="Variables" />
 	<attribute name="Variable Names" value="" />
 	<attribute name="Lightmaps" value="Texture2D" />
 	<component type="Octree" id="1" />
 	<component type="EditorSceneSettings" id="16777216">
-		<attribute name="Camera Position" value="20.629 14.1003 -7.12348" />
-		<attribute name="Camera Rotation" value="0.853811 0.512905 -0.0762615 0.0460352" />
+		<attribute name="Camera Position" value="12.2818 0.700606 6.14495" />
+		<attribute name="Camera Rotation" value="0.960185 0.0660357 -0.270783 0.0189888" />
 	</component>
 	<component type="RenderPipeline" id="315" />
 	<node id="2">
@@ -734,6 +734,67 @@
 				<attribute name="Light Shape Texture" value="TextureCube;" />
 			</component>
 		</node>
+		<node id="509">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Particles" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="-0.147612 -0.0861384 0" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<node id="510">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="1.21364 0.253246 0.57851" />
+				<attribute name="Rotation" value="-0.707107 0.707107 -1.36489e-07 -1.36489e-07" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="491">
+					<attribute name="Model" value="Model;Models/Plane.mdl" />
+					<attribute name="Material" value="Material;Materials/LitSmoke.xml" />
+				</component>
+			</node>
+			<node id="511">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="0.979671 0.391227 1.14" />
+				<attribute name="Rotation" value="-0.707107 0.707107 -0 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="492">
+					<attribute name="Model" value="Model;Models/Plane.mdl" />
+					<attribute name="Material" value="Material;Materials/LitSmoke.xml" />
+				</component>
+			</node>
+			<node id="512">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="0.876859 0.307809 0.798798" />
+				<attribute name="Rotation" value="-0.707107 0.707107 -0 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="493">
+					<attribute name="Model" value="Model;Models/Plane.mdl" />
+					<attribute name="Material" value="Material;Materials/LitSmoke.xml" />
+				</component>
+			</node>
+			<node id="513">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="1.29582 0.163152 1.04384" />
+				<attribute name="Rotation" value="-0.707107 0.707107 -0 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="494">
+					<attribute name="Model" value="Model;Models/Plane.mdl" />
+					<attribute name="Material" value="Material;Materials/LitSmoke.xml" />
+				</component>
+			</node>
+		</node>
 	</node>
 	<node id="214">
 		<attribute name="Is Enabled" value="true" />
@@ -1266,5 +1327,18 @@
 				</component>
 			</node>
 		</node>
+	</node>
+	<node id="452">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Two Sided Material" />
+		<attribute name="Tags" />
+		<attribute name="Position" value="19 1 -5" />
+		<attribute name="Rotation" value="0.831583 0 0 0.5554" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<component type="StaticModel" id="434">
+			<attribute name="Model" value="Model;Models/Plane.mdl" />
+			<attribute name="Material" value="Material;Materials/Constant/MattWhiteTwoSided.xml" />
+		</component>
 	</node>
 </scene>
