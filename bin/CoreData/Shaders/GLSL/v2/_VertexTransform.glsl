@@ -64,23 +64,23 @@ struct VertexTransform
 };
 
 /// Return model-to-world space matrix.
+mat4 GetModelMatrix()
+{
 #if defined(URHO3D_GEOMETRY_SKINNED)
-    mat4 GetModelMatrix()
-    {
-        ivec4 idx = ivec4(iBlendIndices) * 3;
+    ivec4 idx = ivec4(iBlendIndices) * 3;
 
-        #define GetSkinMatrixColumn(i1, i2, i3, i4, k) (cSkinMatrices[i1] * k.x + cSkinMatrices[i2] * k.y + cSkinMatrices[i3] * k.z + cSkinMatrices[i4] * k.w)
-        vec4 col1 = GetSkinMatrixColumn(idx.x, idx.y, idx.z, idx.w, iBlendWeights);
-        vec4 col2 = GetSkinMatrixColumn(idx.x + 1, idx.y + 1, idx.z + 1, idx.w + 1, iBlendWeights);
-        vec4 col3 = GetSkinMatrixColumn(idx.x + 2, idx.y + 2, idx.z + 2, idx.w + 2, iBlendWeights);
-        #undef GetSkinMatrixColumn
+    #define GetSkinMatrixColumn(i1, i2, i3, i4, k) (cSkinMatrices[i1] * k.x + cSkinMatrices[i2] * k.y + cSkinMatrices[i3] * k.z + cSkinMatrices[i4] * k.w)
+    vec4 col1 = GetSkinMatrixColumn(idx.x, idx.y, idx.z, idx.w, iBlendWeights);
+    vec4 col2 = GetSkinMatrixColumn(idx.x + 1, idx.y + 1, idx.z + 1, idx.w + 1, iBlendWeights);
+    vec4 col3 = GetSkinMatrixColumn(idx.x + 2, idx.y + 2, idx.z + 2, idx.w + 2, iBlendWeights);
+    #undef GetSkinMatrixColumn
 
-        const vec4 col4 = vec4(0.0, 0.0, 0.0, 1.0);
-        return mat4(col1, col2, col3, col4);
-    }
+    const vec4 col4 = vec4(0.0, 0.0, 0.0, 1.0);
+    return mat4(col1, col2, col3, col4);
 #else
-    #define GetModelMatrix() cModel
+    return cModel;
 #endif
+}
 
 /// Apply normal offset to position in world space.
 #ifdef URHO3D_SHADOW_NORMAL_OFFSET

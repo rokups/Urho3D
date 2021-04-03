@@ -12,7 +12,7 @@ UNIFORM_BUFFER_BEGIN(0, Frame)
     UNIFORM_HIGHP(float cDeltaTime)
     /// Time elapsed since scene started updating. Avoid using it.
     UNIFORM_HIGHP(float cElapsedTime)
-UNIFORM_BUFFER_END()
+UNIFORM_BUFFER_END(0, Frame)
 
 UNIFORM_BUFFER_BEGIN(1, Camera)
     /// World to view space matrix.
@@ -41,7 +41,7 @@ UNIFORM_BUFFER_BEGIN(1, Camera)
     UNIFORM(half3 cFogColor)
     /// Scale of normal shadow bias.
     UNIFORM(half cNormalOffsetScale)
-UNIFORM_BUFFER_END()
+UNIFORM_BUFFER_END(1, Camera)
 
 /// Zone: Reflection probe parameters.
 /// Disabled if pass has no ambient lighting.
@@ -49,7 +49,7 @@ UNIFORM_BUFFER_END()
 UNIFORM_BUFFER_BEGIN(2, Zone)
     /// Multiplier used to convert roughness factor to LOD of reflection cubemap.
     UNIFORM(half cRoughnessToLODFactor)
-UNIFORM_BUFFER_END()
+UNIFORM_BUFFER_END(2, Zone)
 #endif
 
 UNIFORM_BUFFER_BEGIN(3, Light)
@@ -91,7 +91,7 @@ UNIFORM_BUFFER_BEGIN(3, Light)
     UNIFORM(half cLightRad)
     UNIFORM(half cLightLength)
 #endif
-UNIFORM_BUFFER_END()
+UNIFORM_BUFFER_END(3, Light)
 
 #ifndef CUSTOM_MATERIAL_CBUFFER
 UNIFORM_BUFFER_BEGIN(4, Material)
@@ -109,7 +109,7 @@ UNIFORM_BUFFER_BEGIN(4, Material)
     UNIFORM(half cRoughness)
     UNIFORM(half cMetallic)
 #endif
-UNIFORM_BUFFER_END()
+UNIFORM_BUFFER_END(4, Material)
 #endif
 
 /// Object: Per-instance constants
@@ -173,7 +173,7 @@ INSTANCE_BUFFER_BEGIN(5, Object)
     UNIFORM_HIGHP(vec4 cSkinMatrices[MAXBONES * 3])
 #endif
     /// @}
-INSTANCE_BUFFER_END()
+INSTANCE_BUFFER_END(5, Object)
 #endif // URHO3D_VERTEX_SHADER
 
 #endif // _UNIFORMS_GLSL_

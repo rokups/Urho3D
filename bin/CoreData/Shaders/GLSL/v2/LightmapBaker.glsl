@@ -16,7 +16,7 @@ UNIFORM_BUFFER_BEGIN(4, Material)
 
     UNIFORM(vec4 cMatDiffColor)
     UNIFORM(vec3 cMatEmissiveColor)
-UNIFORM_BUFFER_END()
+UNIFORM_BUFFER_END(4, Material)
 
 #include "_Uniforms.glsl"
 #include "_Samplers.glsl"

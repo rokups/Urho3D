@@ -2,6 +2,14 @@
 /// Global configuration management, platform compatibility utilities,
 /// global constants and helper functions.
 /// Should be included before any other shader code.
+///
+/// Compatibility notes:
+/// - Don't use function-style macros with 0 arguments, they don't work on some Android devices. Example (bad):
+///   #define GetModelMatrix() cModel
+/// - Don't change uniform buffer content depending on shader type or on shader-type-specifiec defines:
+///   DX11 expects same buffers and will not handle it well.
+///   Consider disabling whole buffer for stage.
+///   Example: Object uniform buffer is enabled only for vertex shader.
 #ifndef _CONFIG_GLSL_
 #define _CONFIG_GLSL_
 
@@ -259,12 +267,12 @@
 
     #define UNIFORM_BUFFER_BEGIN(index, name) _URHO3D_LAYOUT(index) uniform name {
     #define UNIFORM(decl) decl;
-    #define UNIFORM_BUFFER_END() };
+    #define UNIFORM_BUFFER_END(index, name) };
     #define SAMPLER(index, decl) _URHO3D_LAYOUT(index) uniform decl;
 #else
     #define UNIFORM_BUFFER_BEGIN(index, name)
     #define UNIFORM(decl) uniform decl;
-    #define UNIFORM_BUFFER_END()
+    #define UNIFORM_BUFFER_END(index, name)
     #define SAMPLER(index, decl) uniform decl;
 #endif
 
@@ -273,10 +281,10 @@
 #ifdef URHO3D_VERTEX_SHADER
     #ifdef URHO3D_INSTANCING
         #define INSTANCE_BUFFER_BEGIN(index, name)
-        #define INSTANCE_BUFFER_END()
+        #define INSTANCE_BUFFER_END(index, name)
     #else
         #define INSTANCE_BUFFER_BEGIN(index, name) UNIFORM_BUFFER_BEGIN(index, name)
-        #define INSTANCE_BUFFER_END() UNIFORM_BUFFER_END()
+        #define INSTANCE_BUFFER_END(index, name) UNIFORM_BUFFER_END(index, name)
     #endif
 #endif
 

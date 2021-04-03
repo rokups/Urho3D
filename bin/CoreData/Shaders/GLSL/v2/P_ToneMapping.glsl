@@ -16,7 +16,7 @@ UNIFORM_BUFFER_BEGIN(6, Custom)
     UNIFORM(vec2 cInputInvSize)
     UNIFORM(vec2 cMinMaxExposure)
     UNIFORM(float cAdaptRate)
-UNIFORM_BUFFER_END()
+UNIFORM_BUFFER_END(6, Custom)
 
 float GatherAvgLum(sampler2D texSampler, vec2 texCoord)
 {

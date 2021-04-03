@@ -17,7 +17,7 @@
 #ifdef URHO3D_PIXEL_SHADER
     UNIFORM_BUFFER_BEGIN(6, Custom)
         UNIFORM(mediump vec3 cFXAAParams)
-    UNIFORM_BUFFER_END()
+    UNIFORM_BUFFER_END(6, Custom)
 #endif
 
 VERTEX_OUTPUT(vec2 vScreenPos)
