@@ -60,6 +60,7 @@ enum class DrawableProcessorPassFlag
     HasAmbientLighting = 1 << 0,
     DisableInstancing = 1 << 1,
     DeferredLightMaskToStencil = 1 << 2,
+    AlphaPass = 1 << 3
 };
 
 URHO3D_FLAGSET(DrawableProcessorPassFlag, DrawableProcessorPassFlags);
@@ -404,6 +405,7 @@ struct SceneProcessorSettings
     , public BatchRendererSettings
 {
     bool enableShadows_{ true };
+    bool softParticles_{};
     DirectLightingMode lightingMode_{};
     unsigned directionalShadowSize_{ 1024 };
     unsigned spotShadowSize_{ 1024 };
@@ -430,6 +432,7 @@ struct SceneProcessorSettings
         CombineHash(hash, OcclusionBufferSettings::CalculatePipelineStateHash());
         CombineHash(hash, BatchRendererSettings::CalculatePipelineStateHash());
         CombineHash(hash, enableShadows_);
+        CombineHash(hash, softParticles_);
         CombineHash(hash, MakeHash(lightingMode_));
         return hash;
     }
@@ -440,6 +443,7 @@ struct SceneProcessorSettings
             && OcclusionBufferSettings::operator==(rhs)
             && BatchRendererSettings::operator==(rhs)
             && enableShadows_ == rhs.enableShadows_
+            && softParticles_ == rhs.softParticles_
             && lightingMode_ == rhs.lightingMode_
             && directionalShadowSize_ == rhs.directionalShadowSize_
             && spotShadowSize_ == rhs.spotShadowSize_

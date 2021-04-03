@@ -30,6 +30,9 @@
 /// Whether vertex shader needs world-space tangent and bitangent.
 // #define URHO3D_VERTEX_NEED_TANGENT
 
+/// Whether pixel shader needs screen position.
+// #define URHO3D_PIXEL_NEED_SCREEN_POSITION
+
 /// Whether pixel shader needs eye vector.
 // #define URHO3D_PIXEL_NEED_EYE_VECTOR
 
@@ -121,6 +124,13 @@
 /// URHO3D_SPECULAR_ANTIALIASING is disabled if derivatives are not supported.
 #if defined(GL_ES) && !defined(GL_OES_standard_derivatives)
     #undef URHO3D_SPECULAR_ANTIALIASING
+#endif
+
+/// URHO3D_SOFT_PARTICLES is implied by soft particles
+#ifdef URHO3D_SOFT_PARTICLES
+    #ifndef URHO3D_PIXEL_NEED_SCREEN_POSITION
+        #define URHO3D_PIXEL_NEED_SCREEN_POSITION
+    #endif
 #endif
 
 // =================================== Vertex output configuration ===================================

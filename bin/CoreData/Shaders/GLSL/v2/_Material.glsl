@@ -14,6 +14,9 @@
 #include "_PixelOutput.glsl"
 
 #include "_VertexTransform.glsl"
+#ifdef URHO3D_PIXEL_NEED_SCREEN_POSITION
+#include "_VertexScreenPos.glsl"
+#endif
 #ifdef URHO3D_IS_LIT
 #include "_IndirectLighting.glsl"
 #include "_DirectLighting.glsl"
@@ -29,6 +32,10 @@ VERTEX_OUTPUT(vec2 vTexCoord)
 
 #ifdef URHO3D_PIXEL_NEED_COLOR
     VERTEX_OUTPUT(vec4 vColor)
+#endif
+
+#ifdef URHO3D_PIXEL_NEED_SCREEN_POSITION
+    VERTEX_OUTPUT(vec4 vScreenPos)
 #endif
 
 #ifdef URHO3D_IS_LIT
@@ -78,6 +85,10 @@ void FillCommonVertexOutput(VertexTransform vertexTransform, vec2 uv)
 
 #ifdef URHO3D_PIXEL_NEED_COLOR
     vColor = iColor;
+#endif
+
+#ifdef URHO3D_PIXEL_NEED_SCREEN_POSITION
+    vScreenPos = GetScreenPos(gl_Position);
 #endif
 
 #ifdef URHO3D_IS_LIT
@@ -271,6 +282,15 @@ SurfaceData GetCommonSurfaceData()
 #endif
 
 #endif // URHO3D_IS_LIT
+
+#ifdef URHO3D_SOFT_PARTICLES
+    // TODO(renderer): Make these configurable
+    vec2 cMatParticleFadeParams = vec2(0.0, 1.0 * (cFarClip - cNearClip));
+
+    float backgroundDepth = ReconstructDepth(texture2DProj(sDepthBuffer, vScreenPos).r);
+    float fade = clamp((backgroundDepth - vWorldDepth - cMatParticleFadeParams.x) * cMatParticleFadeParams.y, 0.0, 1.0);
+    result.albedo.a *= fade;
+#endif
 
     return result;
 }

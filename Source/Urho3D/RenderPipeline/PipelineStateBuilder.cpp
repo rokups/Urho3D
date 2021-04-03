@@ -332,6 +332,10 @@ void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPa
             commonDefines_ += "URHO3D_GBUFFER_PASS ";
     }
 
+    const bool softParticles = sceneProcessor_->GetSettings().softParticles_;
+    if (softParticles && passFlags.Test(DrawableProcessorPassFlag::AlphaPass))
+        commonDefines_ += "URHO3D_SOFT_PARTICLES ";
+
     static const ea::string ambientModeDefines[] = {
         "URHO3D_AMBIENT_CONSTANT ",
         "URHO3D_AMBIENT_FLAT ",

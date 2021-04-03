@@ -225,7 +225,7 @@ bool RenderPipelineView::Define(RenderSurface* renderTarget, Viewport* viewport)
         sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow", shadowMapAllocator_, instancingBuffer_);
 
         alphaPass_ = sceneProcessor_->CreatePass<BackToFrontScenePass>(
-            DrawableProcessorPassFlag::HasAmbientLighting, "", "alpha", "alpha", "litalpha");
+            DrawableProcessorPassFlag::HasAmbientLighting | DrawableProcessorPassFlag::AlphaPass, "", "alpha", "alpha", "litalpha");
         postOpaquePass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(DrawableProcessorPassFlag::None, "postopaque");
     }
 
@@ -274,7 +274,7 @@ void RenderPipelineView::Render()
 {
     RenderBufferManagerFrameSettings frameSettings;
     frameSettings.supportColorReadWrite_ = postProcessFlags_.Test(PostProcessPassFlag::NeedColorOutputReadAndWrite);
-    frameSettings.readableDepth_ = settings_.sceneProcessor_.IsDeferredLighting();
+    frameSettings.readableDepth_ = settings_.sceneProcessor_.IsDeferredLighting() || settings_.sceneProcessor_.softParticles_;
     renderBufferManager_->SetFrameSettings(frameSettings);
 
     OnRenderBegin(this, frameInfo_);
@@ -353,9 +353,33 @@ void RenderPipelineView::Render()
     sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetBaseRenderFlags(), opaquePass_->GetSortedBaseBatches());
     sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetLightRenderFlags(), opaquePass_->GetSortedLightBatches());
     sceneBatchRenderer_->RenderBatches(ctx, postOpaquePass_->GetBaseRenderFlags(), postOpaquePass_->GetSortedBaseBatches());
-    sceneBatchRenderer_->RenderBatches(ctx, alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches());
+    if (!settings_.sceneProcessor_.softParticles_)
+    {
+        sceneBatchRenderer_->RenderBatches(ctx, alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches());
+    }
     instancingBuffer_->End();
     drawQueue->Execute();
+
+#ifdef DESKTOP_GRAPHICS
+    if (settings_.sceneProcessor_.softParticles_)
+    {
+        drawQueue->Reset();
+        instancingBuffer_->Begin();
+
+        const ShaderParameterDesc cameraParameters[] = {
+            { VSP_GBUFFEROFFSETS, renderBufferManager_->GetDefaultClipToUVSpaceOffsetAndScale() },
+        };
+        ShaderResourceDesc shaderResources[] = {
+            { TU_DEPTHBUFFER, renderBufferManager_->GetDepthStencilTexture() }
+        };
+        ctx.cameraParameters_ = cameraParameters;
+        ctx.globalResources_ = shaderResources;
+        sceneBatchRenderer_->RenderBatches(ctx, alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches());
+
+        instancingBuffer_->End();
+        drawQueue->Execute();
+    }
+#endif
 
     for (PostProcessPass* postProcessPass : postProcessPasses_)
         postProcessPass->Execute();
@@ -401,7 +425,8 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("Max Pixel Lights", int, settings_.sceneProcessor_.maxPixelLights_, MarkSettingsDirty, 4, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Ambient Mode", settings_.sceneProcessor_.ambientMode_, MarkSettingsDirty, ambientModeNames, DrawableAmbientMode::Directional, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Enable Instancing", bool, settings_.instancingBuffer_.enableInstancing_, MarkSettingsDirty, true, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Enable Shadow", bool, settings_.sceneProcessor_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Enable Shadows", bool, settings_.sceneProcessor_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Soft Particles", bool, settings_.sceneProcessor_.softParticles_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Lighting Mode", settings_.sceneProcessor_.lightingMode_, MarkSettingsDirty, directLightingModeNames, DirectLightingMode::Forward, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Specular Anti-Aliasing", bool, settings_.sceneProcessor_.specularAntiAliasing_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("PCF Kernel Size", unsigned, settings_.sceneProcessor_.pcfKernelSize_, MarkSettingsDirty, 1, AM_DEFAULT);

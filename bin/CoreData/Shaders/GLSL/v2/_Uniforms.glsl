@@ -105,7 +105,7 @@ UNIFORM_BUFFER_BEGIN(4, Material)
     UNIFORM(half3 cMatEmissiveColor)
     UNIFORM(half3 cMatEnvMapColor)
     UNIFORM(half4 cMatSpecColor)
-#ifdef PBR
+#ifdef URHO3D_PHYSICAL_MATERIAL
     UNIFORM(half cRoughness)
     UNIFORM(half cMetallic)
 #endif
