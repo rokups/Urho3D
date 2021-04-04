@@ -5,17 +5,17 @@
 	<attribute name="Smoothing Constant" value="50.000000" />
 	<attribute name="Snap Threshold" value="5.000000" />
 	<attribute name="Elapsed Time" value="0.000000" />
-	<attribute name="Next Replicated Node ID" value="514" />
-	<attribute name="Next Replicated Component ID" value="495" />
-	<attribute name="Next Local Node ID" value="16777260" />
-	<attribute name="Next Local Component ID" value="16777285" />
+	<attribute name="Next Replicated Node ID" value="574" />
+	<attribute name="Next Replicated Component ID" value="554" />
+	<attribute name="Next Local Node ID" value="16777264" />
+	<attribute name="Next Local Component ID" value="16777291" />
 	<attribute name="Variables" />
 	<attribute name="Variable Names" value="" />
 	<attribute name="Lightmaps" value="Texture2D" />
 	<component type="Octree" id="1" />
 	<component type="EditorSceneSettings" id="16777216">
-		<attribute name="Camera Position" value="12.2818 0.700606 6.14495" />
-		<attribute name="Camera Rotation" value="0.960185 0.0660357 -0.270783 0.0189888" />
+		<attribute name="Camera Position" value="26.573 3.69005 -2.30056" />
+		<attribute name="Camera Rotation" value="0.906991 0.319133 -0.25911 0.0915658" />
 	</component>
 	<component type="RenderPipeline" id="315" />
 	<node id="2">
@@ -1171,9 +1171,9 @@
 		</node>
 		<node id="362">
 			<attribute name="Is Enabled" value="true" />
-			<attribute name="Name" value="Transparent" />
+			<attribute name="Name" value="Transparent Fade" />
 			<attribute name="Tags" />
-			<attribute name="Position" value="0 0 0" />
+			<attribute name="Position" value="0 0 -1" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
@@ -1182,68 +1182,68 @@
 				<attribute name="Name" value="Glossy Transparent" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-4 0.5 1" />
-				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Rotation" value="1 0 0 0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 				<component type="StaticModel" id="346">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/Constant/GlossyTransparent.xml" />
-					<attribute name="Cast Shadows" value="true" />
-				</component>
-			</node>
-			<node id="364">
-				<attribute name="Is Enabled" value="true" />
-				<attribute name="Name" value="Matt Transparent" />
-				<attribute name="Tags" />
-				<attribute name="Position" value="-2 0.5 1" />
-				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
-				<attribute name="Scale" value="1 1 1" />
-				<attribute name="Variables" />
-				<component type="StaticModel" id="347">
-					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/Constant/MattTransparent.xml" />
-					<attribute name="Cast Shadows" value="true" />
-				</component>
-			</node>
-			<node id="365">
-				<attribute name="Is Enabled" value="true" />
-				<attribute name="Name" value="Unlit Transparent" />
-				<attribute name="Tags" />
-				<attribute name="Position" value="0 0.5 1" />
-				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
-				<attribute name="Scale" value="1 1 1" />
-				<attribute name="Variables" />
-				<component type="StaticModel" id="348">
-					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/Constant/UnlitTransparent.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/GlossyTransparentFade.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
 			<node id="366">
 				<attribute name="Is Enabled" value="true" />
-				<attribute name="Name" value="Transparent Metallic" />
+				<attribute name="Name" value="Transparent Dielectric" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="2 0.5 1" />
-				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Rotation" value="1 0 0 0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 				<component type="StaticModel" id="349">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/Constant/GlossyTransparentDielectric.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/GlossyTransparentDielectricFade.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
 			<node id="367">
 				<attribute name="Is Enabled" value="true" />
-				<attribute name="Name" value="Transparent Dielectric" />
+				<attribute name="Name" value="Transparent Metal" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="4 0.5 1" />
-				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Rotation" value="1 0 0 0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 				<component type="StaticModel" id="350">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
-					<attribute name="Material" value="Material;Materials/Constant/GlossyTransparentMetal.xml" />
+					<attribute name="Material" value="Material;Materials/Constant/GlossyTransparentMetalFade.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="546">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Matt Transparent" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="-2 0.5 1" />
+				<attribute name="Rotation" value="1 0 0 0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="526">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/Constant/MattTransparentFade.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="547">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Unlit Transparent" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="0 0.5 1" />
+				<attribute name="Rotation" value="1 0 0 0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="527">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/Constant/UnlitTransparent.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
@@ -1252,7 +1252,7 @@
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Opaque" />
 			<attribute name="Tags" />
-			<attribute name="Position" value="0 0 0" />
+			<attribute name="Position" value="0 0 -0.5" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
@@ -1261,7 +1261,7 @@
 				<attribute name="Name" value="Glossy White" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-4 0.5 -1" />
-				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Rotation" value="1 0 0 0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 				<component type="StaticModel" id="351">
@@ -1275,7 +1275,7 @@
 				<attribute name="Name" value="Matt White" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="-2 0.5 -1" />
-				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Rotation" value="1 0 0 0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 				<component type="StaticModel" id="352">
@@ -1289,7 +1289,7 @@
 				<attribute name="Name" value="Unlit White" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="0 0.5 -1" />
-				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Rotation" value="1 0 0 0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 				<component type="StaticModel" id="353">
@@ -1300,10 +1300,10 @@
 			</node>
 			<node id="372">
 				<attribute name="Is Enabled" value="true" />
-				<attribute name="Name" value="Metallic" />
+				<attribute name="Name" value="Dielectric" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="2 0.5 -1" />
-				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Rotation" value="1 0 0 0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 				<component type="StaticModel" id="354">
@@ -1314,15 +1314,94 @@
 			</node>
 			<node id="373">
 				<attribute name="Is Enabled" value="true" />
-				<attribute name="Name" value="Dielectric" />
+				<attribute name="Name" value="Metal" />
 				<attribute name="Tags" />
 				<attribute name="Position" value="4 0.5 -1" />
-				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Rotation" value="1 0 0 0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 				<component type="StaticModel" id="355">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
 					<attribute name="Material" value="Material;Materials/Constant/GlossyWhiteMetal.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+		</node>
+		<node id="540">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Transparent" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0 0.5" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<node id="541">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Glossy Transparent" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="-4 0.5 1" />
+				<attribute name="Rotation" value="1 0 0 0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="521">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/Constant/GlossyTransparent.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="544">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Transparent Dielectric" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="2 0.5 1" />
+				<attribute name="Rotation" value="1 0 0 0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="524">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/Constant/GlossyTransparentDielectric.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="545">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Transparent Metal" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="4 0.5 1" />
+				<attribute name="Rotation" value="1 0 0 0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="525">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/Constant/GlossyTransparentMetal.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="364">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Matt Transparent" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="-2 0.5 1" />
+				<attribute name="Rotation" value="1 0 0 0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="347">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/Constant/MattTransparent.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="365">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Unlit Transparent" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="0 0.5 1" />
+				<attribute name="Rotation" value="1 0 0 0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="348">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/Constant/UnlitTransparent.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>

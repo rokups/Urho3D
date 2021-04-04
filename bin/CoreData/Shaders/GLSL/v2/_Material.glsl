@@ -144,12 +144,16 @@ SurfaceData GetCommonSurfaceData()
 #ifdef URHO3D_PHYSICAL_MATERIAL
     // TODO(renderer): Add occlusion
     #ifdef URHO3D_MATERIAL_HAS_SPECULAR
-        vec2 roughnessMetallic = texture2D(sSpecMap, vTexCoord).rg + vec2(cRoughness, cMetallic);
+        half2 roughnessMetallic = texture2D(sSpecMap, vTexCoord).rg + vec2(cRoughness, cMetallic);
     #else
-        vec2 roughnessMetallic = vec2(cRoughness, cMetallic);
+        half2 roughnessMetallic = vec2(cRoughness, cMetallic);
     #endif
-    const vec2 minRougnessMetallic = vec2(0.089, 0.00);
+    const half2 minRougnessMetallic = vec2(0.089, 0.00);
     roughnessMetallic = max(roughnessMetallic, minRougnessMetallic);
+
+    // TODO(renderer): Make configurable specular?
+    half oneMinusDielectricReflectivity = 0.97;
+    half oneMinusReflectivity = oneMinusDielectricReflectivity - oneMinusDielectricReflectivity * roughnessMetallic.y;
 #endif
 
     // Evaluate normal
@@ -249,9 +253,8 @@ SurfaceData GetCommonSurfaceData()
 
     // Evaluate specular and/or PBR properties
 #ifdef URHO3D_PHYSICAL_MATERIAL
-    // TODO(renderer): Make configurable specular?
-    result.specular = mix(vec3(0.03), result.albedo.rgb, roughnessMetallic.y);
-    result.albedo.rgb *= (1.0 - roughnessMetallic.y);
+    result.specular = result.albedo.rgb * (1.0 - oneMinusReflectivity);
+    result.albedo.rgb *= oneMinusReflectivity;
     result.roughness = roughnessMetallic.x;
 #else
     #ifdef URHO3D_MATERIAL_HAS_SPECULAR
@@ -283,13 +286,18 @@ SurfaceData GetCommonSurfaceData()
 
 #endif // URHO3D_IS_LIT
 
-#ifdef URHO3D_SOFT_PARTICLES
+#if defined(URHO3D_SOFT_PARTICLES)
     // TODO(renderer): Make these configurable
     vec2 cMatParticleFadeParams = vec2(0.0, 1.0 * (cFarClip - cNearClip));
 
     float backgroundDepth = ReconstructDepth(texture2DProj(sDepthBuffer, vScreenPos).r);
     float fade = clamp((backgroundDepth - vWorldDepth - cMatParticleFadeParams.x) * cMatParticleFadeParams.y, 0.0, 1.0);
     result.albedo.a *= fade;
+#elif defined(URHO3D_PREMULTIPLY_ALPHA)
+    result.albedo.rgb *= result.albedo.a;
+    #ifdef URHO3D_PHYSICAL_MATERIAL
+        result.albedo.a = 1.0 - oneMinusReflectivity + result.albedo.a * oneMinusReflectivity;
+    #endif
 #endif
 
     return result;

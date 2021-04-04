@@ -22,6 +22,25 @@
 #define M_PI 3.14159265358979323846
 #define M_EPSILON 0.0001
 
+/// =================================== Types ===================================
+
+/// Disable precision modifiers if not GL ES
+#ifndef GL_ES
+    #define highp
+    #define mediump
+    #define lowp
+#endif
+
+/// Define shortcuts for precision-qualified types
+#define half   mediump float
+#define half2  mediump vec2
+#define half3  mediump vec3
+#define half4  mediump vec4
+#define fixed  lowp float
+#define fixed2 lowp vec2
+#define fixed3 lowp vec3
+#define fixed4 lowp vec4
+
 /// =================================== External defines ===================================
 
 /// Whether vertex shader needs world-space normal.
@@ -70,6 +89,11 @@
 /// Whether to apply soft fade-out if URHO3D_SOFT_PARTICLES_ENABLED is defined.
 // #define PARTICLE
 
+/// Whether to render transparent object.
+/// If defined, specular is not affected by alpha.
+/// If not defined, object fades out completely when alpha approaches zero.
+// #define TRANSPARENT
+
 /// =================================== Deprecated external defines ===================================
 
 // #define NOUV
@@ -117,6 +141,11 @@
     #ifndef URHO3D_LIGHT_HAS_SPECULAR
         #define URHO3D_LIGHT_HAS_SPECULAR
     #endif
+#endif
+
+/// URHO3D_PREMULTIPLY_ALPHA: Whether to pre-multiply alpha into output color
+#if defined(URHO3D_IS_LIT) && defined(TRANSPARENT)
+    #define URHO3D_PREMULTIPLY_ALPHA
 #endif
 
 /// URHO3D_REFLECTION_MAPPING: Whether to apply reflections from environment cubemap.
@@ -333,10 +362,6 @@
 /// UNIFORM_HIGHP: Uniform with max precision, undefined if not supported.
 /// SAMPLER_HIGHP: Sampler with max precision, mediump if not supported.
 #ifndef GL_ES
-    /// Disable precision modifiers if not GL ES
-    #define highp
-    #define mediump
-    #define lowp
     #define UNIFORM_HIGHP(decl) UNIFORM(decl)
     #define SAMPLER_HIGHP(index, decl) SAMPLER(index, decl)
 #else
@@ -351,16 +376,6 @@
         #define SAMPLER_HIGHP(index, decl) SAMPLER(index, mediump decl)
     #endif
 #endif
-
-/// Define shortcuts for precision-qualified types
-#define half  mediump float
-#define half2 mediump vec2
-#define half3 mediump vec3
-#define half4 mediump vec4
-#define fixed  lowp float
-#define fixed2 lowp vec2
-#define fixed3 lowp vec3
-#define fixed4 lowp vec4
 
 // TODO(renderer): Get rid of optional_highp
 #define optional_highp
