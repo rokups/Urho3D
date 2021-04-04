@@ -75,6 +75,12 @@ half BRDF_Direct_BlinnPhongSpecular(half3 normal, half3 halfVec, half specularPo
     return pow(max(dot(normal, halfVec), 0.0), specularPower);
 }
 
+/// Evaluate simple volumetric lighting for surface w/o normal.
+half3 Direct_Volumetric(half3 lightColor, half3 albedo)
+{
+    return lightColor * albedo;
+}
+
 /// Evaluate simple directional lighting without specular.
 half3 Direct_Simple(half3 lightColor, half3 albedo, half3 lightVec, half3 normal)
 {

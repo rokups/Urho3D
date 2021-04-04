@@ -67,6 +67,9 @@
 /// Whether to use physiclally based material.
 // #define PBR
 
+/// Whether to apply soft fade-out if URHO3D_SOFT_PARTICLES_ENABLED is defined.
+// #define PARTICLE
+
 /// =================================== Deprecated external defines ===================================
 
 // #define NOUV
@@ -119,6 +122,11 @@
 /// URHO3D_REFLECTION_MAPPING: Whether to apply reflections from environment cubemap.
 #if defined(URHO3D_AMBIENT_PASS) && (defined(ENVCUBEMAP) || defined(URHO3D_PHYSICAL_MATERIAL))
     #define URHO3D_REFLECTION_MAPPING
+#endif
+
+/// URHO3D_SOFT_PARTICLES: Whether to apply soft particles fade out.
+#if defined(PARTICLE) && defined(URHO3D_SOFT_PARTICLES_ENABLED)
+    #define URHO3D_SOFT_PARTICLES
 #endif
 
 /// URHO3D_SPECULAR_ANTIALIASING is disabled if derivatives are not supported.
@@ -222,16 +230,17 @@
     /// URHO3D_SURFACE_ONE_SIDED: Normal is clamped when calculating lighting. Ignored in deferred rendering.
     /// URHO3D_SURFACE_TWO_SIDED: Normal is mirrored when calculating lighting. Ignored in deferred rendering.
     /// URHO3D_SURFACE_VOLUMETRIC: Normal is ignored when calculating lighting. Ignored in deferred rendering.
-    /// VERTEX_ADJUST_NoL: Adjust N dot L for vertex normal.
+    /// VERTEX_ADJUST_NoL: Adjust N dot L for lighting in vertex shader.
+    /// PIXEL_ADJUST_NoL: Adjust N dot L for lighting in pixel shader.
     #if defined(VOLUMETRIC)
         #define URHO3D_SURFACE_VOLUMETRIC
-        #define VERTEX_ADJUST_NoL(NdotL) 1.0
+        #define VERTEX_ADJUST_NoL(NoL) 1.0
     #elif defined(TRANSLUCENT)
         #define URHO3D_SURFACE_TWO_SIDED
-        #define VERTEX_ADJUST_NoL(NdotL) abs(NdotL)
+        #define VERTEX_ADJUST_NoL(NoL) abs(NoL)
     #else
         #define URHO3D_SURFACE_ONE_SIDED
-        #define VERTEX_ADJUST_NoL(NdotL) max(0.0, NdotL)
+        #define VERTEX_ADJUST_NoL(NoL) max(0.0, NoL)
     #endif
 #endif
 

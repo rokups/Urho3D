@@ -47,6 +47,17 @@
 namespace Urho3D
 {
 
+bool NeedToReloadDependencies(Resource* resource)
+{
+    // It should always return true in perfect world, but I never tested it.
+    if (!resource)
+        return true;
+    const ea::string extension = GetExtension(resource->GetName());
+    return extension == ".xml"
+        || extension == ".glsl"
+        || extension == ".hlsl";
+}
+
 static const char* checkDirs[] =
 {
     "Fonts",
@@ -449,7 +460,7 @@ void ResourceCache::ReloadResourceWithDependencies(const ea::string& fileName)
         ReloadResource(resource.Get());
     }
     // Always perform dependency resource check for resource loaded from XML file as it could be used in inheritance
-    if (!resource || GetExtension(resource->GetName()) == ".xml")
+    if (NeedToReloadDependencies(resource))
     {
         // Check if this is a dependency resource, reload dependents
         auto j = dependentResources_.find(

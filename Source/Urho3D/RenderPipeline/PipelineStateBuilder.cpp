@@ -334,7 +334,7 @@ void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPa
 
     const bool softParticles = sceneProcessor_->GetSettings().softParticles_;
     if (softParticles && passFlags.Test(DrawableProcessorPassFlag::AlphaPass))
-        commonDefines_ += "URHO3D_SOFT_PARTICLES ";
+        commonDefines_ += "URHO3D_SOFT_PARTICLES_ENABLED ";
 
     static const ea::string ambientModeDefines[] = {
         "URHO3D_AMBIENT_CONSTANT ",

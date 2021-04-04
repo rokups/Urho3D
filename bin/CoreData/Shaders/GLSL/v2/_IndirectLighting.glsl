@@ -65,7 +65,11 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
     // cAmbient and cAmbientColor should contain color in light space.
     // cSH* should contain harmonics in linear space.
     #if defined(URHO3D_AMBIENT_DIRECTIONAL)
-        #define GetAmbientLight(normal) LinearToLightSpace(EvaluateSH01(normal, cSHAr, cSHAg, cSHAb) + EvaluateSH2(normal, cSHBr, cSHBg, cSHBb, cSHC))
+        #ifdef URHO3D_SURFACE_VOLUMETRIC
+            #define GetAmbientLight(normal) LinearToLightSpace(vec3(cSHAr.w, cSHAg.w, cSHAb.w))
+        #else
+            #define GetAmbientLight(normal) LinearToLightSpace(EvaluateSH01(normal, cSHAr, cSHAg, cSHAb) + EvaluateSH2(normal, cSHBr, cSHBg, cSHBb, cSHC))
+        #endif
     #elif defined(URHO3D_AMBIENT_FLAT)
         #define GetAmbientLight(normal) cAmbient.rgb
     #elif defined(URHO3D_AMBIENT_CONSTANT)

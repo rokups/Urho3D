@@ -43,18 +43,18 @@ void main()
             half3 halfVec = normalize(surfaceData.eyeVec + lightData.lightVec.xyz);
         #endif
 
-        #ifdef URHO3D_PHYSICAL_MATERIAL
+        #if defined(URHO3D_SURFACE_VOLUMETRIC)
+            half3 lightColor = Direct_Volumetric(lightData.lightColor, surfaceData.albedo.rgb);
+        #elif defined(URHO3D_PHYSICAL_MATERIAL)
             half3 lightColor = Direct_PBR(lightData.lightColor, surfaceData.albedo.rgb, surfaceData.specular, surfaceData.roughness,
                 lightData.lightVec.xyz, surfaceData.normal, surfaceData.eyeVec, halfVec);
+        #elif defined(URHO3D_LIGHT_HAS_SPECULAR)
+            half3 lightColor = Direct_SimpleSpecular(lightData.lightColor,
+                surfaceData.albedo.rgb, surfaceData.specular,
+                lightData.lightVec.xyz, surfaceData.normal, halfVec, cMatSpecColor.a, cLightColor.a);
         #else
-            #ifdef URHO3D_LIGHT_HAS_SPECULAR
-                half3 lightColor = Direct_SimpleSpecular(lightData.lightColor,
-                    surfaceData.albedo.rgb, surfaceData.specular,
-                    lightData.lightVec.xyz, surfaceData.normal, halfVec, cMatSpecColor.a, cLightColor.a);
-            #else
-                half3 lightColor = Direct_Simple(lightData.lightColor,
-                    surfaceData.albedo.rgb, lightData.lightVec.xyz, surfaceData.normal);
-            #endif
+            half3 lightColor = Direct_Simple(lightData.lightColor,
+                surfaceData.albedo.rgb, lightData.lightVec.xyz, surfaceData.normal);
         #endif
         finalColor += lightColor * GetDirectLightAttenuation(lightData);
     #endif
