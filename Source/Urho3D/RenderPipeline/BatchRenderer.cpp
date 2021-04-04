@@ -37,6 +37,7 @@
 #include "../RenderPipeline/InstancingBuffer.h"
 #include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/PipelineBatchSortKey.h"
+#include "../RenderPipeline/ShaderConsts.h"
 #include "../Scene/Scene.h"
 
 #include <EASTL/sort.h>
@@ -310,7 +311,7 @@ private:
                 drawQueue_.AddShaderParameter(parameter.first, parameter.second.value_);
 
             if (enabled_.ambientLighting_ && current_.lightmapScaleOffset_)
-                drawQueue_.AddShaderParameter(VSP_LMOFFSET, *current_.lightmapScaleOffset_);
+                drawQueue_.AddShaderParameter(ShaderConsts::Material_LMOffset, *current_.lightmapScaleOffset_);
 
             drawQueue_.CommitShaderParameterGroup(SP_MATERIAL);
         }
@@ -358,8 +359,8 @@ private:
         for (const ShaderParameterDesc& shaderParameter : frameParameters_)
             drawQueue_.AddShaderParameter(shaderParameter.name_, shaderParameter.value_);
 
-        drawQueue_.AddShaderParameter(VSP_DELTATIME, frameInfo_.timeStep_);
-        drawQueue_.AddShaderParameter(VSP_ELAPSEDTIME, scene_.GetElapsedTime());
+        drawQueue_.AddShaderParameter(ShaderConsts::Frame_DeltaTime, frameInfo_.timeStep_);
+        drawQueue_.AddShaderParameter(ShaderConsts::Frame_ElapsedTime, scene_.GetElapsedTime());
     }
 
     void AddCameraConstants(float constantDepthBias)
@@ -368,79 +369,80 @@ private:
             drawQueue_.AddShaderParameter(shaderParameter.name_, shaderParameter.value_);
 
         const Matrix3x4 cameraEffectiveTransform = camera_.GetEffectiveWorldTransform();
-        drawQueue_.AddShaderParameter(VSP_CAMERAPOS, cameraEffectiveTransform.Translation());
-        drawQueue_.AddShaderParameter(VSP_VIEWINV, cameraEffectiveTransform);
-        drawQueue_.AddShaderParameter(VSP_VIEW, camera_.GetView());
+        drawQueue_.AddShaderParameter(ShaderConsts::Camera_CameraPos, cameraEffectiveTransform.Translation());
+        drawQueue_.AddShaderParameter(ShaderConsts::Camera_ViewInv, cameraEffectiveTransform);
+        drawQueue_.AddShaderParameter(ShaderConsts::Camera_View, camera_.GetView());
 
         const float nearClip = camera_.GetNearClip();
         const float farClip = camera_.GetFarClip();
-        drawQueue_.AddShaderParameter(VSP_NEARCLIP, nearClip);
-        drawQueue_.AddShaderParameter(VSP_FARCLIP, farClip);
+        drawQueue_.AddShaderParameter(ShaderConsts::Camera_NearClip, nearClip);
+        drawQueue_.AddShaderParameter(ShaderConsts::Camera_FarClip, farClip);
 
         if (outputShadowSplit_)
         {
             const CookedLightParams& lightParams = outputShadowSplit_->GetLightProcessor()->GetParams();
-            drawQueue_.AddShaderParameter(VSP_NORMALOFFSETSCALE,
+            drawQueue_.AddShaderParameter(ShaderConsts::Camera_NormalOffsetScale,
                 lightParams.shadowNormalBias_[outputShadowSplit_->GetSplitIndex()]);
         }
 
-        drawQueue_.AddShaderParameter(VSP_DEPTHMODE, GetCameraDepthModeParameter(camera_));
-        drawQueue_.AddShaderParameter(PSP_DEPTHRECONSTRUCT, GetCameraDepthReconstructParameter(camera_));
+        drawQueue_.AddShaderParameter(ShaderConsts::Camera_DepthMode, GetCameraDepthModeParameter(camera_));
+        drawQueue_.AddShaderParameter(ShaderConsts::Camera_DepthReconstruct, GetCameraDepthReconstructParameter(camera_));
 
         Vector3 nearVector, farVector;
         camera_.GetFrustumSize(nearVector, farVector);
-        drawQueue_.AddShaderParameter(VSP_FRUSTUMSIZE, farVector);
+        drawQueue_.AddShaderParameter(ShaderConsts::Camera_FrustumSize, farVector);
 
-        drawQueue_.AddShaderParameter(VSP_VIEWPROJ, camera_.GetEffectiveGPUViewProjection(constantDepthBias));
+        drawQueue_.AddShaderParameter(ShaderConsts::Camera_ViewProj, camera_.GetEffectiveGPUViewProjection(constantDepthBias));
 
         const Color ambientColorGamma = camera_.GetEffectiveAmbientColor() * camera_.GetEffectiveAmbientBrightness();
-        drawQueue_.AddShaderParameter(PSP_AMBIENTCOLOR,
+        drawQueue_.AddShaderParameter(ShaderConsts::Camera_AmbientColor,
             settings_.linearSpaceLighting_ ? ambientColorGamma.GammaToLinear() : ambientColorGamma);
-        drawQueue_.AddShaderParameter(PSP_FOGCOLOR, camera_.GetEffectiveFogColor());
-        drawQueue_.AddShaderParameter(PSP_FOGPARAMS, GetFogParameter(camera_));
+        drawQueue_.AddShaderParameter(ShaderConsts::Camera_FogColor, camera_.GetEffectiveFogColor());
+        drawQueue_.AddShaderParameter(ShaderConsts::Camera_FogParams, GetFogParameter(camera_));
     }
 
     void AddReflectionProbeConstants()
     {
-        drawQueue_.AddShaderParameter("RoughnessToLODFactor", current_.reflectionProbe_->roughnessToLODFactor_);
+        drawQueue_.AddShaderParameter(ShaderConsts::Zone_RoughnessToLODFactor,
+            current_.reflectionProbe_->roughnessToLODFactor_);
     }
 
     void AddVertexLightConstants()
     {
-        drawQueue_.AddShaderParameter(VSP_VERTEXLIGHTS, ea::span<const Vector4>{ current_.vertexLightsData_ });
+        drawQueue_.AddShaderParameter(ShaderConsts::Light_VertexLights, ea::span<const Vector4>{ current_.vertexLightsData_ });
     }
 
     void AddPixelLightConstants(const CookedLightParams& params)
     {
-        drawQueue_.AddShaderParameter(VSP_LIGHTDIR, params.direction_);
-        drawQueue_.AddShaderParameter(VSP_LIGHTPOS,
+        drawQueue_.AddShaderParameter(ShaderConsts::Light_LightDir, params.direction_);
+        drawQueue_.AddShaderParameter(ShaderConsts::Light_LightPos,
             Vector4{ params.position_, params.inverseRange_ });
-        drawQueue_.AddShaderParameter(PSP_LIGHTCOLOR,
+        drawQueue_.AddShaderParameter(ShaderConsts::Light_LightColor,
             Vector4{ params.GetColor(settings_.linearSpaceLighting_), params.effectiveSpecularIntensity_ });
 
-        drawQueue_.AddShaderParameter(PSP_LIGHTRAD, params.volumetricRadius_);
-        drawQueue_.AddShaderParameter(PSP_LIGHTLENGTH, params.volumetricLength_);
+        drawQueue_.AddShaderParameter(ShaderConsts::Light_LightRad, params.volumetricRadius_);
+        drawQueue_.AddShaderParameter(ShaderConsts::Light_LightLength, params.volumetricLength_);
 
         // TODO(renderer): Cleanup constants
-        drawQueue_.AddShaderParameter("SpotAngle", Vector2{ params.spotCutoff_, params.inverseSpotCutoff_ });
+        drawQueue_.AddShaderParameter(ShaderConsts::Light_SpotAngle, Vector2{ params.spotCutoff_, params.inverseSpotCutoff_ });
         if (params.lightShape_)
-            drawQueue_.AddShaderParameter("LightShapeMatrix", params.lightShapeMatrix_);
+            drawQueue_.AddShaderParameter(ShaderConsts::Light_LightShapeMatrix, params.lightShapeMatrix_);
 
         if (params.numLightMatrices_ > 0)
         {
             ea::span<const Matrix4> shadowMatricesSpan{ params.lightMatrices_.data(), params.numLightMatrices_ };
-            drawQueue_.AddShaderParameter(VSP_LIGHTMATRICES, shadowMatricesSpan);
+            drawQueue_.AddShaderParameter(ShaderConsts::Light_LightMatrices, shadowMatricesSpan);
         }
 
         if (params.shadowMap_)
         {
-            drawQueue_.AddShaderParameter(PSP_SHADOWDEPTHFADE, params.shadowDepthFade_);
-            drawQueue_.AddShaderParameter(PSP_SHADOWINTENSITY, params.shadowIntensity_);
-            drawQueue_.AddShaderParameter(PSP_SHADOWMAPINVSIZE, params.shadowMapInvSize_);
-            drawQueue_.AddShaderParameter(PSP_SHADOWSPLITS, params.shadowSplitDistances_);
-            drawQueue_.AddShaderParameter(PSP_SHADOWCUBEUVBIAS, params.shadowCubeUVBias_);
-            drawQueue_.AddShaderParameter(PSP_SHADOWCUBEADJUST, params.shadowCubeAdjust_);
-            drawQueue_.AddShaderParameter(PSP_VSMSHADOWPARAMS, settings_.varianceShadowMapParams_);
+            drawQueue_.AddShaderParameter(ShaderConsts::Light_ShadowDepthFade, params.shadowDepthFade_);
+            drawQueue_.AddShaderParameter(ShaderConsts::Light_ShadowIntensity, params.shadowIntensity_);
+            drawQueue_.AddShaderParameter(ShaderConsts::Light_ShadowMapInvSize, params.shadowMapInvSize_);
+            drawQueue_.AddShaderParameter(ShaderConsts::Light_ShadowSplits, params.shadowSplitDistances_);
+            drawQueue_.AddShaderParameter(ShaderConsts::Light_ShadowCubeUVBias, params.shadowCubeUVBias_);
+            drawQueue_.AddShaderParameter(ShaderConsts::Light_ShadowCubeAdjust, params.shadowCubeAdjust_);
+            drawQueue_.AddShaderParameter(ShaderConsts::Light_VSMShadowParams, settings_.varianceShadowMapParams_);
         }
     }
 
@@ -449,37 +451,43 @@ private:
         if (enabled_.ambientLighting_)
         {
             if (settings_.ambientMode_ == DrawableAmbientMode::Flat)
-                drawQueue_.AddShaderParameter(VSP_AMBIENT, object_.ambient_);
+                drawQueue_.AddShaderParameter(ShaderConsts::Object_Ambient, object_.ambient_);
             else if (settings_.ambientMode_ == DrawableAmbientMode::Directional)
             {
                 const SphericalHarmonicsDot9& sh = *object_.sh_;
-                drawQueue_.AddShaderParameter(VSP_SHAR, sh.Ar_);
-                drawQueue_.AddShaderParameter(VSP_SHAG, sh.Ag_);
-                drawQueue_.AddShaderParameter(VSP_SHAB, sh.Ab_);
-                drawQueue_.AddShaderParameter(VSP_SHBR, sh.Br_);
-                drawQueue_.AddShaderParameter(VSP_SHBG, sh.Bg_);
-                drawQueue_.AddShaderParameter(VSP_SHBB, sh.Bb_);
-                drawQueue_.AddShaderParameter(VSP_SHC, sh.C_);
+                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHAr, sh.Ar_);
+                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHAg, sh.Ag_);
+                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHAb, sh.Ab_);
+                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHBr, sh.Br_);
+                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHBg, sh.Bg_);
+                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHBb, sh.Bb_);
+                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHC, sh.C_);
             }
         }
 
         switch (object_.geometryType_)
         {
         case GEOM_SKINNED:
-            drawQueue_.AddShaderParameter(VSP_SKINMATRICES,
+            drawQueue_.AddShaderParameter(ShaderConsts::Object_SkinMatrices,
                 ea::span<const Matrix3x4>(object_.worldTransform_, object_.numWorldTransforms_));
             break;
 
         case GEOM_BILLBOARD:
-            drawQueue_.AddShaderParameter(VSP_MODEL, *object_.worldTransform_);
+            drawQueue_.AddShaderParameter(ShaderConsts::Object_Model, *object_.worldTransform_);
             if (object_.numWorldTransforms_ > 1)
-                drawQueue_.AddShaderParameter(VSP_BILLBOARDROT, object_.worldTransform_[1].RotationMatrix());
+            {
+                drawQueue_.AddShaderParameter(ShaderConsts::Object_BillboardRot,
+                    object_.worldTransform_[1].RotationMatrix());
+            }
             else
-                drawQueue_.AddShaderParameter(VSP_BILLBOARDROT, cameraNode_.GetWorldRotation().RotationMatrix());
+            {
+                drawQueue_.AddShaderParameter(ShaderConsts::Object_BillboardRot,
+                    cameraNode_.GetWorldRotation().RotationMatrix());
+            }
             break;
 
         default:
-            drawQueue_.AddShaderParameter(VSP_MODEL, *object_.worldTransform_);
+            drawQueue_.AddShaderParameter(ShaderConsts::Object_Model, *object_.worldTransform_);
             break;
         }
     }
