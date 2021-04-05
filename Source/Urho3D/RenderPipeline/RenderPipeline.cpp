@@ -160,7 +160,7 @@ void RenderPipelineView::ApplySettings()
         }
     }
 
-    sceneProcessor_->SetPasses({ opaquePass_, alphaPass_, postOpaquePass_ });
+    sceneProcessor_->SetPasses({ opaquePass_, refractPass_, alphaPass_, postOpaquePass_ });
 
     postProcessPasses_.clear();
 
@@ -224,8 +224,9 @@ bool RenderPipelineView::Define(RenderSurface* renderTarget, Viewport* viewport)
         instancingBuffer_ = MakeShared<InstancingBuffer>(context_);
         sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow", shadowMapAllocator_, instancingBuffer_);
 
+        refractPass_ = sceneProcessor_->CreatePass<BackToFrontScenePass>(DrawableProcessorPassFlag::None, "refract");
         alphaPass_ = sceneProcessor_->CreatePass<BackToFrontScenePass>(
-            DrawableProcessorPassFlag::HasAmbientLighting | DrawableProcessorPassFlag::AlphaPass, "", "alpha", "alpha", "litalpha");
+            DrawableProcessorPassFlag::HasAmbientLighting | DrawableProcessorPassFlag::SoftParticlesPass, "", "alpha", "alpha", "litalpha");
         postOpaquePass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(DrawableProcessorPassFlag::None, "postopaque");
     }
 
@@ -272,9 +273,12 @@ void RenderPipelineView::Update(const FrameInfo& frameInfo)
 
 void RenderPipelineView::Render()
 {
+    const bool hasRefraction = refractPass_->HasBatches();
     RenderBufferManagerFrameSettings frameSettings;
     frameSettings.supportColorReadWrite_ = postProcessFlags_.Test(PostProcessPassFlag::NeedColorOutputReadAndWrite);
     frameSettings.readableDepth_ = settings_.sceneProcessor_.IsDeferredLighting() || settings_.sceneProcessor_.softParticles_;
+    if (hasRefraction)
+        frameSettings.supportColorReadWrite_ = true;
     renderBufferManager_->SetFrameSettings(frameSettings);
 
     OnRenderBegin(this, frameInfo_);
@@ -353,33 +357,54 @@ void RenderPipelineView::Render()
     sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetBaseRenderFlags(), opaquePass_->GetSortedBaseBatches());
     sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetLightRenderFlags(), opaquePass_->GetSortedLightBatches());
     sceneBatchRenderer_->RenderBatches(ctx, postOpaquePass_->GetBaseRenderFlags(), postOpaquePass_->GetSortedBaseBatches());
-    if (!settings_.sceneProcessor_.softParticles_)
-    {
-        sceneBatchRenderer_->RenderBatches(ctx, alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches());
-    }
     instancingBuffer_->End();
     drawQueue->Execute();
 
-#ifdef DESKTOP_GRAPHICS
-    if (settings_.sceneProcessor_.softParticles_)
+    if (!settings_.sceneProcessor_.softParticles_)
     {
-        drawQueue->Reset();
-        instancingBuffer_->Begin();
-
-        const ShaderParameterDesc cameraParameters[] = {
-            { VSP_GBUFFEROFFSETS, renderBufferManager_->GetDefaultClipToUVSpaceOffsetAndScale() },
-        };
-        ShaderResourceDesc shaderResources[] = {
-            { TU_DEPTHBUFFER, renderBufferManager_->GetDepthStencilTexture() }
-        };
-        ctx.cameraParameters_ = cameraParameters;
-        ctx.globalResources_ = shaderResources;
+        sceneBatchRenderer_->RenderBatches(ctx, refractPass_->GetRenderFlags(), refractPass_->GetSortedBatches());
         sceneBatchRenderer_->RenderBatches(ctx, alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches());
-
-        instancingBuffer_->End();
-        drawQueue->Execute();
     }
+
+    if (hasRefraction)
+        renderBufferManager_->PrepareForColorReadWrite(true);
+
+#ifdef DESKTOP_GRAPHICS
+    ShaderResourceDesc depthAndColorTextures[] = {
+        { TU_DEPTHBUFFER, renderBufferManager_->GetDepthStencilTexture() },
+        { TU_EMISSIVE, renderBufferManager_->GetSecondaryColorTexture() },
+    };
+    ShaderResourceDesc depthTexture[] = {
+        { TU_DEPTHBUFFER, renderBufferManager_->GetDepthStencilTexture() },
+    };
+#else
+    ShaderResourceDesc depthAndColorTextures[] = {
+        { TU_EMISSIVE, renderBufferManager_->GetSecondaryColorTexture() },
+    };
+    ea::span<ShaderResourceDesc> depthTexture;
 #endif
+
+    drawQueue->Reset();
+    instancingBuffer_->Begin();
+
+    const ShaderParameterDesc cameraParameters[] = {
+        { VSP_GBUFFEROFFSETS, renderBufferManager_->GetDefaultClipToUVSpaceOffsetAndScale() },
+    };
+    ctx.cameraParameters_ = cameraParameters;
+    ctx.globalResources_ = depthAndColorTextures;
+    sceneBatchRenderer_->RenderBatches(ctx, refractPass_->GetRenderFlags(), refractPass_->GetSortedBatches());
+
+    ctx.globalResources_ = depthTexture;
+    sceneBatchRenderer_->RenderBatches(ctx, alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches());
+
+    instancingBuffer_->End();
+    drawQueue->Execute();
+
+    drawQueue->Reset();
+    instancingBuffer_->Begin();
+    sceneBatchRenderer_->RenderBatches(ctx, postOpaquePass_->GetBaseRenderFlags(), postOpaquePass_->GetSortedBaseBatches());
+    instancingBuffer_->End();
+    drawQueue->Execute();
 
     for (PostProcessPass* postProcessPass : postProcessPasses_)
         postProcessPass->Execute();

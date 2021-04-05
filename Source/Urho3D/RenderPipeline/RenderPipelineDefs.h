@@ -60,7 +60,7 @@ enum class DrawableProcessorPassFlag
     HasAmbientLighting = 1 << 0,
     DisableInstancing = 1 << 1,
     DeferredLightMaskToStencil = 1 << 2,
-    AlphaPass = 1 << 3
+    SoftParticlesPass = 1 << 3
 };
 
 URHO3D_FLAGSET(DrawableProcessorPassFlag, DrawableProcessorPassFlags);

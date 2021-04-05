@@ -145,7 +145,7 @@ public:
     /// Return secondary color render buffer texture that can be used while writing to color render buffer.
     /// Texture content is defined at the moment of previous PrepareForColorReadWrite.
     /// Content is undefined if PrepareForColorReadWrite was not called during current frame.
-    Texture2D* GetSecondaryColorTexture() const { return readableColorBuffer_->GetTexture2D(); }
+    Texture2D* GetSecondaryColorTexture() const { return readableColorBuffer_ ? readableColorBuffer_->GetTexture2D() : nullptr; }
 
     /// Return size of output region (not size of output texture itself).
     IntVector2 GetOutputSize() const { return viewportRect_.Size(); }

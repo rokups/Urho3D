@@ -151,6 +151,13 @@ public:
 
     void ComposeBatches();
 
+    bool HasBatches() const
+    {
+        return deferredBatches_.Size() > 0
+            || baseBatches_.Size() > 0
+            || lightBatches_.Size() > 0;
+        }
+
 protected:
     /// Callbacks from RenderPipeline
     /// @{
