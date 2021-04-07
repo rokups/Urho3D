@@ -268,7 +268,6 @@ private:
             AddCameraConstants(current_.constantDepthBias_);
             drawQueue_.CommitShaderParameterGroup(SP_CAMERA);
         }
-        dirty_.cameraConstants_ = false;
 
         if (enabled_.ambientLighting_)
         {
@@ -448,7 +447,7 @@ private:
         }
     }
 
-    void AddObjectConstants()
+    void AddObjectConstants(unsigned instanceIndex)
     {
         if (enabled_.ambientLighting_)
         {
@@ -489,20 +488,25 @@ private:
             break;
 
         default:
-            drawQueue_.AddShaderParameter(ShaderConsts::Object_Model, *object_.worldTransform_);
+            drawQueue_.AddShaderParameter(ShaderConsts::Object_Model, object_.worldTransform_[instanceIndex]);
             break;
         }
     }
 
-    void AddObjectInstanceData()
+    void AddObjectInstanceData(unsigned numInstances)
     {
-        instancingBuffer_.SetElements(object_.worldTransform_, 0, 3);
-        if (enabled_.ambientLighting_)
+        for (unsigned i = 0; i < numInstances; ++i)
         {
-            if (settings_.ambientMode_ == DrawableAmbientMode::Flat)
-                instancingBuffer_.SetElements(&object_.ambient_, 3, 1);
-            else if (settings_.ambientMode_ == DrawableAmbientMode::Directional)
-                instancingBuffer_.SetElements(object_.sh_, 3, 7);
+            if (i != 0)
+                instancingBuffer_.AddInstance();
+            instancingBuffer_.SetElements(&object_.worldTransform_[i], 0, 3);
+            if (enabled_.ambientLighting_)
+            {
+                if (settings_.ambientMode_ == DrawableAmbientMode::Flat)
+                    instancingBuffer_.SetElements(&object_.ambient_, 3, 1);
+                else if (settings_.ambientMode_ == DrawableAmbientMode::Directional)
+                    instancingBuffer_.SetElements(object_.sh_, 3, 7);
+            }
         }
     }
     /// @}
@@ -553,6 +557,9 @@ private:
             CheckDirtyLightmap(sourceBatch);
         }
 
+        const unsigned numBatchInstances = pipelineBatch.geometryType_ == GEOM_STATIC
+            ? object_.numWorldTransforms_ : 1u;
+
         const bool resetInstancingGroup = instancingGroup_.count_ == 0 || dirty_.IsAnythingDirty();
         if (resetInstancingGroup)
         {
@@ -570,25 +577,28 @@ private:
                 && pipelineBatch.geometry_->GetIndexBuffer() != nullptr;
             if (beginInstancingGroup)
             {
-                instancingGroup_.count_ = 1;
+                instancingGroup_.count_ = numBatchInstances;
                 instancingGroup_.start_ = instancingBuffer_.AddInstance();
                 instancingGroup_.geometry_ = current_.geometry_;
-                AddObjectInstanceData();
+                AddObjectInstanceData(numBatchInstances);
             }
             else
             {
-                drawQueue_.BeginShaderParameterGroup(SP_OBJECT, true);
-                AddObjectConstants();
-                drawQueue_.CommitShaderParameterGroup(SP_OBJECT);
+                for (unsigned i = 0; i < numBatchInstances; ++i)
+                {
+                    drawQueue_.BeginShaderParameterGroup(SP_OBJECT, true);
+                    AddObjectConstants(i);
+                    drawQueue_.CommitShaderParameterGroup(SP_OBJECT);
 
-                DrawObject();
+                    DrawObject();
+                }
             }
         }
         else
         {
-            ++instancingGroup_.count_;
+            instancingGroup_.count_ += numBatchInstances;
             instancingBuffer_.AddInstance();
-            AddObjectInstanceData();
+            AddObjectInstanceData(numBatchInstances);
         }
     }
 

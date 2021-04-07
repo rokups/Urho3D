@@ -50,6 +50,7 @@
 #include "../Resource/XMLFile.h"
 #include "../Scene/Scene.h"
 
+#include <EASTL/bonus/adaptors.h>
 #include <EASTL/functional.h>
 
 #include "../DebugNew.h"
@@ -807,8 +808,8 @@ void Renderer::Render()
         views_[i]->Render();
     }
 
-    // Render custom views.
-    for (RenderPipelineView* renderPipelineView : renderPipelineViews_)
+    // Render RenderPipeline views.
+    for (RenderPipelineView* renderPipelineView : ea::reverse(renderPipelineViews_))
     {
         PrepareViewRender();
         renderPipelineView->Render();

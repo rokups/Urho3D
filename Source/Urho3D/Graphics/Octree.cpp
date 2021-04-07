@@ -386,6 +386,8 @@ void ZoneLookupIndex::Commit()
 
     for (Zone* zone : zones_)
         zone->UpdateCachedData();
+    if (defaultZone_)
+        defaultZone_->UpdateCachedData();
 }
 
 CachedDrawableZone ZoneLookupIndex::QueryZone(const Vector3& position, unsigned zoneMask) const

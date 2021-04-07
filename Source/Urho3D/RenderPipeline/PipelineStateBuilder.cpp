@@ -379,6 +379,9 @@ void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPa
     desc_.colorWriteEnabled_ = true;
     desc_.blendMode_ = materialPass->GetBlendMode();
     desc_.alphaToCoverageEnabled_ = materialPass->GetAlphaToCoverage();
+    // TODO(renderer): Revisit this place
+    desc_.constantDepthBias_ = material->GetDepthBias().constantBias_;
+    desc_.slopeScaledDepthBias_ = material->GetDepthBias().slopeScaledBias_;
 
     // TODO(renderer): Implement fill mode
     desc_.fillMode_ = FILL_SOLID;
