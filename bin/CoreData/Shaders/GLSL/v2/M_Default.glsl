@@ -13,10 +13,14 @@ void main()
 {
     FragmentData fragmentData = GetFragmentData();
     SurfaceGeometryData surfaceGeometryData = GetSurfaceGeometryData();
+
     SetupFragmentReflectionColor(fragmentData, surfaceGeometryData);
+    SetupFragmentBackgroundDepth(fragmentData);
+
     SurfaceMaterialData surfaceMaterialData = GetSurfaceMaterialData(surfaceGeometryData.oneMinusReflectivity);
 
     half3 finalColor = GetFinalColor(fragmentData, surfaceGeometryData, surfaceMaterialData);
-    gl_FragColor = vec4(ApplyFog(finalColor, fragmentData.fogFactor), surfaceMaterialData.albedo.a);
+    gl_FragColor.rgb = ApplyFog(finalColor, fragmentData.fogFactor);
+    gl_FragColor.a = GetFinalAlpha(fragmentData, surfaceMaterialData);
 }
 #endif

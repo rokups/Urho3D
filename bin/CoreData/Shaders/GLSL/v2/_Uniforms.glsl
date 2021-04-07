@@ -93,23 +93,22 @@ UNIFORM_BUFFER_BEGIN(3, Light)
 #endif
 UNIFORM_BUFFER_END(3, Light)
 
-#ifndef CUSTOM_MATERIAL_CBUFFER
-UNIFORM_BUFFER_BEGIN(4, Material)
-    UNIFORM(half4 cUOffset)
-    UNIFORM(half4 cVOffset)
-    /// xy: Scale applied to lightmap UVs;
-    /// zw: Offset applied to lightmap UVs.
-    UNIFORM(half4 cLMOffset)
-
-    UNIFORM(half4 cMatDiffColor)
-    UNIFORM(half3 cMatEmissiveColor)
-    UNIFORM(half cRefraction)
-    UNIFORM(half3 cMatEnvMapColor)
+#define DEFAULT_MATERIAL_UNIFORMS \
+    UNIFORM(half4 cUOffset) \
+    UNIFORM(half4 cVOffset) \
+    UNIFORM(half4 cLMOffset) \
+    UNIFORM(half4 cMatDiffColor) \
+    UNIFORM(half3 cMatEmissiveColor) \
+    UNIFORM(half cRoughness) \
+    UNIFORM(half3 cMatEnvMapColor) \
+    UNIFORM(half cMetallic) \
     UNIFORM(half4 cMatSpecColor)
-#ifdef URHO3D_PHYSICAL_MATERIAL
-    UNIFORM(half cRoughness)
-    UNIFORM(half cMetallic)
-#endif
+
+/// cLMOffset.xy: Scale applied to lightmap UVs;
+/// cLMOffset.zw: Offset applied to lightmap UVs.
+#ifndef URHO3D_CUSTOM_MATERIAL_UNIFORMS
+UNIFORM_BUFFER_BEGIN(4, Material)
+    DEFAULT_MATERIAL_UNIFORMS
 UNIFORM_BUFFER_END(4, Material)
 #endif
 

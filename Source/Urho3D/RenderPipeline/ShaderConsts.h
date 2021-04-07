@@ -89,7 +89,6 @@ namespace ShaderConsts
     URHO3D_SHADER_CONST(Material, MatSpecColor);
     URHO3D_SHADER_CONST(Material, Roughness);
     URHO3D_SHADER_CONST(Material, Metallic);
-    URHO3D_SHADER_CONST(Material, Refraction);
     /// @}
 
     URHO3D_SHADER_CONST(Object, Model);

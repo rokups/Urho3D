@@ -1,6 +1,6 @@
 #define URHO3D_NUM_RENDER_TARGETS 6
 #define URHO3D_PIXEL_NEED_NORMAL
-#define CUSTOM_MATERIAL_CBUFFER
+#define URHO3D_CUSTOM_MATERIAL_UNIFORMS
 
 #include "_Config.glsl"
 #include "_GammaCorrection.glsl"

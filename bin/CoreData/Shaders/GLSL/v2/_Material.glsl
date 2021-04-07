@@ -158,7 +158,7 @@ FragmentData GetFragmentData()
 
     // Initialize screen UV
 #ifdef URHO3D_PIXEL_NEED_SCREEN_POSITION
-    result.screenUV = vScreenPos.xy / vScreenPos.w;
+    result.screenPos = vScreenPos.xy / vScreenPos.w;
 #endif
 
     return result;
@@ -323,7 +323,7 @@ SurfaceMaterialData GetSurfaceMaterialData(const half oneMinusReflectivity)
 /// Setup background color data for fragment, if applicable.
 #ifdef URHO3D_PIXEL_NEED_BACKGROUND_COLOR
     #define SetupFragmentBackgroundColor(fragmentData) \
-        fragmentData.backgroundColor = texture2D(sEmissiveMap, fragmentData.screenUV).rgb
+        fragmentData.backgroundColor = texture2D(sEmissiveMap, fragmentData.screenPos).rgb
 #else
     #define SetupFragmentBackgroundColor(fragmentData)
 #endif
@@ -331,9 +331,24 @@ SurfaceMaterialData GetSurfaceMaterialData(const half oneMinusReflectivity)
 /// Setup background depth data for fragment, if applicable.
 #ifdef URHO3D_PIXEL_NEED_BACKGROUND_DEPTH
     #define SetupFragmentBackgroundDepth(fragmentData) \
-        fragmentData.backgroundDepth = ReconstructDepth(texture2D(sDepthBuffer, fragmentData.screenUV).r)
+        fragmentData.backgroundDepth = ReconstructDepth(texture2D(sDepthBuffer, fragmentData.screenPos).r)
 #else
     #define SetupFragmentBackgroundDepth(fragmentData)
+#endif
+
+/// Return final alpha with optionally applied fade out.
+#ifdef URHO3D_SOFT_PARTICLES
+    half GetSoftParticleFade(float fragmentDepth, float backgroundDepth)
+    {
+        // TODO(renderer): Make these configurable
+        vec2 cMatParticleFadeParams = vec2(0.0, 1.0 * (cFarClip - cNearClip));
+        float depthDelta = backgroundDepth - fragmentDepth - cMatParticleFadeParams.x;
+        return clamp(depthDelta * cMatParticleFadeParams.y, 0.0, 1.0);
+    }
+    #define GetFinalAlpha(fragmentData, surfaceMaterialData) \
+        surfaceMaterialData.albedo.a * GetSoftParticleFade(vWorldDepth, fragmentData.backgroundDepth)
+#else
+    #define GetFinalAlpha(fragmentData, surfaceMaterialData) surfaceMaterialData.albedo.a
 #endif
 
 #ifdef URHO3D_IS_LIT

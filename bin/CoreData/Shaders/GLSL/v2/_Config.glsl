@@ -43,6 +43,10 @@
 
 /// =================================== External defines ===================================
 
+/// Whether to disable default uniform buffer in favor of custom one.
+/// You may still need to declare default constants to use built-in includes.
+// #define URHO3D_CUSTOM_MATERIAL_UNIFORMS
+
 /// Configures what data vertex shader needs in VertexTransform:
 // #define URHO3D_VERTEX_NEED_NORMAL
 // #define URHO3D_VERTEX_NEED_TANGENT

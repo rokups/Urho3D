@@ -323,6 +323,9 @@ private:
         const bool resourcesDirty = dirty_.material_ || dirty_.reflectionProbe_ || dirty_.IsResourcesDirty();
         if (resourcesDirty)
         {
+            for (const ShaderResourceDesc& desc : globalResources_)
+                drawQueue_.AddShaderResource(desc.unit_, desc.texture_);
+
             const auto& materialTextures = current_.material_->GetTextures();
             bool materialHasEnvironmentMap = false;
             for (const auto& texture : materialTextures)
@@ -334,9 +337,6 @@ private:
                     continue;
                 drawQueue_.AddShaderResource(texture.first, texture.second);
             }
-
-            for (const ShaderResourceDesc& desc : globalResources_)
-                drawQueue_.AddShaderResource(desc.unit_, desc.texture_);
 
             if (current_.lightmapTexture_)
                 drawQueue_.AddShaderResource(TU_EMISSIVE, current_.lightmapTexture_);

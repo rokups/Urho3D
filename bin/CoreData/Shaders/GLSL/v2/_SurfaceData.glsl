@@ -52,7 +52,7 @@ struct FragmentData
 #endif
 #ifdef URHO3D_PIXEL_NEED_SCREEN_POSITION
     /// UV of depth or color background buffer corresponding to this fragment.
-    vec2 screenUV;
+    vec2 screenPos;
 #endif
 #ifdef URHO3D_PIXEL_NEED_BACKGROUND_COLOR
     /// Color of background object.
