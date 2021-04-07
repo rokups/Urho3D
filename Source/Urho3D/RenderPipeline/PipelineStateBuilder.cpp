@@ -323,13 +323,16 @@ void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPa
     {
         commonDefines_ += "URHO3D_ADDITIVE_LIGHT_PASS ";
     }
-    else if (passFlags.Test(DrawableProcessorPassFlag::HasAmbientLighting))
+    else
     {
-        commonDefines_ += "URHO3D_AMBIENT_PASS ";
-        if (!isDeferred)
-            commonDefines_ += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", sceneProcessor_->GetSettings().maxVertexLights_);
-        else
-            commonDefines_ += "URHO3D_GBUFFER_PASS ";
+        if (passFlags.Test(DrawableProcessorPassFlag::HasAmbientLighting))
+        {
+            commonDefines_ += "URHO3D_AMBIENT_PASS ";
+            if (!isDeferred)
+                commonDefines_ += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", sceneProcessor_->GetSettings().maxVertexLights_);
+            else
+                commonDefines_ += "URHO3D_GBUFFER_PASS ";
+        }
     }
 
     const bool softParticles = sceneProcessor_->GetSettings().softParticles_;

@@ -43,26 +43,19 @@
 
 /// =================================== External defines ===================================
 
-/// Whether vertex shader needs world-space normal.
+/// Configures what data vertex shader needs in VertexTransform:
 // #define URHO3D_VERTEX_NEED_NORMAL
-
-/// Whether vertex shader needs world-space tangent and bitangent.
 // #define URHO3D_VERTEX_NEED_TANGENT
 
-/// Whether pixel shader needs screen position.
+/// Configures what data pixel shader needs:
 // #define URHO3D_PIXEL_NEED_SCREEN_POSITION
-
-/// Whether pixel shader needs eye vector.
 // #define URHO3D_PIXEL_NEED_EYE_VECTOR
-
-/// Whether pixel shader needs world-space normal.
 // #define URHO3D_PIXEL_NEED_NORMAL
-
-/// Whether pixel shader needs world-space tangent and bitangent.
+// #define URHO3D_PIXEL_NEED_NORMAL_IN_TANGENT_SPACE
 // #define URHO3D_PIXEL_NEED_TANGENT
-
-/// Whether pixel shader needs vertex color.
-// #define URHO3D_PIXEL_NEED_COLOR
+// #define URHO3D_PIXEL_NEED_VERTEX_COLOR
+// #define URHO3D_PIXEL_NEED_BACKGROUND_DEPTH
+// #define URHO3D_PIXEL_NEED_BACKGROUND_COLOR
 
 /// Whether to disable all lighting calculation.
 // #define UNLIT
@@ -79,8 +72,10 @@
 /// Whether to sample reflections from environment cubemap.
 // #define ENVCUBEMAP
 
-/// Whether to use two-sided or volumetric ligthing for geometries (forward lighting only).
+/// Whether to use two-sided ligthing for geometries.
 // #define TRANSLUCENT
+
+/// Whether to use volumetric ligthing for geometries (forward lighting only).
 // #define VOLUMETRIC
 
 /// Whether to use physiclally based material.
@@ -114,10 +109,25 @@
     #define URHO3D_PIXEL_SHADER
 #endif
 
+/// URHO3D_DEPTH_ONLY: Whether there's no color output and caller needs only depth.
+#if defined(URHO3D_SHADOW_PASS)
+    #define URHO3D_DEPTH_ONLY
+#endif
+
+/// URHO3D_NUM_RENDER_TARGETS: Number of active render targets.
+#ifndef URHO3D_NUM_RENDER_TARGETS
+    #if defined(URHO3D_GBUFFER_PASS)
+        #define URHO3D_NUM_RENDER_TARGETS 4
+    #else
+        #define URHO3D_NUM_RENDER_TARGETS 1
+    #endif
+#endif
+
 /// URHO3D_IS_LIT: Whether there's lighting in any form applied to geometry.
 /// URHO3D_HAS_PIXEL_LIGHT: Whether there's per-pixel lighting from directional, point or spot light source.
 /// URHO3D_NORMAL_MAPPING: Whether to apply normal mapping.
-#if !defined(UNLIT) && !defined(URHO3D_SHADOW_PASS)
+/// URHO3D_PIXEL_NEED_AMBIENT: Whether pixel shader needs ambient lighting.
+#if !defined(UNLIT) && !defined(URHO3D_DEPTH_ONLY)
     #define URHO3D_IS_LIT
 
     #if defined(URHO3D_LIGHT_DIRECTIONAL) || defined(URHO3D_LIGHT_POINT) || defined(URHO3D_LIGHT_SPOT)
@@ -126,6 +136,10 @@
 
     #ifdef NORMALMAP
         #define URHO3D_NORMAL_MAPPING
+    #endif
+
+    #ifdef URHO3D_AMBIENT_PASS
+        #define URHO3D_PIXEL_NEED_AMBIENT
     #endif
 #endif
 
@@ -149,7 +163,7 @@
 #endif
 
 /// URHO3D_REFLECTION_MAPPING: Whether to apply reflections from environment cubemap.
-#if defined(URHO3D_AMBIENT_PASS) && (defined(ENVCUBEMAP) || defined(URHO3D_PHYSICAL_MATERIAL))
+#if !defined(URHO3D_ADDITIVE_LIGHT_PASS) && (defined(ENVCUBEMAP) || defined(URHO3D_PHYSICAL_MATERIAL))
     #define URHO3D_REFLECTION_MAPPING
 #endif
 
@@ -163,10 +177,10 @@
     #undef URHO3D_SPECULAR_ANTIALIASING
 #endif
 
-/// URHO3D_SOFT_PARTICLES is implied by soft particles
+/// URHO3D_PIXEL_NEED_BACKGROUND_DEPTH is implied by soft particles
 #ifdef URHO3D_SOFT_PARTICLES
-    #ifndef URHO3D_PIXEL_NEED_SCREEN_POSITION
-        #define URHO3D_PIXEL_NEED_SCREEN_POSITION
+    #ifndef URHO3D_PIXEL_NEED_BACKGROUND_DEPTH
+        #define URHO3D_PIXEL_NEED_BACKGROUND_DEPTH
     #endif
 #endif
 
@@ -199,10 +213,17 @@
     #endif
 #endif
 
-/// URHO3D_PIXEL_NEED_COLOR is implied by URHO3D_VERTEX_HAS_COLOR.
+/// URHO3D_PIXEL_NEED_VERTEX_COLOR is implied by URHO3D_VERTEX_HAS_COLOR.
 #if defined(URHO3D_VERTEX_HAS_COLOR) && !defined(URHO3D_SHADOW_PASS)
-    #ifndef URHO3D_PIXEL_NEED_COLOR
-        #define URHO3D_PIXEL_NEED_COLOR
+    #ifndef URHO3D_PIXEL_NEED_VERTEX_COLOR
+        #define URHO3D_PIXEL_NEED_VERTEX_COLOR
+    #endif
+#endif
+
+/// URHO3D_PIXEL_NEED_SCREEN_POSITION is implied by background color or depth.
+#if defined(URHO3D_PIXEL_NEED_BACKGROUND_DEPTH) || defined(URHO3D_PIXEL_NEED_BACKGROUND_COLOR)
+    #ifndef URHO3D_PIXEL_NEED_SCREEN_POSITION
+        #define URHO3D_PIXEL_NEED_SCREEN_POSITION
     #endif
 #endif
 
@@ -283,6 +304,20 @@
 #endif
 
 /// =================================== Platform configuration ===================================
+
+/// Make gl_FragData and gl_FragColor always accessible.
+#ifdef URHO3D_PIXEL_SHADER
+    #ifdef GL3
+        out vec4 _fragData[URHO3D_NUM_RENDER_TARGETS];
+
+        #define gl_FragColor _fragData[0]
+        #define gl_FragData _fragData
+    #else
+        #if URHO3D_NUM_RENDER_TARGETS > 1
+            #define gl_FragColor gl_FragData[0]
+        #endif
+    #endif
+#endif
 
 /// VERTEX_INPUT: Declare vertex input variable;
 /// VERTEX_OUTPUT: Declare vertex output variable.

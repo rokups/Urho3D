@@ -323,18 +323,20 @@ private:
         const bool resourcesDirty = dirty_.material_ || dirty_.reflectionProbe_ || dirty_.IsResourcesDirty();
         if (resourcesDirty)
         {
-            for (const ShaderResourceDesc& desc : globalResources_)
-                drawQueue_.AddShaderResource(desc.unit_, desc.texture_);
-
             const auto& materialTextures = current_.material_->GetTextures();
             bool materialHasEnvironmentMap = false;
             for (const auto& texture : materialTextures)
             {
                 if (texture.first == TU_ENVIRONMENT)
                     materialHasEnvironmentMap = true;
-                if (!current_.lightmapTexture_ || texture.first != TU_EMISSIVE)
-                    drawQueue_.AddShaderResource(texture.first, texture.second);
+                // Emissive texture is used for lightmaps and refraction background, skip if necessary
+                if (texture.first == TU_EMISSIVE && current_.lightmapTexture_)
+                    continue;
+                drawQueue_.AddShaderResource(texture.first, texture.second);
             }
+
+            for (const ShaderResourceDesc& desc : globalResources_)
+                drawQueue_.AddShaderResource(desc.unit_, desc.texture_);
 
             if (current_.lightmapTexture_)
                 drawQueue_.AddShaderResource(TU_EMISSIVE, current_.lightmapTexture_);

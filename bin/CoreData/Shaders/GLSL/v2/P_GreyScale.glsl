@@ -3,7 +3,6 @@
 #include "_VertexLayout.glsl"
 #include "_VertexTransform.glsl"
 #include "_VertexScreenPos.glsl"
-#include "_PixelOutput.glsl"
 #include "_Samplers.glsl"
 
 VERTEX_OUTPUT(vec2 vScreenPos)

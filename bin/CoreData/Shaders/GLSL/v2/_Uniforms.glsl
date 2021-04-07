@@ -103,6 +103,7 @@ UNIFORM_BUFFER_BEGIN(4, Material)
 
     UNIFORM(half4 cMatDiffColor)
     UNIFORM(half3 cMatEmissiveColor)
+    UNIFORM(half cRefraction)
     UNIFORM(half3 cMatEnvMapColor)
     UNIFORM(half4 cMatSpecColor)
 #ifdef URHO3D_PHYSICAL_MATERIAL
@@ -175,5 +176,8 @@ INSTANCE_BUFFER_BEGIN(5, Object)
     /// @}
 INSTANCE_BUFFER_END(5, Object)
 #endif // URHO3D_VERTEX_SHADER
+
+/// Return eye vector, not normalized.
+#define GetEyeVector(worldPos) (cCameraPos - (worldPos))
 
 #endif // _UNIFORMS_GLSL_

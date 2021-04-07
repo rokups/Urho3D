@@ -948,6 +948,7 @@ void Material::SetShaderParameter(const ea::string& name, const Variant& value)
     if (nameHash == PSP_MATSPECCOLOR)
     {
         VariantType type = value.GetType();
+        const bool oldSpecular = specular_;
         if (type == VAR_VECTOR3)
         {
             const Vector3& vec = value.GetVector3();
@@ -958,6 +959,8 @@ void Material::SetShaderParameter(const ea::string& name, const Variant& value)
             const Vector4& vec = value.GetVector4();
             specular_ = vec.x_ > 0.0f || vec.y_ > 0.0f || vec.z_ > 0.0f;
         }
+        if (oldSpecular != specular_)
+            MarkPipelineStateHashDirty();
     }
 
     if (!batchedParameterUpdate_)
@@ -1124,7 +1127,11 @@ void Material::RemoveShaderParameter(const ea::string& name)
     shaderParameters_.erase(nameHash);
 
     if (nameHash == PSP_MATSPECCOLOR)
+    {
+        if (specular_)
+            MarkPipelineStateHashDirty();
         specular_ = false;
+    }
 
     RefreshShaderParameterHash();
     RefreshMemoryUse();
@@ -1434,6 +1441,7 @@ unsigned Material::RecalculatePipelineStateHash() const
     CombineHash(hash, depthBias_.constantBias_);
     CombineHash(hash, depthBias_.slopeScaledBias_);
     CombineHash(hash, alphaToCoverage_);
+    CombineHash(hash, specular_);
     for (const auto& item : textures_)
     {
         CombineHash(hash, item.first);

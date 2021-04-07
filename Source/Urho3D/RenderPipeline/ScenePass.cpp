@@ -108,6 +108,19 @@ BatchRenderFlags BackToFrontScenePass::GetRenderFlags() const
 void BackToFrontScenePass::OnBatchesReady()
 {
     BatchCompositor::SortBatches(sortedBatches_, baseBatches_, lightBatches_);
+    if (GetFlags().Test(DrawableProcessorPassFlag::RefractionPass))
+    {
+        hasRefractionBatches_ = false;
+        for (const PipelineBatchBackToFront& sortedBatch : sortedBatches_)
+        {
+            // Assume refraction if blending is disabled
+            if (sortedBatch.pipelineBatch_->pipelineState_->GetDesc().blendMode_ == BLEND_REPLACE)
+            {
+                hasRefractionBatches_ = true;
+                break;
+            }
+        }
+    }
 }
 
 }

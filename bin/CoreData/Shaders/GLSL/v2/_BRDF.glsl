@@ -21,14 +21,14 @@
     #error Include _SurfaceData.glsl before _BRDF.glsl
 #endif
 
-/// Calculate simple indirect lighting: ambient and reflection. Also includes emission.
-half3 Indirect_Simple(SurfaceData surfaceData)
+/// Calculate simple indirect diffuse and specular lighting.
+half3 Indirect_Simple(const FragmentData fragmentData, half3 albedo, half3 specular)
 {
-    half3 diffuseAndSpecular = surfaceData.ambientLighting * surfaceData.albedo.rgb;
+    half3 diffuseAndSpecularColor = fragmentData.ambientLighting * albedo;
 #ifdef URHO3D_REFLECTION_MAPPING
-    diffuseAndSpecular += GammaToLightSpace(surfaceData.reflectionColorRaw.rgb);
+    diffuseAndSpecularColor += GammaToLightSpace(specular * fragmentData.reflectionColor.rgb);
 #endif
-    return surfaceData.emission + surfaceData.occlusion * diffuseAndSpecular;
+    return diffuseAndSpecularColor;
 }
 
 #ifdef URHO3D_PHYSICAL_MATERIAL
@@ -46,21 +46,21 @@ half3 BRDF_IndirectSpecular(half3 specularColor, half roughness, half NoV)
 }
 
 /// Calculate indirect PBR lighting. Also includes emission.
-half3 Indirect_PBR(SurfaceData surfaceData, half NoV)
+half3 Indirect_PBR(const FragmentData fragmentData, half3 albedo, half3 specular, half roughness, half NoV)
 {
 #ifdef URHO3D_GAMMA_CORRECTION
-    half3 brdf = BRDF_IndirectSpecular(surfaceData.specular, surfaceData.roughness, NoV);
+    half3 brdf = BRDF_IndirectSpecular(specular, roughness, NoV);
 #else
-    half3 brdf = BRDF_IndirectSpecular(surfaceData.specular * surfaceData.specular, surfaceData.roughness, NoV);
+    half3 brdf = BRDF_IndirectSpecular(specular * specular, roughness, NoV);
 #endif
 
-    half3 diffuse = surfaceData.ambientLighting * surfaceData.albedo.rgb;
-    half3 specular = brdf * GammaToLinearSpace(surfaceData.reflectionColorRaw.rgb);
+    half3 diffuseColor = fragmentData.ambientLighting * albedo;
+    half3 specularColor = brdf * GammaToLinearSpace(fragmentData.reflectionColor.rgb);
 #ifndef URHO3D_GAMMA_CORRECTION
-    specular = sqrt(max(specular, 0.0));
+    specularColor = sqrt(max(specularColor, 0.0));
 #endif
 
-    return surfaceData.emission + (diffuse + specular) * surfaceData.occlusion;
+    return diffuseColor + specularColor;
 }
 
 #endif // URHO3D_PHYSICAL_MATERIAL

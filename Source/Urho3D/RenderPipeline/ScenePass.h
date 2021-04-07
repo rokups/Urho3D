@@ -87,10 +87,13 @@ public:
 
     BatchRenderFlags GetRenderFlags() const;
 
+    bool HasRefractionBatches() const { return hasRefractionBatches_; }
+
 protected:
     void OnBatchesReady() override;
 
     ea::vector<PipelineBatchBackToFront> sortedBatches_;
+    bool hasRefractionBatches_{};
 };
 
 }

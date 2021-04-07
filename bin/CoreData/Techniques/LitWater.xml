@@ -1,0 +1,5 @@
+<technique vs="M_Water" ps="M_Water" vsdefines="" psdefines="">
+    <pass name="alpha" depthwrite="false" />
+    <pass name="litalpha" depthwrite="false" blend="add" />
+    <pass name="shadow" vs="Shadow" ps="Shadow" />
+</technique>

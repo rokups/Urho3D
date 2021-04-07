@@ -5,9 +5,6 @@
     #error Include _Uniforms.glsl before _DirectLighting.glsl
 #endif
 
-/// Return eye vector, not normalized.
-#define GetEyeVector(worldPos) (cCameraPos - (worldPos))
-
 #ifdef URHO3D_HAS_PIXEL_LIGHT
 
 /// Return light vector normalized to light range.

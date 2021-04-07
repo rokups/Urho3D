@@ -27,11 +27,17 @@
 namespace Urho3D
 {
 
-#define URHO3D_SHADER_CONST(group, name) static inline const ConstString group##_##name = #name
+// VS 2017 has bug:
+// https://developercommunity.visualstudio.com/t/static-inline-class-variables-have-their-destructo/300686
+#if defined(_MSC_VER) && _MSC_VER <= 1916
+    #define URHO3D_SHADER_CONST(group, name) static const ConstString group##_##name = #name
+#else
+    #define URHO3D_SHADER_CONST(group, name) static inline const ConstString group##_##name = #name
+#endif
 
 /// Built-in shader consts.
 /// See _Uniforms.glsl for descriptions.
-struct ShaderConsts
+namespace ShaderConsts
 {
     URHO3D_SHADER_CONST(Frame, DeltaTime);
     URHO3D_SHADER_CONST(Frame, ElapsedTime);
@@ -83,6 +89,7 @@ struct ShaderConsts
     URHO3D_SHADER_CONST(Material, MatSpecColor);
     URHO3D_SHADER_CONST(Material, Roughness);
     URHO3D_SHADER_CONST(Material, Metallic);
+    URHO3D_SHADER_CONST(Material, Refraction);
     /// @}
 
     URHO3D_SHADER_CONST(Object, Model);

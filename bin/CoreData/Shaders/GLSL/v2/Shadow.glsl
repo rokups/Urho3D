@@ -2,7 +2,6 @@
 #include "_Uniforms.glsl"
 #include "_VertexLayout.glsl"
 #include "_VertexTransform.glsl"
-#include "_PixelOutput.glsl"
 #include "_Samplers.glsl"
 
 #ifdef VSM_SHADOW

@@ -2,7 +2,6 @@
 #include "_Uniforms.glsl"
 #include "_Samplers.glsl"
 #include "_VertexLayout.glsl"
-#include "_PixelOutput.glsl"
 
 #include "_VertexTransform.glsl"
 #include "_GammaCorrection.glsl"

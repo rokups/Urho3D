@@ -1,4 +1,4 @@
-#define NUM_RENDER_TARGETS 6
+#define URHO3D_NUM_RENDER_TARGETS 6
 #define URHO3D_PIXEL_NEED_NORMAL
 #define CUSTOM_MATERIAL_CBUFFER
 
@@ -21,7 +21,6 @@ UNIFORM_BUFFER_END(4, Material)
 #include "_Uniforms.glsl"
 #include "_Samplers.glsl"
 #include "_VertexLayout.glsl"
-#include "_PixelOutput.glsl"
 
 #include "_VertexTransform.glsl"
 

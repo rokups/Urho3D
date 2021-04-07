@@ -1,0 +1,6 @@
+<material>
+    <technique name="Techniques/LitWater.xml" />
+    <texture unit="normal" name="Textures/WaterNoise.dds" />
+    <parameter name="MatDiffColor" value="0.8 0.8 1.0 1.0" />
+    <parameter name="MatSpecColor" value="0.05 0.05 0.05 16" />
+</material>
