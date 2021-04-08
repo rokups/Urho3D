@@ -61,6 +61,7 @@ public:
     /// @}
 
     RenderPipeline* GetRenderPipeline() const { return renderPipeline_; }
+    const FrameInfo& GetFrameInfo() const;
     const RenderPipelineSettings& GetSettings() const { return settings_; }
     void SetSettings(const RenderPipelineSettings& settings);
 
@@ -73,6 +74,7 @@ public:
 
 protected:
     unsigned RecalculatePipelineStateHash() const;
+    void SendViewEvent(StringHash eventType);
     void ApplySettings();
 
 private:

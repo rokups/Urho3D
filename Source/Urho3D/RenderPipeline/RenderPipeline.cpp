@@ -32,6 +32,7 @@
 #include "../Graphics/IndexBuffer.h"
 #include "../Graphics/OcclusionBuffer.h"
 #include "../Graphics/Graphics.h"
+#include "../Graphics/GraphicsEvents.h"
 #include "../Graphics/Texture2D.h"
 #include "../Graphics/Viewport.h"
 #include "../RenderPipeline/RenderPipeline.h"
@@ -123,12 +124,33 @@ RenderPipelineView::~RenderPipelineView()
 {
 }
 
+const FrameInfo& RenderPipelineView::GetFrameInfo() const
+{
+    static const FrameInfo defaultFrameInfo;
+    return sceneProcessor_ ? sceneProcessor_->GetFrameInfo() : defaultFrameInfo;
+}
+
 void RenderPipelineView::SetSettings(const RenderPipelineSettings& settings)
 {
     settings_ = settings;
     settings_.Validate(context_);
     settingsDirty_ = true;
     settingsPipelineStateHash_ = settings_.CalculatePipelineStateHash();
+}
+
+void RenderPipelineView::SendViewEvent(StringHash eventType)
+{
+    using namespace BeginViewRender;
+
+    VariantMap& eventData = GetEventDataMap();
+
+    eventData[P_RENDERPIPELINEVIEW] = this;
+    eventData[P_SURFACE] = frameInfo_.renderTarget_;
+    eventData[P_TEXTURE] = frameInfo_.renderTarget_ ? frameInfo_.renderTarget_->GetParentTexture() : nullptr;
+    eventData[P_SCENE] = sceneProcessor_->GetFrameInfo().scene_;
+    eventData[P_CAMERA] = sceneProcessor_->GetFrameInfo().camera_;
+
+    renderer_->SendEvent(eventType, eventData);
 }
 
 void RenderPipelineView::ApplySettings()
@@ -258,6 +280,7 @@ void RenderPipelineView::Update(const FrameInfo& frameInfo)
     // Begin update. Should happen before pipeline state hash check.
     shadowMapAllocator_->ResetAllShadowMaps();
     OnUpdateBegin(this, frameInfo_);
+    SendViewEvent(E_BEGINVIEWUPDATE);
 
     // Invalidate pipeline states if necessary
     const unsigned pipelineStateHash = RecalculatePipelineStateHash();
@@ -269,6 +292,7 @@ void RenderPipelineView::Update(const FrameInfo& frameInfo)
 
     sceneProcessor_->Update();
 
+    SendViewEvent(E_ENDVIEWUPDATE);
     OnUpdateEnd(this, frameInfo_);
 }
 
@@ -283,6 +307,8 @@ void RenderPipelineView::Render()
     renderBufferManager_->SetFrameSettings(frameSettings);
 
     OnRenderBegin(this, frameInfo_);
+    SendViewEvent(E_BEGINVIEWRENDER);
+    SendViewEvent(E_VIEWBUFFERSREADY);
 
     // TODO(renderer): Do something about this hack
     graphics_->SetVertexBuffer(nullptr);
@@ -407,6 +433,7 @@ void RenderPipelineView::Render()
         debug->Render();
     }
 
+    SendViewEvent(E_ENDVIEWRENDER);
     OnRenderEnd(this, frameInfo_);
     graphics_->SetColorWrite(true);
 }
