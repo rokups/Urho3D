@@ -173,7 +173,7 @@ void SamplesManager::Start()
     // Register an object factory for our custom Rotator component so that we can create them to scene nodes
     context_->RegisterFactory<Rotator>();
 
-    inspectorNode_ = MakeShared<Node>(context_);
+    inspectorNode_ = MakeShared<Scene>(context_);
 
     input->SetMouseMode(MM_FREE);
     input->SetMouseVisible(true);

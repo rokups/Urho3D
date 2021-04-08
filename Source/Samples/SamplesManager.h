@@ -80,7 +80,7 @@ private:
 
     /// Generic Serializable inspector.
     /// @{
-    SharedPtr<Node> inspectorNode_;
+    SharedPtr<Scene> inspectorNode_;
     bool oldMouseVisible_{};
     MouseMode oldMouseMode_{};
     /// @}

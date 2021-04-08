@@ -44,6 +44,7 @@ struct RmlSerializableAttribute
 {
     WeakPtr<Serializable> serializable_;
     unsigned index_{};
+    VariantType internalType_{};
     Rml::String name_;
     Rml::String enumSelector_;
     Rml::StringList enumNames_;
@@ -62,27 +63,40 @@ struct RmlSerializableAttribute
             serializable_->SetAttribute(index_, static_cast<int>(iter - enumNames_.begin()));
     }
 
-    void GetValue(Rml::Variant& variant)
+    Rml::Variant GetValue()
     {
         if (!serializable_)
-            return;
+            return Rml::Variant{};
 
         switch (type_)
         {
         case AttributeType_Bool:
-            variant = serializable_->GetAttribute(index_).GetBool();
-            break;
+            return Rml::Variant{ serializable_->GetAttribute(index_).GetBool() };
 
         case AttributeType_Enum:
-            variant = GetEnumStringValue();
-            break;
+            return Rml::Variant{ GetEnumStringValue() };
 
         case AttributeType_Number:
-            variant = serializable_->GetAttribute(index_).GetInt();
-            break;
+            switch (internalType_)
+            {
+            case VAR_INT:
+                return Rml::Variant{ serializable_->GetAttribute(index_).GetInt() };
+
+            case VAR_INT64:
+                return Rml::Variant{ static_cast<int64_t>(serializable_->GetAttribute(index_).GetInt64()) };
+
+            case VAR_FLOAT:
+                return Rml::Variant{ serializable_->GetAttribute(index_).GetFloat() };
+
+            case VAR_DOUBLE:
+                return Rml::Variant{ serializable_->GetAttribute(index_).GetDouble() };
+
+            default:
+                return Rml::Variant{};
+            }
 
         default:
-            break;
+            return Rml::Variant{};
         }
     }
 
@@ -102,8 +116,27 @@ struct RmlSerializableAttribute
             break;
 
         case AttributeType_Number:
-            serializable_->SetAttribute(index_, variant.Get<int>());
-            break;
+            switch (internalType_)
+            {
+            case VAR_INT:
+                serializable_->SetAttribute(index_, variant.Get<int>());
+                break;
+
+            case VAR_INT64:
+                serializable_->SetAttribute(index_, static_cast<long long>(variant.Get<int64_t>()));
+                break;
+
+            case VAR_FLOAT:
+                serializable_->SetAttribute(index_, variant.Get<float>());
+                break;
+
+            case VAR_DOUBLE:
+                serializable_->SetAttribute(index_, variant.Get<double>());
+                break;
+
+            default:
+                break;
+            }
 
         default:
             break;
@@ -146,6 +179,7 @@ void RmlSerializableInspector::Connect(Serializable* serializable)
     {
         RmlSerializableAttribute attribute;
         attribute.index_ = index;
+        attribute.internalType_ = attributeInfo.type_;
         attribute.serializable_ = serializable_;
         attribute.name_ = attributeInfo.name_;
 
@@ -161,6 +195,11 @@ void RmlSerializableInspector::Connect(Serializable* serializable)
             for (const auto& option : attribute.enumNames_)
                 attribute.enumSelector_ += Format("<option value='{}'>{}</option>", option, option);
             attribute.enumSelector_ += "</select>";
+        }
+        else if (attributeInfo.type_ == VAR_INT || attributeInfo.type_ == VAR_INT64
+            || attributeInfo.type_ == VAR_FLOAT || attributeInfo.type_ == VAR_DOUBLE)
+        {
+            attribute.type_ = AttributeType_Number;
         }
 
         if (attribute.type_ != AttributeType_Undefined)
@@ -186,12 +225,15 @@ void RmlSerializableInspector::OnNodeSet(Node* node)
             return;
 
         constructor.RegisterArray<Rml::StringList>();
+        static const auto getVariant = [](const Rml::Variant& src, Rml::Variant& dest) { dest = src; };
+        static const auto setVariant = [](Rml::Variant& dest, const Rml::Variant& src) { dest = src; };
+        constructor.RegisterScalar<Rml::Variant>(getVariant, setVariant);
         if (auto attributeHandle = constructor.RegisterStruct<RmlSerializableAttribute>())
         {
             attributeHandle.RegisterMember("name", &RmlSerializableAttribute::name_);
             attributeHandle.RegisterMember("type", &RmlSerializableAttribute::type_);
             attributeHandle.RegisterMember("enum_selector", &RmlSerializableAttribute::enumSelector_);
-            attributeHandle.RegisterMemberFunc("value", &RmlSerializableAttribute::GetValue, &RmlSerializableAttribute::SetValue);
+            attributeHandle.RegisterMember("value", &RmlSerializableAttribute::GetValue, &RmlSerializableAttribute::SetValue);
         }
         constructor.RegisterArray<ea::vector<RmlSerializableAttribute>>();
 

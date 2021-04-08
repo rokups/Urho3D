@@ -15,6 +15,7 @@
         </div>
         <div data-for="attribute : attributes">
             <input type="checkbox" value="value" data-if="attribute.type == 1" data-checked="attribute.value"/>
+            <input type="text" data-if="attribute.type == 2" data-value="attribute.value"/>
             <span data-if="attribute.type == 3" data-rml="attribute.enum_selector"></span>
             <span>{{attribute.name}}</span>
         </div>
