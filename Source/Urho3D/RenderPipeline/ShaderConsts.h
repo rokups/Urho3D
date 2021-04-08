@@ -30,9 +30,9 @@ namespace Urho3D
 // VS 2017 has bug:
 // https://developercommunity.visualstudio.com/t/static-inline-class-variables-have-their-destructo/300686
 #if defined(_MSC_VER) && _MSC_VER <= 1916
-    #define URHO3D_SHADER_CONST(group, name) static const ConstString group##_##name = #name
+    #define URHO3D_SHADER_CONST(group, name) static const ConstString group##_##name{ #name }
 #else
-    #define URHO3D_SHADER_CONST(group, name) static inline const ConstString group##_##name = #name
+    #define URHO3D_SHADER_CONST(group, name) static inline const ConstString group##_##name{ #name }
 #endif
 
 /// Built-in shader consts.
