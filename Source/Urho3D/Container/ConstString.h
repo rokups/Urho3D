@@ -41,7 +41,7 @@ public:
     ConstString() = default;
     ConstString(ea::string_view str)
         : ea::string(str)
-        , hash_(*this)
+        , hash_(c_str())
     {
     }
     /// @}
