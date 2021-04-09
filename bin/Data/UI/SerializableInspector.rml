@@ -5,7 +5,7 @@
     <title>Inspector</title>
 </head>
 
-<body id="window" style="width:35%; left:60%; top:20%">
+<body id="window" style="width: 45%; left: 52%; top: 5%">
     <div data-model="RmlSerializableInspector_model">
         <div id="titlebar">
             <handle move_target="#document">
@@ -13,12 +13,18 @@
                 <button class="close-window" onclick="{'e': 'RmlSerializableInspector_CloseWindow'}"></button>
             </handle>
         </div>
-        <div data-for="attribute : attributes">
-            <input type="checkbox" value="value" data-if="attribute.type == 1" data-checked="attribute.value"/>
-            <input type="text" data-if="attribute.type == 2" data-value="attribute.value"/>
-            <span data-if="attribute.type == 3" data-rml="attribute.enum_selector"></span>
-            <span>{{attribute.name}}</span>
-        </div>
+        <table>
+            <tbody>
+                <tr style="height: 30dp" data-for="attribute : attributes">
+                    <td style="width: 40%; text-align: right; vertical-align: middle; padding-right: 5pt;">{{attribute.name}}</td>
+                    <td style="width: 60%; vertical-align: middle">
+                        <input type="checkbox" value="value" data-if="attribute.type == 1" data-checked="attribute.value"/>
+                        <input type="text" data-if="attribute.type == 2" data-value="attribute.value"/>
+                        <span data-if="attribute.type == 3" data-rml="attribute.enum_selector"></span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
     <handle size_target="#document" class="resize-handle"></handle>
 </body>

@@ -20,7 +20,6 @@
 /// =================================== Constants ===================================
 
 #define M_PI 3.14159265358979323846
-#define M_EPSILON 0.0001
 
 /// =================================== Types ===================================
 
@@ -60,6 +59,12 @@
 // #define URHO3D_PIXEL_NEED_VERTEX_COLOR
 // #define URHO3D_PIXEL_NEED_BACKGROUND_DEPTH
 // #define URHO3D_PIXEL_NEED_BACKGROUND_COLOR
+
+/// Configures what built-in inputs should be ignored by built-in utilities.
+// #define URHO3D_IGNORE_MATERIAL_DIFFUSE
+// #define URHO3D_IGNORE_MATERIAL_NORMAL
+// #define URHO3D_IGNORE_MATERIAL_SPECULAR
+// #define URHO3D_IGNORE_MATERIAL_EMISSIVE
 
 /// Whether to disable all lighting calculation.
 // #define UNLIT
@@ -187,6 +192,31 @@
         #define URHO3D_PIXEL_NEED_BACKGROUND_DEPTH
     #endif
 #endif
+
+#ifdef URHO3D_IGNORE_MATERIAL_DIFFUSE
+    #ifdef URHO3D_MATERIAL_HAS_DIFFUSE
+        #undef URHO3D_MATERIAL_HAS_DIFFUSE
+    #endif
+#endif
+
+#ifdef URHO3D_IGNORE_MATERIAL_NORMAL
+    #ifdef URHO3D_MATERIAL_HAS_NORMAL
+        #undef URHO3D_MATERIAL_HAS_NORMAL
+    #endif
+#endif
+
+#ifdef URHO3D_IGNORE_MATERIAL_SPECULAR
+    #ifdef URHO3D_MATERIAL_HAS_SPECULAR
+        #undef URHO3D_MATERIAL_HAS_SPECULAR
+    #endif
+#endif
+
+#ifdef URHO3D_IGNORE_MATERIAL_EMISSIVE
+    #ifdef URHO3D_MATERIAL_HAS_EMISSIVE
+        #undef URHO3D_MATERIAL_HAS_EMISSIVE
+    #endif
+#endif
+
 
 // =================================== Vertex output configuration ===================================
 
