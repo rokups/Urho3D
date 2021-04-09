@@ -15,6 +15,13 @@
     #error Include _GammaCorrection.glsl before _BRDF.glsl
 #endif
 
+/// Evaluate Schlick Fresnel function.
+half3 F_Schlick(half3 specularColor, half u)
+{
+    half f = pow(1.0 - u, 5.0);
+    return vec3(f) + specularColor * (vec3(1.0) - f);
+}
+
 #ifdef URHO3D_AMBIENT_PASS
 
 #ifndef _SURFACE_DATA_GLSL_
@@ -31,6 +38,15 @@ half3 Indirect_Simple(const FragmentData fragmentData, half3 albedo, half3 specu
     return diffuseAndSpecularColor;
 }
 
+#ifdef URHO3D_REFLECTION_MAPPING
+    /// Calculate simple indirect lighting and transparency for water.
+    half4 Indirect_SimpleWater(const FragmentData fragmentData, const half3 specular, half NoV)
+    {
+        half fresnel = pow(1.0 - NoV, 5.0);
+        return vec4(GammaToLightSpace(specular * fragmentData.reflectionColor.rgb), fresnel);
+    }
+#endif
+
 #ifdef URHO3D_PHYSICAL_MATERIAL
 
 /// Evaluate approximated specular color for indirect lighting.
@@ -45,7 +61,7 @@ half3 BRDF_IndirectSpecular(half3 specularColor, half roughness, half NoV)
     return specularColor * ab.x + ab.y;
 }
 
-/// Calculate indirect PBR lighting. Also includes emission.
+/// Calculate indirect PBR lighting.
 half3 Indirect_PBR(const FragmentData fragmentData, half3 albedo, half3 specular, half roughness, half NoV)
 {
 #ifdef URHO3D_GAMMA_CORRECTION
@@ -61,6 +77,24 @@ half3 Indirect_PBR(const FragmentData fragmentData, half3 albedo, half3 specular
 #endif
 
     return diffuseColor + specularColor;
+}
+
+/// Calculate indirect PBR lighting for transparent object.
+half4 Indirect_PBRWater(const FragmentData fragmentData, half3 specular, half NoV)
+{
+#ifdef URHO3D_GAMMA_CORRECTION
+    half3 brdf = F_Schlick(specular, NoV);
+#else
+    half3 brdf = F_Schlick(specular * specular, NoV);
+#endif
+
+    half3 specularColor = brdf * GammaToLinearSpace(fragmentData.reflectionColor.rgb);
+
+#ifndef URHO3D_GAMMA_CORRECTION
+    specularColor = sqrt(max(specularColor, 0.0));
+#endif
+
+    return vec4(specularColor, brdf.x);
 }
 
 #endif // URHO3D_PHYSICAL_MATERIAL
@@ -122,13 +156,6 @@ half V_SmithGGXCorrelatedFast(half roughness2, half NoV, half NoL)
     half GGXV = NoL * (NoV * (1.0 - roughness2) + roughness2);
     half GGXL = NoV * (NoL * (1.0 - roughness2) + roughness2);
     return 0.5 / (GGXV + GGXL);
-}
-
-/// Evaluate Schlick Fresnel function.
-half3 F_Schlick(half3 specularColor, half LoH)
-{
-    half f = pow(1.0 - LoH, 5.0);
-    return vec3(f) + specularColor * (vec3(1.0) - f);
 }
 
 /// Calculate direct PBR lighting. Light attenuation is not applied.

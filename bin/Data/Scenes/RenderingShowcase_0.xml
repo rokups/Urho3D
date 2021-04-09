@@ -5,17 +5,17 @@
 	<attribute name="Smoothing Constant" value="50.000000" />
 	<attribute name="Snap Threshold" value="5.000000" />
 	<attribute name="Elapsed Time" value="0.000000" />
-	<attribute name="Next Replicated Node ID" value="920" />
-	<attribute name="Next Replicated Component ID" value="899" />
-	<attribute name="Next Local Node ID" value="16777290" />
-	<attribute name="Next Local Component ID" value="16777330" />
+	<attribute name="Next Replicated Node ID" value="1003" />
+	<attribute name="Next Replicated Component ID" value="982" />
+	<attribute name="Next Local Node ID" value="16777296" />
+	<attribute name="Next Local Component ID" value="16777339" />
 	<attribute name="Variables" />
 	<attribute name="Variable Names" value="" />
 	<attribute name="Lightmaps" value="Texture2D" />
 	<component type="Octree" id="1" />
 	<component type="EditorSceneSettings" id="16777216">
-		<attribute name="Camera Position" value="9.56829 1.75659 -6.09944" />
-		<attribute name="Camera Rotation" value="0.696881 0.25908 0.627039 -0.2325" />
+		<attribute name="Camera Position" value="14.5135 1.0547 -9.75464" />
+		<attribute name="Camera Rotation" value="0.920609 0.108765 -0.372321 0.0450048" />
 	</component>
 	<component type="RenderPipeline" id="315" />
 	<node id="2">
@@ -1112,7 +1112,7 @@
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Mirror Teapot" />
 			<attribute name="Tags" />
-			<attribute name="Position" value="0 -0.333297 0" />
+			<attribute name="Position" value="0 -0.333297 -0.563549" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="2 2 2" />
 			<attribute name="Variables" />
@@ -1138,7 +1138,7 @@
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Water" />
 			<attribute name="Tags" />
-			<attribute name="Position" value="1.44315 3.9823e-07 0" />
+			<attribute name="Position" value="1 3.9823e-07 0" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="4.9 3 4.9" />
 			<attribute name="Variables" />
@@ -1151,13 +1151,41 @@
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Terrain" />
 			<attribute name="Tags" />
-			<attribute name="Position" value="1.44315 -0.684727 0" />
+			<attribute name="Position" value="1.1214 -1.48973 -2.26397" />
 			<attribute name="Rotation" value="1 0 0 0" />
-			<attribute name="Scale" value="4.9 3 4.9" />
+			<attribute name="Scale" value="6.9 3 6.9" />
 			<attribute name="Variables" />
 			<component type="StaticModel" id="898">
 				<attribute name="Model" value="Model;Models/Plane.mdl" />
 				<attribute name="Material" value="Material;Materials/Terrain.xml" />
+			</component>
+		</node>
+		<node id="946">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Light" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0.845691 0.599407 -2.37593" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<component type="Light" id="925">
+				<attribute name="Color" value="0 0.996429 0.227755 1" />
+				<attribute name="Brightness Multiplier" value="2.000000" />
+				<attribute name="Range" value="3.000000" />
+				<attribute name="Light Shape Texture" value="TextureCube;" />
+			</component>
+		</node>
+		<node id="975">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Water PBR" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="1 4.08969e-07 -5" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="4.9 3 4.9" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="954">
+				<attribute name="Model" value="Model;Models/Plane.mdl" />
+				<attribute name="Material" value="Material;Materials/LitWaterPBR.xml" />
 			</component>
 		</node>
 	</node>

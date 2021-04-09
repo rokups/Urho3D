@@ -98,8 +98,8 @@ void FillCommonVertexOutput(VertexTransform vertexTransform, vec2 uv)
 #endif
 
 #ifdef URHO3D_PIXEL_NEED_TANGENT
-    vTangent = vec4(vertexTransform.tangent.xyz, vertexTransform.bitangent.z);
-    vBitangentXY = vertexTransform.bitangent.xy;
+    vTangent = cNormalScale * vec4(vertexTransform.tangent.xyz, vertexTransform.bitangent.z);
+    vBitangentXY = cNormalScale * vertexTransform.bitangent.xy;
 #endif
 
 #ifdef URHO3D_PIXEL_NEED_EYE_VECTOR

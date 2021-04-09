@@ -8,8 +8,8 @@
     #define NORMALMAP
 #endif
 
-#ifndef PBR
-    #define PBR
+#ifndef ENVCUBEMAP
+    #define ENVCUBEMAP
 #endif
 
 #include "_Config.glsl"
@@ -38,25 +38,37 @@ void main()
     FragmentData fragmentData = GetFragmentData();
     SurfaceGeometryData surfaceGeometryData = GetSurfaceGeometryData();
 
+    // Apply noise to screen position used for background sampling
     fragmentData.screenPos += surfaceGeometryData.normalInTangentSpace.xy * cNoiseStrength;
 
     SetupFragmentReflectionColor(fragmentData, surfaceGeometryData);
     SetupFragmentBackgroundColor(fragmentData);
 
+    // Water doesn't accept diffuse lighting, set albedo to zero
     SurfaceMaterialData surfaceMaterialData;
     surfaceMaterialData.albedo = vec4(0.0, 0.0, 0.0, 0.0);
-#ifdef URHO3D_IS_LIT
     surfaceMaterialData.specular = cMatSpecColor.rgb;
     surfaceMaterialData.emission = cMatEmissiveColor;
+
+#ifdef URHO3D_AMBIENT_PASS
+    half NoV = abs(dot(surfaceGeometryData.normal, fragmentData.eyeVec)) + 1e-5;
+    #ifdef URHO3D_PHYSICAL_MATERIAL
+        half4 reflectedColor = Indirect_PBRWater(fragmentData, surfaceMaterialData.specular, NoV);
+    #else
+        half4 reflectedColor = Indirect_SimpleWater(fragmentData, surfaceMaterialData.specular, NoV);
+    #endif
+#else
+    half4 reflectedColor = vec4(0.0);
 #endif
 
-    half3 finalColor = GetFinalColor(fragmentData, surfaceGeometryData, surfaceMaterialData);
-    half3 outputColor = ApplyFog(finalColor, fragmentData.fogFactor);
+#ifdef URHO3D_HAS_PIXEL_LIGHT
+    reflectedColor.rgb += CalculateDirectLighting(fragmentData, surfaceGeometryData, surfaceMaterialData);
+#endif
+
 #ifdef URHO3D_ADDITIVE_LIGHT_PASS
-    gl_FragColor = vec4(outputColor, 0.0);
+    gl_FragColor = vec4(ApplyFog(reflectedColor.rgb, fragmentData.fogFactor), 0.0);
 #else
-    gl_FragColor.rgb = outputColor + fragmentData.backgroundColor;
-    gl_FragColor.a = 1.0;
+    gl_FragColor = vec4(mix(fragmentData.backgroundColor, reflectedColor.rgb, reflectedColor.a), 1.0);
 #endif
 
 }
