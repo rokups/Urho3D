@@ -200,13 +200,17 @@ SurfaceGeometryData GetSurfaceGeometryData()
         half3 rmo = vec3(cRoughness, cMetallic, 1.0);
     #endif
 
-    // TODO(renderer): Make configurable specular?
     const half minRougness = 0.089;
-    const half oneMinusDielectricReflectivity = 0.97;
+    const half oneMinusDielectricReflectivity = 1.0 - 0.16 * cGlossiness * cGlossiness;
     result.roughness = max(rmo.x, minRougness);
     result.oneMinusReflectivity = oneMinusDielectricReflectivity - oneMinusDielectricReflectivity * rmo.y;
 #else
-    result.oneMinusReflectivity = 1.0;
+    // Consider non-PBR materials either non-reflective or 100% reflective
+    #ifdef ENVCUBEMAP
+        result.oneMinusReflectivity = 0.0;
+    #else
+        result.oneMinusReflectivity = 1.0;
+    #endif
 #endif
 
 #if defined(URHO3D_SPECULAR_ANTIALIASING) && defined(URHO3D_PHYSICAL_MATERIAL)

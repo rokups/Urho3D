@@ -47,11 +47,11 @@ void main()
     // Water doesn't accept diffuse lighting, set albedo to zero
     SurfaceMaterialData surfaceMaterialData;
     surfaceMaterialData.albedo = vec4(0.0, 0.0, 0.0, 0.0);
-    surfaceMaterialData.specular = cMatSpecColor.rgb;
+    surfaceMaterialData.specular = cMatSpecColor.rgb * (1.0 - surfaceGeometryData.oneMinusReflectivity);
     surfaceMaterialData.emission = cMatEmissiveColor;
 
 #ifdef URHO3D_AMBIENT_PASS
-    half NoV = abs(dot(surfaceGeometryData.normal, fragmentData.eyeVec)) + 1e-5;
+    half NoV = clamp(dot(surfaceGeometryData.normal, fragmentData.eyeVec), 0.0, 1.0);
     #ifdef URHO3D_PHYSICAL_MATERIAL
         half4 reflectedColor = Indirect_PBRWater(fragmentData, surfaceMaterialData.specular, NoV);
     #else

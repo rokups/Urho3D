@@ -5,17 +5,17 @@
 	<attribute name="Smoothing Constant" value="50.000000" />
 	<attribute name="Snap Threshold" value="5.000000" />
 	<attribute name="Elapsed Time" value="0.000000" />
-	<attribute name="Next Replicated Node ID" value="1003" />
-	<attribute name="Next Replicated Component ID" value="982" />
-	<attribute name="Next Local Node ID" value="16777296" />
-	<attribute name="Next Local Component ID" value="16777339" />
+	<attribute name="Next Replicated Node ID" value="1063" />
+	<attribute name="Next Replicated Component ID" value="1041" />
+	<attribute name="Next Local Node ID" value="16777300" />
+	<attribute name="Next Local Component ID" value="16777345" />
 	<attribute name="Variables" />
 	<attribute name="Variable Names" value="" />
 	<attribute name="Lightmaps" value="Texture2D" />
 	<component type="Octree" id="1" />
 	<component type="EditorSceneSettings" id="16777216">
-		<attribute name="Camera Position" value="14.5135 1.0547 -9.75464" />
-		<attribute name="Camera Rotation" value="0.920609 0.108765 -0.372321 0.0450048" />
+		<attribute name="Camera Position" value="13.923 2.51855 -10.2459" />
+		<attribute name="Camera Rotation" value="0.764695 0.312159 -0.521774 0.213424" />
 	</component>
 	<component type="RenderPipeline" id="315" />
 	<node id="2">
@@ -945,7 +945,7 @@
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Metallic" />
 			<attribute name="Tags" />
-			<attribute name="Position" value="0 0 0" />
+			<attribute name="Position" value="0 0 -1.5" />
 			<attribute name="Rotation" value="1 0 0 0" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
@@ -953,7 +953,7 @@
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Metallic R0" />
 				<attribute name="Tags" />
-				<attribute name="Position" value="-4 0.5 1" />
+				<attribute name="Position" value="-4 0.5 0" />
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
@@ -967,7 +967,7 @@
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Metallic R3" />
 				<attribute name="Tags" />
-				<attribute name="Position" value="-2 0.5 1" />
+				<attribute name="Position" value="-2 0.5 0" />
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
@@ -981,7 +981,7 @@
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Metallic R5" />
 				<attribute name="Tags" />
-				<attribute name="Position" value="0 0.5 1" />
+				<attribute name="Position" value="0 0.5 0" />
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
@@ -995,7 +995,7 @@
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Metallic R7" />
 				<attribute name="Tags" />
-				<attribute name="Position" value="2 0.5 1" />
+				<attribute name="Position" value="2 0.5 0" />
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
@@ -1009,7 +1009,7 @@
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Metallic R10" />
 				<attribute name="Tags" />
-				<attribute name="Position" value="4 0.5 1" />
+				<attribute name="Position" value="4 0.5 0" />
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
@@ -1022,7 +1022,7 @@
 		</node>
 		<node id="180">
 			<attribute name="Is Enabled" value="true" />
-			<attribute name="Name" value="Dielectric" />
+			<attribute name="Name" value="Dielectric R" />
 			<attribute name="Tags" />
 			<attribute name="Position" value="0 0 0" />
 			<attribute name="Rotation" value="1 0 0 0" />
@@ -1032,7 +1032,7 @@
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Dielectric R0" />
 				<attribute name="Tags" />
-				<attribute name="Position" value="-4 0.5 -1" />
+				<attribute name="Position" value="-4 0.5 0" />
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
@@ -1046,7 +1046,7 @@
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Dielectric R3" />
 				<attribute name="Tags" />
-				<attribute name="Position" value="-2 0.5 -1" />
+				<attribute name="Position" value="-2 0.5 0" />
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
@@ -1060,7 +1060,7 @@
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Dielectric R5" />
 				<attribute name="Tags" />
-				<attribute name="Position" value="0 0.5 -1" />
+				<attribute name="Position" value="0 0.5 0" />
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
@@ -1074,7 +1074,7 @@
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Dielectric R7" />
 				<attribute name="Tags" />
-				<attribute name="Position" value="2 0.5 -1" />
+				<attribute name="Position" value="2 0.5 0" />
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
@@ -1088,13 +1088,92 @@
 				<attribute name="Is Enabled" value="true" />
 				<attribute name="Name" value="Dielectric R10" />
 				<attribute name="Tags" />
-				<attribute name="Position" value="4 0.5 -1" />
+				<attribute name="Position" value="4 0.5 0" />
 				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
 				<attribute name="Scale" value="1 1 1" />
 				<attribute name="Variables" />
 				<component type="StaticModel" id="173">
 					<attribute name="Model" value="Model;Models/Sphere.mdl" />
 					<attribute name="Material" value="Material;Materials/Constant/DielectricR10.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+		</node>
+		<node id="1030">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Dielectric G" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0 1.5" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<node id="1031">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Dielectric G0" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="-4 0.5 0" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="1009">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/Constant/DielectricG10.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="1032">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Dielectric G3" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="-2 0.5 0" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="1010">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/Constant/DielectricG7.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="1033">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Dielectric G5" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="0 0.5 0" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="1011">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/Constant/DielectricG5.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="1034">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Dielectric G7" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="2 0.5 0" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="1012">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/Constant/DielectricG3.xml" />
+					<attribute name="Cast Shadows" value="true" />
+				</component>
+			</node>
+			<node id="1035">
+				<attribute name="Is Enabled" value="true" />
+				<attribute name="Name" value="Dielectric G10" />
+				<attribute name="Tags" />
+				<attribute name="Position" value="4 0.5 0" />
+				<attribute name="Rotation" value="0.961313 0 0.275453 -0" />
+				<attribute name="Scale" value="1 1 1" />
+				<attribute name="Variables" />
+				<component type="StaticModel" id="1013">
+					<attribute name="Model" value="Model;Models/Sphere.mdl" />
+					<attribute name="Material" value="Material;Materials/Constant/DielectricG0.xml" />
 					<attribute name="Cast Shadows" value="true" />
 				</component>
 			</node>
