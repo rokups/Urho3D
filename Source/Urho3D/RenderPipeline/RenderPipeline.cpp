@@ -41,6 +41,7 @@
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/BatchRenderer.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
+#include "../RenderPipeline/AutoExposurePass.h"
 #include "../RenderPipeline/ToneMappingPass.h"
 #include "../Scene/Scene.h"
 
@@ -188,8 +189,15 @@ void RenderPipelineView::ApplySettings()
 
     if (settings_.renderBufferManager_.colorSpace_ == RenderPipelineColorSpace::LinearHDR)
     {
+        auto pass = MakeShared<AutoExposurePass>(this, renderBufferManager_);
+        pass->SetSettings(settings_.autoExposure_);
+        postProcessPasses_.push_back(pass);
+    }
+
+    if (settings_.renderBufferManager_.colorSpace_ == RenderPipelineColorSpace::LinearHDR)
+    {
         auto pass = MakeShared<ToneMappingPass>(this, renderBufferManager_);
-        pass->SetSettings(settings_.toneMapping_);
+        pass->SetMode(settings_.toneMapping_);
         postProcessPasses_.push_back(pass);
     }
 
@@ -476,11 +484,11 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, settings_.sceneProcessor_.varianceShadowMapParams_, MarkSettingsDirty, BatchRendererSettings{}.varianceShadowMapParams_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("VSM Multi Sample", int, settings_.shadowMapAllocator_.varianceShadowMapMultiSample_, MarkSettingsDirty, 1, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("16-bit Shadow Maps", bool, settings_.shadowMapAllocator_.use16bitShadowMaps_, MarkSettingsDirty, false, AM_DEFAULT);
-    URHO3D_ENUM_ATTRIBUTE_EX("Tone Mapping Mode", settings_.toneMapping_.mode_, MarkSettingsDirty, toneMappingModeNames, ToneMappingMode::None, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Auto Exposure", bool, settings_.toneMapping_.autoExposure_, MarkSettingsDirty, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Min Exposure", float, settings_.toneMapping_.minExposure_, MarkSettingsDirty, ToneMappingPassSettings{}.minExposure_, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Max Exposure", float, settings_.toneMapping_.maxExposure_, MarkSettingsDirty, ToneMappingPassSettings{}.maxExposure_, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Adapt Rate", float, settings_.toneMapping_.adaptRate_, MarkSettingsDirty, ToneMappingPassSettings{}.adaptRate_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Auto Exposure", bool, settings_.autoExposure_.autoExposure_, MarkSettingsDirty, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Min Exposure", float, settings_.autoExposure_.minExposure_, MarkSettingsDirty, AutoExposurePassSettings{}.minExposure_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Max Exposure", float, settings_.autoExposure_.maxExposure_, MarkSettingsDirty, AutoExposurePassSettings{}.maxExposure_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Adapt Rate", float, settings_.autoExposure_.adaptRate_, MarkSettingsDirty, AutoExposurePassSettings{}.adaptRate_, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Tone Mapping Mode", settings_.toneMapping_, MarkSettingsDirty, toneMappingModeNames, ToneMappingMode::None, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Post Process Antialiasing", settings_.antialiasing_, MarkSettingsDirty, postProcessAntialiasingNames, PostProcessAntialiasing::None, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Post Process Grey Scale", bool, settings_.greyScale_, MarkSettingsDirty, false, AM_DEFAULT);
 }

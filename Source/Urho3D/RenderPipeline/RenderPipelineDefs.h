@@ -463,9 +463,8 @@ enum class ToneMappingMode
     Uncharted2,
 };
 
-struct ToneMappingPassSettings
+struct AutoExposurePassSettings
 {
-    ToneMappingMode mode_{};
     bool autoExposure_{};
     float minExposure_{ 1.0f };
     float maxExposure_{ 3.0f };
@@ -473,16 +472,15 @@ struct ToneMappingPassSettings
 
     /// Utility operators
     /// @{
-    bool operator==(const ToneMappingPassSettings& rhs) const
+    bool operator==(const AutoExposurePassSettings& rhs) const
     {
-        return mode_ == rhs.mode_
-            && autoExposure_ == rhs.autoExposure_
+        return autoExposure_ == rhs.autoExposure_
             && minExposure_ == rhs.minExposure_
             && maxExposure_ == rhs.maxExposure_
             && adaptRate_ == rhs.adaptRate_;
     }
 
-    bool operator!=(const ToneMappingPassSettings& rhs) const { return !(*this == rhs); }
+    bool operator!=(const AutoExposurePassSettings& rhs) const { return !(*this == rhs); }
     /// @}
 };
 
@@ -504,7 +502,8 @@ struct RenderPipelineSettings
 
     /// Post-processing settings
     /// @{
-    ToneMappingPassSettings toneMapping_;
+    AutoExposurePassSettings autoExposure_;
+    ToneMappingMode toneMapping_{};
     PostProcessAntialiasing antialiasing_{};
     bool greyScale_{};
     /// @}

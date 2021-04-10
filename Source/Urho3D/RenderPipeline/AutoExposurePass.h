@@ -35,25 +35,51 @@ namespace Urho3D
 class RenderBufferManager;
 class RenderPipelineInterface;
 
-/// Post-processing pass that converts HDR linear color input to LDR gamma color.
-class URHO3D_API ToneMappingPass
+/// Post-processing pass that adjusts HDR scene exposure.
+class URHO3D_API AutoExposurePass
     : public PostProcessPass
 {
-    URHO3D_OBJECT(ToneMappingPass, PostProcessPass);
+    URHO3D_OBJECT(AutoExposurePass, PostProcessPass);
 
 public:
-    ToneMappingPass(RenderPipelineInterface* renderPipeline, RenderBufferManager* renderBufferManager);
-    void SetMode(ToneMappingMode mode);
+    AutoExposurePass(RenderPipelineInterface* renderPipeline, RenderBufferManager* renderBufferManager);
+    void SetSettings(const AutoExposurePassSettings& settings);
 
     PostProcessPassFlags GetExecutionFlags() const override { return PostProcessPassFlag::NeedColorOutputReadAndWrite; }
     void Execute() override;
 
 protected:
+    void InitializeTextures();
     void InitializeStates();
 
-    ToneMappingMode mode_;
+    void EvaluateDownsampledColorBuffer();
+    void EvaluateLuminance();
+    void EvaluateAdaptedLuminance();
 
-    SharedPtr<PipelineState> toneMappingState_;
+    bool isAdaptedLuminanceInitialized_{};
+    AutoExposurePassSettings settings_;
+
+    struct CachedTextures
+    {
+        SharedPtr<RenderBuffer> color128_;
+        SharedPtr<RenderBuffer> lum64_;
+        SharedPtr<RenderBuffer> lum16_;
+        SharedPtr<RenderBuffer> lum4_;
+        SharedPtr<RenderBuffer> lum1_;
+        SharedPtr<RenderBuffer> adaptedLum_;
+        SharedPtr<RenderBuffer> prevAdaptedLum_;
+    } textures_;
+
+    struct CachedStates
+    {
+        SharedPtr<PipelineState> lum64_;
+        SharedPtr<PipelineState> lum16_;
+        SharedPtr<PipelineState> lum4_;
+        SharedPtr<PipelineState> lum1_;
+        SharedPtr<PipelineState> adaptedLum_;
+        SharedPtr<PipelineState> autoExposure_;
+    };
+    ea::optional<CachedStates> pipelineStates_;
 };
 
 }
