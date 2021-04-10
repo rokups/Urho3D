@@ -479,7 +479,8 @@ void DynamicVertexBuffer::Commit()
         }
     }
 
-    vertexBuffer_->SetData(shadowData_.data());
+    //vertexBuffer_->SetData(shadowData_.data());
+    vertexBuffer_->SetDataRange(shadowData_.data(), 0, numVertices_, true);
 }
 
 void DynamicVertexBuffer::GrowBuffer()

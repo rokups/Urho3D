@@ -27,6 +27,7 @@
 #include <Urho3D/Graphics/Camera.h>
 #include <Urho3D/Graphics/DebugRenderer.h>
 #include <Urho3D/Graphics/Graphics.h>
+#include <Urho3D/Graphics/GraphicsImpl.h>
 #include <Urho3D/Graphics/Material.h>
 #include <Urho3D/Graphics/Octree.h>
 #include <Urho3D/Graphics/RenderPath.h>
@@ -65,6 +66,16 @@ namespace Urho3D
 static const IntVector2 cameraPreviewSize{320, 200};
 static Matrix4 inversionMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1);
 
+unsigned GetViewportTextureFormat()
+{
+#ifdef URHO3D_D3D11
+    // DX11 doesn't have RGB texture format and we don't want ImGUI to use alpha
+    return DXGI_FORMAT_B8G8R8X8_UNORM;
+#else
+    return Graphics::GetRGBFormat();
+#endif
+}
+
 SceneTab::SceneTab(Context* context)
     : BaseClassName(context)
     , rect_({0, 0, 1024, 768})
@@ -81,7 +92,7 @@ SceneTab::SceneTab(Context* context)
     viewport_ = new Viewport(context_);
     viewport_->SetRect(rect_);
     texture_ = new Texture2D(context_);
-    texture_->SetSize(rect_.Width(), rect_.Height(), Graphics::GetRGBFormat(), TEXTURE_RENDERTARGET);
+    texture_->SetSize(rect_.Width(), rect_.Height(), GetViewportTextureFormat(), TEXTURE_RENDERTARGET);
     texture_->GetRenderSurface()->SetUpdateMode(SURFACE_UPDATEALWAYS);
     texture_->GetRenderSurface()->SetViewport(0, viewport_);
 
@@ -90,7 +101,7 @@ SceneTab::SceneTab(Context* context)
     cameraPreviewViewport_->SetRect(IntRect{{0, 0}, cameraPreviewSize});
     cameraPreviewViewport_->SetDrawDebug(false);
     cameraPreviewTexture_ = new Texture2D(context_);
-    cameraPreviewTexture_->SetSize(cameraPreviewSize.x_, cameraPreviewSize.y_, Graphics::GetRGBFormat(), TEXTURE_RENDERTARGET);
+    cameraPreviewTexture_->SetSize(cameraPreviewSize.x_, cameraPreviewSize.y_, GetViewportTextureFormat(), TEXTURE_RENDERTARGET);
     cameraPreviewTexture_->GetRenderSurface()->SetUpdateMode(SURFACE_UPDATEALWAYS);
     cameraPreviewTexture_->GetRenderSurface()->SetViewport(0, cameraPreviewViewport_);
 
@@ -151,7 +162,7 @@ bool SceneTab::RenderWindowContent()
     if (textureSize.x_ != texture_->GetWidth() || textureSize.y_ != texture_->GetHeight())
     {
         viewport_->SetRect(IntRect(IntVector2::ZERO, textureSize));
-        texture_->SetSize(textureSize.x_, textureSize.y_, Graphics::GetRGBFormat(), TEXTURE_RENDERTARGET);
+        texture_->SetSize(textureSize.x_, textureSize.y_, GetViewportTextureFormat(), TEXTURE_RENDERTARGET);
         texture_->GetRenderSurface()->SetViewport(0, viewport_);
         texture_->GetRenderSurface()->SetUpdateMode(SURFACE_UPDATEALWAYS);
     }
@@ -1115,7 +1126,12 @@ void SceneTab::OnEditorProjectClosing()
     }
 
     // Also crop image to a square.
-    SharedPtr<Image> snapshot(texture_->GetImage());
+    SharedPtr<Image> snapshot = texture_->GetImage();
+    if (!snapshot)
+    {
+        return;
+    }
+
     int w = snapshot->GetWidth();
     int h = snapshot->GetHeight();
     int side = Min(w, h);

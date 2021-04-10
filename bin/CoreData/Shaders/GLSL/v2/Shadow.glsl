@@ -36,7 +36,11 @@ void main()
     #endif
 
     #ifdef VSM_SHADOW
-        float depth = vTexCoord.z / vTexCoord.w * 0.5 + 0.5;
+        #ifdef D3D11
+            float depth = vTexCoord.z / vTexCoord.w;
+        #else
+            float depth = vTexCoord.z / vTexCoord.w * 0.5 + 0.5;
+        #endif
         gl_FragColor = vec4(depth, depth * depth, 1.0, 1.0);
     #else
         gl_FragColor = vec4(1.0);
