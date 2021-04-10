@@ -201,7 +201,7 @@ SurfaceGeometryData GetSurfaceGeometryData()
     #endif
 
     const half minRougness = 0.089;
-    const half oneMinusDielectricReflectivity = 1.0 - 0.16 * cGlossiness * cGlossiness;
+    const half oneMinusDielectricReflectivity = 1.0 - 0.16 * cDielectricReflectance * cDielectricReflectance;
     result.roughness = max(rmo.x, minRougness);
     result.oneMinusReflectivity = oneMinusDielectricReflectivity - oneMinusDielectricReflectivity * rmo.y;
 #else

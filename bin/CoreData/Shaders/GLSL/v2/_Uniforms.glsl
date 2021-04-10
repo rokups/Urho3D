@@ -104,7 +104,7 @@ UNIFORM_BUFFER_END(3, Light)
     UNIFORM(half cMetallic) \
     UNIFORM(half4 cMatSpecColor) \
     UNIFORM(half cNormalScale) \
-    UNIFORM(half cGlossiness)
+    UNIFORM(half cDielectricReflectance)
 
 /// cLMOffset.xy: Scale applied to lightmap UVs;
 /// cLMOffset.zw: Offset applied to lightmap UVs.
