@@ -35,15 +35,15 @@ namespace Urho3D
 class RenderBufferManager;
 class RenderPipelineInterface;
 
-/// Post-processing pass that adjusts HDR scene exposure.
-class URHO3D_API AutoExposurePass
+/// Post-processing pass that applies bloom to scene.
+class URHO3D_API BloomPass
     : public PostProcessPass
 {
-    URHO3D_OBJECT(AutoExposurePass, PostProcessPass);
+    URHO3D_OBJECT(BloomPass, PostProcessPass);
 
 public:
-    AutoExposurePass(RenderPipelineInterface* renderPipeline, RenderBufferManager* renderBufferManager);
-    void SetSettings(const AutoExposurePassSettings& settings);
+    BloomPass(RenderPipelineInterface* renderPipeline, RenderBufferManager* renderBufferManager);
+    void SetSettings(const BloomPassSettings& settings);
 
     PostProcessPassFlags GetExecutionFlags() const override { return PostProcessPassFlag::NeedColorOutputReadAndWrite; }
     void Execute() override;
@@ -52,41 +52,29 @@ protected:
     void InitializeTextures();
     void InitializeStates();
 
-    void EvaluateDownsampledColorBuffer();
-    void EvaluateLuminance();
-    void EvaluateAdaptedLuminance();
+    void EvaluateBloom();
 
-    bool isAdaptedLuminanceInitialized_{};
-    AutoExposurePassSettings settings_;
+    BloomPassSettings settings_;
 
     struct CachedTextures
     {
-        SharedPtr<RenderBuffer> color128_;
-        SharedPtr<RenderBuffer> lum64_;
-        SharedPtr<RenderBuffer> lum16_;
-        SharedPtr<RenderBuffer> lum4_;
-        SharedPtr<RenderBuffer> lum1_;
-        SharedPtr<RenderBuffer> adaptedLum_;
-        SharedPtr<RenderBuffer> prevAdaptedLum_;
+        SharedPtr<RenderBuffer> blurV_;
+        SharedPtr<RenderBuffer> blurH_;
     } textures_;
 
     struct CachedStates
     {
-        SharedPtr<PipelineState> lum64_;
-        SharedPtr<PipelineState> lum16_;
-        SharedPtr<PipelineState> lum4_;
-        SharedPtr<PipelineState> lum1_;
-        SharedPtr<PipelineState> adaptedLum_;
-        SharedPtr<PipelineState> autoExposure_;
+        SharedPtr<PipelineState> bright_;
+        SharedPtr<PipelineState> blurV_;
+        SharedPtr<PipelineState> blurH_;
+        SharedPtr<PipelineState> bloom_;
 
         bool IsValid()
         {
-            return lum64_->IsValid()
-                && lum16_->IsValid()
-                && lum4_->IsValid()
-                && lum1_->IsValid()
-                && adaptedLum_->IsValid()
-                && autoExposure_->IsValid();
+            return bright_->IsValid()
+                && blurV_->IsValid()
+                && blurH_->IsValid()
+                && bloom_->IsValid();
         }
     };
     ea::optional<CachedStates> pipelineStates_;

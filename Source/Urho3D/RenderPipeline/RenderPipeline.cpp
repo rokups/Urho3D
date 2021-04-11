@@ -43,6 +43,7 @@
 #include "../RenderPipeline/ShadowMapAllocator.h"
 #include "../RenderPipeline/AutoExposurePass.h"
 #include "../RenderPipeline/ToneMappingPass.h"
+#include "../RenderPipeline/BloomPass.h"
 #include "../Scene/Scene.h"
 
 #include <EASTL/fixed_vector.h>
@@ -191,6 +192,13 @@ void RenderPipelineView::ApplySettings()
     {
         auto pass = MakeShared<AutoExposurePass>(this, renderBufferManager_);
         pass->SetSettings(settings_.autoExposure_);
+        postProcessPasses_.push_back(pass);
+    }
+
+    if (settings_.bloom_.enabled_)
+    {
+        auto pass = MakeShared<BloomPass>(this, renderBufferManager_);
+        pass->SetSettings(settings_.bloom_);
         postProcessPasses_.push_back(pass);
     }
 
@@ -488,6 +496,10 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("Min Exposure", float, settings_.autoExposure_.minExposure_, MarkSettingsDirty, AutoExposurePassSettings{}.minExposure_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Max Exposure", float, settings_.autoExposure_.maxExposure_, MarkSettingsDirty, AutoExposurePassSettings{}.maxExposure_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Adapt Rate", float, settings_.autoExposure_.adaptRate_, MarkSettingsDirty, AutoExposurePassSettings{}.adaptRate_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Bloom", bool, settings_.bloom_.enabled_, MarkSettingsDirty, BloomPassSettings{}.enabled_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Bloom Threshold", float, settings_.bloom_.threshold_, MarkSettingsDirty, BloomPassSettings{}.threshold_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Bloom Intensity", float, settings_.bloom_.bloomIntensity_, MarkSettingsDirty, BloomPassSettings{}.bloomIntensity_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Bloom Source Multiplier", float, settings_.bloom_.sourceIntensity_, MarkSettingsDirty, BloomPassSettings{}.sourceIntensity_, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Tone Mapping Mode", settings_.toneMapping_, MarkSettingsDirty, toneMappingModeNames, ToneMappingMode::None, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Post Process Antialiasing", settings_.antialiasing_, MarkSettingsDirty, postProcessAntialiasingNames, PostProcessAntialiasing::None, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Post Process Grey Scale", bool, settings_.greyScale_, MarkSettingsDirty, false, AM_DEFAULT);

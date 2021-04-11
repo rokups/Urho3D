@@ -168,6 +168,9 @@ void AutoExposurePass::Execute()
     if (!pipelineStates_)
         InitializeStates();
 
+    if (!pipelineStates_->IsValid())
+        return;
+
     renderBufferManager_->PrepareForColorReadWrite(false);
 
     if (settings_.autoExposure_)

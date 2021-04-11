@@ -1,27 +1,36 @@
-#include "Uniforms.glsl"
+#include "_Config.glsl"
+#include "_Uniforms.glsl"
+#include "_VertexLayout.glsl"
+#include "_VertexTransform.glsl"
+#include "_VertexScreenPos.glsl"
 #include "_Samplers.glsl"
-#include "Transform.glsl"
-#include "ScreenPos.glsl"
+#include "_GammaCorrection.glsl"
 
-varying vec2 vTexCoord;
-varying vec2 vScreenPos;
+VERTEX_OUTPUT(vec2 vTexCoord)
+VERTEX_OUTPUT(vec2 vScreenPos)
 
-#ifdef COMPILEPS
-uniform float cBloomThreshold;
-uniform vec2 cBloomMix;
-uniform vec2 cBlurHInvSize;
+#ifdef URHO3D_PIXEL_SHADER
+
+UNIFORM_BUFFER_BEGIN(6, Custom)
+    UNIFORM(vec2 cBlurHInvSize)
+    UNIFORM(vec2 cBloomMix)
+    UNIFORM(float cBloomThreshold)
+UNIFORM_BUFFER_END(6, Custom)
+
 #endif
 
-void VS()
+#ifdef URHO3D_VERTEX_SHADER
+void main()
 {
-    mat4 modelMatrix = iModelMatrix;
-    vec3 worldPos = GetWorldPos(modelMatrix);
-    gl_Position = GetClipPos(worldPos);
+    VertexTransform vertexTransform = GetVertexTransform();
+    gl_Position = GetClipPos(vertexTransform.position.xyz);
     vTexCoord = GetQuadTexCoord(gl_Position);
     vScreenPos = GetScreenPosPreDiv(gl_Position);
 }
+#endif
 
-void PS()
+#ifdef URHO3D_PIXEL_SHADER
+void main()
 {
     #ifdef BRIGHT
     vec3 rgb = texture2D(sDiffMap, vScreenPos).rgb;
@@ -54,4 +63,5 @@ void PS()
     gl_FragColor = vec4(original + bloom, 1.0);
     #endif
 }
+#endif
 

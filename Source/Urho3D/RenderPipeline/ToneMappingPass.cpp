@@ -74,6 +74,9 @@ void ToneMappingPass::Execute()
     if (!toneMappingState_)
         InitializeStates();
 
+    if (!toneMappingState_->IsValid())
+        return;
+
     renderBufferManager_->PrepareForColorReadWrite(false);
 
     renderBufferManager_->SetOutputRenderTargers();

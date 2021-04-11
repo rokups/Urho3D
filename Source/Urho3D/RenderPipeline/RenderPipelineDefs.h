@@ -484,6 +484,27 @@ struct AutoExposurePassSettings
     /// @}
 };
 
+struct BloomPassSettings
+{
+    bool enabled_{};
+    float threshold_{ 0.95f };
+    float bloomIntensity_{ 1.0f };
+    float sourceIntensity_{ 0.9f };
+
+    /// Utility operators
+    /// @{
+    bool operator==(const BloomPassSettings& rhs) const
+    {
+        return enabled_ == rhs.enabled_
+            && threshold_ == rhs.threshold_
+            && bloomIntensity_ == rhs.bloomIntensity_
+            && sourceIntensity_ == rhs.sourceIntensity_;
+    }
+
+    bool operator!=(const BloomPassSettings& rhs) const { return !(*this == rhs); }
+    /// @}
+};
+
 /// Post-processing antialiasing mode.
 enum class PostProcessAntialiasing
 {
@@ -503,6 +524,7 @@ struct RenderPipelineSettings
     /// Post-processing settings
     /// @{
     AutoExposurePassSettings autoExposure_;
+    BloomPassSettings bloom_;
     ToneMappingMode toneMapping_{};
     PostProcessAntialiasing antialiasing_{};
     bool greyScale_{};
@@ -526,6 +548,9 @@ struct RenderPipelineSettings
             && sceneProcessor_ == rhs.sceneProcessor_
             && shadowMapAllocator_ == rhs.shadowMapAllocator_
             && instancingBuffer_ == rhs.instancingBuffer_
+
+            && autoExposure_ == rhs.autoExposure_
+            && bloom_ == rhs.bloom_
             && toneMapping_ == rhs.toneMapping_
             && antialiasing_ == rhs.antialiasing_
             && greyScale_ == rhs.greyScale_;
