@@ -70,13 +70,17 @@ void BloomPass::InitializeStates()
 void BloomPass::EvaluateBloom()
 {
     Texture2D* viewportTexture = renderBufferManager_->GetSecondaryColorTexture();
-    const Vector2 invSize = Vector2::ONE / static_cast<Vector2>(textures_.blurH_->GetTexture2D()->GetSize());
+    const Vector2 invInputSize = Vector2::ONE / static_cast<Vector2>(viewportTexture->GetSize());
+    const Vector2 invBlueSize = Vector2::ONE / static_cast<Vector2>(textures_.blurH_->GetTexture2D()->GetSize());
+    const Color luminanceWeights = renderBufferManager_->GetSettings().colorSpace_ == RenderPipelineColorSpace::GammaLDR
+        ? Color::LUMINOSITY_GAMMA : Color::LUMINOSITY_LINEAR;
 
     ShaderResourceDesc shaderResources[1];
     shaderResources[0].unit_ = TU_DIFFUSE;
     ShaderParameterDesc shaderParameters[] = {
-        { "BlurHInvSize", invSize },
+        { "LuminanceWeights", luminanceWeights.ToVector3() },
         { "BloomThreshold", settings_.threshold_ },
+        { "InputInvSize", invInputSize },
     };
 
     DrawQuadParams drawParams;
@@ -89,6 +93,7 @@ void BloomPass::EvaluateBloom()
     renderBufferManager_->SetRenderTargets(nullptr, { textures_.blurV_ });
     renderBufferManager_->DrawQuad(drawParams);
 
+    shaderParameters[2].value_ = invBlueSize;
     shaderResources[0].texture_ = textures_.blurV_->GetTexture2D();
     drawParams.pipelineState_ = pipelineStates_->blurH_;
     renderBufferManager_->SetRenderTargets(nullptr, { textures_.blurH_ });

@@ -152,6 +152,7 @@ public:
     Vector2 GetInvOutputSize() const { return Vector2::ONE / static_cast<Vector2>(GetOutputSize()); }
     /// Return identity offset and scale used to convert clip space to UV space.
     Vector4 GetDefaultClipToUVSpaceOffsetAndScale() const;
+    const RenderBufferManagerSettings& GetSettings() const { return settings_; }
 
 private:
     /// RenderPipeline callbacks

@@ -487,8 +487,8 @@ struct AutoExposurePassSettings
 struct BloomPassSettings
 {
     bool enabled_{};
-    float threshold_{ 0.95f };
-    float bloomIntensity_{ 1.0f };
+    float threshold_{ 0.8f };
+    float bloomIntensity_{ 4.0f };
     float sourceIntensity_{ 0.9f };
 
     /// Utility operators

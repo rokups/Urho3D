@@ -373,4 +373,6 @@ const Color Color::CYAN(0.0f, 1.0f, 1.0f);
 const Color Color::MAGENTA(1.0f, 0.0f, 1.0f);
 const Color Color::YELLOW(1.0f, 1.0f, 0.0f);
 const Color Color::TRANSPARENT_BLACK(0.0f, 0.0f, 0.0f, 0.0f);
+const Color Color::LUMINOSITY_GAMMA(0.299f, 0.587f, 0.114f, 0.0f);
+const Color Color::LUMINOSITY_LINEAR(0.2126f, 0.7152f, 0.0722f, 0.0f);
 }
