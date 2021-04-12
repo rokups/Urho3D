@@ -91,7 +91,8 @@ void main()
         float exposure = cMinMaxExposure.x;
     #endif
 
-    gl_FragColor = vec4(color * exposure, 1.0);
+    const float whitePoint = 4.0;
+    gl_FragColor = vec4(min(color * exposure, vec3(whitePoint, whitePoint, whitePoint)), 1.0);
 #endif
 }
 #endif

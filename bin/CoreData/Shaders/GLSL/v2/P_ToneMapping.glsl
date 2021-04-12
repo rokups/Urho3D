@@ -56,7 +56,7 @@ void main()
     finalColor = Reinhard(finalColor);
 #endif
 #ifdef REINHARDWHITE
-    finalColor = ReinhardWhite(finalColor, 8.0);
+    finalColor = ReinhardWhite(finalColor, 4.0);
 #endif
 #ifdef UNCHARTED2
     const vec3 whiteScale = 1.0 / Uncharted2(vec3(4.0));

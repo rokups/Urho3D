@@ -77,9 +77,12 @@ ea::string DebugFrameSnapshotQuad::ToString() const
 
 ea::string DebugFrameSnapshotPass::ToString() const
 {
+    unsigned numBatches = 0;
     unsigned numVertices = 0;
     unsigned numPrimitives = 0;
     ea::string result;
+
+    numBatches += batches_.size();
     for (const DebugFrameSnapshotBatch& batch : batches_)
     {
         result += batch.ToString();
@@ -87,6 +90,8 @@ ea::string DebugFrameSnapshotPass::ToString() const
         numVertices += batch.numVertices_;
         numPrimitives += batch.numPrimitives_;
     }
+
+    numBatches += quads_.size();
     for (const DebugFrameSnapshotQuad& quad : quads_)
     {
         result += quad.ToString();
@@ -94,7 +99,7 @@ ea::string DebugFrameSnapshotPass::ToString() const
         numVertices += 4;
         numPrimitives += 2;
     }
-    return Format("Pass {} - {}b {}v {}t:\n\n{}\n", name_, batches_.size(), numVertices, numPrimitives, result);
+    return Format("Pass {} - {}b {}v {}t:\n\n{}\n", name_, numBatches, numVertices, numPrimitives, result);
 }
 
 ea::string DebugFrameSnapshot::ToString() const
