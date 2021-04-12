@@ -24,6 +24,7 @@
 
 #include "../Core/Context.h"
 #include "../Core/IteratorRange.h"
+#include "../Input/Input.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/ConstantBuffer.h"
 #include "../Graphics/ShaderProgramLayout.h"
@@ -34,6 +35,7 @@
 #include "../Graphics/Graphics.h"
 #include "../Graphics/GraphicsEvents.h"
 #include "../Graphics/Texture2D.h"
+#include "../Graphics/Renderer.h"
 #include "../Graphics/Viewport.h"
 #include "../RenderPipeline/RenderPipeline.h"
 #include "../RenderPipeline/InstancingBuffer.h"
@@ -45,19 +47,13 @@
 #include "../RenderPipeline/ToneMappingPass.h"
 #include "../RenderPipeline/BloomPass.h"
 #include "../Scene/Scene.h"
+#if URHO3D_SYSTEMUI
+    #include "../SystemUI/SystemUI.h"
+#endif
 
 #include <EASTL/fixed_vector.h>
 #include <EASTL/vector_map.h>
 #include <EASTL/sort.h>
-
-#include "../Graphics/Light.h"
-#include "../Graphics/Octree.h"
-#include "../Graphics/Geometry.h"
-#include "../Graphics/Batch.h"
-#include "../Graphics/Renderer.h"
-#include "../Graphics/Zone.h"
-#include "../Graphics/PipelineState.h"
-#include "../Core/WorkQueue.h"
 
 #include "../DebugNew.h"
 
@@ -293,6 +289,18 @@ void RenderPipelineView::Update(const FrameInfo& frameInfo)
     frameInfo_.frameNumber_ = frameInfo.frameNumber_;
     frameInfo_.timeStep_ = frameInfo.timeStep_;
 
+    // Begin debug snapshot
+#if URHO3D_SYSTEMUI
+    const bool shiftDown = ui::IsKeyDown(KEY_LSHIFT) || ui::IsKeyDown(KEY_RSHIFT);
+    const bool ctrlDown = ui::IsKeyDown(KEY_LCTRL) || ui::IsKeyDown(KEY_RCTRL);
+    const bool takeSnapshot = shiftDown && ctrlDown && ui::IsKeyPressed(KEY_F12);
+#else
+    auto input = GetSubsystem<Input>();
+    const bool takeSnapshot = input->GetQualifiers().Test(QUAL_CTRL | QUAL_SHIFT) && input->GetKeyPress(KEY_F12);
+#endif
+    if (takeSnapshot)
+        debugger_.BeginSnapshot();
+
     // Begin update. Should happen before pipeline state hash check.
     shadowMapAllocator_->ResetAllShadowMaps();
     OnUpdateBegin(this, frameInfo_);
@@ -331,6 +339,7 @@ void RenderPipelineView::Render()
 
     sceneProcessor_->RenderShadowMaps();
 
+    Camera* camera = sceneProcessor_->GetFrameInfo().camera_;
     auto sceneBatchRenderer_ = sceneProcessor_->GetBatchRenderer();
     const Color fogColorInGammaSpace = sceneProcessor_->GetFrameInfo().camera_->GetEffectiveFogColor();
     const Color effectiveFogColor = settings_.sceneProcessor_.linearSpaceLighting_
@@ -354,15 +363,8 @@ void RenderPipelineView::Render()
             deferred_->normalBuffer_
         };
         renderBufferManager_->SetRenderTargets(renderBufferManager_->GetDepthStencilOutput(), gBuffer);
-
-        drawQueue->Reset();
-
-        instancingBuffer_->Begin();
-        sceneBatchRenderer_->RenderBatches({ *drawQueue, *sceneProcessor_->GetFrameInfo().camera_ },
+        sceneProcessor_->RenderSceneBatches("Deferred", camera,
             opaquePass_->GetDeferredRenderFlags(), opaquePass_->GetSortedDeferredBatches());
-        instancingBuffer_->End();
-
-        drawQueue->Execute();
 
         // Draw deferred lights
         const ShaderResourceDesc geometryBuffer[] = {
@@ -394,20 +396,12 @@ void RenderPipelineView::Render()
         renderBufferManager_->SetOutputRenderTargers();
     }
 
-    drawQueue->Reset();
-    instancingBuffer_->Begin();
-    BatchRenderingContext ctx{ *drawQueue, *sceneProcessor_->GetFrameInfo().camera_ };
-    sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetBaseRenderFlags(), opaquePass_->GetSortedBaseBatches());
-    sceneBatchRenderer_->RenderBatches(ctx, opaquePass_->GetLightRenderFlags(), opaquePass_->GetSortedLightBatches());
-    sceneBatchRenderer_->RenderBatches(ctx, postOpaquePass_->GetBaseRenderFlags(), postOpaquePass_->GetSortedBaseBatches());
-    instancingBuffer_->End();
-    drawQueue->Execute();
-
-    if (!settings_.sceneProcessor_.softParticles_)
-    {
-        sceneBatchRenderer_->RenderBatches(ctx, refractPass_->GetRenderFlags(), refractPass_->GetSortedBatches());
-        sceneBatchRenderer_->RenderBatches(ctx, alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches());
-    }
+    sceneProcessor_->RenderSceneBatches("Opaque Base", camera,
+        opaquePass_->GetBaseRenderFlags(), opaquePass_->GetSortedBaseBatches());
+    sceneProcessor_->RenderSceneBatches("Opaque Light", camera,
+        opaquePass_->GetLightRenderFlags(), opaquePass_->GetSortedLightBatches());
+    sceneProcessor_->RenderSceneBatches("Post-Opaque", camera,
+        postOpaquePass_->GetBaseRenderFlags(), postOpaquePass_->GetSortedBaseBatches());
 
     if (hasRefraction)
         renderBufferManager_->PrepareForColorReadWrite(true);
@@ -430,18 +424,14 @@ void RenderPipelineView::Render()
         { VSP_GBUFFEROFFSETS, renderBufferManager_->GetDefaultClipToUVSpaceOffsetAndScale() },
         { PSP_GBUFFERINVSIZE, renderBufferManager_->GetInvOutputSize() },
     };
-    ctx.cameraParameters_ = cameraParameters;
-    ctx.globalResources_ = depthAndColorTextures;
-    sceneBatchRenderer_->RenderBatches(ctx, refractPass_->GetRenderFlags(), refractPass_->GetSortedBatches());
-    sceneBatchRenderer_->RenderBatches(ctx, alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches());
-
-    instancingBuffer_->End();
-    drawQueue->Execute();
+    sceneProcessor_->RenderSceneBatches("Alpha", camera,
+        alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches(),
+        depthAndColorTextures, cameraParameters);
 
     for (PostProcessPass* postProcessPass : postProcessPasses_)
         postProcessPass->Execute();
 
-    auto debug = sceneProcessor_->GetFrameInfo().octree_->GetComponent<DebugRenderer>();
+    auto debug = sceneProcessor_->GetFrameInfo().scene_->GetComponent<DebugRenderer>();
     if (debug && debug->IsEnabledEffective() && debug->HasContent())
     {
         renderBufferManager_->SetOutputRenderTargers();
@@ -452,6 +442,15 @@ void RenderPipelineView::Render()
     SendViewEvent(E_ENDVIEWRENDER);
     OnRenderEnd(this, frameInfo_);
     graphics_->SetColorWrite(true);
+
+    // End debug snapshot
+    if (debugger_.IsSnapshotBuildingInProgress())
+    {
+        debugger_.EndSnapshot();
+
+        const DebugFrameSnapshot& snapshot = debugger_.GetSnapshot();
+        URHO3D_LOGINFO("RenderPipeline snapshot:\n\n{}\n", snapshot.ToString());
+    }
 }
 
 unsigned RenderPipelineView::RecalculatePipelineStateHash() const

@@ -32,6 +32,7 @@ namespace Urho3D
 
 class Light;
 class PipelineState;
+class RenderPipelineDebugger;
 class RenderSurface;
 class Texture2D;
 class Viewport;
@@ -207,6 +208,7 @@ class URHO3D_API RenderPipelineInterface
 {
 public:
     virtual Context* GetContext() const = 0;
+    virtual RenderPipelineDebugger* GetDebugger() = 0;
 
     /// Callbacks
     /// @{

@@ -56,6 +56,7 @@ public:
     /// Implement RenderPipelineInterface
     /// @{
     Context* GetContext() const override { return BaseClassName::GetContext(); }
+    RenderPipelineDebugger* GetDebugger() override { return nullptr; }
     /// @}
 
 private:

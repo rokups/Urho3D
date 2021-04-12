@@ -101,6 +101,9 @@ public:
     /// @property
     bool IsEnabledEffective() const;
 
+    /// Return full component name for debugging. Unique for each component in the scene. Slow!
+    ea::string GetFullNameDebug() const;
+
     /// Return component in the same scene node by type. If there are several, returns the first.
     Component* GetComponent(StringHash type) const;
     /// Return components in the same scene node by type.

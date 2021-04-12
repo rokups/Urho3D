@@ -210,6 +210,10 @@ BatchCompositor::BatchCompositor(RenderPipelineInterface* renderPipeline,
     renderPipeline->OnPipelineStatesInvalidated.Subscribe(this, &BatchCompositor::OnPipelineStatesInvalidated);
 }
 
+BatchCompositor::~BatchCompositor()
+{
+}
+
 void BatchCompositor::SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes)
 {
     passes_ = passes;

@@ -40,6 +40,10 @@ class RenderPipelineInterface;
 class RenderSurface;
 class ShadowMapAllocator;
 class Viewport;
+struct PipelineBatchBackToFront;
+struct PipelineBatchByState;
+struct ShaderParameterDesc;
+struct ShaderResourceDesc;
 
 /// Scene processor for RenderPipeline
 class URHO3D_API SceneProcessor : public Object, public LightProcessorCallback
@@ -79,6 +83,12 @@ public:
 
     void Update();
     void RenderShadowMaps();
+    void RenderSceneBatches(ea::string_view debugName, Camera* camera,
+        BatchRenderFlags flags, ea::span<const PipelineBatchByState> batches,
+        ea::span<const ShaderResourceDesc> globalResources = {}, ea::span<const ShaderParameterDesc> cameraParameters = {});
+    void RenderSceneBatches(ea::string_view debugName, Camera* camera,
+        BatchRenderFlags flags, ea::span<const PipelineBatchBackToFront> batches,
+        ea::span<const ShaderResourceDesc> globalResources = {}, ea::span<const ShaderParameterDesc> cameraParameters = {});
     /// @}
 
     /// Getters
@@ -113,8 +123,13 @@ private:
     /// @}
 
     void DrawOccluders();
+    template <class T>
+    void RenderBatchesInternal(ea::string_view debugName, Camera* camera,
+        BatchRenderFlags flags, ea::span<const T> batches,
+        ea::span<const ShaderResourceDesc> globalResources, ea::span<const ShaderParameterDesc> cameraParameters);
 
     RenderPipelineInterface* renderPipeline_{};
+    RenderPipelineDebugger* debugger_{};
 
     /// Shared objects
     /// @{

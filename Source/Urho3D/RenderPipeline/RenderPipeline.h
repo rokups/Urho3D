@@ -30,6 +30,7 @@
 #include "../RenderPipeline/RenderBuffer.h"
 #include "../RenderPipeline/RenderBufferManager.h"
 #include "../RenderPipeline/RenderPipelineDefs.h"
+#include "../RenderPipeline/RenderPipelineDebugger.h"
 #include "../RenderPipeline/PostProcessPass.h"
 #include "../RenderPipeline/ScenePass.h"
 #include "../Scene/Serializable.h"
@@ -58,6 +59,7 @@ public:
     /// Implement RenderPipelineInterface
     /// @{
     Context* GetContext() const override { return BaseClassName::GetContext(); }
+    RenderPipelineDebugger* GetDebugger() override { return &debugger_; }
     /// @}
 
     RenderPipeline* GetRenderPipeline() const { return renderPipeline_; }
@@ -91,6 +93,8 @@ private:
 
     CommonFrameInfo frameInfo_;
     PostProcessPassFlags postProcessFlags_;
+
+    RenderPipelineDebugger debugger_;
 
     SharedPtr<RenderBufferManager> renderBufferManager_;
     SharedPtr<ShadowMapAllocator> shadowMapAllocator_;

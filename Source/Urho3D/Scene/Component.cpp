@@ -23,6 +23,7 @@
 #include "../Precompiled.h"
 
 #include "../Core/Context.h"
+#include "../Core/StringUtils.h"
 #include "../Resource/JSONValue.h"
 #include "../Scene/Component.h"
 #include "../Scene/ReplicationState.h"
@@ -270,6 +271,13 @@ Component* Component::GetComponent(StringHash type) const
 bool Component::IsEnabledEffective() const
 {
     return enabled_ && node_ && node_->IsEnabled();
+}
+
+ea::string Component::GetFullNameDebug() const
+{
+    ea::string fullName = node_ ? Format("{}/({})", node_->GetFullNameDebug(), node_->GetComponentIndex(this)) : "";
+    fullName += GetTypeName();
+    return fullName;
 }
 
 void Component::GetComponents(ea::vector<Component*>& dest, StringHash type) const

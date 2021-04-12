@@ -219,6 +219,7 @@ public:
 
     BatchCompositor(RenderPipelineInterface* renderPipeline,
         const DrawableProcessor* drawableProcessor, BatchStateCacheCallback* callback, unsigned shadowPassIndex);
+    ~BatchCompositor() override;
     void SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes);
     void SetShadowMaterialQuality(MaterialQuality materialQuality) { shadowMaterialQuality_ = materialQuality; }
 

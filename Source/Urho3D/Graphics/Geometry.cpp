@@ -216,6 +216,27 @@ VertexBuffer* Geometry::GetVertexBuffer(unsigned index) const
     return index < vertexBuffers_.size() ? vertexBuffers_[index] : nullptr;
 }
 
+unsigned Geometry::GetPrimitiveCount() const
+{
+    const unsigned indexCount = indexBuffer_ ? indexCount_ : vertexCount_;
+    switch (primitiveType_)
+    {
+    case TRIANGLE_LIST:
+        return indexCount / 3;
+    case LINE_LIST:
+        return indexCount / 2;
+    case POINT_LIST:
+        return indexCount;
+    case TRIANGLE_STRIP:
+    case TRIANGLE_FAN:
+        return indexCount >= 2 ? indexCount - 2 : 0;
+    case LINE_STRIP:
+        return indexCount >= 1 ? indexCount - 1 : 0;
+    default:
+        return 0;
+    }
+}
+
 unsigned short Geometry::GetBufferHash() const
 {
     unsigned short hash = 0;
