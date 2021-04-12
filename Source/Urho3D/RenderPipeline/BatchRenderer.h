@@ -60,7 +60,7 @@ class URHO3D_API BatchRenderer : public Object
     URHO3D_OBJECT(BatchRenderer, Object);
 
 public:
-    BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor,
+    BatchRenderer(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
         InstancingBuffer* instancingBuffer);
     void SetSettings(const BatchRendererSettings& settings);
 
@@ -78,6 +78,7 @@ private:
     /// External dependencies
     /// @{
     Renderer* renderer_{};
+    RenderPipelineDebugger* debugger_{};
     const DrawableProcessor* drawableProcessor_{};
     InstancingBuffer* instancingBuffer_{};
     /// @}

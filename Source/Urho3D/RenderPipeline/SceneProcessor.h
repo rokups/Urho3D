@@ -89,6 +89,8 @@ public:
     void RenderSceneBatches(ea::string_view debugName, Camera* camera,
         BatchRenderFlags flags, ea::span<const PipelineBatchBackToFront> batches,
         ea::span<const ShaderResourceDesc> globalResources = {}, ea::span<const ShaderParameterDesc> cameraParameters = {});
+    void RenderLightVolumeBatches(ea::string_view debugName, Camera* camera,
+        ea::span<const ShaderResourceDesc> globalResources, ea::span<const ShaderParameterDesc> cameraParameters);
     /// @}
 
     /// Getters

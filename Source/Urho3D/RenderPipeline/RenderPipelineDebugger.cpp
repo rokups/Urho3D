@@ -36,7 +36,8 @@
 namespace Urho3D
 {
 
-DebugFrameSnapshotBatch::DebugFrameSnapshotBatch(const DrawableProcessor& drawableProcessor, const PipelineBatch& pipelineBatch)
+DebugFrameSnapshotBatch::DebugFrameSnapshotBatch(const DrawableProcessor& drawableProcessor,
+    const PipelineBatch& pipelineBatch, bool newInstancingGroup)
     : drawable_(pipelineBatch.drawable_)
     , geometry_(pipelineBatch.geometry_)
     , material_(pipelineBatch.material_)
@@ -45,6 +46,7 @@ DebugFrameSnapshotBatch::DebugFrameSnapshotBatch(const DrawableProcessor& drawab
     , distance_(pipelineBatch.distance_)
     , numVertices_(geometry_->GetVertexCount())
     , numPrimitives_(geometry_->GetPrimitiveCount())
+    , newInstancingGroup_(newInstancingGroup)
 {
     const ea::vector<Light*>& lights = drawableProcessor.GetLights();
     light_ = pipelineBatch.pixelLightIndex_ < lights.size() ? lights[pipelineBatch.pixelLightIndex_] : nullptr;
@@ -52,12 +54,18 @@ DebugFrameSnapshotBatch::DebugFrameSnapshotBatch(const DrawableProcessor& drawab
 
 ea::string DebugFrameSnapshotBatch::ToString() const
 {
-    const ea::string drawableName = drawable_ ? drawable_->GetFullNameDebug() : "null";
+    const ea::string drawableName = drawable_ && sourceBatchIndex_ != M_MAX_UNSIGNED ? drawable_->GetFullNameDebug() : "";
     const ea::string lightName = light_ ? light_->GetFullNameDebug() : "null";
     const ea::string materialName = material_ ? material_->GetName() : "null";
-    return Format("{}v {}t [{}].{} with material [{}] lit with [{}] at {:.2f} units (state {})",
-        numVertices_, numPrimitives_, drawableName, sourceBatchIndex_, materialName, lightName,
-        distance_, static_cast<void*>(pipelineState_));
+
+    const char bulletPoint = newInstancingGroup_ ? '*' : '.';
+    const ea::string geometryText = !drawableName.empty()
+        ? Format("[{}].{} with material [{}] lit with", drawableName, sourceBatchIndex_, materialName)
+        : "Light volume geometry for";
+
+    return Format("{} {}v {}t {} [{}] (distance={:.2f} state={} geometry={})",
+        bulletPoint, numVertices_, numPrimitives_, geometryText, lightName,
+        distance_, static_cast<void*>(pipelineState_), static_cast<void*>(geometry_));
 }
 
 ea::string DebugFrameSnapshotPass::ToString() const
@@ -67,13 +75,12 @@ ea::string DebugFrameSnapshotPass::ToString() const
     ea::string batches;
     for (const DebugFrameSnapshotBatch& batch : batches_)
     {
-        batches += "* ";
         batches += batch.ToString();
         batches += "\n";
         numVertices += batch.numVertices_;
         numPrimitives += batch.numPrimitives_;
     }
-    return Format("Scene Pass {} - {}b {}v {}t:\n\n{}\n", name_, batches_.size(), numVertices, numPrimitives, batches);
+    return Format("Pass {} - {}b {}v {}t:\n\n{}\n", name_, batches_.size(), numVertices, numPrimitives, batches);
 }
 
 ea::string DebugFrameSnapshot::ToString() const
@@ -95,24 +102,24 @@ void RenderPipelineDebugger::EndSnapshot()
     snapshotBuildingInProgress_ = false;
 }
 
-void RenderPipelineDebugger::BeginScenePass(ea::string_view name)
+void RenderPipelineDebugger::BeginPass(ea::string_view name)
 {
-    if (scenePassInProgress_)
-        EndScenePass();
+    if (passInProgress_)
+        EndPass();
     snapshot_.passes_.push_back(DebugFrameSnapshotPass{ ea::string(name) });
-    scenePassInProgress_ = true;
+    passInProgress_ = true;
 }
 
 void RenderPipelineDebugger::ReportSceneBatch(const DebugFrameSnapshotBatch& sceneBatch)
 {
-    if (!scenePassInProgress_)
-        BeginScenePass("Undefined");
+    if (!passInProgress_)
+        BeginPass("Unnamed");
     snapshot_.passes_.back().batches_.push_back(sceneBatch);
 }
 
-void RenderPipelineDebugger::EndScenePass()
+void RenderPipelineDebugger::EndPass()
 {
-    scenePassInProgress_ = false;
+    passInProgress_ = false;
 }
 
 }

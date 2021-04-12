@@ -194,7 +194,7 @@ SceneProcessor::SceneProcessor(RenderPipelineInterface* renderPipeline, const ea
     , drawableProcessor_(MakeShared<DrawableProcessor>(renderPipeline_))
     , batchCompositor_(MakeShared<BatchCompositor>(
         renderPipeline_, drawableProcessor_, pipelineStateBuilder_, Technique::GetPassIndex("shadow")))
-    , batchRenderer_(MakeShared<BatchRenderer>(context_, drawableProcessor_, instancingBuffer_))
+    , batchRenderer_(MakeShared<BatchRenderer>(renderPipeline_, drawableProcessor_, instancingBuffer_))
     , batchStateCacheCallback_(pipelineStateBuilder_)
 {
     renderPipeline_->OnUpdateBegin.Subscribe(this, &SceneProcessor::OnUpdateBegin);
@@ -333,6 +333,13 @@ void SceneProcessor::RenderShadowMaps()
         {
             split.SortShadowBatches(tempSortedShadowBatches_);
 
+            if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
+            {
+                const ea::string passName = Format("ShadowMap.[{}].{}",
+                    split.GetLight()->GetFullNameDebug(), split.GetSplitIndex());
+                debugger_->BeginPass(passName);
+            }
+
             drawQueue_->Reset();
 
             instancingBuffer_->Begin();
@@ -343,14 +350,9 @@ void SceneProcessor::RenderShadowMaps()
             shadowMapAllocator_->BeginShadowMapRendering(split.GetShadowMap());
             drawQueue_->Execute();
 
-            if (debugger_ && debugger_->IsSnapshotBuildingInProgress())
+            if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
             {
-                const ea::string passName = Format("ShadowMap.[{}].{}",
-                    split.GetLight()->GetFullNameDebug(), split.GetSplitIndex());
-                debugger_->BeginScenePass(passName);
-                for (const auto& sortedBatch : tempSortedShadowBatches_)
-                    debugger_->ReportSceneBatch(DebugFrameSnapshotBatch{*drawableProcessor_, *sortedBatch.pipelineBatch_});
-                debugger_->EndScenePass();
+                debugger_->EndPass();
             }
         }
     }
@@ -370,11 +372,34 @@ void SceneProcessor::RenderSceneBatches(ea::string_view debugName, Camera* camer
     RenderBatchesInternal(debugName, camera, flags, batches, globalResources, cameraParameters);
 }
 
+void SceneProcessor::RenderLightVolumeBatches(ea::string_view debugName, Camera* camera,
+    ea::span<const ShaderResourceDesc> globalResources, ea::span<const ShaderParameterDesc> cameraParameters)
+{
+    if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
+        debugger_->BeginPass(debugName);
+
+    drawQueue_->Reset();
+
+    BatchRenderingContext ctx{ *drawQueue_, *camera };
+    ctx.globalResources_ = globalResources;
+    ctx.cameraParameters_ = cameraParameters;
+
+    batchRenderer_->RenderLightVolumeBatches(ctx, GetLightVolumeBatches());
+
+    drawQueue_->Execute();
+
+    if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
+        debugger_->EndPass();
+}
+
 template <class T>
 void SceneProcessor::RenderBatchesInternal(ea::string_view debugName, Camera* camera,
     BatchRenderFlags flags, ea::span<const T> batches,
     ea::span<const ShaderResourceDesc> globalResources, ea::span<const ShaderParameterDesc> cameraParameters)
 {
+    if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
+        debugger_->BeginPass(debugName);
+
     drawQueue_->Reset();
     instancingBuffer_->Begin();
 
@@ -387,13 +412,8 @@ void SceneProcessor::RenderBatchesInternal(ea::string_view debugName, Camera* ca
     instancingBuffer_->End();
     drawQueue_->Execute();
 
-    if (debugger_ && debugger_->IsSnapshotBuildingInProgress())
-    {
-        debugger_->BeginScenePass(debugName);
-        for (const auto& sortedBatch : batches)
-            debugger_->ReportSceneBatch(DebugFrameSnapshotBatch{*drawableProcessor_, *sortedBatch.pipelineBatch_});
-        debugger_->EndScenePass();
-    }
+    if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
+        debugger_->EndPass();
 }
 
 BatchCompositorPass* SceneProcessor::GetUserPass(Object* pass) const

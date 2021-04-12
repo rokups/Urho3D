@@ -340,7 +340,6 @@ void RenderPipelineView::Render()
     sceneProcessor_->RenderShadowMaps();
 
     Camera* camera = sceneProcessor_->GetFrameInfo().camera_;
-    auto sceneBatchRenderer_ = sceneProcessor_->GetBatchRenderer();
     const Color fogColorInGammaSpace = sceneProcessor_->GetFrameInfo().camera_->GetEffectiveFogColor();
     const Color effectiveFogColor = settings_.sceneProcessor_.linearSpaceLighting_
         ? fogColorInGammaSpace.GammaToLinear()
@@ -363,7 +362,7 @@ void RenderPipelineView::Render()
             deferred_->normalBuffer_
         };
         renderBufferManager_->SetRenderTargets(renderBufferManager_->GetDepthStencilOutput(), gBuffer);
-        sceneProcessor_->RenderSceneBatches("Deferred", camera,
+        sceneProcessor_->RenderSceneBatches("GeometryBuffer", camera,
             opaquePass_->GetDeferredRenderFlags(), opaquePass_->GetSortedDeferredBatches());
 
         // Draw deferred lights
@@ -384,10 +383,7 @@ void RenderPipelineView::Render()
         ctx.cameraParameters_ = cameraParameters;
 
         renderBufferManager_->SetOutputRenderTargers();
-
-        drawQueue->Reset();
-        sceneBatchRenderer_->RenderLightVolumeBatches(ctx, sceneProcessor_->GetLightVolumeBatches());
-        drawQueue->Execute();
+        sceneProcessor_->RenderLightVolumeBatches("LightVolumes", camera, geometryBuffer, cameraParameters);
     }
     else
 #endif
@@ -396,11 +392,11 @@ void RenderPipelineView::Render()
         renderBufferManager_->SetOutputRenderTargers();
     }
 
-    sceneProcessor_->RenderSceneBatches("Opaque Base", camera,
+    sceneProcessor_->RenderSceneBatches("OpaqueBase", camera,
         opaquePass_->GetBaseRenderFlags(), opaquePass_->GetSortedBaseBatches());
-    sceneProcessor_->RenderSceneBatches("Opaque Light", camera,
+    sceneProcessor_->RenderSceneBatches("OpaqueLight", camera,
         opaquePass_->GetLightRenderFlags(), opaquePass_->GetSortedLightBatches());
-    sceneProcessor_->RenderSceneBatches("Post-Opaque", camera,
+    sceneProcessor_->RenderSceneBatches("PostOpaque", camera,
         postOpaquePass_->GetBaseRenderFlags(), postOpaquePass_->GetSortedBaseBatches());
 
     if (hasRefraction)
@@ -444,7 +440,7 @@ void RenderPipelineView::Render()
     graphics_->SetColorWrite(true);
 
     // End debug snapshot
-    if (debugger_.IsSnapshotBuildingInProgress())
+    if (debugger_.IsSnapshotInProgress())
     {
         debugger_.EndSnapshot();
 

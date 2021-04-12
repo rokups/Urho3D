@@ -37,6 +37,7 @@
 #include "../RenderPipeline/InstancingBuffer.h"
 #include "../RenderPipeline/LightProcessor.h"
 #include "../RenderPipeline/PipelineBatchSortKey.h"
+#include "../RenderPipeline/RenderPipelineDebugger.h"
 #include "../RenderPipeline/ShaderConsts.h"
 #include "../Scene/Scene.h"
 
@@ -101,13 +102,16 @@ Vector4 GetFogParameter(const Camera& camera)
 
 /// Batch renderer to command queue.
 // TODO(renderer): Add template parameter to avoid branching?
+template <bool DebuggerEnabled>
 class DrawCommandCompositor : public NonCopyable, private BatchRenderingContext
 {
 public:
     DrawCommandCompositor(const BatchRenderingContext& ctx, const BatchRendererSettings& settings,
-        const DrawableProcessor& drawableProcessor, InstancingBuffer& instancingBuffer, BatchRenderFlags flags)
+        RenderPipelineDebugger* debugger, const DrawableProcessor& drawableProcessor, InstancingBuffer& instancingBuffer,
+        BatchRenderFlags flags)
         : BatchRenderingContext(ctx)
         , settings_(settings)
+        , debugger_(debugger)
         , drawableProcessor_(drawableProcessor)
         , instancingBuffer_(instancingBuffer)
         , frameInfo_(drawableProcessor_.GetFrameInfo())
@@ -561,6 +565,8 @@ private:
             ? object_.numWorldTransforms_ : 1u;
 
         const bool resetInstancingGroup = instancingGroup_.count_ == 0 || dirty_.IsAnythingDirty();
+        if constexpr (DebuggerEnabled)
+            debugger_->ReportSceneBatch(DebugFrameSnapshotBatch{ drawableProcessor_, pipelineBatch, resetInstancingGroup });
         if (resetInstancingGroup)
         {
             if (instancingGroup_.count_ > 0)
@@ -605,6 +611,7 @@ private:
     /// External state (required)
     /// @{
     const BatchRendererSettings& settings_;
+    RenderPipelineDebugger* debugger_{};
     const DrawableProcessor& drawableProcessor_;
     InstancingBuffer& instancingBuffer_;
     const FrameInfo& frameInfo_;
@@ -741,10 +748,11 @@ BatchRenderingContext::BatchRenderingContext(DrawCommandQueue& drawQueue, const 
 {
 }
 
-BatchRenderer::BatchRenderer(Context* context, const DrawableProcessor* drawableProcessor,
+BatchRenderer::BatchRenderer(RenderPipelineInterface* renderPipeline, const DrawableProcessor* drawableProcessor,
     InstancingBuffer* instancingBuffer)
-    : Object(context)
+    : Object(renderPipeline->GetContext())
     , renderer_(context_->GetSubsystem<Renderer>())
+    , debugger_(renderPipeline->GetDebugger())
     , drawableProcessor_(drawableProcessor)
     , instancingBuffer_(instancingBuffer)
 {
@@ -758,32 +766,60 @@ void BatchRenderer::SetSettings(const BatchRendererSettings& settings)
 void BatchRenderer::RenderBatches(const BatchRenderingContext& ctx,
     BatchRenderFlags flags, ea::span<const PipelineBatchByState> batches)
 {
-    DrawCommandCompositor compositor(ctx, settings_, *drawableProcessor_, *instancingBuffer_, flags);
-
-    for (const auto& sortedBatch : batches)
-        compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
-    compositor.FlushDrawCommands();
+    if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
+    {
+        DrawCommandCompositor<true> compositor(ctx, settings_, debugger_, *drawableProcessor_, *instancingBuffer_, flags);
+        for (const auto& sortedBatch : batches)
+            compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
+        compositor.FlushDrawCommands();
+    }
+    else
+    {
+        DrawCommandCompositor<false> compositor(ctx, settings_, nullptr, *drawableProcessor_, *instancingBuffer_, flags);
+        for (const auto& sortedBatch : batches)
+            compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
+        compositor.FlushDrawCommands();
+    }
 }
 
 void BatchRenderer::RenderBatches(const BatchRenderingContext& ctx,
     BatchRenderFlags flags, ea::span<const PipelineBatchBackToFront> batches)
 {
-    DrawCommandCompositor compositor(ctx, settings_, *drawableProcessor_, *instancingBuffer_, flags);
-
-    for (const auto& sortedBatch : batches)
-        compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
-    compositor.FlushDrawCommands();
+    if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
+    {
+        DrawCommandCompositor<true> compositor(ctx, settings_, debugger_, *drawableProcessor_, *instancingBuffer_, flags);
+        for (const auto& sortedBatch : batches)
+            compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
+        compositor.FlushDrawCommands();
+    }
+    else
+    {
+        DrawCommandCompositor<false> compositor(ctx, settings_, nullptr, *drawableProcessor_, *instancingBuffer_, flags);
+        for (const auto& sortedBatch : batches)
+            compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
+        compositor.FlushDrawCommands();
+    }
 }
 
 void BatchRenderer::RenderLightVolumeBatches(const BatchRenderingContext& ctx,
     ea::span<const PipelineBatchByState> batches)
 {
-    DrawCommandCompositor compositor(ctx, settings_, *drawableProcessor_, *instancingBuffer_,
-        BatchRenderFlag::EnablePixelLights);
-
-    for (const auto& sortedBatch : batches)
-        compositor.ProcessLightVolumeBatch(*sortedBatch.pipelineBatch_);
-    compositor.FlushDrawCommands();
+    if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
+    {
+        DrawCommandCompositor<true> compositor(ctx, settings_, debugger_, *drawableProcessor_, *instancingBuffer_,
+            BatchRenderFlag::EnablePixelLights);
+        for (const auto& sortedBatch : batches)
+            compositor.ProcessLightVolumeBatch(*sortedBatch.pipelineBatch_);
+        compositor.FlushDrawCommands();
+    }
+    else
+    {
+        DrawCommandCompositor<false> compositor(ctx, settings_, nullptr, *drawableProcessor_, *instancingBuffer_,
+            BatchRenderFlag::EnablePixelLights);
+        for (const auto& sortedBatch : batches)
+            compositor.ProcessLightVolumeBatch(*sortedBatch.pipelineBatch_);
+        compositor.FlushDrawCommands();
+    }
 }
 
 }

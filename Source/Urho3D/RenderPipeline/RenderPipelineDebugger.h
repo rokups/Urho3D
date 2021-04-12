@@ -49,9 +49,11 @@ struct URHO3D_API DebugFrameSnapshotBatch
     float distance_{};
     unsigned numVertices_{};
     unsigned numPrimitives_{};
+    bool newInstancingGroup_{};
 
     DebugFrameSnapshotBatch() = default;
-    DebugFrameSnapshotBatch(const DrawableProcessor& drawableProcessor, const PipelineBatch& pipelineBatch);
+    DebugFrameSnapshotBatch(const DrawableProcessor& drawableProcessor,
+        const PipelineBatch& pipelineBatch, bool newInstancingGroup);
     ea::string ToString() const;
 };
 
@@ -84,19 +86,20 @@ public:
 
     /// Debug info reporting. Should be called from main thread.
     /// @{
-    void BeginScenePass(ea::string_view name);
+    void BeginPass(ea::string_view name);
     void ReportSceneBatch(const DebugFrameSnapshotBatch& sceneBatch);
-    void EndScenePass();
+    void EndPass();
     /// @}
 
-    bool IsSnapshotBuildingInProgress() const { return snapshotBuildingInProgress_; }
+    bool IsSnapshotInProgress() const { return snapshotBuildingInProgress_; }
+    static bool IsSnapshotInProgress(const RenderPipelineDebugger* debugger) { return debugger && debugger->IsSnapshotInProgress(); }
     const DebugFrameSnapshot& GetSnapshot() const { return snapshot_; }
 
 private:
     bool snapshotBuildingInProgress_{};
     DebugFrameSnapshot snapshot_;
 
-    bool scenePassInProgress_{};
+    bool passInProgress_{};
 };
 
 }
