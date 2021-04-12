@@ -50,6 +50,7 @@ SimplePostProcessPass::SimplePostProcessPass(
     const ea::string& shaderName, const ea::string& shaderDefines)
     : PostProcessPass(renderPipeline, renderBufferManager)
     , flags_(flags)
+    , debugComment_(Format("Apply shader '{}'", shaderName))
     , pipelineState_(renderBufferManager_->CreateQuadPipelineState(blendMode, shaderName, shaderDefines))
 {
 }
@@ -76,9 +77,9 @@ void SimplePostProcessPass::Execute()
     renderBufferManager_->SetOutputRenderTargers();
 
     if (colorReadAndWrite)
-        renderBufferManager_->DrawFeedbackViewportQuad(pipelineState_, shaderResources_, shaderParameters_);
+        renderBufferManager_->DrawFeedbackViewportQuad(debugComment_, pipelineState_, shaderResources_, shaderParameters_);
     else
-        renderBufferManager_->DrawViewportQuad(pipelineState_, shaderResources_, shaderParameters_);
+        renderBufferManager_->DrawViewportQuad(debugComment_, pipelineState_, shaderResources_, shaderParameters_);
 }
 
 }

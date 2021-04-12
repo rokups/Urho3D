@@ -34,10 +34,10 @@ void main()
 void main()
 {
 #ifdef BRIGHT
-    half3 inputColor = texture2D(sDiffMap, vTexCoord + vec2(-0.5, -0.5) * cInputInvSize).rgb;
-    inputColor += texture2D(sDiffMap, vTexCoord + vec2(-0.5, 0.5) * cInputInvSize).rgb;
-    inputColor += texture2D(sDiffMap, vTexCoord + vec2(0.5, 0.5) * cInputInvSize).rgb;
-    inputColor += texture2D(sDiffMap, vTexCoord + vec2(0.5, -0.5) * cInputInvSize).rgb;
+    half3 inputColor = texture2D(sDiffMap, vTexCoord + vec2(-1.0, -1.0) * cInputInvSize).rgb;
+    inputColor += texture2D(sDiffMap, vTexCoord + vec2(-1.0, 1.0) * cInputInvSize).rgb;
+    inputColor += texture2D(sDiffMap, vTexCoord + vec2(1.0, 1.0) * cInputInvSize).rgb;
+    inputColor += texture2D(sDiffMap, vTexCoord + vec2(1.0, -1.0) * cInputInvSize).rgb;
     inputColor *= 0.25;
     half brightness = dot(inputColor, cLuminanceWeights);
     gl_FragColor = vec4(inputColor * (brightness - cBloomThreshold), 1.0);

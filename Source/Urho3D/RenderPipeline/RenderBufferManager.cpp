@@ -27,6 +27,7 @@
 #include "../Graphics/RenderSurface.h"
 #include "../Graphics/Texture2D.h"
 #include "../RenderPipeline/RenderBufferManager.h"
+#include "../RenderPipeline/RenderPipelineDebugger.h"
 #include "../RenderPipeline/RenderPipelineDefs.h"
 
 #include <EASTL/optional.h>
@@ -211,6 +212,7 @@ RenderBufferManager::RenderBufferManager(RenderPipelineInterface* renderPipeline
     , renderPipeline_(renderPipeline)
     , graphics_(GetSubsystem<Graphics>())
     , renderer_(GetSubsystem<Renderer>())
+    , debugger_(renderPipeline_->GetDebugger())
     , drawQueue_(renderer_->GetDefaultDrawQueue())
 {
     // Order is important. RenderBufferManager should receive callbacks before any of render buffers
@@ -254,7 +256,7 @@ void RenderBufferManager::PrepareForColorReadWrite(bool synchronizeInputAndOutpu
     if (synchronizeInputAndOutput)
     {
         SetRenderTargets(depthStencilBuffer_, { writeableColorBuffer_ });
-        DrawTexture(ColorSpaceTransition::Automatic, readableColorBuffer_->GetTexture2D());
+        DrawTexture("Synchronize readable and writeable color buffers", readableColorBuffer_->GetTexture2D());
     }
 }
 
@@ -394,7 +396,7 @@ SharedPtr<PipelineState> RenderBufferManager::CreateQuadPipelineState(BlendMode 
     return CreateQuadPipelineState(desc);
 }
 
-void RenderBufferManager::DrawQuad(const DrawQuadParams& params, bool flipVertical)
+void RenderBufferManager::DrawQuad(ea::string_view debugComment, const DrawQuadParams& params, bool flipVertical)
 {
     if (!params.pipelineState_->IsValid())
         return;
@@ -456,9 +458,15 @@ void RenderBufferManager::DrawQuad(const DrawQuadParams& params, bool flipVertic
     drawQueue_->DrawIndexed(quadGeometry->GetIndexStart(), quadGeometry->GetIndexCount());
 
     drawQueue_->Execute();
+
+    if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
+    {
+        debugger_->ReportQuad(debugComment, graphics_->GetViewport().Size());
+    }
 }
 
-void RenderBufferManager::DrawViewportQuad(PipelineState* pipelineState, ea::span<const ShaderResourceDesc> resources,
+void RenderBufferManager::DrawViewportQuad(ea::string_view debugComment,
+    PipelineState* pipelineState, ea::span<const ShaderResourceDesc> resources,
     ea::span<const ShaderParameterDesc> parameters, bool flipVertical)
 {
     DrawQuadParams params;
@@ -467,10 +475,11 @@ void RenderBufferManager::DrawViewportQuad(PipelineState* pipelineState, ea::spa
     params.invInputSize_ = GetInvOutputSize();
     params.resources_ = resources;
     params.parameters_ = parameters;
-    DrawQuad(params, flipVertical);
+    DrawQuad(debugComment, params, flipVertical);
 }
 
-void RenderBufferManager::DrawFeedbackViewportQuad(PipelineState* pipelineState, ea::span<const ShaderResourceDesc> resources,
+void RenderBufferManager::DrawFeedbackViewportQuad(ea::string_view debugComment,
+    PipelineState* pipelineState, ea::span<const ShaderResourceDesc> resources,
     ea::span<const ShaderParameterDesc> parameters, bool flipVertical)
 {
     DrawQuadParams params;
@@ -480,7 +489,7 @@ void RenderBufferManager::DrawFeedbackViewportQuad(PipelineState* pipelineState,
     params.bindSecondaryColorToDiffuse_ = true;
     params.resources_ = resources;
     params.parameters_ = parameters;
-    DrawQuad(params, flipVertical);
+    DrawQuad(debugComment, params, flipVertical);
 }
 
 void RenderBufferManager::OnPipelineStatesInvalidated()
@@ -580,8 +589,9 @@ void RenderBufferManager::OnRenderEnd(const CommonFrameInfo& frameInfo)
     if (writeableColorBuffer_ != viewportColorBuffer_.Get())
     {
         Texture* colorTexture = writeableColorBuffer_->GetTexture();
-        CopyTextureRegion(colorTexture, colorTexture->GetRect(),
-            viewportColorBuffer_->GetRenderSurface(), viewportColorBuffer_->GetViewportRect(), false);
+        CopyTextureRegion("Copy final color to output RenderSurface", colorTexture,
+            colorTexture->GetRect(), viewportColorBuffer_->GetRenderSurface(),
+            viewportColorBuffer_->GetViewportRect(), ColorSpaceTransition::Automatic, false);
     }
 }
 
@@ -600,19 +610,20 @@ void RenderBufferManager::InitializeCopyTexturePipelineState()
     copyLinearToGammaTexturePipelineState_ = CreateQuadPipelineState(BLEND_REPLACE, shaderName, "URHO3D_LINEAR_TO_GAMMA");
 }
 
-void RenderBufferManager::CopyTextureRegion(Texture* sourceTexture, const IntRect& sourceRect,
-    RenderSurface* destinationSurface, const IntRect& destinationRect, bool flipVertical)
+void RenderBufferManager::CopyTextureRegion(ea::string_view debugComment,
+    Texture* sourceTexture, const IntRect& sourceRect,
+    RenderSurface* destinationSurface, const IntRect& destinationRect, ColorSpaceTransition mode, bool flipVertical)
 {
     graphics_->SetRenderTarget(0, destinationSurface);
     for (unsigned i = 1; i < MAX_RENDERTARGETS; ++i)
         graphics_->ResetRenderTarget(i);
     graphics_->SetDepthStencil(renderer_->GetDepthStencil(destinationSurface));
     graphics_->SetViewport(destinationRect);
-    DrawTextureRegion(ColorSpaceTransition::Automatic, sourceTexture, sourceRect, flipVertical);
+    DrawTextureRegion(debugComment, sourceTexture, sourceRect, mode, flipVertical);
 }
 
-void RenderBufferManager::DrawTextureRegion(ColorSpaceTransition mode, Texture* sourceTexture,
-    const IntRect& sourceRect, bool flipVertical)
+void RenderBufferManager::DrawTextureRegion(ea::string_view debugComment, Texture* sourceTexture,
+    const IntRect& sourceRect, ColorSpaceTransition mode, bool flipVertical)
 {
     if (!sourceTexture->IsInstanceOf<Texture2D>())
     {
@@ -626,29 +637,13 @@ void RenderBufferManager::DrawTextureRegion(ColorSpaceTransition mode, Texture* 
     const bool isSRGBSource = sourceTexture->GetSRGB();
     const bool isSRGBDestination = RenderSurface::GetSRGB(graphics_, graphics_->GetRenderTarget(0));
 
-    if (isSRGBDestination && mode == ColorSpaceTransition::ToLinear)
-    {
-        URHO3D_LOGERROR("Cannot write linear data to sRGB output texture");
-        return;
-    }
-
     DrawQuadParams callParams;
-    if (mode == ColorSpaceTransition::ToLinear)
-    {
-        if (isSRGBSource)
-            callParams.pipelineState_ = copyTexturePipelineState_;
-        else
-            callParams.pipelineState_ = copyGammaToLinearTexturePipelineState_;
-    }
+    if (mode == ColorSpaceTransition::None || isSRGBSource == isSRGBDestination)
+        callParams.pipelineState_ = copyTexturePipelineState_;
+    else if (isSRGBDestination)
+        callParams.pipelineState_ = copyGammaToLinearTexturePipelineState_;
     else
-    {
-        if (isSRGBSource && !isSRGBDestination)
-            callParams.pipelineState_ = copyLinearToGammaTexturePipelineState_;
-        else if (!isSRGBSource && isSRGBDestination)
-            callParams.pipelineState_ = copyGammaToLinearTexturePipelineState_;
-        else
-            callParams.pipelineState_ = copyTexturePipelineState_;
-    }
+        callParams.pipelineState_ = copyLinearToGammaTexturePipelineState_;
 
     callParams.invInputSize_ = Vector2::ONE / static_cast<Vector2>(sourceTexture->GetSize());
 
@@ -658,12 +653,13 @@ void RenderBufferManager::DrawTextureRegion(ColorSpaceTransition mode, Texture* 
     const ShaderResourceDesc shaderResources[] = { { TU_DIFFUSE, sourceTexture } };
     callParams.resources_ = shaderResources;
 
-    DrawQuad(callParams, flipVertical);
+    DrawQuad(debugComment, callParams, flipVertical);
 }
 
-void RenderBufferManager::DrawTexture(ColorSpaceTransition mode, Texture* sourceTexture, bool flipVertical)
+void RenderBufferManager::DrawTexture(ea::string_view debugComment, Texture* sourceTexture,
+    ColorSpaceTransition mode, bool flipVertical)
 {
-    DrawTextureRegion(mode, sourceTexture, IntRect::ZERO, flipVertical);
+    DrawTextureRegion(debugComment, sourceTexture, IntRect::ZERO, mode, flipVertical);
 }
 
 }

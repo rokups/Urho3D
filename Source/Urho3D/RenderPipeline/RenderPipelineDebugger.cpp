@@ -62,25 +62,39 @@ ea::string DebugFrameSnapshotBatch::ToString() const
     const ea::string geometryText = !drawableName.empty()
         ? Format("[{}].{} with material [{}] lit with", drawableName, sourceBatchIndex_, materialName)
         : "Light volume geometry for";
+    const ea::string detailsText = Format("distance={:.2f} state={} geometry={} material={}",
+        distance_, static_cast<void*>(pipelineState_), static_cast<void*>(geometry_), static_cast<void*>(material_));
 
-    return Format("{} {}v {}t {} [{}] (distance={:.2f} state={} geometry={})",
-        bulletPoint, numVertices_, numPrimitives_, geometryText, lightName,
-        distance_, static_cast<void*>(pipelineState_), static_cast<void*>(geometry_));
+    return Format("{} {}v {}t {} [{}] ({})",
+        bulletPoint, numVertices_, numPrimitives_, geometryText, lightName, detailsText);
+}
+
+ea::string DebugFrameSnapshotQuad::ToString() const
+{
+    const ea::string sizeText = size_ != IntVector2::ZERO ? Format(" {}x{}", size_.x_, size_.y_) : "";
+    return Format("+ [quad{}] {}", sizeText, debugComment_);
 }
 
 ea::string DebugFrameSnapshotPass::ToString() const
 {
     unsigned numVertices = 0;
     unsigned numPrimitives = 0;
-    ea::string batches;
+    ea::string result;
     for (const DebugFrameSnapshotBatch& batch : batches_)
     {
-        batches += batch.ToString();
-        batches += "\n";
+        result += batch.ToString();
+        result += "\n";
         numVertices += batch.numVertices_;
         numPrimitives += batch.numPrimitives_;
     }
-    return Format("Pass {} - {}b {}v {}t:\n\n{}\n", name_, batches_.size(), numVertices, numPrimitives, batches);
+    for (const DebugFrameSnapshotQuad& quad : quads_)
+    {
+        result += quad.ToString();
+        result += "\n";
+        numVertices += 4;
+        numPrimitives += 2;
+    }
+    return Format("Pass {} - {}b {}v {}t:\n\n{}\n", name_, batches_.size(), numVertices, numPrimitives, result);
 }
 
 ea::string DebugFrameSnapshot::ToString() const
@@ -115,6 +129,13 @@ void RenderPipelineDebugger::ReportSceneBatch(const DebugFrameSnapshotBatch& sce
     if (!passInProgress_)
         BeginPass("Unnamed");
     snapshot_.passes_.back().batches_.push_back(sceneBatch);
+}
+
+void RenderPipelineDebugger::ReportQuad(ea::string_view debugComment, const IntVector2& size)
+{
+    if (!passInProgress_)
+        BeginPass("Unnamed");
+    snapshot_.passes_.back().quads_.push_back(DebugFrameSnapshotQuad{ ea::string(debugComment), size });
 }
 
 void RenderPipelineDebugger::EndPass()

@@ -57,10 +57,19 @@ struct URHO3D_API DebugFrameSnapshotBatch
     ea::string ToString() const;
 };
 
+struct URHO3D_API DebugFrameSnapshotQuad
+{
+    ea::string debugComment_;
+    IntVector2 size_;
+
+    ea::string ToString() const;
+};
+
 struct URHO3D_API DebugFrameSnapshotPass
 {
     ea::string name_;
     ea::vector<DebugFrameSnapshotBatch> batches_;
+    ea::vector<DebugFrameSnapshotQuad> quads_;
 
     ea::string ToString() const;
 };
@@ -88,6 +97,7 @@ public:
     /// @{
     void BeginPass(ea::string_view name);
     void ReportSceneBatch(const DebugFrameSnapshotBatch& sceneBatch);
+    void ReportQuad(ea::string_view debugComment, const IntVector2& size = IntVector2::ZERO);
     void EndPass();
     /// @}
 

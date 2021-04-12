@@ -91,18 +91,18 @@ void BloomPass::EvaluateBloom()
     shaderResources[0].texture_ = viewportTexture;
     drawParams.pipelineState_ = pipelineStates_->bright_;
     renderBufferManager_->SetRenderTargets(nullptr, { textures_.blurV_ });
-    renderBufferManager_->DrawQuad(drawParams);
+    renderBufferManager_->DrawQuad("Gather bright regions", drawParams);
 
     shaderParameters[2].value_ = invBlueSize;
     shaderResources[0].texture_ = textures_.blurV_->GetTexture2D();
     drawParams.pipelineState_ = pipelineStates_->blurH_;
     renderBufferManager_->SetRenderTargets(nullptr, { textures_.blurH_ });
-    renderBufferManager_->DrawQuad(drawParams);
+    renderBufferManager_->DrawQuad("Blur vertically", drawParams);
 
     shaderResources[0].texture_ = textures_.blurH_->GetTexture2D();
     drawParams.pipelineState_ = pipelineStates_->blurV_;
     renderBufferManager_->SetRenderTargets(nullptr, { textures_.blurV_ });
-    renderBufferManager_->DrawQuad(drawParams);
+    renderBufferManager_->DrawQuad("Blur horizontally", drawParams);
 }
 
 void BloomPass::Execute()
@@ -124,7 +124,7 @@ void BloomPass::Execute()
         { "BloomMix", Vector2(settings_.sourceIntensity_, settings_.bloomIntensity_) },
     };
     renderBufferManager_->SetOutputRenderTargers();
-    renderBufferManager_->DrawFeedbackViewportQuad(pipelineStates_->bloom_, shaderResources, shaderParameters);
+    renderBufferManager_->DrawFeedbackViewportQuad("Apply bloom", pipelineStates_->bloom_, shaderResources, shaderParameters);
 }
 
 }

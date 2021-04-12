@@ -80,7 +80,7 @@ void ToneMappingPass::Execute()
     renderBufferManager_->PrepareForColorReadWrite(false);
 
     renderBufferManager_->SetOutputRenderTargers();
-    renderBufferManager_->DrawFeedbackViewportQuad(toneMappingState_, {}, {});
+    renderBufferManager_->DrawFeedbackViewportQuad("Apply tone mapping", toneMappingState_, {}, {});
 }
 
 }

@@ -50,8 +50,8 @@ struct DrawQuadParams
 /// Controls how DrawTexture[Region] handles Gamma and Linear color space.
 enum class ColorSpaceTransition
 {
-    /// Write linear data to output texture. Output texture should not be sRGB.
-    ToLinear,
+    /// Read and write as is.
+    None,
     /// Write linear data to output texture if output is sRGB.
     /// Write gamma data to output texture if output is not sRGB.
     Automatic
@@ -120,19 +120,22 @@ public:
     /// @}
 
     /// Render fullscreen quad with custom parameters into currently bound render buffer.
-    void DrawQuad(const DrawQuadParams& params, bool flipVertical = false);
+    void DrawQuad(ea::string_view debugComment, const DrawQuadParams& params, bool flipVertical = false);
     /// Render fullscreen quad into currently bound viewport-sized render buffer.
-    void DrawViewportQuad(PipelineState* pipelineState, ea::span<const ShaderResourceDesc> resources,
+    void DrawViewportQuad(ea::string_view debugComment,
+        PipelineState* pipelineState, ea::span<const ShaderResourceDesc> resources,
         ea::span<const ShaderParameterDesc> parameters, bool flipVertical = false);
     /// Render fullscreen quad into currently bound viewport-sized render buffer.
     /// Current secondary color render buffer is passed as diffuse texture input.
-    void DrawFeedbackViewportQuad(PipelineState* pipelineState, ea::span<const ShaderResourceDesc> resources,
+    void DrawFeedbackViewportQuad(ea::string_view debugComment,
+        PipelineState* pipelineState, ea::span<const ShaderResourceDesc> resources,
         ea::span<const ShaderParameterDesc> parameters, bool flipVertical = false);
     /// Draw region of input texture into into currently bound render buffer. sRGB is taken into account.
-    void DrawTextureRegion(ColorSpaceTransition mode, Texture* sourceTexture,
-             const IntRect& sourceRect, bool flipVertical = false);
+    void DrawTextureRegion(ea::string_view debugComment, Texture* sourceTexture, const IntRect& sourceRect,
+        ColorSpaceTransition mode = ColorSpaceTransition::None, bool flipVertical = false);
     /// Draw input texture into into currently bound render buffer. sRGB is taken into account.
-    void DrawTexture(ColorSpaceTransition mode, Texture* sourceTexture, bool flipVertical = false);
+    void DrawTexture(ea::string_view debugComment, Texture* sourceTexture,
+        ColorSpaceTransition mode = ColorSpaceTransition::None, bool flipVertical = false);
 
     /// Return depth-stencil buffer. Stays the same during the frame.
     RenderBuffer* GetDepthStencilOutput() const { return depthStencilBuffer_; }
@@ -164,14 +167,15 @@ private:
 
     void InitializeCopyTexturePipelineState();
     void ResetCachedRenderBuffers();
-    void CopyTextureRegion(Texture* sourceTexture, const IntRect& sourceRect,
-        RenderSurface* destinationSurface, const IntRect& destinationRect, bool flipVertical);
+    void CopyTextureRegion(ea::string_view debugComment, Texture* sourceTexture, const IntRect& sourceRect,
+        RenderSurface* destinationSurface, const IntRect& destinationRect, ColorSpaceTransition mode, bool flipVertical);
 
     /// Extrenal dependencies
     /// @{
     RenderPipelineInterface* renderPipeline_{};
     Graphics* graphics_{};
     Renderer* renderer_{};
+    RenderPipelineDebugger* debugger_{};
     SharedPtr<DrawCommandQueue> drawQueue_;
     /// @}
 
