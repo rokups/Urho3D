@@ -87,6 +87,10 @@ void RenderPipelineSettings::Validate(Context* context)
         antialiasing_ = PostProcessAntialiasing::FXAA2;
     }
 #endif
+
+    // TODO(renderer): Split this method
+    bloom_.numIterations_ = Clamp(bloom_.numIterations_, 1u, 16u);
+    bloom_.hdr_ = renderBufferManager_.colorSpace_ == RenderPipelineColorSpace::LinearHDR;
 }
 
 }

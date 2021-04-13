@@ -35,6 +35,11 @@ namespace Urho3D
 class RenderBufferManager;
 class RenderPipelineInterface;
 
+URHO3D_SHADER_CONST(Bloom, LuminanceWeights);
+URHO3D_SHADER_CONST(Bloom, Threshold);
+URHO3D_SHADER_CONST(Bloom, InputInvSize);
+URHO3D_SHADER_CONST(Bloom, Intensity);
+
 /// Post-processing pass that applies bloom to scene.
 class URHO3D_API BloomPass
     : public PostProcessPass
@@ -45,22 +50,37 @@ public:
     BloomPass(RenderPipelineInterface* renderPipeline, RenderBufferManager* renderBufferManager);
     void SetSettings(const BloomPassSettings& settings);
 
-    PostProcessPassFlags GetExecutionFlags() const override { return PostProcessPassFlag::NeedColorOutputReadAndWrite; }
+    PostProcessPassFlags GetExecutionFlags() const override { return PostProcessPassFlag::NeedColorOutputReadAndWrite | PostProcessPassFlag::NeedColorOutputBilinear; }
     void Execute() override;
 
 protected:
     void InitializeTextures();
     void InitializeStates();
 
-    void EvaluateBloom();
+    unsigned GatherBrightRegions(RenderBuffer* destination);
+    void BlurTexture(RenderBuffer* final, RenderBuffer* temporary);
+    void CopyTexture(RenderBuffer* source, RenderBuffer* destination);
+    void ApplyBloom(RenderBuffer* bloom, float intensity);
+
+    auto GetShaderParameters(const Vector2& inputInvSize) const
+    {
+        const float thresholdGap = ea::max(0.01f, settings_.thresholdMax_ - settings_.threshold_);
+        const ShaderParameterDesc result[] = {
+            { Bloom_LuminanceWeights, luminanceWeights_ },
+            { Bloom_Threshold, Vector2(settings_.threshold_, 1.0f / thresholdGap) },
+            { Bloom_InputInvSize, inputInvSize },
+        };
+        return ea::to_array(result);
+    }
 
     BloomPassSettings settings_;
 
     struct CachedTextures
     {
-        SharedPtr<RenderBuffer> blurV_;
-        SharedPtr<RenderBuffer> blurH_;
-    } textures_;
+        SharedPtr<RenderBuffer> final_;
+        SharedPtr<RenderBuffer> temporary_;
+    };
+    ea::vector<CachedTextures> textures_;
 
     struct CachedStates
     {
@@ -78,6 +98,9 @@ protected:
         }
     };
     ea::optional<CachedStates> pipelineStates_;
+
+    Vector3 luminanceWeights_;
+    ea::vector<float> intensityMultipliers_;
 };
 
 }

@@ -13,10 +13,21 @@ VERTEX_OUTPUT(vec2 vScreenPos)
 
 UNIFORM_BUFFER_BEGIN(6, Custom)
     UNIFORM(half3 cLuminanceWeights)
-    UNIFORM(half cBloomThreshold)
+    UNIFORM(half cIntensity)
     UNIFORM(vec2 cInputInvSize)
-    UNIFORM(half2 cBloomMix)
+    UNIFORM(half2 cThreshold)
 UNIFORM_BUFFER_END(6, Custom)
+
+half FilterBrightness(half brightness)
+{
+    return clamp((brightness - cThreshold.x) * cThreshold.y, 0.0, 1.0);
+}
+
+half3 BrightFilter(half3 inputColor)
+{
+    half brightness = dot(inputColor, cLuminanceWeights);
+    return inputColor * FilterBrightness(brightness);
+}
 
 #endif
 
@@ -34,13 +45,8 @@ void main()
 void main()
 {
 #ifdef BRIGHT
-    half3 inputColor = texture2D(sDiffMap, vTexCoord + vec2(-1.0, -1.0) * cInputInvSize).rgb;
-    inputColor += texture2D(sDiffMap, vTexCoord + vec2(-1.0, 1.0) * cInputInvSize).rgb;
-    inputColor += texture2D(sDiffMap, vTexCoord + vec2(1.0, 1.0) * cInputInvSize).rgb;
-    inputColor += texture2D(sDiffMap, vTexCoord + vec2(1.0, -1.0) * cInputInvSize).rgb;
-    inputColor *= 0.25;
-    half brightness = dot(inputColor, cLuminanceWeights);
-    gl_FragColor = vec4(inputColor * (brightness - cBloomThreshold), 1.0);
+    half3 inputColor = texture2D(sDiffMap, vTexCoord).rgb;
+    gl_FragColor = vec4(BrightFilter(inputColor), 1.0);
 #endif
 
 #ifdef BLURH
@@ -62,11 +68,9 @@ void main()
 #endif
 
 #ifdef COMBINE
-    half3 original = texture2D(sDiffMap, vScreenPos).rgb * cBloomMix.x;
-    half3 bloom = texture2D(sNormalMap, vTexCoord).rgb  * cBloomMix.y;
-    // Prevent oversaturation
-    original *= max(vec3(1.0) - bloom, vec3(0.0));
-    gl_FragColor = vec4(original + bloom, 1.0);
+    half3 bloom = cIntensity * texture2D(sDiffMap, vTexCoord).rgb;
+    half brightness = clamp(dot(bloom, cLuminanceWeights), 0.0, 1.0);
+    gl_FragColor = vec4(bloom, brightness);
 #endif
 }
 #endif

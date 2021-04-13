@@ -23,17 +23,10 @@
 #pragma once
 
 #include "../Container/ConstString.h"
+#include "../RenderPipeline/RenderPipelineDefs.h"
 
 namespace Urho3D
 {
-
-// VS 2017 has bug:
-// https://developercommunity.visualstudio.com/t/static-inline-class-variables-have-their-destructo/300686
-#if defined(_MSC_VER) && _MSC_VER <= 1916
-    #define URHO3D_SHADER_CONST(group, name) static const ConstString group##_##name{ #name }
-#else
-    #define URHO3D_SHADER_CONST(group, name) static inline const ConstString group##_##name{ #name }
-#endif
 
 /// Built-in shader consts.
 /// See _Uniforms.glsl for descriptions.
@@ -103,7 +96,5 @@ namespace ShaderConsts
     URHO3D_SHADER_CONST(Object, BillboardRot);
     URHO3D_SHADER_CONST(Object, SkinMatrices);
 };
-
-#undef URHO3D_SHADER_CONST
 
 }

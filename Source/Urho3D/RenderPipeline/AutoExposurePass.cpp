@@ -43,13 +43,13 @@ void AutoExposurePass::SetSettings(const AutoExposurePassSettings& settings)
 {
     if (settings_ != settings)
     {
-        if (settings_.autoExposure_ != settings.autoExposure_)
+        const bool resetCachedTexturesAndStates = settings_.autoExposure_ != settings.autoExposure_;
+        settings_ = settings;
+        if (resetCachedTexturesAndStates)
         {
             pipelineStates_ = ea::nullopt;
-            settings_ = settings;
             InitializeTextures();
         }
-        settings_ = settings;
     }
 }
 

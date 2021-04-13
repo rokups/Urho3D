@@ -492,9 +492,11 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("Max Exposure", float, settings_.autoExposure_.maxExposure_, MarkSettingsDirty, AutoExposurePassSettings{}.maxExposure_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Adapt Rate", float, settings_.autoExposure_.adaptRate_, MarkSettingsDirty, AutoExposurePassSettings{}.adaptRate_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Bloom", bool, settings_.bloom_.enabled_, MarkSettingsDirty, BloomPassSettings{}.enabled_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Bloom Iterations", unsigned, settings_.bloom_.numIterations_, MarkSettingsDirty, BloomPassSettings{}.numIterations_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Bloom Threshold", float, settings_.bloom_.threshold_, MarkSettingsDirty, BloomPassSettings{}.threshold_, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Bloom Intensity", float, settings_.bloom_.bloomIntensity_, MarkSettingsDirty, BloomPassSettings{}.bloomIntensity_, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Bloom Source Multiplier", float, settings_.bloom_.sourceIntensity_, MarkSettingsDirty, BloomPassSettings{}.sourceIntensity_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Bloom Threshold Max", float, settings_.bloom_.thresholdMax_, MarkSettingsDirty, BloomPassSettings{}.thresholdMax_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Bloom Intensity", float, settings_.bloom_.intensity_, MarkSettingsDirty, BloomPassSettings{}.intensity_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Bloom Iteration Factor", float, settings_.bloom_.iterationFactor_, MarkSettingsDirty, BloomPassSettings{}.iterationFactor_, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Tone Mapping Mode", settings_.toneMapping_, MarkSettingsDirty, toneMappingModeNames, ToneMappingMode::None, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Post Process Antialiasing", settings_.antialiasing_, MarkSettingsDirty, postProcessAntialiasingNames, PostProcessAntialiasing::None, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Post Process Grey Scale", bool, settings_.greyScale_, MarkSettingsDirty, false, AM_DEFAULT);

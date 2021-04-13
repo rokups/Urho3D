@@ -41,6 +41,15 @@ struct BatchStateCreateContext;
 struct UIBatchStateKey;
 struct UIBatchStateCreateContext;
 
+/// Macro to define shader constant name. Group name doesn't serve any functional purpose.
+/// VS 2017 has bug:
+/// https://developercommunity.visualstudio.com/t/static-inline-class-variables-have-their-destructo/300686
+#if defined(_MSC_VER) && _MSC_VER <= 1916
+    #define URHO3D_SHADER_CONST(group, name) static const ConstString group##_##name{ #name }
+#else
+    #define URHO3D_SHADER_CONST(group, name) static inline const ConstString group##_##name{ #name }
+#endif
+
 /// Common parameters of rendered frame.
 struct CommonFrameInfo
 {
@@ -489,18 +498,24 @@ struct AutoExposurePassSettings
 struct BloomPassSettings
 {
     bool enabled_{};
+    bool hdr_{};
+    unsigned numIterations_{ 5 };
     float threshold_{ 0.8f };
-    float bloomIntensity_{ 4.0f };
-    float sourceIntensity_{ 0.9f };
+    float thresholdMax_{ 1.0f };
+    float intensity_{ 1.0f };
+    float iterationFactor_{ 1.0f };
 
     /// Utility operators
     /// @{
     bool operator==(const BloomPassSettings& rhs) const
     {
         return enabled_ == rhs.enabled_
+            && hdr_ == rhs.hdr_
+            && numIterations_ == rhs.numIterations_
             && threshold_ == rhs.threshold_
-            && bloomIntensity_ == rhs.bloomIntensity_
-            && sourceIntensity_ == rhs.sourceIntensity_;
+            && thresholdMax_ == rhs.thresholdMax_
+            && intensity_ == rhs.intensity_
+            && iterationFactor_ == rhs.iterationFactor_;
     }
 
     bool operator!=(const BloomPassSettings& rhs) const { return !(*this == rhs); }
