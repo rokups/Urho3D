@@ -22,7 +22,6 @@
 
 #pragma once
 
-#include "../Container/ConstString.h"
 #include "../RenderPipeline/RenderPipelineDefs.h"
 
 namespace Urho3D

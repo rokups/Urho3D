@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "../Container/ConstString.h"
 #include "../Container/Hash.h"
 #include "../Core/Signal.h"
 #include "../Graphics/GraphicsDefs.h"
