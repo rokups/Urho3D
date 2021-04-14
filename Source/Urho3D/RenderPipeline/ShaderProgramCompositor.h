@@ -75,8 +75,8 @@ public:
         Light* light, bool hasShadow, BatchCompositorSubpass subpass);
     void ProcessShadowBatch(ShaderProgramDesc& result,
         Geometry* geometry, GeometryType geometryType, Material* material, Pass* pass, Light* light);
-    void ProcessLightVolumeBatch(ShaderProgramDesc& result,
-        Geometry* geometry, GeometryType geometryType, Pass* pass);
+    void ProcessLightVolumeBatch(ShaderProgramDesc& result, Geometry* geometry, GeometryType geometryType,
+        Pass* pass, Light* light, bool hasShadow);
     /// @}
 
 private:

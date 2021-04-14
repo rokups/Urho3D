@@ -97,12 +97,13 @@ void ShaderProgramCompositor::ProcessShadowBatch(ShaderProgramDesc& result,
 }
 
 void ShaderProgramCompositor::ProcessLightVolumeBatch(ShaderProgramDesc& result,
-    Geometry* geometry, GeometryType geometryType, Pass* pass)
+    Geometry* geometry, GeometryType geometryType, Pass* pass, Light* light, bool hasShadow)
 {
     const DrawableProcessorPassFlags flags = DrawableProcessorPassFlag::DisableInstancing;
     SetupShaders(result, pass);
     ApplyCommonDefines(result, flags, pass);
     ApplyGeometryVertexDefines(result, flags, geometry, geometryType);
+    ApplyPixelLightPixelAndCommonDefines(result, light, hasShadow, true);
     ApplyDefinesForLightVolumePass(result);
 }
 

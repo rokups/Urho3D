@@ -42,11 +42,6 @@ namespace Urho3D
 namespace
 {
 
-int GetTextureColorSpaceHint(bool linearInput, bool srgbTexture)
-{
-    return static_cast<int>(linearInput) + static_cast<int>(srgbTexture);
-}
-
 CullMode GetEffectiveCullMode(CullMode mode, bool isCameraReversed)
 {
     if (mode == CULL_NONE || !isCameraReversed)
@@ -100,20 +95,23 @@ SharedPtr<PipelineState> PipelineStateBuilder::CreateBatchPipelineState(
     {
         compositor_->ProcessShadowBatch(shaderProgramDesc_,
             key.geometry_, key.geometryType_, key.material_, key.pass_, light);
-        ApplyShadowPass(ctx.shadowSplitIndex_, key.pixelLight_, key.material_, key.pass_);
+        SetupShadowPassState(ctx.shadowSplitIndex_, key.pixelLight_, key.material_, key.pass_);
     }
     else if (isLightVolumePass)
     {
         compositor_->ProcessLightVolumeBatch(shaderProgramDesc_,
-            key.geometry_, key.geometryType_, key.pass_);
-        ApplyLightVolumePass(key.pixelLight_);
+            key.geometry_, key.geometryType_, key.pass_, light, hasShadow);
+        SetupLightVolumePassState(key.pixelLight_);
     }
     else if (batchCompositorPass)
     {
         const auto subpass = static_cast<BatchCompositorSubpass>(ctx.subpassIndex_);
+        const bool lightMaskToStencil = subpass == BatchCompositorSubpass::Deferred
+            && batchCompositorPass->GetFlags().Test(DrawableProcessorPassFlag::DeferredLightMaskToStencil);
+
         compositor_->ProcessUserBatch(shaderProgramDesc_, batchCompositorPass->GetFlags(),
             key.drawable_, key.geometry_, key.geometryType_, key.material_, key.pass_, light, hasShadow, subpass);
-        ApplyUserPass(batchCompositorPass, subpass, key.material_, key.pass_, key.drawable_);
+        SetupUserPassState(key.drawable_, key.material_, key.pass_, lightMaskToStencil);
     }
 
     if (shaderProgramDesc_.isInstancingUsed_)
@@ -121,7 +119,7 @@ SharedPtr<PipelineState> PipelineStateBuilder::CreateBatchPipelineState(
     else
         pipelineStateDesc_.InitializeInputLayoutAndPrimitiveType(key.geometry_);
 
-    FinalizeDescription(key.pass_);
+    SetupShaders();
     return renderer_->GetOrCreatePipelineState(pipelineStateDesc_);
 }
 
@@ -135,8 +133,8 @@ void PipelineStateBuilder::ClearState()
     shaderProgramDesc_.commonShaderDefines_.clear();
 }
 
-void PipelineStateBuilder::ApplyShadowPass(unsigned splitIndex, const LightProcessor* lightProcessor,
-    const Material* material, const Pass* materialPass)
+void PipelineStateBuilder::SetupShadowPassState(unsigned splitIndex, const LightProcessor* lightProcessor,
+        const Material* material, const Pass* pass)
 {
     const CookedLightParams& lightParams = lightProcessor->GetParams();
     const float biasMultiplier = lightParams.shadowDepthBiasMultiplier_[splitIndex];
@@ -155,10 +153,10 @@ void PipelineStateBuilder::ApplyShadowPass(unsigned splitIndex, const LightProce
         pipelineStateDesc_.slopeScaledDepthBias_ = biasMultiplier * biasParameters.slopeScaledBias_;
     }
 
-    pipelineStateDesc_.depthWriteEnabled_ = materialPass->GetDepthWrite();
-    pipelineStateDesc_.depthCompareFunction_ = materialPass->GetDepthTestMode();
+    pipelineStateDesc_.depthWriteEnabled_ = pass->GetDepthWrite();
+    pipelineStateDesc_.depthCompareFunction_ = pass->GetDepthTestMode();
 
-    pipelineStateDesc_.cullMode_ = GetEffectiveCullMode(materialPass->GetCullMode(), material->GetShadowCullMode(), false);
+    pipelineStateDesc_.cullMode_ = GetEffectiveCullMode(pass->GetCullMode(), material->GetShadowCullMode(), false);
 
     // TODO(renderer): Revisit this place
     // Perform further modification of depth bias on OpenGL ES, as shadow calculations' precision is limited
@@ -170,7 +168,7 @@ void PipelineStateBuilder::ApplyShadowPass(unsigned splitIndex, const LightProce
 #endif*/
 }
 
-void PipelineStateBuilder::ApplyLightVolumePass(const LightProcessor* lightProcessor)
+void PipelineStateBuilder::SetupLightVolumePassState(const LightProcessor* lightProcessor)
 {
     const Light* light = lightProcessor->GetLight();
 
@@ -202,26 +200,25 @@ void PipelineStateBuilder::ApplyLightVolumePass(const LightProcessor* lightProce
     pipelineStateDesc_.stencilReferenceValue_ = 0;
 }
 
-void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPass, BatchCompositorSubpass subpass,
-     const Material* material, const Pass* materialPass, const Drawable* drawable)
+void PipelineStateBuilder::SetupUserPassState(const Drawable* drawable,
+    const Material* material, const Pass* pass, bool lightMaskToStencil)
 {
-    pipelineStateDesc_.depthWriteEnabled_ = materialPass->GetDepthWrite();
-    pipelineStateDesc_.depthCompareFunction_ = materialPass->GetDepthTestMode();
+    pipelineStateDesc_.depthWriteEnabled_ = pass->GetDepthWrite();
+    pipelineStateDesc_.depthCompareFunction_ = pass->GetDepthTestMode();
 
     pipelineStateDesc_.colorWriteEnabled_ = true;
-    pipelineStateDesc_.blendMode_ = materialPass->GetBlendMode();
-    pipelineStateDesc_.alphaToCoverageEnabled_ = materialPass->GetAlphaToCoverage();
+    pipelineStateDesc_.blendMode_ = pass->GetBlendMode();
+    pipelineStateDesc_.alphaToCoverageEnabled_ = pass->GetAlphaToCoverage();
     // TODO(renderer): Revisit this place
     pipelineStateDesc_.constantDepthBias_ = material->GetDepthBias().constantBias_;
     pipelineStateDesc_.slopeScaledDepthBias_ = material->GetDepthBias().slopeScaledBias_;
 
     // TODO(renderer): Implement fill mode
     pipelineStateDesc_.fillMode_ = FILL_SOLID;
-    pipelineStateDesc_.cullMode_ = GetEffectiveCullMode(materialPass->GetCullMode(),
+    pipelineStateDesc_.cullMode_ = GetEffectiveCullMode(pass->GetCullMode(),
         material->GetCullMode(), cameraProcessor_->IsCameraReversed());
 
-    const bool isDeferred = subpass == BatchCompositorSubpass::Deferred;
-    if (isDeferred && compositorPass->GetFlags().Test(DrawableProcessorPassFlag::DeferredLightMaskToStencil))
+    if (lightMaskToStencil)
     {
         pipelineStateDesc_.stencilTestEnabled_ = true;
         pipelineStateDesc_.stencilOperationOnPassed_ = OP_REF;
@@ -230,12 +227,14 @@ void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPa
     }
 }
 
-void PipelineStateBuilder::FinalizeDescription(const Pass* materialPass)
+void PipelineStateBuilder::SetupShaders()
 {
     shaderProgramDesc_.vertexShaderDefines_ += shaderProgramDesc_.commonShaderDefines_;
     shaderProgramDesc_.pixelShaderDefines_ += shaderProgramDesc_.commonShaderDefines_;
-    pipelineStateDesc_.vertexShader_ = graphics_->GetShader(VS, shaderProgramDesc_.vertexShaderName_, shaderProgramDesc_.vertexShaderDefines_);
-    pipelineStateDesc_.pixelShader_ = graphics_->GetShader(PS, shaderProgramDesc_.pixelShaderName_, shaderProgramDesc_.pixelShaderDefines_);
+    pipelineStateDesc_.vertexShader_ = graphics_->GetShader(
+        VS, shaderProgramDesc_.vertexShaderName_, shaderProgramDesc_.vertexShaderDefines_);
+    pipelineStateDesc_.pixelShader_ = graphics_->GetShader(
+        PS, shaderProgramDesc_.pixelShaderName_, shaderProgramDesc_.pixelShaderDefines_);
 }
 
 }

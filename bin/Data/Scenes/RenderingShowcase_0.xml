@@ -1204,13 +1204,14 @@
 			<attribute name="Is Enabled" value="true" />
 			<attribute name="Name" value="Two Sided Material" />
 			<attribute name="Tags" />
-			<attribute name="Position" value="3.33636 0.259299 0" />
+			<attribute name="Position" value="2.55613 0.259299 0" />
 			<attribute name="Rotation" value="0.831583 0 0 0.5554" />
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
 			<component type="StaticModel" id="434">
 				<attribute name="Model" value="Model;Models/Plane.mdl" />
 				<attribute name="Material" value="Material;Materials/Constant/MattWhiteTwoSided.xml" />
+				<attribute name="Cast Shadows" value="true" />
 			</component>
 		</node>
 		<node id="600">
@@ -1265,6 +1266,20 @@
 			<component type="StaticModel" id="954">
 				<attribute name="Model" value="Model;Models/Plane.mdl" />
 				<attribute name="Material" value="Material;Materials/LitWaterPBR.xml" />
+			</component>
+		</node>
+		<node id="1117">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Cutout Material" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="2.75281 -1.00079 -1.74739" />
+			<attribute name="Rotation" value="0.614912 -0.373899 0.55983 0.410689" />
+			<attribute name="Scale" value="2 1 1" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="1095">
+				<attribute name="Model" value="Model;Models/Plane.mdl" />
+				<attribute name="Material" value="Material;Materials/LightmapLogo.xml" />
+				<attribute name="Cast Shadows" value="true" />
 			</component>
 		</node>
 	</node>

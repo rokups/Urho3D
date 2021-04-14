@@ -59,19 +59,13 @@ private:
     /// @{
     void ClearState();
 
-    void ApplyCommonDefines(const Pass* materialPass);
-    void ApplyGeometry(Geometry* geometry, GeometryType geometryType, bool useInstancingBuffer);
-    void ApplyVertexLayout(bool isShadowPass);
+    void SetupUserPassState(const Drawable* drawable,
+        const Material* material, const Pass* pass, bool lightMaskToStencil);
+    void SetupLightVolumePassState(const LightProcessor* lightProcessor);
+    void SetupShadowPassState(unsigned splitIndex, const LightProcessor* lightProcessor,
+        const Material* material, const Pass* pass);
 
-    void ApplyShadowPass(unsigned splitIndex, const LightProcessor* lightProcessor,
-        const Material* material, const Pass* materialPass);
-    void ApplyLightVolumePass(const LightProcessor* lightProcessor);
-    void ApplyUserPass(const BatchCompositorPass* compositorPass, BatchCompositorSubpass subpass,
-        const Material* material, const Pass* materialPass, const Drawable* drawable);
-
-    void ApplyPixelLight(const LightProcessor* lightProcessor, bool materialHasSpecular);
-
-    void FinalizeDescription(const Pass* materialPass);
+    void SetupShaders();
     /// @}
 
     /// Objects whose settings contribute to pipeline states.
