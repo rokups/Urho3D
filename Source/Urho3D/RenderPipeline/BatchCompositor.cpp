@@ -78,10 +78,10 @@ void BatchCompositorPass::ComposeBatches()
     });
 
     // Create missing pipeline states from main thread
-    ResolveDelayedBatches(DeferredSubpass, delayedDeferredBatches_, deferredCache_, deferredBatches_);
-    ResolveDelayedBatches(BaseSubpass, delayedUnlitBaseBatches_, unlitBaseCache_, baseBatches_);
-    ResolveDelayedBatches(BaseSubpass, delayedLitBaseBatches_, litBaseCache_, baseBatches_);
-    ResolveDelayedBatches(LightSubpass, delayedLightBatches_, lightCache_, lightBatches_);
+    ResolveDelayedBatches(BatchCompositorSubpass::Deferred, delayedDeferredBatches_, deferredCache_, deferredBatches_);
+    ResolveDelayedBatches(BatchCompositorSubpass::Base, delayedUnlitBaseBatches_, unlitBaseCache_, baseBatches_);
+    ResolveDelayedBatches(BatchCompositorSubpass::Base, delayedLitBaseBatches_, litBaseCache_, baseBatches_);
+    ResolveDelayedBatches(BatchCompositorSubpass::Light, delayedLightBatches_, lightCache_, lightBatches_);
 
     OnBatchesReady();
 }
@@ -174,12 +174,13 @@ void BatchCompositorPass::ProcessGeometryBatch(const GeometryBatch& geometryBatc
     }
 }
 
-void BatchCompositorPass::ResolveDelayedBatches(unsigned index, const WorkQueueVector<PipelineBatchDesc>& delayedBatches,
+void BatchCompositorPass::ResolveDelayedBatches(BatchCompositorSubpass subpass,
+    const WorkQueueVector<PipelineBatchDesc>& delayedBatches,
     BatchStateCache& cache, WorkQueueVector<PipelineBatch>& batches)
 {
     BatchStateCreateContext ctx;
     ctx.pass_ = this;
-    ctx.subpassIndex_ = index;
+    ctx.subpassIndex_ = static_cast<unsigned>(subpass);
 
     for (const PipelineBatchDesc& desc : delayedBatches)
     {

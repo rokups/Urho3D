@@ -25,6 +25,7 @@
 #include "../RenderPipeline/RenderPipelineDefs.h"
 
 #include <EASTL/string.h>
+#include <EASTL/unordered_set.h>
 #include <EASTL/vector.h>
 
 namespace Urho3D
@@ -77,8 +78,12 @@ struct URHO3D_API DebugFrameSnapshotPass
 struct URHO3D_API DebugFrameSnapshot
 {
     ea::vector<DebugFrameSnapshotPass> passes_;
+    ea::unordered_set<PipelineState*> scenePipelineStates_{};
+    ea::unordered_set<Material*> sceneMaterials_{};
 
     ea::string ToString() const;
+    ea::string ScenePipelineStatesToString() const;
+    ea::string SceneMaterialsToString() const;
 };;
 
 /// Debug utility that takes snapshot of current frame.

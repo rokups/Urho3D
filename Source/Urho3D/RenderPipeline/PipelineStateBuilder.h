@@ -25,6 +25,7 @@
 #include "../Core/Object.h"
 #include "../Graphics/PipelineState.h"
 #include "../RenderPipeline/RenderPipelineDefs.h"
+#include "../RenderPipeline/ShaderProgramCompositor.h"
 
 namespace Urho3D
 {
@@ -45,12 +46,14 @@ class URHO3D_API PipelineStateBuilder : public Object, public BatchStateCacheCal
 public:
     PipelineStateBuilder(Context* context, const SceneProcessor* sceneProcessor, const CameraProcessor* cameraProcessor,
         const ShadowMapAllocator* shadowMapAllocator, const InstancingBuffer* instancingBuffer);
+    void OnSettingsUpdated();
 
     /// Implement BatchStateCacheCallback
     /// @{
     SharedPtr<PipelineState> CreateBatchPipelineState(
         const BatchStateCreateKey& key, const BatchStateCreateContext& ctx) override;
     /// @}
+
 private:
     /// State builder
     /// @{
@@ -63,7 +66,7 @@ private:
     void ApplyShadowPass(unsigned splitIndex, const LightProcessor* lightProcessor,
         const Material* material, const Pass* materialPass);
     void ApplyLightVolumePass(const LightProcessor* lightProcessor);
-    void ApplyUserPass(const BatchCompositorPass* compositorPass, unsigned subpassIndex,
+    void ApplyUserPass(const BatchCompositorPass* compositorPass, BatchCompositorSubpass subpass,
         const Material* material, const Pass* materialPass, const Drawable* drawable);
 
     void ApplyPixelLight(const LightProcessor* lightProcessor, bool materialHasSpecular);
@@ -83,13 +86,12 @@ private:
     Graphics* graphics_{};
     Renderer* renderer_{};
 
+    SharedPtr<ShaderProgramCompositor> compositor_;
+
     /// Re-used objects
-    /// TODO(renderer): Consider replacing define string with tokenized define lists
     /// @{
-    PipelineStateDesc desc_;
-    ea::string commonDefines_;
-    ea::string vertexDefines_;
-    ea::string pixelDefines_;
+    PipelineStateDesc pipelineStateDesc_;
+    ShaderProgramDesc shaderProgramDesc_;
     /// @}
 };
 

@@ -15,19 +15,20 @@ VERTEX_INPUT(vec4 iPos)
 #endif
 
 // Optional parameters
-#ifdef URHO3D_VERTEX_HAS_TEXCOORD0
+// TODO(renderer): move geometry checks to config
+#if defined(URHO3D_VERTEX_HAS_TEXCOORD0)
     VERTEX_INPUT(vec2 iTexCoord)
 #endif
-#ifdef URHO3D_VERTEX_HAS_TEXCOORD1
+#if defined(URHO3D_VERTEX_HAS_TEXCOORD1) || defined(URHO3D_GEOMETRY_BILLBOARD) || defined(URHO3D_GEOMETRY_DIRBILLBOARD)
     VERTEX_INPUT(vec2 iTexCoord1)
 #endif
-#ifdef URHO3D_VERTEX_HAS_COLOR
+#if defined(URHO3D_VERTEX_HAS_COLOR)
     VERTEX_INPUT(vec4 iColor)
 #endif
-#ifdef URHO3D_VERTEX_HAS_NORMAL
+#if defined(URHO3D_VERTEX_HAS_NORMAL) || defined(URHO3D_GEOMETRY_DIRBILLBOARD)
     VERTEX_INPUT(vec3 iNormal)
 #endif
-#ifdef URHO3D_VERTEX_HAS_TANGENT
+#if defined(URHO3D_VERTEX_HAS_TANGENT) || defined(URHO3D_GEOMETRY_TRAIL_FACE_CAMERA) || defined(URHO3D_GEOMETRY_TRAIL_BONE)
     VERTEX_INPUT(vec4 iTangent)
 #endif
 

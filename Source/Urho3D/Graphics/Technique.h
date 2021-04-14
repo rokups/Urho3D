@@ -166,6 +166,9 @@ public:
     /// @property
     bool IsDesktop() const { return isDesktop_; }
 
+    /// Return whether the pass uses cutout transparency via ALPHAMASK.
+    bool IsAlphaMask() const { return isAlphaMask_; }
+
     /// Return vertex shader name.
     /// @property
     const ea::string& GetVertexShader() const { return vertexShaderName_; }
@@ -227,6 +230,8 @@ private:
     bool alphaToCoverage_;
     /// Require desktop level hardware flag.
     bool isDesktop_;
+    /// Whether the pass uses cutout transparency via ALPHAMASK.
+    bool isAlphaMask_{};
     /// Vertex shader name.
     ea::string vertexShaderName_;
     /// Pixel shader name.

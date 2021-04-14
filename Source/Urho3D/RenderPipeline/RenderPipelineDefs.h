@@ -73,9 +73,21 @@ enum class DrawableProcessorPassFlag
     DeferredLightMaskToStencil = 1 << 2,
     SoftParticlesPass = 1 << 3,
     RefractionPass = 1 << 4,
+    DepthOnlyPass = 1 << 5,
 };
 
 URHO3D_FLAGSET(DrawableProcessorPassFlag, DrawableProcessorPassFlags);
+
+/// Sub-passes of user pass.
+enum class BatchCompositorSubpass
+{
+    /// Geometry buffer building pass of deferred rendering.
+    Deferred,
+    /// Base pass, optionally lit with forward rendering.
+    Base,
+    /// Additive light pass for forward rendering.
+    Light
+};
 
 /// Flags that control how exactly batches are rendered.
 enum class BatchRenderFlag

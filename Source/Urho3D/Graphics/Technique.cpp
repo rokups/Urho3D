@@ -126,6 +126,7 @@ void Pass::SetVertexShaderDefines(const ea::string& defines)
 void Pass::SetPixelShaderDefines(const ea::string& defines)
 {
     pixelShaderDefines_ = defines;
+    isAlphaMask_ = pixelShaderDefines_.contains("ALPHAMASK");
     ReleaseShaders();
     MarkPipelineStateHashDirty();
 }

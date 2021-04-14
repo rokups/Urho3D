@@ -137,14 +137,6 @@ class URHO3D_API BatchCompositorPass : public DrawableProcessorPass
     URHO3D_OBJECT(BatchCompositorPass, DrawableProcessorPass);
 
 public:
-    /// Subpass indices.
-    enum : unsigned
-    {
-        DeferredSubpass,
-        BaseSubpass,
-        LightSubpass,
-    };
-
     BatchCompositorPass(RenderPipelineInterface* renderPipeline,
         DrawableProcessor* drawableProcessor, BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags,
         unsigned deferredPassIndex, unsigned unlitBasePassIndex, unsigned litBasePassIndex, unsigned lightPassIndex);
@@ -184,7 +176,7 @@ private:
     bool PreparePipelineBatch(PipelineBatchDesc& key, const GeometryBatch& geometryBatch) const;
 
     void ProcessGeometryBatch(const GeometryBatch& geometryBatch);
-    void ResolveDelayedBatches(unsigned index, const WorkQueueVector<PipelineBatchDesc>& delayedBatches,
+    void ResolveDelayedBatches(BatchCompositorSubpass subpass, const WorkQueueVector<PipelineBatchDesc>& delayedBatches,
         BatchStateCache& cache, WorkQueueVector<PipelineBatch>& batches);
 
     /// Pipeline state caches

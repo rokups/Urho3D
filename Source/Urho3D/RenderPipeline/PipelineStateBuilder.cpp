@@ -61,60 +61,6 @@ CullMode GetEffectiveCullMode(CullMode passCullMode, CullMode materialCullMode, 
     return GetEffectiveCullMode(cullMode, isCameraReversed);
 }
 
-enum class VertexLayoutFlag
-{
-    HasNormal    = 1 << 0,
-    HasTangent   = 1 << 1,
-    HasColor     = 1 << 2,
-    HasTexCoord0 = 1 << 3,
-    HasTexCoord1 = 1 << 4,
-    DefaultMask  = HasNormal | HasTangent | HasColor | HasTexCoord0 | HasTexCoord1,
-    ShadowMask   = HasNormal | HasTexCoord0,
-};
-
-URHO3D_FLAGSET(VertexLayoutFlag, VertexLayoutFlags);
-
-VertexLayoutFlags ScanVertexElements(ea::span<const VertexElement> elements)
-{
-    VertexLayoutFlags result;
-    for (const VertexElement& element : elements)
-    {
-        switch (element.semantic_)
-        {
-        case SEM_NORMAL:
-            result |= VertexLayoutFlag::HasNormal;
-            break;
-
-        case SEM_TANGENT:
-            result |= VertexLayoutFlag::HasTangent;
-            break;
-
-        case SEM_COLOR:
-            result |= VertexLayoutFlag::HasColor;
-            break;
-
-        case SEM_TEXCOORD:
-            switch (element.index_)
-            {
-            case 0:
-                result |= VertexLayoutFlag::HasTexCoord0;
-                break;
-
-            case 1:
-                result |= VertexLayoutFlag::HasTexCoord1;
-                break;
-
-            default:
-                break;
-            }
-
-        default:
-            break;
-        }
-    }
-    return result;
-}
-
 }
 
 PipelineStateBuilder::PipelineStateBuilder(Context* context,
@@ -127,112 +73,66 @@ PipelineStateBuilder::PipelineStateBuilder(Context* context,
     , instancingBuffer_(instancingBuffer)
     , graphics_(GetSubsystem<Graphics>())
     , renderer_(GetSubsystem<Renderer>())
+    , compositor_(MakeShared<ShaderProgramCompositor>(context_))
 {
+}
+
+void PipelineStateBuilder::OnSettingsUpdated()
+{
+    compositor_->SetSettings(sceneProcessor_->GetSettings(),
+        shadowMapAllocator_->GetSettings(), instancingBuffer_->GetSettings(),
+        cameraProcessor_->IsCameraOrthographic());
 }
 
 SharedPtr<PipelineState> PipelineStateBuilder::CreateBatchPipelineState(
     const BatchStateCreateKey& key, const BatchStateCreateContext& ctx)
 {
+    Light* light = key.pixelLight_ ? key.pixelLight_->GetLight() : nullptr;
+    const bool hasShadow = key.pixelLight_ && key.pixelLight_->HasShadow();
+
     const BatchCompositorPass* batchCompositorPass = sceneProcessor_->GetUserPass(ctx.pass_);
     const bool isShadowPass = batchCompositorPass == nullptr && ctx.subpassIndex_ == BatchCompositor::ShadowSubpass;
     const bool isLightVolumePass = batchCompositorPass == nullptr && ctx.subpassIndex_ == BatchCompositor::LitVolumeSubpass;
-    const bool isInstancingEnabled = isShadowPass
-        || (batchCompositorPass && !batchCompositorPass->GetFlags().Test(DrawableProcessorPassFlag::DisableInstancing));
 
     ClearState();
 
-    ApplyCommonDefines(key.pass_);
-    ApplyGeometry(key.geometry_, key.geometryType_, isInstancingEnabled);
-    ApplyVertexLayout(isShadowPass);
     if (isShadowPass)
-        ApplyShadowPass(ctx.shadowSplitIndex_, key.pixelLight_, key.material_, key.pass_);
-    else if (isLightVolumePass)
-        ApplyLightVolumePass(key.pixelLight_);
-    else if (batchCompositorPass)
-        ApplyUserPass(batchCompositorPass, ctx.subpassIndex_, key.material_, key.pass_, key.drawable_);
-
-    if (!isShadowPass && key.pixelLight_)
     {
-        if (isLightVolumePass)
-            ApplyPixelLight(key.pixelLight_, true);
-        else
-            ApplyPixelLight(key.pixelLight_, key.material_->GetSpecular());
+        compositor_->ProcessShadowBatch(shaderProgramDesc_,
+            key.geometry_, key.geometryType_, key.material_, key.pass_, light);
+        ApplyShadowPass(ctx.shadowSplitIndex_, key.pixelLight_, key.material_, key.pass_);
+    }
+    else if (isLightVolumePass)
+    {
+        compositor_->ProcessLightVolumeBatch(shaderProgramDesc_,
+            key.geometry_, key.geometryType_, key.pass_);
+        ApplyLightVolumePass(key.pixelLight_);
+    }
+    else if (batchCompositorPass)
+    {
+        const auto subpass = static_cast<BatchCompositorSubpass>(ctx.subpassIndex_);
+        compositor_->ProcessUserBatch(shaderProgramDesc_, batchCompositorPass->GetFlags(),
+            key.drawable_, key.geometry_, key.geometryType_, key.material_, key.pass_, light, hasShadow, subpass);
+        ApplyUserPass(batchCompositorPass, subpass, key.material_, key.pass_, key.drawable_);
     }
 
+    if (shaderProgramDesc_.isInstancingUsed_)
+        pipelineStateDesc_.InitializeInputLayoutAndPrimitiveType(key.geometry_, instancingBuffer_->GetVertexBuffer());
+    else
+        pipelineStateDesc_.InitializeInputLayoutAndPrimitiveType(key.geometry_);
+
     FinalizeDescription(key.pass_);
-    return renderer_->GetOrCreatePipelineState(desc_);
+    return renderer_->GetOrCreatePipelineState(pipelineStateDesc_);
 }
 
 void PipelineStateBuilder::ClearState()
 {
-    commonDefines_.clear();
-    vertexDefines_.clear();
-    pixelDefines_.clear();
-    desc_ = {};
-}
-
-void PipelineStateBuilder::ApplyCommonDefines(const Pass* materialPass)
-{
-    if (graphics_->GetCaps().constantBuffersSupported_)
-        commonDefines_ += "URHO3D_USE_CBUFFERS ";
-
-    if (sceneProcessor_->GetSettings().linearSpaceLighting_)
-        commonDefines_ += "URHO3D_GAMMA_CORRECTION ";
-
-    if (sceneProcessor_->GetSettings().specularAntiAliasing_)
-        commonDefines_ += "URHO3D_SPECULAR_ANTIALIASING ";
-
-    vertexDefines_ += materialPass->GetEffectiveVertexShaderDefines();
-    vertexDefines_ += " ";
-    pixelDefines_ += materialPass->GetEffectivePixelShaderDefines();
-    pixelDefines_ += " ";
-}
-
-void PipelineStateBuilder::ApplyGeometry(Geometry* geometry, GeometryType geometryType, bool useInstancingBuffer)
-{
-    const bool isInstancingSupported = (geometryType == GEOM_STATIC || geometryType == GEOM_INSTANCED) && geometry->GetIndexBuffer();
-    if (!useInstancingBuffer || !instancingBuffer_->IsEnabled() || !isInstancingSupported)
-        desc_.InitializeInputLayoutAndPrimitiveType(geometry);
-    else
-    {
-        vertexDefines_ += "URHO3D_INSTANCING ";
-        desc_.InitializeInputLayoutAndPrimitiveType(geometry, instancingBuffer_->GetVertexBuffer());
-    }
-
-    static const ea::string geometryDefines[] = {
-        "URHO3D_GEOMETRY_STATIC ",
-        "URHO3D_GEOMETRY_SKINNED ",
-        "URHO3D_GEOMETRY_STATIC ",
-        "URHO3D_GEOMETRY_BILLBOARD ",
-        "URHO3D_GEOMETRY_DIRBILLBOARD ",
-        "URHO3D_GEOMETRY_TRAIL_FACE_CAMERA ",
-        "URHO3D_GEOMETRY_TRAIL_BONE ",
-        "URHO3D_GEOMETRY_STATIC ",
-    };
-    const auto geometryTypeIndex = static_cast<int>(geometryType);
-    if (geometryTypeIndex < ea::size(geometryDefines))
-        vertexDefines_ += geometryDefines[geometryTypeIndex];
-    else
-        vertexDefines_ += Format("URHO3D_GEOMETRY_CUSTOM={} ", geometryTypeIndex);
-}
-
-void PipelineStateBuilder::ApplyVertexLayout(bool isShadowPass)
-{
-    const VertexLayoutFlags geometryVertexLayout = ScanVertexElements({ desc_.vertexElements_.data(), desc_.numVertexElements_ });
-    const VertexLayoutFlags passVertexLayout = isShadowPass ? VertexLayoutFlag::ShadowMask : VertexLayoutFlag::DefaultMask;
-    const VertexLayoutFlags vertexLayout = geometryVertexLayout & passVertexLayout;
-
-    if (vertexLayout.Test(VertexLayoutFlag::HasColor))
-        commonDefines_ += "URHO3D_VERTEX_HAS_COLOR ";
-
-    if (vertexLayout.Test(VertexLayoutFlag::HasNormal))
-        vertexDefines_ += "URHO3D_VERTEX_HAS_NORMAL ";
-    if (vertexLayout.Test(VertexLayoutFlag::HasTangent))
-        vertexDefines_ += "URHO3D_VERTEX_HAS_TANGENT ";
-    if (vertexLayout.Test(VertexLayoutFlag::HasTexCoord0))
-        vertexDefines_ += "URHO3D_VERTEX_HAS_TEXCOORD0 ";
-    if (vertexLayout.Test(VertexLayoutFlag::HasTexCoord1))
-        vertexDefines_ += "URHO3D_VERTEX_HAS_TEXCOORD1 ";
+    pipelineStateDesc_ = {};
+    shaderProgramDesc_.vertexShaderName_.clear();
+    shaderProgramDesc_.vertexShaderDefines_.clear();
+    shaderProgramDesc_.pixelShaderName_.clear();
+    shaderProgramDesc_.pixelShaderDefines_.clear();
+    shaderProgramDesc_.commonShaderDefines_.clear();
 }
 
 void PipelineStateBuilder::ApplyShadowPass(unsigned splitIndex, const LightProcessor* lightProcessor,
@@ -244,21 +144,21 @@ void PipelineStateBuilder::ApplyShadowPass(unsigned splitIndex, const LightProce
 
     if (shadowMapAllocator_->GetSettings().enableVarianceShadowMaps_)
     {
-        desc_.colorWriteEnabled_ = true;
-        desc_.constantDepthBias_ = 0.0f;
-        desc_.slopeScaledDepthBias_ = 0.0f;
+        pipelineStateDesc_.colorWriteEnabled_ = true;
+        pipelineStateDesc_.constantDepthBias_ = 0.0f;
+        pipelineStateDesc_.slopeScaledDepthBias_ = 0.0f;
     }
     else
     {
-        desc_.colorWriteEnabled_ = false;
-        desc_.constantDepthBias_ = biasMultiplier * biasParameters.constantBias_;
-        desc_.slopeScaledDepthBias_ = biasMultiplier * biasParameters.slopeScaledBias_;
+        pipelineStateDesc_.colorWriteEnabled_ = false;
+        pipelineStateDesc_.constantDepthBias_ = biasMultiplier * biasParameters.constantBias_;
+        pipelineStateDesc_.slopeScaledDepthBias_ = biasMultiplier * biasParameters.slopeScaledBias_;
     }
 
-    desc_.depthWriteEnabled_ = materialPass->GetDepthWrite();
-    desc_.depthCompareFunction_ = materialPass->GetDepthTestMode();
+    pipelineStateDesc_.depthWriteEnabled_ = materialPass->GetDepthWrite();
+    pipelineStateDesc_.depthCompareFunction_ = materialPass->GetDepthTestMode();
 
-    desc_.cullMode_ = GetEffectiveCullMode(materialPass->GetCullMode(), material->GetShadowCullMode(), false);
+    pipelineStateDesc_.cullMode_ = GetEffectiveCullMode(materialPass->GetCullMode(), material->GetShadowCullMode(), false);
 
     // TODO(renderer): Revisit this place
     // Perform further modification of depth bias on OpenGL ES, as shadow calculations' precision is limited
@@ -268,172 +168,74 @@ void PipelineStateBuilder::ApplyShadowPass(unsigned splitIndex, const LightProce
     desc.constantDepthBias_ = desc.constantDepthBias_ * multiplier + addition;
     desc.slopeScaledDepthBias_ *= multiplier;
 #endif*/
-
-    commonDefines_ += "URHO3D_SHADOW_PASS ";
-    if (shadowMapAllocator_->GetSettings().enableVarianceShadowMaps_)
-        commonDefines_ += "URHO3D_VARIANCE_SHADOW_MAP VSM_SHADOW ";
-    if (biasParameters.normalOffset_ > 0.0)
-        vertexDefines_ += "URHO3D_SHADOW_NORMAL_OFFSET ";
 }
 
 void PipelineStateBuilder::ApplyLightVolumePass(const LightProcessor* lightProcessor)
 {
     const Light* light = lightProcessor->GetLight();
 
-    desc_.colorWriteEnabled_ = true;
-    desc_.blendMode_ = light->IsNegative() ? BLEND_SUBTRACT : BLEND_ADD;
-
-    if (cameraProcessor_->IsCameraOrthographic())
-        commonDefines_ += "URHO3D_ORTHOGRAPHIC_DEPTH ORTHO ";
-
-    if (sceneProcessor_->GetSettings().lightingMode_ == DirectLightingMode::DeferredPBR)
-        commonDefines_ += "URHO3D_PHYSICAL_MATERIAL ";
+    pipelineStateDesc_.colorWriteEnabled_ = true;
+    pipelineStateDesc_.blendMode_ = light->IsNegative() ? BLEND_SUBTRACT : BLEND_ADD;
 
     if (light->GetLightType() != LIGHT_DIRECTIONAL)
     {
         if (lightProcessor->DoesOverlapCamera())
         {
-            desc_.cullMode_ = GetEffectiveCullMode(CULL_CW, cameraProcessor_->IsCameraReversed());
-            desc_.depthCompareFunction_ = CMP_GREATER;
+            pipelineStateDesc_.cullMode_ = GetEffectiveCullMode(CULL_CW, cameraProcessor_->IsCameraReversed());
+            pipelineStateDesc_.depthCompareFunction_ = CMP_GREATER;
         }
         else
         {
-            desc_.cullMode_ = GetEffectiveCullMode(CULL_CCW, cameraProcessor_->IsCameraReversed());
-            desc_.depthCompareFunction_ = CMP_LESSEQUAL;
+            pipelineStateDesc_.cullMode_ = GetEffectiveCullMode(CULL_CCW, cameraProcessor_->IsCameraReversed());
+            pipelineStateDesc_.depthCompareFunction_ = CMP_LESSEQUAL;
         }
     }
     else
     {
-        desc_.cullMode_ = CULL_NONE;
-        desc_.depthCompareFunction_ = CMP_ALWAYS;
+        pipelineStateDesc_.cullMode_ = CULL_NONE;
+        pipelineStateDesc_.depthCompareFunction_ = CMP_ALWAYS;
     }
 
-    desc_.stencilTestEnabled_ = true;
-    desc_.stencilCompareFunction_ = CMP_NOTEQUAL;
-    desc_.stencilCompareMask_ = light->GetLightMaskEffective() & PORTABLE_LIGHTMASK;
-    desc_.stencilReferenceValue_ = 0;
+    pipelineStateDesc_.stencilTestEnabled_ = true;
+    pipelineStateDesc_.stencilCompareFunction_ = CMP_NOTEQUAL;
+    pipelineStateDesc_.stencilCompareMask_ = light->GetLightMaskEffective() & PORTABLE_LIGHTMASK;
+    pipelineStateDesc_.stencilReferenceValue_ = 0;
 }
 
-void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPass, unsigned subpassIndex,
+void PipelineStateBuilder::ApplyUserPass(const BatchCompositorPass* compositorPass, BatchCompositorSubpass subpass,
      const Material* material, const Pass* materialPass, const Drawable* drawable)
 {
-    const DrawableProcessorPassFlags passFlags = compositorPass->GetFlags();
-    const bool isDeferred = subpassIndex == BatchCompositorPass::DeferredSubpass;
-    if (subpassIndex == BatchCompositorPass::LightSubpass)
-    {
-        commonDefines_ += "URHO3D_ADDITIVE_LIGHT_PASS ";
-    }
-    else
-    {
-        if (passFlags.Test(DrawableProcessorPassFlag::HasAmbientLighting))
-        {
-            commonDefines_ += "URHO3D_AMBIENT_PASS ";
-            if (!isDeferred)
-                commonDefines_ += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", sceneProcessor_->GetSettings().maxVertexLights_);
-            else
-                commonDefines_ += "URHO3D_GBUFFER_PASS ";
-        }
-    }
+    pipelineStateDesc_.depthWriteEnabled_ = materialPass->GetDepthWrite();
+    pipelineStateDesc_.depthCompareFunction_ = materialPass->GetDepthTestMode();
 
-    const bool softParticles = sceneProcessor_->GetSettings().softParticles_;
-    if (softParticles && passFlags.Test(DrawableProcessorPassFlag::SoftParticlesPass))
-        commonDefines_ += "URHO3D_SOFT_PARTICLES_ENABLED ";
-
-    static const ea::string ambientModeDefines[] = {
-        "URHO3D_AMBIENT_CONSTANT ",
-        "URHO3D_AMBIENT_FLAT ",
-        "URHO3D_AMBIENT_DIRECTIONAL ",
-    };
-
-    vertexDefines_ += ambientModeDefines[static_cast<int>(sceneProcessor_->GetSettings().ambientMode_)];
-
-    if (drawable->GetGlobalIlluminationType() == GlobalIlluminationType::UseLightMap)
-        commonDefines_ += "URHO3D_HAS_LIGHTMAP LIGHTMAP ";
-
-    if (Texture* diffuseTexture = material->GetTexture(TU_DIFFUSE))
-    {
-        pixelDefines_ += "URHO3D_MATERIAL_HAS_DIFFUSE ";
-        // TODO(renderer): Throttle logging
-        const int hint = GetTextureColorSpaceHint(diffuseTexture->GetLinear(), diffuseTexture->GetSRGB());
-        if (hint > 1)
-            URHO3D_LOGWARNING("Texture {} cannot be both sRGB and Linear", diffuseTexture->GetName());
-        pixelDefines_ += Format("URHO3D_MATERIAL_DIFFUSE_HINT={} ", ea::min(1, hint));
-    }
-    if (material->GetTexture(TU_NORMAL))
-        pixelDefines_ += "URHO3D_MATERIAL_HAS_NORMAL ";
-    if (material->GetTexture(TU_SPECULAR))
-        pixelDefines_ += "URHO3D_MATERIAL_HAS_SPECULAR ";
-    if (Texture* emissiveTexture = material->GetTexture(TU_EMISSIVE))
-    {
-        pixelDefines_ += "URHO3D_MATERIAL_HAS_EMISSIVE ";
-        // TODO(renderer): Throttle logging
-        const int hint = GetTextureColorSpaceHint(emissiveTexture->GetLinear(), emissiveTexture->GetSRGB());
-        if (hint > 1)
-            URHO3D_LOGWARNING("Texture {} cannot be both sRGB and Linear", emissiveTexture->GetName());
-        pixelDefines_ += Format("URHO3D_MATERIAL_EMISSIVE_HINT={} ", ea::min(1, hint));
-    }
-
-    desc_.depthWriteEnabled_ = materialPass->GetDepthWrite();
-    desc_.depthCompareFunction_ = materialPass->GetDepthTestMode();
-
-    desc_.colorWriteEnabled_ = true;
-    desc_.blendMode_ = materialPass->GetBlendMode();
-    desc_.alphaToCoverageEnabled_ = materialPass->GetAlphaToCoverage();
+    pipelineStateDesc_.colorWriteEnabled_ = true;
+    pipelineStateDesc_.blendMode_ = materialPass->GetBlendMode();
+    pipelineStateDesc_.alphaToCoverageEnabled_ = materialPass->GetAlphaToCoverage();
     // TODO(renderer): Revisit this place
-    desc_.constantDepthBias_ = material->GetDepthBias().constantBias_;
-    desc_.slopeScaledDepthBias_ = material->GetDepthBias().slopeScaledBias_;
+    pipelineStateDesc_.constantDepthBias_ = material->GetDepthBias().constantBias_;
+    pipelineStateDesc_.slopeScaledDepthBias_ = material->GetDepthBias().slopeScaledBias_;
 
     // TODO(renderer): Implement fill mode
-    desc_.fillMode_ = FILL_SOLID;
-    desc_.cullMode_ = GetEffectiveCullMode(materialPass->GetCullMode(),
+    pipelineStateDesc_.fillMode_ = FILL_SOLID;
+    pipelineStateDesc_.cullMode_ = GetEffectiveCullMode(materialPass->GetCullMode(),
         material->GetCullMode(), cameraProcessor_->IsCameraReversed());
 
+    const bool isDeferred = subpass == BatchCompositorSubpass::Deferred;
     if (isDeferred && compositorPass->GetFlags().Test(DrawableProcessorPassFlag::DeferredLightMaskToStencil))
     {
-        desc_.stencilTestEnabled_ = true;
-        desc_.stencilOperationOnPassed_ = OP_REF;
-        desc_.stencilWriteMask_ = PORTABLE_LIGHTMASK;
-        desc_.stencilReferenceValue_ = drawable->GetLightMaskInZone() & PORTABLE_LIGHTMASK;
-    }
-}
-
-void PipelineStateBuilder::ApplyPixelLight(const LightProcessor* lightProcessor, bool materialHasSpecular)
-{
-    const Light* light = lightProcessor->GetLight();
-
-    if (light->GetSpecularIntensity() > 0.0f && materialHasSpecular)
-        commonDefines_ += "URHO3D_LIGHT_HAS_SPECULAR SPECULAR ";
-
-    if (light->GetShapeTexture())
-        commonDefines_ += "URHO3D_LIGHT_CUSTOM_SHAPE ";
-
-    if (light->GetRampTexture())
-        pixelDefines_ += "URHO3D_LIGHT_CUSTOM_RAMP ";
-
-    static const ea::string lightTypeDefines[] = {
-        "URHO3D_LIGHT_DIRECTIONAL DIRLIGHT ",
-        "URHO3D_LIGHT_SPOT SPOTLIGHT ",
-        "URHO3D_LIGHT_POINT POINTLIGHT "
-    };
-    commonDefines_ += lightTypeDefines[static_cast<int>(light->GetLightType())];
-    commonDefines_ += "PERPIXEL ";
-
-    if (lightProcessor->HasShadow())
-    {
-        commonDefines_ += "URHO3D_HAS_SHADOW SHADOW ";
-        if (shadowMapAllocator_->GetSettings().enableVarianceShadowMaps_)
-            commonDefines_ += "URHO3D_VARIANCE_SHADOW_MAP VSM_SHADOW ";
-        else
-            commonDefines_ += Format("URHO3D_SHADOW_PCF_SIZE={} SIMPLE_SHADOW ", sceneProcessor_->GetSettings().pcfKernelSize_);
+        pipelineStateDesc_.stencilTestEnabled_ = true;
+        pipelineStateDesc_.stencilOperationOnPassed_ = OP_REF;
+        pipelineStateDesc_.stencilWriteMask_ = PORTABLE_LIGHTMASK;
+        pipelineStateDesc_.stencilReferenceValue_ = drawable->GetLightMaskInZone() & PORTABLE_LIGHTMASK;
     }
 }
 
 void PipelineStateBuilder::FinalizeDescription(const Pass* materialPass)
 {
-    vertexDefines_ += commonDefines_;
-    pixelDefines_ += commonDefines_;
-    desc_.vertexShader_ = graphics_->GetShader(VS, "v2/" + materialPass->GetVertexShader(), vertexDefines_);
-    desc_.pixelShader_ = graphics_->GetShader(PS, "v2/" + materialPass->GetPixelShader(), pixelDefines_);
+    shaderProgramDesc_.vertexShaderDefines_ += shaderProgramDesc_.commonShaderDefines_;
+    shaderProgramDesc_.pixelShaderDefines_ += shaderProgramDesc_.commonShaderDefines_;
+    pipelineStateDesc_.vertexShader_ = graphics_->GetShader(VS, shaderProgramDesc_.vertexShaderName_, shaderProgramDesc_.vertexShaderDefines_);
+    pipelineStateDesc_.pixelShader_ = graphics_->GetShader(PS, shaderProgramDesc_.pixelShaderName_, shaderProgramDesc_.pixelShaderDefines_);
 }
 
 }

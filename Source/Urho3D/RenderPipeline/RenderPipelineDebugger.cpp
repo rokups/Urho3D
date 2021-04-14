@@ -28,6 +28,7 @@
 #include "../Graphics/Light.h"
 #include "../Graphics/Material.h"
 #include "../Graphics/PipelineState.h"
+#include "../Graphics/ShaderVariation.h"
 #include "../RenderPipeline/BatchCompositor.h"
 #include "../RenderPipeline/RenderPipelineDebugger.h"
 
@@ -107,6 +108,32 @@ ea::string DebugFrameSnapshot::ToString() const
     ea::string result;
     for (const DebugFrameSnapshotPass& pass : passes_)
         result += pass.ToString();
+    result += Format("Pipeline states in scene ({}): \n\n{}\n", scenePipelineStates_.size(), ScenePipelineStatesToString());
+    result += Format("Materials in scene ({}): \n\n{}\n", sceneMaterials_.size(), SceneMaterialsToString());
+    return result;
+}
+
+ea::string DebugFrameSnapshot::ScenePipelineStatesToString() const
+{
+    ea::string result;
+    for (PipelineState* pipelineState : scenePipelineStates_)
+    {
+        const PipelineStateDesc& desc = pipelineState->GetDesc();
+        result += Format("- {}: VS={}({}) PS={}({})\n", static_cast<void*>(pipelineState),
+            desc.vertexShader_->GetName(), desc.vertexShader_->GetDefines(),
+            desc.pixelShader_->GetName(), desc.pixelShader_->GetDefines());
+    }
+    return result;
+}
+
+ea::string DebugFrameSnapshot::SceneMaterialsToString() const
+{
+    ea::string result;
+    for (Material* material : sceneMaterials_)
+    {
+        const ea::string name = !material->GetName().empty() ? material->GetName() : "Unnamed";
+        result += Format("- {}: {}\n", static_cast<void*>(material), name);
+    }
     return result;
 }
 
@@ -134,6 +161,8 @@ void RenderPipelineDebugger::ReportSceneBatch(const DebugFrameSnapshotBatch& sce
     if (!passInProgress_)
         BeginPass("Unnamed");
     snapshot_.passes_.back().batches_.push_back(sceneBatch);
+    snapshot_.scenePipelineStates_.insert(sceneBatch.pipelineState_);
+    snapshot_.sceneMaterials_.insert(sceneBatch.material_);
 }
 
 void RenderPipelineDebugger::ReportQuad(ea::string_view debugComment, const IntVector2& size)

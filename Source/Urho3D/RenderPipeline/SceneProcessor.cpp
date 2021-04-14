@@ -434,6 +434,7 @@ void SceneProcessor::OnUpdateBegin(const CommonFrameInfo& frameInfo)
 
     cameraProcessor_->OnUpdateBegin(frameInfo_);
     drawableProcessor_->OnUpdateBegin(frameInfo_);
+    pipelineStateBuilder_->OnSettingsUpdated();
 }
 
 void SceneProcessor::OnRenderBegin(const CommonFrameInfo& frameInfo)
