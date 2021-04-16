@@ -5,9 +5,9 @@
 #include "_Samplers.glsl"
 
 #ifdef VSM_SHADOW
-    VERTEX_OUTPUT(vec4 vTexCoord)
+    VERTEX_OUTPUT_HIGHP(vec4 vTexCoord)
 #else
-    VERTEX_OUTPUT(vec2 vTexCoord)
+    VERTEX_OUTPUT_HIGHP(vec2 vTexCoord)
 #endif
 
 #ifdef URHO3D_VERTEX_SHADER
@@ -42,8 +42,6 @@ void main()
             float depth = vTexCoord.z / vTexCoord.w * 0.5 + 0.5;
         #endif
         gl_FragColor = vec4(depth, depth * depth, 1.0, 1.0);
-    #else
-        gl_FragColor = vec4(1.0);
     #endif
 }
 #endif

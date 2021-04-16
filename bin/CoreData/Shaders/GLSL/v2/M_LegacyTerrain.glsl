@@ -14,7 +14,7 @@ UNIFORM_BUFFER_END(4, Material)
 
 #include "_Material.glsl"
 
-VERTEX_OUTPUT(vec2 vDetailTexCoord)
+VERTEX_OUTPUT_HIGHP(vec2 vDetailTexCoord)
 
 #ifdef URHO3D_VERTEX_SHADER
 void main()

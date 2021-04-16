@@ -6,8 +6,8 @@
 #include "_Samplers.glsl"
 #include "_GammaCorrection.glsl"
 
-VERTEX_OUTPUT(vec2 vTexCoord)
-VERTEX_OUTPUT(vec2 vScreenPos)
+VERTEX_OUTPUT_HIGHP(vec2 vTexCoord)
+VERTEX_OUTPUT_HIGHP(vec2 vScreenPos)
 
 #ifdef URHO3D_PIXEL_SHADER
 

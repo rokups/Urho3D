@@ -29,7 +29,7 @@ SAMPLER(9, samplerCube sLightCubeMap)
     SAMPLER(15, sampler3D sZoneVolumeMap)
 #endif
 
-#ifdef URHO3D_MATERIAL_HAS_DIFFUSE
+#ifdef URHO3D_MATERIAL_DIFFUSE_HINT
     #if URHO3D_MATERIAL_DIFFUSE_HINT == 0
         #define DiffMap_ToGamma(color)  Texture_ToGamma_0(color)
         #define DiffMap_ToLinear(color) Texture_ToLinear_0(color)
@@ -41,7 +41,7 @@ SAMPLER(9, samplerCube sLightCubeMap)
     #endif
 #endif
 
-#ifdef URHO3D_MATERIAL_HAS_EMISSIVE
+#ifdef URHO3D_MATERIAL_EMISSIVE_HINT
     #if URHO3D_MATERIAL_EMISSIVE_HINT == 0
         #define EmissiveMap_ToGamma(color)  Texture_ToGamma_0(color)
         #define EmissiveMap_ToLinear(color) Texture_ToLinear_0(color)

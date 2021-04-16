@@ -337,7 +337,6 @@ struct BatchRendererSettings
     bool linearSpaceLighting_{};
     DrawableAmbientMode ambientMode_{ DrawableAmbientMode::Directional };
     Vector2 varianceShadowMapParams_{ 0.0000001f, 0.9f };
-    bool specularAntiAliasing_{};
 
     /// Utility operators
     /// @{
@@ -346,7 +345,6 @@ struct BatchRendererSettings
         unsigned hash = 0;
         CombineHash(hash, linearSpaceLighting_);
         CombineHash(hash, MakeHash(ambientMode_));
-        CombineHash(hash, specularAntiAliasing_);
         return hash;
     }
 
@@ -354,8 +352,7 @@ struct BatchRendererSettings
     {
         return linearSpaceLighting_ == rhs.linearSpaceLighting_
             && ambientMode_ == rhs.ambientMode_
-            && varianceShadowMapParams_ == rhs.varianceShadowMapParams_
-            && specularAntiAliasing_ == rhs.specularAntiAliasing_;
+            && varianceShadowMapParams_ == rhs.varianceShadowMapParams_;
     }
 
     bool operator!=(const BatchRendererSettings& rhs) const { return !(*this == rhs); }
@@ -424,11 +421,26 @@ enum class DirectLightingMode
     DeferredPBR
 };
 
+enum class SpecularQuality
+{
+    Disabled,
+    Simple,
+    Antialiased
+};
+
+enum class ReflectionQuality
+{
+    Vertex,
+    Pixel
+};
+
 struct SceneProcessorSettings
     : public DrawableProcessorSettings
     , public OcclusionBufferSettings
     , public BatchRendererSettings
 {
+    SpecularQuality specularQuality_{ SpecularQuality::Simple };
+    ReflectionQuality reflectionQuality_{ ReflectionQuality::Pixel };
     bool enableShadows_{ true };
     bool softParticles_{};
     DirectLightingMode lightingMode_{};
@@ -456,6 +468,8 @@ struct SceneProcessorSettings
         CombineHash(hash, DrawableProcessorSettings::CalculatePipelineStateHash());
         CombineHash(hash, OcclusionBufferSettings::CalculatePipelineStateHash());
         CombineHash(hash, BatchRendererSettings::CalculatePipelineStateHash());
+        CombineHash(hash, MakeHash(specularQuality_));
+        CombineHash(hash, MakeHash(reflectionQuality_));
         CombineHash(hash, enableShadows_);
         CombineHash(hash, softParticles_);
         CombineHash(hash, MakeHash(lightingMode_));
@@ -467,6 +481,8 @@ struct SceneProcessorSettings
         return DrawableProcessorSettings::operator==(rhs)
             && OcclusionBufferSettings::operator==(rhs)
             && BatchRendererSettings::operator==(rhs)
+            && specularQuality_ == rhs.specularQuality_
+            && reflectionQuality_ == rhs.reflectionQuality_
             && enableShadows_ == rhs.enableShadows_
             && softParticles_ == rhs.softParticles_
             && lightingMode_ == rhs.lightingMode_

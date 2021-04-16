@@ -51,7 +51,7 @@
 #include "_VertexScreenPos.glsl"
 #include "_Samplers.glsl"
 
-VERTEX_OUTPUT(vec2 vScreenPos)
+VERTEX_OUTPUT_HIGHP(vec2 vScreenPos)
 
 /*==========================================================================*/
 //

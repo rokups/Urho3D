@@ -14,7 +14,7 @@ vec4 GetScreenPos(vec4 clipPos)
 {
     return vec4(
         clipPos.x * cGBufferOffsets.z + cGBufferOffsets.x * clipPos.w,
-#ifdef URHO3D_FLIP_FRAMEBUFFER
+#ifdef URHO3D_FEATURE_FRAMEBUFFER_Y_INVERTED
         -clipPos.y * cGBufferOffsets.w + cGBufferOffsets.y * clipPos.w,
 #else
         clipPos.y * cGBufferOffsets.w + cGBufferOffsets.y * clipPos.w,
@@ -27,7 +27,7 @@ vec2 GetScreenPosPreDiv(vec4 clipPos)
 {
     return vec2(
         clipPos.x / clipPos.w * cGBufferOffsets.z + cGBufferOffsets.x,
-#ifdef URHO3D_FLIP_FRAMEBUFFER
+#ifdef URHO3D_FEATURE_FRAMEBUFFER_Y_INVERTED
         -clipPos.y / clipPos.w * cGBufferOffsets.w + cGBufferOffsets.y);
 #else
         clipPos.y / clipPos.w * cGBufferOffsets.w + cGBufferOffsets.y);
@@ -38,7 +38,7 @@ vec2 GetQuadTexCoord(vec4 clipPos)
 {
     return vec2(
         clipPos.x / clipPos.w * 0.5 + 0.5,
-#ifdef URHO3D_FLIP_FRAMEBUFFER
+#ifdef URHO3D_FEATURE_FRAMEBUFFER_Y_INVERTED
         -clipPos.y / clipPos.w * 0.5 + 0.5);
 #else
         clipPos.y / clipPos.w * 0.5 + 0.5);

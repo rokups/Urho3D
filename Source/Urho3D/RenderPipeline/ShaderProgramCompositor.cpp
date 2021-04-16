@@ -23,6 +23,7 @@
 #include "../Precompiled.h"
 
 #include "../Graphics/Graphics.h"
+#include "../Graphics/GraphicsImpl.h"
 #include "../Graphics/Renderer.h"
 #include "../IO/Log.h"
 #include "../RenderPipeline/CameraProcessor.h"
@@ -77,10 +78,17 @@ void ShaderProgramCompositor::ProcessUserBatch(ShaderProgramDesc& result, Drawab
     ApplyLayoutVertexAndCommonDefinesForUserPass(result, geometry->GetVertexBuffer(0));
     ApplyMaterialPixelDefinesForUserPass(result, material);
 
+    const bool isDeferred = subpass == BatchCompositorSubpass::Deferred;
+    const bool isDepthOnly = flags.Test(DrawableProcessorPassFlag::DepthOnlyPass);
     if (subpass == BatchCompositorSubpass::Light)
         result.commonShaderDefines_ += "URHO3D_ADDITIVE_LIGHT_PASS ";
     else if (flags.Test(DrawableProcessorPassFlag::HasAmbientLighting))
-        ApplyAmbientLightingVertexAndCommonDefinesForUserPass(result, drawable, subpass == BatchCompositorSubpass::Deferred);
+        ApplyAmbientLightingVertexAndCommonDefinesForUserPass(result, drawable, isDeferred);
+
+    if (isDeferred)
+        result.commonShaderDefines_ += "URHO3D_NUM_RENDER_TARGETS=4 ";
+    else if (isDepthOnly)
+        result.commonShaderDefines_ += "URHO3D_NUM_RENDER_TARGETS=0 ";
 
     if (light)
         ApplyPixelLightPixelAndCommonDefines(result, light, hasShadow, material->GetSpecular());
@@ -124,8 +132,21 @@ void ShaderProgramCompositor::ApplyCommonDefines(ShaderProgramDesc& result,
         if (sceneProcessorSettings_.linearSpaceLighting_)
             result.commonShaderDefines_ += "URHO3D_GAMMA_CORRECTION ";
 
-        if (sceneProcessorSettings_.specularAntiAliasing_)
-            result.commonShaderDefines_ += "URHO3D_SPECULAR_ANTIALIASING ";
+        // TODO(renderer): Check for lighting too?
+        switch (sceneProcessorSettings_.specularQuality_)
+        {
+        case SpecularQuality::Simple:
+            result.commonShaderDefines_ += "URHO3D_SPECULAR=1 ";
+            break;
+        case SpecularQuality::Antialiased:
+            result.commonShaderDefines_ += "URHO3D_SPECULAR=2 ";
+            break;
+        default:
+            break;
+        }
+
+        if (sceneProcessorSettings_.reflectionQuality_ == ReflectionQuality::Vertex)
+            result.commonShaderDefines_ += "URHO3D_VERTEX_SHADER_REFLECTION ";
     }
 
     if (flags.Test(DrawableProcessorPassFlag::SoftParticlesPass) && sceneProcessorSettings_.softParticles_)
@@ -183,7 +204,16 @@ void ShaderProgramCompositor::ApplyPixelLightPixelAndCommonDefines(ShaderProgram
 
     if (hasShadow)
     {
+        /// TODO(renderer): Make more flexible
+    #if defined(GL_ES_VERSION_2_0) && !defined(__EMSCRIPTEN__)
+        const unsigned maxCascades = 1;
+    #else
+        const unsigned maxCascades = light->GetLightType() == LIGHT_DIRECTIONAL ? 4 : 1;
+    #endif
+
         result.commonShaderDefines_ += "URHO3D_HAS_SHADOW SHADOW ";
+        if (maxCascades > 1)
+            result.commonShaderDefines_ += Format("URHO3D_MAX_SHADOW_CASCADES={} ", maxCascades);
         if (shadowMapSettings_.enableVarianceShadowMaps_)
             result.commonShaderDefines_ += "URHO3D_VARIANCE_SHADOW_MAP VSM_SHADOW ";
         else
@@ -275,6 +305,8 @@ void ShaderProgramCompositor::ApplyDefinesForShadowPass(ShaderProgramDesc& resul
     result.commonShaderDefines_ += "URHO3D_SHADOW_PASS ";
     if (shadowMapSettings_.enableVarianceShadowMaps_)
         result.commonShaderDefines_ += "URHO3D_VARIANCE_SHADOW_MAP VSM_SHADOW ";
+    else
+        result.commonShaderDefines_ += "URHO3D_NUM_RENDER_TARGETS=0 ";
 }
 
 void ShaderProgramCompositor::ApplyDefinesForLightVolumePass(ShaderProgramDesc& result) const
@@ -290,8 +322,7 @@ bool ShaderProgramCompositor::IsInstancingUsed(
 {
     return !flags.Test(DrawableProcessorPassFlag::DisableInstancing)
         && instancingBufferSettings_.enableInstancing_
-        && (geometryType == GEOM_STATIC || geometryType == GEOM_INSTANCED)
-        && geometry->GetIndexBuffer() != nullptr;
+        && geometry->IsInstanced(geometryType);
 }
 
 }

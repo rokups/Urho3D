@@ -14,16 +14,16 @@
 #ifdef URHO3D_VERTEX_SHADER
 
 // Convert vector from world to shadow space, for each cascade if applicable
-void WorldSpaceToShadowCoord(out vec4 shadowPos[URHO3D_SHADOW_NUM_CASCADES], vec4 worldPos)
+void WorldSpaceToShadowCoord(out vec4 shadowPos[URHO3D_MAX_SHADOW_CASCADES], vec4 worldPos)
 {
     #if defined(URHO3D_LIGHT_DIRECTIONAL)
-        #if URHO3D_SHADOW_NUM_CASCADES >= 4
+        #if URHO3D_MAX_SHADOW_CASCADES >= 4
             shadowPos[3] = worldPos * cLightMatrices[3];
         #endif
-        #if URHO3D_SHADOW_NUM_CASCADES >= 3
+        #if URHO3D_MAX_SHADOW_CASCADES >= 3
             shadowPos[2] = worldPos * cLightMatrices[2];
         #endif
-        #if URHO3D_SHADOW_NUM_CASCADES >= 2
+        #if URHO3D_MAX_SHADOW_CASCADES >= 2
             shadowPos[1] = worldPos * cLightMatrices[1];
         #endif
         shadowPos[0] = worldPos * cLightMatrices[0];
@@ -69,7 +69,7 @@ vec3 DirectionToUV(vec3 vec, vec2 bias)
 
 #ifdef URHO3D_VARIANCE_SHADOW_MAP
     /// Calculate shadow value from sampled VSM texture and fragment depth
-    float EvaluateVarianceShadow(optional_highp vec2 moments, float depth)
+    float EvaluateVarianceShadow(vec2 moments, float depth)
     {
         float p = float(depth <= moments.x);
         float variance = moments.y - (moments.x * moments.x);
@@ -83,7 +83,7 @@ vec3 DirectionToUV(vec3 vec, vec2 bias)
     }
 #else
     /// Sample shadow map texture at given 4-coordinate
-    float SampleShadow(optional_highp vec4 shadowPos)
+    float SampleShadow(vec4 shadowPos)
     {
         #if defined(GL3)
             return textureProj(sShadowMap, shadowPos);
@@ -112,10 +112,10 @@ vec3 DirectionToUV(vec3 vec, vec2 bias)
 #endif
 
 /// Sample shadow map texture with predefined filtering at given 4-coordinate
-float SampleShadowFiltered(optional_highp vec4 shadowPos)
+float SampleShadowFiltered(vec4 shadowPos)
 {
     #if defined(URHO3D_VARIANCE_SHADOW_MAP)
-        optional_highp vec2 moments = texture2D(sShadowMap, shadowPos.xy / shadowPos.w).rg;
+        vec2 moments = texture2D(sShadowMap, shadowPos.xy / shadowPos.w).rg;
         return cShadowIntensity.y + cShadowIntensity.x * EvaluateVarianceShadow(moments, shadowPos.z / shadowPos.w);
 
     #elif URHO3D_SHADOW_PCF_SIZE == 2
@@ -204,8 +204,8 @@ float SampleShadowFiltered(optional_highp vec4 shadowPos)
 }
 
 /// Convert 4D-coordinate in shadow space to 4-UV used to sample shadow map
-#if URHO3D_SHADOW_NUM_CASCADES == 4
-    optional_highp vec4 ShadowCoordToUV(optional_highp vec4 shadowPos[URHO3D_SHADOW_NUM_CASCADES], float depth)
+#if URHO3D_MAX_SHADOW_CASCADES == 4
+    vec4 ShadowCoordToUV(vec4 shadowPos[URHO3D_MAX_SHADOW_CASCADES], float depth)
     {
         // TODO(renderer): Optimize this?
         if (depth < cShadowSplits.x)
@@ -218,9 +218,9 @@ float SampleShadowFiltered(optional_highp vec4 shadowPos)
             return shadowPos[3];
     }
 #elif defined(URHO3D_LIGHT_POINT)
-    optional_highp vec4 PointShadowCoordToUV(optional_highp vec3 shadowPos)
+    vec4 PointShadowCoordToUV(vec3 shadowPos)
     {
-        optional_highp vec3 uvDepth = DirectionToUV(shadowPos, cShadowCubeUVBias.xy);
+        vec3 uvDepth = DirectionToUV(shadowPos, cShadowCubeUVBias.xy);
         uvDepth.xy = uvDepth.xy * cShadowCubeAdjust.xy + cShadowCubeAdjust.zw;
         uvDepth.z = cShadowDepthFade.x + cShadowDepthFade.y * uvDepth.z;
         return vec4(uvDepth, 1.0);
@@ -231,8 +231,8 @@ float SampleShadowFiltered(optional_highp vec4 shadowPos)
 #endif
 
 /// Convert position in world space to shadow UV
-#if defined(URHO3D_LIGHT_DIRECTIONAL) && URHO3D_SHADOW_NUM_CASCADES == 4
-    optional_highp vec4 WorldSpaceToShadowUV(optional_highp vec4 worldPos, float depth)
+#if defined(URHO3D_LIGHT_DIRECTIONAL) && URHO3D_MAX_SHADOW_CASCADES == 4
+    vec4 WorldSpaceToShadowUV(vec4 worldPos, float depth)
     {
         if (depth < cShadowSplits.x)
             return worldPos * cLightMatrices[0];

@@ -6,7 +6,7 @@
 #include "_VertexTransform.glsl"
 #include "_GammaCorrection.glsl"
 
-VERTEX_OUTPUT(vec3 vTexCoord)
+VERTEX_OUTPUT_HIGHP(vec3 vTexCoord)
 
 #ifdef URHO3D_VERTEX_SHADER
 void main()

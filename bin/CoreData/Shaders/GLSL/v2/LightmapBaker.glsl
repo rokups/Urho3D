@@ -24,10 +24,10 @@ UNIFORM_BUFFER_END(4, Material)
 
 #include "_VertexTransform.glsl"
 
-VERTEX_OUTPUT(vec2 vTexCoord)
-VERTEX_OUTPUT(vec3 vNormal)
-VERTEX_OUTPUT(vec3 vWorldPos)
-VERTEX_OUTPUT(vec4 vMetadata)
+VERTEX_OUTPUT_HIGHP(vec2 vTexCoord)
+VERTEX_OUTPUT(half3 vNormal)
+VERTEX_OUTPUT_HIGHP(vec3 vWorldPos)
+VERTEX_OUTPUT_HIGHP(vec4 vMetadata)
 
 #ifdef URHO3D_VERTEX_SHADER
 void main()
@@ -35,7 +35,7 @@ void main()
     VertexTransform vertexTransform = GetVertexTransform();
     vec2 lightmapUV = iTexCoord1 * cLMOffset.xy + cLMOffset.zw;
 
-#ifdef URHO3D_FLIP_FRAMEBUFFER
+#ifdef URHO3D_FEATURE_FRAMEBUFFER_Y_INVERTED
     const vec4 scaleOffset = vec4(2, -2, -1, 1);
 #else
     const vec4 scaleOffset = vec4(2, 2, -1, -1);

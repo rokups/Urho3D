@@ -29,49 +29,49 @@
 
 /// Common vertex output for any material
 /// @{
-VERTEX_OUTPUT(float vWorldDepth)
-VERTEX_OUTPUT(vec2 vTexCoord)
+VERTEX_OUTPUT_HIGHP(float vWorldDepth)
+VERTEX_OUTPUT_HIGHP(vec2 vTexCoord)
 
 #ifdef URHO3D_PIXEL_NEED_VERTEX_COLOR
-    VERTEX_OUTPUT(vec4 vColor)
+    VERTEX_OUTPUT(half4 vColor)
 #endif
 
 #ifdef URHO3D_PIXEL_NEED_SCREEN_POSITION
-    VERTEX_OUTPUT(vec4 vScreenPos)
+    VERTEX_OUTPUT_HIGHP(vec4 vScreenPos)
 #endif
 
 #ifdef URHO3D_PIXEL_NEED_NORMAL
-    VERTEX_OUTPUT(vec3 vNormal)
+    VERTEX_OUTPUT(half3 vNormal)
 #endif
 
 #ifdef URHO3D_PIXEL_NEED_TANGENT
-    VERTEX_OUTPUT(vec4 vTangent)
-    VERTEX_OUTPUT(vec2 vBitangentXY)
+    VERTEX_OUTPUT(half4 vTangent)
+    VERTEX_OUTPUT(half2 vBitangentXY)
 #endif
 
 #ifdef URHO3D_PIXEL_NEED_EYE_VECTOR
-    VERTEX_OUTPUT(vec3 vEyeVec)
+    VERTEX_OUTPUT(half3 vEyeVec)
 #endif
 
 #ifdef URHO3D_PIXEL_NEED_AMBIENT
-    VERTEX_OUTPUT(vec3 vAmbientAndVertexLigthing)
+    VERTEX_OUTPUT(half3 vAmbientAndVertexLigthing)
 #endif
 
 #ifdef URHO3D_IS_LIT
     #ifdef URHO3D_HAS_LIGHTMAP
-        VERTEX_OUTPUT(vec2 vTexCoord2)
+        VERTEX_OUTPUT_HIGHP(vec2 vTexCoord2)
     #endif
 
     #ifdef URHO3D_HAS_PIXEL_LIGHT
-        VERTEX_OUTPUT(vec3 vLightVec)
+        VERTEX_OUTPUT(half3 vLightVec)
     #endif
 
     #ifdef URHO3D_HAS_SHADOW
-        VERTEX_OUTPUT(optional_highp vec4 vShadowPos[URHO3D_SHADOW_NUM_CASCADES])
+        VERTEX_OUTPUT_HIGHP(vec4 vShadowPos[URHO3D_MAX_SHADOW_CASCADES])
     #endif
 
     #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
-        VERTEX_OUTPUT(vec4 vShapePos)
+        VERTEX_OUTPUT_HIGHP(vec4 vShapePos)
     #endif
 #endif
 /// @}
@@ -103,7 +103,7 @@ void FillCommonVertexOutput(VertexTransform vertexTransform, vec2 uv)
 #endif
 
 #ifdef URHO3D_PIXEL_NEED_EYE_VECTOR
-    vEyeVec = GetEyeVector(vertexTransform.position.xyz);
+    vEyeVec = cCameraPos - vertexTransform.position.xyz;
 #endif
 
 #ifdef URHO3D_PIXEL_NEED_AMBIENT
@@ -201,7 +201,7 @@ SurfaceGeometryData GetSurfaceGeometryData()
     #endif
 
     const half minRougness = 0.089;
-    const half oneMinusDielectricReflectivity = 1.0 - 0.16 * cDielectricReflectance * cDielectricReflectance;
+    half oneMinusDielectricReflectivity = 1.0 - 0.16 * cDielectricReflectance * cDielectricReflectance;
     result.roughness = max(rmo.x, minRougness);
     result.oneMinusReflectivity = oneMinusDielectricReflectivity - oneMinusDielectricReflectivity * rmo.y;
 #else

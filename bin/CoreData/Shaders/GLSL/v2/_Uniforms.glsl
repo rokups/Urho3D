@@ -178,7 +178,4 @@ INSTANCE_BUFFER_BEGIN(5, Object)
 INSTANCE_BUFFER_END(5, Object)
 #endif // URHO3D_VERTEX_SHADER
 
-/// Return eye vector, not normalized.
-#define GetEyeVector(worldPos) (cCameraPos - (worldPos))
-
 #endif // _UNIFORMS_GLSL_

@@ -77,6 +77,19 @@ static const ea::vector<ea::string> materialQualityNames =
     "High",
 };
 
+static const ea::vector<ea::string> specularQualityNames =
+{
+    "Disabled",
+    "Simple",
+    "Antialiased",
+};
+
+static const ea::vector<ea::string> reflectionQualityNames =
+{
+    "Vertex",
+    "Pixel",
+};
+
 static const ea::vector<ea::string> ambientModeNames =
 {
     "Constant",
@@ -471,9 +484,10 @@ RenderPipeline::~RenderPipeline()
 void RenderPipeline::RegisterObject(Context* context)
 {
     context->RegisterFactory<RenderPipeline>();
-
     URHO3D_ENUM_ATTRIBUTE_EX("Color Space", settings_.renderBufferManager_.colorSpace_, MarkSettingsDirty, colorSpaceNames, RenderPipelineColorSpace::GammaLDR, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Material Quality", settings_.sceneProcessor_.materialQuality_, MarkSettingsDirty, materialQualityNames, SceneProcessorSettings{}.materialQuality_, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Specular Quality", settings_.sceneProcessor_.specularQuality_, MarkSettingsDirty, specularQualityNames, SceneProcessorSettings{}.specularQuality_, AM_DEFAULT);
+    URHO3D_ENUM_ATTRIBUTE_EX("Reflection Quality", settings_.sceneProcessor_.reflectionQuality_, MarkSettingsDirty, reflectionQualityNames, SceneProcessorSettings{}.reflectionQuality_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Max Vertex Lights", int, settings_.sceneProcessor_.maxVertexLights_, MarkSettingsDirty, 4, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Max Pixel Lights", int, settings_.sceneProcessor_.maxPixelLights_, MarkSettingsDirty, 4, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Ambient Mode", settings_.sceneProcessor_.ambientMode_, MarkSettingsDirty, ambientModeNames, DrawableAmbientMode::Directional, AM_DEFAULT);
@@ -481,7 +495,6 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("Enable Shadows", bool, settings_.sceneProcessor_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Soft Particles", bool, settings_.sceneProcessor_.softParticles_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Lighting Mode", settings_.sceneProcessor_.lightingMode_, MarkSettingsDirty, directLightingModeNames, DirectLightingMode::Forward, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Specular Anti-Aliasing", bool, settings_.sceneProcessor_.specularAntiAliasing_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("PCF Kernel Size", unsigned, settings_.sceneProcessor_.pcfKernelSize_, MarkSettingsDirty, 1, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Use Variance Shadow Maps", bool, settings_.shadowMapAllocator_.enableVarianceShadowMaps_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, settings_.sceneProcessor_.varianceShadowMapParams_, MarkSettingsDirty, BatchRendererSettings{}.varianceShadowMapParams_, AM_DEFAULT);

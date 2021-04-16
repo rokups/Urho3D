@@ -19,7 +19,7 @@
     UNIFORM_BUFFER_END(6, Custom)
 #endif
 
-VERTEX_OUTPUT(vec2 vScreenPos)
+VERTEX_OUTPUT_HIGHP(vec2 vScreenPos)
 
 #ifdef URHO3D_VERTEX_SHADER
 void main()

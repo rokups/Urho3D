@@ -11,10 +11,10 @@
 #include "_DeferredLighting.glsl"
 #include "_BRDF.glsl"
 
-VERTEX_OUTPUT(vec4 vScreenPos)
-VERTEX_OUTPUT(vec3 vFarRay)
+VERTEX_OUTPUT_HIGHP(vec4 vScreenPos)
+VERTEX_OUTPUT_HIGHP(vec3 vFarRay)
 #ifdef URHO3D_ORTHOGRAPHIC_DEPTH
-    VERTEX_OUTPUT(vec3 vNearRay)
+    VERTEX_OUTPUT_HIGHP(vec3 vNearRay)
 #endif
 
 #ifdef URHO3D_VERTEX_SHADER

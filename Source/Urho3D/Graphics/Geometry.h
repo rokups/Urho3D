@@ -136,6 +136,13 @@ public:
     /// @property
     bool IsEmpty() const { return indexCount_ == 0 && vertexCount_ == 0; }
 
+    /// Return whether the geometry can be rendered using instancing buffer.
+    bool IsInstanced(GeometryType geometryType) const
+    {
+        return (geometryType == GEOM_STATIC || geometryType == GEOM_INSTANCED)
+            && indexBuffer_ != nullptr;
+    }
+
 private:
     /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
     unsigned RecalculatePipelineStateHash() const override;
