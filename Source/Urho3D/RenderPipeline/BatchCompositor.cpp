@@ -111,7 +111,7 @@ void BatchCompositorPass::OnPipelineStatesInvalidated()
 void BatchCompositorPass::ProcessGeometryBatch(const GeometryBatch& geometryBatch)
 {
     // Skip invalid batches. It may happen if UpdateGeometry removed some source batches.
-    PipelineBatchDesc desc(geometryBatch.geometry_, geometryBatch.sourceBatchIndex_, geometryBatch.deferredPass_);
+    PipelineBatchDesc desc(geometryBatch.drawable_, geometryBatch.sourceBatchIndex_, geometryBatch.deferredPass_);
     if (!desc.geometry_)
         return;
 

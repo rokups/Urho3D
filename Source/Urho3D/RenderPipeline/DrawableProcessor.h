@@ -68,7 +68,7 @@ struct SortedOccluder
 /// Reference to SourceBatch of Drawable geometry, with resolved material passes.
 struct GeometryBatch
 {
-    Drawable* geometry_{};
+    Drawable* drawable_{};
     unsigned sourceBatchIndex_{};
 
     /// If deferred pass is present, unlit base, lit base and light passes are ignored.

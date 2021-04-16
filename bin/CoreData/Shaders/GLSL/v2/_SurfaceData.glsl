@@ -11,7 +11,7 @@
 #endif
 
 #ifdef URHO3D_PIXEL_SHADER
-#ifndef URHO3D_DEPTH_ONLY
+#ifndef URHO3D_DEPTH_ONLY_PASS
 
 /// Apply specular antialiasing to roughness if supported.
 half AdjustRoughness(const half roughness, const half3 normal)
@@ -101,6 +101,6 @@ struct SurfaceMaterialData
 #endif
 };
 
-#endif // !URHO3D_DEPTH_ONLY
+#endif // !URHO3D_DEPTH_ONLY_PASS
 #endif // URHO3D_PIXEL_SHADER
 #endif // _SURFACE_DATA_GLSL_
