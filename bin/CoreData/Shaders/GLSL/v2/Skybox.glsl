@@ -21,10 +21,6 @@ void main()
 #ifdef URHO3D_PIXEL_SHADER
 void main()
 {
-    vec4 sky = DiffMap_ToLight(cMatDiffColor * textureCube(sDiffCubeMap, vTexCoord));
-    #ifdef HDRSCALE
-        sky = pow(sky + clamp((cAmbientColor.a - 1.0) * 0.1, 0.0, 0.25), max(vec4(cAmbientColor.a), 1.0)) * clamp(cAmbientColor.a, 0.0, 1.0);
-    #endif
-    gl_FragColor = sky;
+    gl_FragColor = DiffMap_ToLight(cMatDiffColor * textureCube(sDiffCubeMap, vTexCoord));
 }
 #endif

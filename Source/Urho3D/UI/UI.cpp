@@ -859,10 +859,10 @@ void UI::Initialize()
 
     batchStateCache_ = MakeShared<DefaultUIBatchStateCache>(context_);
 
-    noTextureMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "VERTEXCOLOR", "VERTEXCOLOR");
-    alphaMapMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "ALPHAMAP VERTEXCOLOR");
-    diffMapMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "DIFFMAP VERTEXCOLOR");
-    diffMapAlphaMaskMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "DIFFMAP ALPHAMASK VERTEXCOLOR");
+    noTextureMaterial_ = Material::CreateBaseMaterial(context_, "Basic", "VERTEXCOLOR", "VERTEXCOLOR");
+    alphaMapMaterial_ = Material::CreateBaseMaterial(context_, "Basic", "DIFFMAP VERTEXCOLOR", "ALPHAMAP VERTEXCOLOR");
+    diffMapMaterial_ = Material::CreateBaseMaterial(context_, "Basic", "DIFFMAP VERTEXCOLOR", "DIFFMAP VERTEXCOLOR");
+    diffMapAlphaMaskMaterial_ = Material::CreateBaseMaterial(context_, "Basic", "DIFFMAP VERTEXCOLOR", "DIFFMAP ALPHAMASK VERTEXCOLOR");
 
     initialized_ = true;
 

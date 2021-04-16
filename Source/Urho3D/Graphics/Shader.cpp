@@ -256,6 +256,7 @@ void Shader::ProcessSource(ea::string& code, Deserializer& source)
     if (source.GetName() != GetName())
         cache->StoreResourceDependency(this, source.GetName());
 
+    unsigned numNewLines = 0;
     unsigned currentLine = 1;
     code += FormatLineDirective(isGLSL, fileName, fileIndex, currentLine);
     while (!source.IsEof())
@@ -285,8 +286,14 @@ void Shader::ProcessSource(ea::string& code, Deserializer& source)
             if (!graphics->IsShaderValidationEnabled() || !line.trimmed().starts_with("//"))
                 code += line;
 
+            ++numNewLines;
             if (!isLineContinuation)
-                code += "\n";
+            {
+                // When line continuation chain is over, append skipped newlines to keep line numbers
+                for (unsigned i = 0; i < numNewLines; ++i)
+                    code += "\n";
+                numNewLines = 0;
+            }
         }
         ++currentLine;
     }

@@ -136,9 +136,9 @@ void RmlRenderer::InitializeGraphics()
     indexBuffer_ = MakeShared<DynamicIndexBuffer>(context_);
     indexBuffer_->Initialize(1024, true);
 
-    noTextureMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "VERTEXCOLOR", "VERTEXCOLOR");
-    alphaMapMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "ALPHAMAP VERTEXCOLOR");
-    diffMapMaterial_ = Material::CreateBaseMaterial(context_, "UIBasic", "DIFFMAP VERTEXCOLOR", "DIFFMAP VERTEXCOLOR");
+    noTextureMaterial_ = Material::CreateBaseMaterial(context_, "Basic", "VERTEXCOLOR", "VERTEXCOLOR");
+    alphaMapMaterial_ = Material::CreateBaseMaterial(context_, "Basic", "DIFFMAP VERTEXCOLOR", "ALPHAMAP VERTEXCOLOR");
+    diffMapMaterial_ = Material::CreateBaseMaterial(context_, "Basic", "DIFFMAP VERTEXCOLOR", "DIFFMAP VERTEXCOLOR");
 }
 
 Material* RmlRenderer::GetBatchMaterial(Texture2D* texture)

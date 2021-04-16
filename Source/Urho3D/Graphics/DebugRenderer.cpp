@@ -754,8 +754,8 @@ void DebugRenderer::InitializePipelineStates()
         desc.InitializeInputLayout(GeometryBufferArray{ { vertexBuffer_ }, nullptr, nullptr });
         desc.colorWriteEnabled_ = true;
 
-        desc.vertexShader_ = graphics->GetShader(VS, "UIBasic", "VERTEXCOLOR");
-        desc.pixelShader_ = graphics->GetShader(PS, "UIBasic", "VERTEXCOLOR");
+        desc.vertexShader_ = graphics->GetShader(VS, "Basic", "VERTEXCOLOR");
+        desc.pixelShader_ = graphics->GetShader(PS, "Basic", "VERTEXCOLOR");
 
         desc.primitiveType_ = primitiveType;
         desc.depthCompareFunction_ = depthCompare;
