@@ -291,8 +291,11 @@ void ShaderProgramCompositor::ApplyAmbientLightingVertexAndCommonDefinesForUserP
 void ShaderProgramCompositor::ApplyDefinesForShadowPass(ShaderProgramDesc& result,
     Light* light, VertexBuffer* vertexBuffer, Material* material, Pass* pass) const
 {
-    if (light->GetShadowBias().normalOffset_ > 0.0 && vertexBuffer->HasElement(SEM_NORMAL))
-        result.vertexShaderDefines_ += "URHO3D_VERTEX_HAS_NORMAL URHO3D_SHADOW_NORMAL_OFFSET ";
+    if (vertexBuffer->HasElement(SEM_NORMAL))
+        result.vertexShaderDefines_ += "URHO3D_VERTEX_HAS_NORMAL ";
+
+    if (light->GetShadowBias().normalOffset_ > 0.0)
+        result.vertexShaderDefines_ += "URHO3D_SHADOW_NORMAL_OFFSET ";
 
     if (pass->IsAlphaMask())
     {
