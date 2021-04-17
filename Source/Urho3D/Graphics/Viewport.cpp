@@ -77,6 +77,14 @@ void Viewport::RegisterObject(Context* context)
 
 void Viewport::SetScene(Scene* scene)
 {
+#if !defined(URHO3D_D3D9) && !defined(URHO3D_LEGACY_RENDERER)
+    if (!!scene_ != !!scene)
+    {
+        renderPipeline_ = nullptr;
+        view_ = nullptr;
+    }
+#endif
+
     scene_ = scene;
 }
 
