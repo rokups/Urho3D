@@ -21,6 +21,7 @@
 		<attribute name="Color Space" value="LDR Linear" />
 		<attribute name="Specular Anti-Aliasing" value="true" />
 		<attribute name="PCF Kernel Size" value="5" />
+		<attribute name="Bloom" value="true" />
 		<attribute name="Post Process Antialiasing" value="FXAA3" />
 	</component>
 	<node id="2">

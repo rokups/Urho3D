@@ -144,7 +144,7 @@ const FrameInfo& RenderPipelineView::GetFrameInfo() const
 void RenderPipelineView::SetSettings(const RenderPipelineSettings& settings)
 {
     settings_ = settings;
-    settings_.Validate(context_);
+    settings_.ValidateAndAdjust(context_);
     settingsDirty_ = true;
     settingsPipelineStateHash_ = settings_.CalculatePipelineStateHash();
 }
@@ -166,7 +166,7 @@ void RenderPipelineView::SendViewEvent(StringHash eventType)
 
 void RenderPipelineView::ApplySettings()
 {
-    sceneProcessor_->SetSettings(settings_.sceneProcessor_);
+    sceneProcessor_->SetSettings(settings_);
     instancingBuffer_->SetSettings(settings_.instancingBuffer_);
     shadowMapAllocator_->SetSettings(settings_.shadowMapAllocator_);
 
@@ -258,6 +258,7 @@ void RenderPipelineView::ApplySettings()
     settings_.renderBufferManager_.colorUsableWithMultipleRenderTargets_ = isDeferredLighting;
     settings_.renderBufferManager_.stencilBuffer_ = isDeferredLighting;
     settings_.renderBufferManager_.inheritMultiSampleLevel_ = !isDeferredLighting;
+    settings_.renderBufferManager_.readableDepth_ = settings_.sceneProcessor_.IsDeferredLighting();
     renderBufferManager_->SetSettings(settings_.renderBufferManager_);
 }
 
@@ -273,7 +274,7 @@ bool RenderPipelineView::Define(RenderSurface* renderTarget, Viewport* viewport)
 
         refractPass_ = sceneProcessor_->CreatePass<BackToFrontScenePass>(DrawableProcessorPassFlag::None, "refract");
         alphaPass_ = sceneProcessor_->CreatePass<BackToFrontScenePass>(
-            DrawableProcessorPassFlag::HasAmbientLighting | DrawableProcessorPassFlag::SoftParticlesPass
+            DrawableProcessorPassFlag::HasAmbientLighting | DrawableProcessorPassFlag::NeedReadableDepth
             | DrawableProcessorPassFlag::RefractionPass, "", "alpha", "alpha", "litalpha");
         postOpaquePass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(DrawableProcessorPassFlag::None, "postopaque");
     }
@@ -338,7 +339,6 @@ void RenderPipelineView::Render()
     const bool hasRefraction = refractPass_->HasBatches() || alphaPass_->HasRefractionBatches();
     RenderBufferManagerFrameSettings frameSettings;
     frameSettings.supportColorReadWrite_ = postProcessFlags_.Test(PostProcessPassFlag::NeedColorOutputReadAndWrite);
-    frameSettings.readableDepth_ = settings_.sceneProcessor_.IsDeferredLighting() || settings_.sceneProcessor_.softParticles_;
     if (hasRefraction)
         frameSettings.supportColorReadWrite_ = true;
     renderBufferManager_->SetFrameSettings(frameSettings);
@@ -474,7 +474,7 @@ RenderPipeline::RenderPipeline(Context* context)
 {
     // Enable instancing by default for default render pipeline
     settings_.instancingBuffer_.enableInstancing_ = true;
-    settings_.Validate(context_);
+    settings_.ValidateAndAdjust(context_);
 }
 
 RenderPipeline::~RenderPipeline()
@@ -488,12 +488,12 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ENUM_ATTRIBUTE_EX("Material Quality", settings_.sceneProcessor_.materialQuality_, MarkSettingsDirty, materialQualityNames, SceneProcessorSettings{}.materialQuality_, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Specular Quality", settings_.sceneProcessor_.specularQuality_, MarkSettingsDirty, specularQualityNames, SceneProcessorSettings{}.specularQuality_, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Reflection Quality", settings_.sceneProcessor_.reflectionQuality_, MarkSettingsDirty, reflectionQualityNames, SceneProcessorSettings{}.reflectionQuality_, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Readable Depth", bool, settings_.renderBufferManager_.readableDepth_, MarkSettingsDirty, RenderBufferManagerSettings{}.readableDepth_, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Max Vertex Lights", int, settings_.sceneProcessor_.maxVertexLights_, MarkSettingsDirty, 4, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Max Pixel Lights", int, settings_.sceneProcessor_.maxPixelLights_, MarkSettingsDirty, 4, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Ambient Mode", settings_.sceneProcessor_.ambientMode_, MarkSettingsDirty, ambientModeNames, DrawableAmbientMode::Directional, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Enable Instancing", bool, settings_.instancingBuffer_.enableInstancing_, MarkSettingsDirty, true, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Enable Shadows", bool, settings_.sceneProcessor_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Soft Particles", bool, settings_.sceneProcessor_.softParticles_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Lighting Mode", settings_.sceneProcessor_.lightingMode_, MarkSettingsDirty, directLightingModeNames, DirectLightingMode::Forward, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("PCF Kernel Size", unsigned, settings_.sceneProcessor_.pcfKernelSize_, MarkSettingsDirty, 1, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Use Variance Shadow Maps", bool, settings_.shadowMapAllocator_.enableVarianceShadowMaps_, MarkSettingsDirty, false, AM_DEFAULT);
@@ -518,7 +518,7 @@ void RenderPipeline::RegisterObject(Context* context)
 void RenderPipeline::SetSettings(const RenderPipelineSettings& settings)
 {
     settings_ = settings;
-    settings_.Validate(context_);
+    settings_.ValidateAndAdjust(context_);
     MarkSettingsDirty();
 }
 
@@ -529,7 +529,7 @@ SharedPtr<RenderPipelineView> RenderPipeline::Instantiate()
 
 void RenderPipeline::MarkSettingsDirty()
 {
-    settings_.Validate(context_);
+    settings_.ValidateAndAdjust(context_);
     OnSettingsChanged(this, settings_);
 }
 

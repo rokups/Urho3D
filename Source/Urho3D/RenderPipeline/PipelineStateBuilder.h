@@ -46,7 +46,8 @@ class URHO3D_API PipelineStateBuilder : public Object, public BatchStateCacheCal
 public:
     PipelineStateBuilder(Context* context, const SceneProcessor* sceneProcessor, const CameraProcessor* cameraProcessor,
         const ShadowMapAllocator* shadowMapAllocator, const InstancingBuffer* instancingBuffer);
-    void OnSettingsUpdated();
+    void SetSettings(const ShaderProgramCompositorSettings& settings);
+    void SetFrameSettings(bool isCameraOrthographic);
 
     /// Implement BatchStateCacheCallback
     /// @{

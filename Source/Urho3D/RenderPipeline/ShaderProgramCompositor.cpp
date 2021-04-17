@@ -55,15 +55,15 @@ ShaderProgramCompositor::ShaderProgramCompositor(Context* context)
 {
 }
 
-void ShaderProgramCompositor::SetSettings(const SceneProcessorSettings& sceneProcessorSettings,
-    const ShadowMapAllocatorSettings& shadowMapSettings, const InstancingBufferSettings& instancingBufferSettings,
-    bool isCameraOrthographic)
+void ShaderProgramCompositor::SetSettings(const ShaderProgramCompositorSettings& settings)
 {
     auto graphics = GetSubsystem<Graphics>();
     constantBuffersSupported_ = graphics->GetCaps().constantBuffersSupported_;
-    sceneProcessorSettings_ = sceneProcessorSettings;
-    shadowMapSettings_ = shadowMapSettings;
-    instancingBufferSettings_ = instancingBufferSettings;
+    settings_ = settings;
+}
+
+void ShaderProgramCompositor::SetFrameSettings(bool isCameraOrthographic)
+{
     isCameraOrthographic_ = isCameraOrthographic;
 }
 
@@ -129,11 +129,11 @@ void ShaderProgramCompositor::ApplyCommonDefines(ShaderProgramDesc& result,
 
     if (!flags.Test(DrawableProcessorPassFlag::DepthOnlyPass))
     {
-        if (sceneProcessorSettings_.linearSpaceLighting_)
+        if (settings_.sceneProcessor_.linearSpaceLighting_)
             result.commonShaderDefines_ += "URHO3D_GAMMA_CORRECTION ";
 
         // TODO(renderer): Check for lighting too?
-        switch (sceneProcessorSettings_.specularQuality_)
+        switch (settings_.sceneProcessor_.specularQuality_)
         {
         case SpecularQuality::Simple:
             result.commonShaderDefines_ += "URHO3D_SPECULAR=1 ";
@@ -145,12 +145,12 @@ void ShaderProgramCompositor::ApplyCommonDefines(ShaderProgramDesc& result,
             break;
         }
 
-        if (sceneProcessorSettings_.reflectionQuality_ == ReflectionQuality::Vertex)
+        if (settings_.sceneProcessor_.reflectionQuality_ == ReflectionQuality::Vertex)
             result.commonShaderDefines_ += "URHO3D_VERTEX_SHADER_REFLECTION ";
     }
 
-    if (flags.Test(DrawableProcessorPassFlag::SoftParticlesPass) && sceneProcessorSettings_.softParticles_)
-        result.commonShaderDefines_ += "URHO3D_SOFT_PARTICLES_ENABLED ";
+    if (flags.Test(DrawableProcessorPassFlag::NeedReadableDepth) && settings_.renderBufferManager_.readableDepth_)
+        result.commonShaderDefines_ += "URHO3D_HAS_READABLE_DEPTH ";
 
     result.vertexShaderDefines_ += pass->GetEffectiveVertexShaderDefines();
     result.vertexShaderDefines_ += " ";
@@ -214,11 +214,11 @@ void ShaderProgramCompositor::ApplyPixelLightPixelAndCommonDefines(ShaderProgram
         result.commonShaderDefines_ += "URHO3D_HAS_SHADOW SHADOW ";
         if (maxCascades > 1)
             result.commonShaderDefines_ += Format("URHO3D_MAX_SHADOW_CASCADES={} ", maxCascades);
-        if (shadowMapSettings_.enableVarianceShadowMaps_)
+        if (settings_.shadowMapAllocator_.enableVarianceShadowMaps_)
             result.commonShaderDefines_ += "URHO3D_VARIANCE_SHADOW_MAP VSM_SHADOW ";
         else
             result.commonShaderDefines_ += Format("URHO3D_SHADOW_PCF_SIZE={} SIMPLE_SHADOW ",
-                sceneProcessorSettings_.pcfKernelSize_);
+                settings_.sceneProcessor_.pcfKernelSize_);
     }
 }
 
@@ -274,7 +274,7 @@ void ShaderProgramCompositor::ApplyAmbientLightingVertexAndCommonDefinesForUserP
     if (isGeometryBufferPass)
         result.commonShaderDefines_ += "URHO3D_GBUFFER_PASS ";
     else
-        result.commonShaderDefines_ += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", sceneProcessorSettings_.maxVertexLights_);
+        result.commonShaderDefines_ += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", settings_.sceneProcessor_.maxVertexLights_);
 
     if (drawable->GetGlobalIlluminationType() == GlobalIlluminationType::UseLightMap)
         result.commonShaderDefines_ += "URHO3D_HAS_LIGHTMAP LIGHTMAP ";
@@ -285,7 +285,7 @@ void ShaderProgramCompositor::ApplyAmbientLightingVertexAndCommonDefinesForUserP
         "URHO3D_AMBIENT_DIRECTIONAL ",
     };
 
-    result.vertexShaderDefines_ += ambientModeDefines[static_cast<int>(sceneProcessorSettings_.ambientMode_)];
+    result.vertexShaderDefines_ += ambientModeDefines[static_cast<int>(settings_.sceneProcessor_.ambientMode_)];
 }
 
 void ShaderProgramCompositor::ApplyDefinesForShadowPass(ShaderProgramDesc& result,
@@ -303,7 +303,7 @@ void ShaderProgramCompositor::ApplyDefinesForShadowPass(ShaderProgramDesc& resul
     }
 
     result.commonShaderDefines_ += "URHO3D_SHADOW_PASS ";
-    if (shadowMapSettings_.enableVarianceShadowMaps_)
+    if (settings_.shadowMapAllocator_.enableVarianceShadowMaps_)
         result.commonShaderDefines_ += "URHO3D_VARIANCE_SHADOW_MAP VSM_SHADOW ";
     else
         result.commonShaderDefines_ += "URHO3D_NUM_RENDER_TARGETS=0 ";
@@ -313,7 +313,7 @@ void ShaderProgramCompositor::ApplyDefinesForLightVolumePass(ShaderProgramDesc& 
 {
     if (isCameraOrthographic_)
         result.commonShaderDefines_ += "URHO3D_ORTHOGRAPHIC_DEPTH ORTHO ";
-    if (sceneProcessorSettings_.lightingMode_ == DirectLightingMode::DeferredPBR)
+    if (settings_.sceneProcessor_.lightingMode_ == DirectLightingMode::DeferredPBR)
         result.commonShaderDefines_ += "URHO3D_PHYSICAL_MATERIAL ";
 }
 
@@ -321,7 +321,7 @@ bool ShaderProgramCompositor::IsInstancingUsed(
     DrawableProcessorPassFlags flags, Geometry* geometry, GeometryType geometryType) const
 {
     return !flags.Test(DrawableProcessorPassFlag::DisableInstancing)
-        && instancingBufferSettings_.enableInstancing_
+        && settings_.instancingBuffer_.enableInstancing_
         && geometry->IsInstanced(geometryType);
 }
 

@@ -535,7 +535,7 @@ void RenderBufferManager::OnRenderBegin(const CommonFrameInfo& frameInfo)
     }
 
     // Check if need to allocate secondary color buffer, substitute primary color buffer or substitute depth buffer
-    const bool needSimpleTexture = frameSettings_.readableColor_ || frameSettings_.readableDepth_
+    const bool needSimpleTexture = frameSettings_.readableColor_ || settings_.readableDepth_
         || settings_.colorUsableWithMultipleRenderTargets_;
 
     const bool isColorFormatMatching = IsColorFormatMatching(outputFormat, viewportParams.textureFormat_);
@@ -549,7 +549,7 @@ void RenderBufferManager::OnRenderBegin(const CommonFrameInfo& frameInfo)
         || !isColorSRGBMatching || !isMultiSampleMatching || !isFilterMatching || !isColorUsageMatching;
     const bool needSubstituteDepthBuffer = !isMultiSampleMatching || !outputDepthStencil.has_value()
         || ((needSecondaryBuffer || needSubstitutePrimaryBuffer) && outputDepthStencil.value() == nullptr)
-        || (frameSettings_.readableDepth_ && (!outputHasReadableDepth || !isSimpleTextureOutput))
+        || (settings_.readableDepth_ && (!outputHasReadableDepth || !isSimpleTextureOutput))
         || (settings_.stencilBuffer_ && !outputHasStencil);
 
     // Allocate substitute buffers if necessary
@@ -565,7 +565,7 @@ void RenderBufferManager::OnRenderBegin(const CommonFrameInfo& frameInfo)
     {
         RenderBufferParams depthBufferParams = viewportParams;
         depthBufferParams.flags_ |= RenderBufferFlag::Persistent;
-        if (frameSettings_.readableDepth_)
+        if (settings_.readableDepth_)
         {
             depthBufferParams.textureFormat_ = settings_.stencilBuffer_
                 ? Graphics::GetReadableDepthStencilFormat()

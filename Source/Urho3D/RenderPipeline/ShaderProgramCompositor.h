@@ -64,9 +64,8 @@ class URHO3D_API ShaderProgramCompositor : public Object
 
 public:
     explicit ShaderProgramCompositor(Context* context);
-    void SetSettings(const SceneProcessorSettings& sceneProcessorSettings,
-        const ShadowMapAllocatorSettings& shadowMapSettings, const InstancingBufferSettings& instancingBufferSettings,
-        bool isCameraOrthographic);
+    void SetSettings(const ShaderProgramCompositorSettings& settings);
+    void SetFrameSettings(bool isCameraOrthographic);
 
     /// Process batches
     /// @{
@@ -110,9 +109,7 @@ private:
     /// External configuration
     /// @{
     bool constantBuffersSupported_{};
-    SceneProcessorSettings sceneProcessorSettings_;
-    ShadowMapAllocatorSettings shadowMapSettings_;
-    InstancingBufferSettings instancingBufferSettings_;
+    ShaderProgramCompositorSettings settings_;
     bool isCameraOrthographic_{};
     /// @}
 };

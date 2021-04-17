@@ -244,14 +244,16 @@ void SceneProcessor::SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes
     batchCompositor_->SetPasses(ea::move(passes));
 }
 
-void SceneProcessor::SetSettings(const SceneProcessorSettings& settings)
+void SceneProcessor::SetSettings(const ShaderProgramCompositorSettings& settings)
 {
-    if (settings_ != settings)
+    pipelineStateBuilder_->SetSettings(settings);
+
+    if (settings_ != settings.sceneProcessor_)
     {
-        settings_ = settings;
-        drawableProcessor_->SetSettings(settings_);
-        batchRenderer_->SetSettings(settings_);
-        batchCompositor_->SetShadowMaterialQuality(settings_.materialQuality_);
+        settings_ = settings.sceneProcessor_;
+        drawableProcessor_->SetSettings(settings.sceneProcessor_);
+        batchRenderer_->SetSettings(settings.sceneProcessor_);
+        batchCompositor_->SetShadowMaterialQuality(settings.sceneProcessor_.materialQuality_);
     }
 }
 
@@ -434,7 +436,7 @@ void SceneProcessor::OnUpdateBegin(const CommonFrameInfo& frameInfo)
 
     cameraProcessor_->OnUpdateBegin(frameInfo_);
     drawableProcessor_->OnUpdateBegin(frameInfo_);
-    pipelineStateBuilder_->OnSettingsUpdated();
+    pipelineStateBuilder_->SetFrameSettings(cameraProcessor_->IsCameraOrthographic());
 }
 
 void SceneProcessor::OnRenderBegin(const CommonFrameInfo& frameInfo)

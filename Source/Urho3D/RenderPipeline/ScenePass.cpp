@@ -108,6 +108,7 @@ BatchRenderFlags BackToFrontScenePass::GetRenderFlags() const
 void BackToFrontScenePass::OnBatchesReady()
 {
     BatchCompositor::SortBatches(sortedBatches_, baseBatches_, lightBatches_);
+
     if (GetFlags().Test(DrawableProcessorPassFlag::RefractionPass))
     {
         hasRefractionBatches_ = false;

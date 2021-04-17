@@ -70,8 +70,8 @@
 /// Whether to use physiclally based material.
 // #define PBR
 
-/// Whether to apply soft fade-out if URHO3D_SOFT_PARTICLES_ENABLED is defined.
-// #define PARTICLE
+/// Whether to apply soft fade-out for particles.
+// #define SOFTPARTICLES
 
 /// Whether to render transparent object.
 /// If defined, specular is not affected by alpha.

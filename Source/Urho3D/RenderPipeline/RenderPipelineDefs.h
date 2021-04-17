@@ -71,7 +71,7 @@ enum class DrawableProcessorPassFlag
     HasAmbientLighting = 1 << 0,
     DisableInstancing = 1 << 1,
     DeferredLightMaskToStencil = 1 << 2,
-    SoftParticlesPass = 1 << 3,
+    NeedReadableDepth = 1 << 3,
     RefractionPass = 1 << 4,
     DepthOnlyPass = 1 << 5,
 };
@@ -159,6 +159,8 @@ struct RenderBufferManagerSettings
     bool filteredColor_{};
     /// Whether the depth-stencil buffer is required to have stencil.
     bool stencilBuffer_{};
+    /// Whether the depth buffer should be readable.
+    bool readableDepth_{};
     /// Whether the both of output color buffers should be usable with other render targets.
     /// OpenGL backbuffer color cannot do that.
     bool colorUsableWithMultipleRenderTargets_{};
@@ -168,7 +170,13 @@ struct RenderBufferManagerSettings
     unsigned CalculatePipelineStateHash() const
     {
         unsigned hash = 0;
+        CombineHash(hash, readableDepth_);
         return hash;
+    }
+
+    void Validate()
+    {
+        multiSampleLevel_ = Clamp(ClosestPowerOfTwo(multiSampleLevel_), 1u, 16u);
     }
 
     bool operator==(const RenderBufferManagerSettings& rhs) const
@@ -178,6 +186,7 @@ struct RenderBufferManagerSettings
             && colorSpace_ == rhs.colorSpace_
             && filteredColor_ == rhs.filteredColor_
             && stencilBuffer_ == rhs.stencilBuffer_
+            && readableDepth_ == rhs.readableDepth_
             && colorUsableWithMultipleRenderTargets_ == rhs.colorUsableWithMultipleRenderTargets_;
     }
 
@@ -188,8 +197,6 @@ struct RenderBufferManagerSettings
 /// Frequently-changing settings of render buffer manager.
 struct RenderBufferManagerFrameSettings
 {
-    /// Whether the depth buffer should be readable.
-    bool readableDepth_{};
     /// Whether the both of output color buffers should be readable.
     bool readableColor_{};
     /// Whether it's should be supported to read from and write to output color buffer simultaneously.
@@ -285,6 +292,17 @@ struct DrawableProcessorSettings
         return hash;
     }
 
+    void Validate()
+    {
+        maxVertexLights_ = Clamp(maxVertexLights_, 0u, 4u);
+        maxPixelLights_ = Clamp(maxPixelLights_, 0u, 256u);
+        pcfKernelSize_ = Clamp(pcfKernelSize_, 1u, 5u);
+
+        // Kernel size of 4 is not supported
+        if (pcfKernelSize_ == 4)
+            pcfKernelSize_ = 3;
+    }
+
     bool operator==(const DrawableProcessorSettings& rhs) const
     {
         return materialQuality_ == rhs.materialQuality_
@@ -312,6 +330,10 @@ struct InstancingBufferSettings
         CombineHash(hash, firstInstancingTexCoord_);
         CombineHash(hash, numInstancingTexCoords_);
         return hash;
+    }
+
+    void Validate()
+    {
     }
 
     bool operator==(const InstancingBufferSettings& rhs) const
@@ -348,6 +370,10 @@ struct BatchRendererSettings
         return hash;
     }
 
+    void Validate()
+    {
+    }
+
     bool operator==(const BatchRendererSettings& rhs) const
     {
         return linearSpaceLighting_ == rhs.linearSpaceLighting_
@@ -376,6 +402,12 @@ struct ShadowMapAllocatorSettings
         return hash;
     }
 
+    void Validate()
+    {
+        varianceShadowMapMultiSample_ = Clamp(ClosestPowerOfTwo(varianceShadowMapMultiSample_), 1u, 16u);
+        shadowAtlasPageSize_ = Clamp(ClosestPowerOfTwo(shadowAtlasPageSize_), 128u, 16 * 1024u);
+    }
+
     bool operator==(const ShadowMapAllocatorSettings& rhs) const
     {
         return enableVarianceShadowMaps_ == rhs.enableVarianceShadowMaps_
@@ -400,6 +432,11 @@ struct OcclusionBufferSettings
     unsigned CalculatePipelineStateHash() const
     {
         return 0;
+    }
+
+    void Validate()
+    {
+        occlusionBufferSize_ = Clamp(occlusionBufferSize_, 1u, 16 * 1024u);
     }
 
     bool operator==(const OcclusionBufferSettings& rhs) const
@@ -442,7 +479,6 @@ struct SceneProcessorSettings
     SpecularQuality specularQuality_{ SpecularQuality::Simple };
     ReflectionQuality reflectionQuality_{ ReflectionQuality::Pixel };
     bool enableShadows_{ true };
-    bool softParticles_{};
     DirectLightingMode lightingMode_{};
     unsigned directionalShadowSize_{ 1024 };
     unsigned spotShadowSize_{ 1024 };
@@ -471,9 +507,18 @@ struct SceneProcessorSettings
         CombineHash(hash, MakeHash(specularQuality_));
         CombineHash(hash, MakeHash(reflectionQuality_));
         CombineHash(hash, enableShadows_);
-        CombineHash(hash, softParticles_);
         CombineHash(hash, MakeHash(lightingMode_));
         return hash;
+    }
+
+    void Validate()
+    {
+        DrawableProcessorSettings::Validate();
+        OcclusionBufferSettings::Validate();
+        BatchRendererSettings::Validate();
+        directionalShadowSize_ = ClosestPowerOfTwo(directionalShadowSize_);
+        spotShadowSize_ = ClosestPowerOfTwo(spotShadowSize_);
+        pointShadowSize_ = ClosestPowerOfTwo(pointShadowSize_);
     }
 
     bool operator==(const SceneProcessorSettings& rhs) const
@@ -484,7 +529,6 @@ struct SceneProcessorSettings
             && specularQuality_ == rhs.specularQuality_
             && reflectionQuality_ == rhs.reflectionQuality_
             && enableShadows_ == rhs.enableShadows_
-            && softParticles_ == rhs.softParticles_
             && lightingMode_ == rhs.lightingMode_
             && directionalShadowSize_ == rhs.directionalShadowSize_
             && spotShadowSize_ == rhs.spotShadowSize_
@@ -492,6 +536,46 @@ struct SceneProcessorSettings
     }
 
     bool operator!=(const SceneProcessorSettings& rhs) const { return !(*this == rhs); }
+    /// @}
+};
+
+/// Settings that contribute to shader defines.
+struct ShaderProgramCompositorSettings
+{
+    RenderBufferManagerSettings renderBufferManager_;
+    SceneProcessorSettings sceneProcessor_;
+    ShadowMapAllocatorSettings shadowMapAllocator_;
+    InstancingBufferSettings instancingBuffer_;
+
+    /// Utility operators
+    /// @{
+    unsigned CalculatePipelineStateHash() const
+    {
+        unsigned hash = 0;
+        CombineHash(hash, renderBufferManager_.CalculatePipelineStateHash());
+        CombineHash(hash, sceneProcessor_.CalculatePipelineStateHash());
+        CombineHash(hash, shadowMapAllocator_.CalculatePipelineStateHash());
+        CombineHash(hash, instancingBuffer_.CalculatePipelineStateHash());
+        return hash;
+    }
+
+    void Validate()
+    {
+        renderBufferManager_.Validate();
+        sceneProcessor_.Validate();
+        shadowMapAllocator_.Validate();
+        instancingBuffer_.Validate();
+    }
+
+    bool operator==(const ShaderProgramCompositorSettings& rhs) const
+    {
+        return renderBufferManager_ == rhs.renderBufferManager_
+            && sceneProcessor_ == rhs.sceneProcessor_
+            && shadowMapAllocator_ == rhs.shadowMapAllocator_
+            && instancingBuffer_ == rhs.instancingBuffer_;
+    }
+
+    bool operator!=(const ShaderProgramCompositorSettings& rhs) const { return !(*this == rhs); }
     /// @}
 };
 
@@ -512,6 +596,10 @@ struct AutoExposurePassSettings
 
     /// Utility operators
     /// @{
+    void Validate()
+    {
+    }
+
     bool operator==(const AutoExposurePassSettings& rhs) const
     {
         return autoExposure_ == rhs.autoExposure_
@@ -536,6 +624,11 @@ struct BloomPassSettings
 
     /// Utility operators
     /// @{
+    void Validate()
+    {
+        numIterations_ = Clamp(numIterations_, 1u, 16u);
+    }
+
     bool operator==(const BloomPassSettings& rhs) const
     {
         return enabled_ == rhs.enabled_
@@ -560,13 +653,8 @@ enum class PostProcessAntialiasing
 };
 
 /// Settings of default render pipeline.
-struct RenderPipelineSettings
+struct RenderPipelineSettings : public ShaderProgramCompositorSettings
 {
-    RenderBufferManagerSettings renderBufferManager_;
-    SceneProcessorSettings sceneProcessor_;
-    ShadowMapAllocatorSettings shadowMapAllocator_;
-    InstancingBufferSettings instancingBuffer_;
-
     /// Post-processing settings
     /// @{
     AutoExposurePassSettings autoExposure_;
@@ -581,20 +669,21 @@ struct RenderPipelineSettings
     unsigned CalculatePipelineStateHash() const
     {
         unsigned hash = 0;
-        CombineHash(hash, renderBufferManager_.CalculatePipelineStateHash());
-        CombineHash(hash, sceneProcessor_.CalculatePipelineStateHash());
-        CombineHash(hash, shadowMapAllocator_.CalculatePipelineStateHash());
-        CombineHash(hash, instancingBuffer_.CalculatePipelineStateHash());
+        CombineHash(hash, ShaderProgramCompositorSettings::CalculatePipelineStateHash());
         return hash;
+    }
+
+    void Validate()
+    {
+        ShaderProgramCompositorSettings::Validate();
+
+        autoExposure_.Validate();
+        bloom_.Validate();
     }
 
     bool operator==(const RenderPipelineSettings& rhs) const
     {
-        return renderBufferManager_ == rhs.renderBufferManager_
-            && sceneProcessor_ == rhs.sceneProcessor_
-            && shadowMapAllocator_ == rhs.shadowMapAllocator_
-            && instancingBuffer_ == rhs.instancingBuffer_
-
+        return ShaderProgramCompositorSettings::operator==(rhs)
             && autoExposure_ == rhs.autoExposure_
             && bloom_ == rhs.bloom_
             && toneMapping_ == rhs.toneMapping_
@@ -605,8 +694,16 @@ struct RenderPipelineSettings
     bool operator!=(const RenderPipelineSettings& rhs) const { return !(*this == rhs); }
     /// @}
 
+    /// Adjust to closest suported settings.
+    void AdjustToSupported(Context* context);
+
     /// Validate settings and adjust to closest valid option.
-    void Validate(Context* context);
+    void ValidateAndAdjust(Context* context)
+    {
+        Validate();
+        AdjustToSupported(context);
+        Validate();
+    }
 };
 
 }

@@ -33,7 +33,7 @@
 namespace Urho3D
 {
 
-void RenderPipelineSettings::Validate(Context* context)
+void RenderPipelineSettings::AdjustToSupported(Context* context)
 {
     auto graphics = context->GetSubsystem<Graphics>();
 
@@ -68,12 +68,18 @@ void RenderPipelineSettings::Validate(Context* context)
     if (instancingBuffer_.enableInstancing_)
     {
         instancingBuffer_.firstInstancingTexCoord_ = 4;
-        instancingBuffer_.numInstancingTexCoords_ = 3 +
-            (sceneProcessor_.ambientMode_ == DrawableAmbientMode::Constant
-            ? 0
-            : sceneProcessor_.ambientMode_ == DrawableAmbientMode::Flat
-            ? 1
-            : 7);
+        switch (sceneProcessor_.ambientMode_)
+        {
+        case DrawableAmbientMode::Constant:
+            instancingBuffer_.numInstancingTexCoords_ = 3;
+            break;
+        case DrawableAmbientMode::Flat:
+            instancingBuffer_.numInstancingTexCoords_ = 3 + 1;
+            break;
+        case DrawableAmbientMode::Directional:
+            instancingBuffer_.numInstancingTexCoords_ = 3 + 7;
+            break;
+        }
     }
 
     sceneProcessor_.linearSpaceLighting_ =
@@ -88,8 +94,6 @@ void RenderPipelineSettings::Validate(Context* context)
     }
 #endif
 
-    // TODO(renderer): Split this method
-    bloom_.numIterations_ = Clamp(bloom_.numIterations_, 1u, 16u);
     bloom_.hdr_ = renderBufferManager_.colorSpace_ == RenderPipelineColorSpace::LinearHDR;
 }
 

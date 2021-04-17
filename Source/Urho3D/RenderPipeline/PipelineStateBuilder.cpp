@@ -72,11 +72,14 @@ PipelineStateBuilder::PipelineStateBuilder(Context* context,
 {
 }
 
-void PipelineStateBuilder::OnSettingsUpdated()
+void PipelineStateBuilder::SetSettings(const ShaderProgramCompositorSettings& settings)
 {
-    compositor_->SetSettings(sceneProcessor_->GetSettings(),
-        shadowMapAllocator_->GetSettings(), instancingBuffer_->GetSettings(),
-        cameraProcessor_->IsCameraOrthographic());
+    compositor_->SetSettings(settings);
+}
+
+void PipelineStateBuilder::SetFrameSettings(bool isCameraOrthographic)
+{
+    compositor_->SetFrameSettings(isCameraOrthographic);
 }
 
 SharedPtr<PipelineState> PipelineStateBuilder::CreateBatchPipelineState(

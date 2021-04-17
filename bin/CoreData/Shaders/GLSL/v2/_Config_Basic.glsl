@@ -198,6 +198,11 @@
     #define URHO3D_DEPTH_ONLY_PASS
 #endif
 
+/// URHO3D_LIGHT_PASS: Whether there's active per-pixel light source in this pass (litbase, light and lightvolume passes).
+#if defined(URHO3D_LIGHT_DIRECTIONAL) || defined(URHO3D_LIGHT_POINT) || defined(URHO3D_LIGHT_SPOT)
+    #define URHO3D_LIGHT_PASS
+#endif
+
 #ifdef URHO3D_VERTEX_SHADER
     /// Some geometries require certain vertex attributes.
     #if defined(URHO3D_GEOMETRY_SKINNED)

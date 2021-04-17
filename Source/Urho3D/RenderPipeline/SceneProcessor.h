@@ -58,7 +58,7 @@ public:
     /// Setup. Slow, called rarely.
     /// @{
     void SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes);
-    void SetSettings(const SceneProcessorSettings& settings);
+    void SetSettings(const ShaderProgramCompositorSettings& settings);
     /// @}
 
     /// Create scene passes

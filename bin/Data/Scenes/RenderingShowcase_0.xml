@@ -752,7 +752,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="491">
 					<attribute name="Model" value="Model;Models/Plane.mdl" />
-					<attribute name="Material" value="Material;Materials/LitSmoke.xml" />
+					<attribute name="Material" value="Material;Materials/LitSmokeSoft.xml" />
 				</component>
 			</node>
 			<node id="511">
@@ -765,7 +765,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="492">
 					<attribute name="Model" value="Model;Models/Plane.mdl" />
-					<attribute name="Material" value="Material;Materials/LitSmoke.xml" />
+					<attribute name="Material" value="Material;Materials/LitSmokeSoft.xml" />
 				</component>
 			</node>
 			<node id="512">
@@ -778,7 +778,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="493">
 					<attribute name="Model" value="Model;Models/Plane.mdl" />
-					<attribute name="Material" value="Material;Materials/LitSmoke.xml" />
+					<attribute name="Material" value="Material;Materials/LitSmokeSoft.xml" />
 				</component>
 			</node>
 			<node id="513">
@@ -791,7 +791,7 @@
 				<attribute name="Variables" />
 				<component type="StaticModel" id="494">
 					<attribute name="Model" value="Model;Models/Plane.mdl" />
-					<attribute name="Material" value="Material;Materials/LitSmoke.xml" />
+					<attribute name="Material" value="Material;Materials/LitSmokeSoft.xml" />
 				</component>
 			</node>
 		</node>

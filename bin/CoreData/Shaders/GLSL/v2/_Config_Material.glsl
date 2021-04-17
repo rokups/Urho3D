@@ -47,7 +47,7 @@
 #endif
 
 /// URHO3D_SOFT_PARTICLES: Whether to apply soft particles fade out.
-#if defined(PARTICLE) && defined(URHO3D_SOFT_PARTICLES_ENABLED)
+#if defined(SOFTPARTICLES) && defined(URHO3D_HAS_READABLE_DEPTH)
     #define URHO3D_SOFT_PARTICLES
 #endif
 
