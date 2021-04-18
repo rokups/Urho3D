@@ -55,6 +55,11 @@
     #define URHO3D_FEATURE_DERIVATIVES
 #endif
 
+/// URHO3D_FEATURE_CUBEMAP_LOD: Whether textureCubeLod is supported.
+#if !defined(GL_ES) || defined(GL_EXT_shader_texture_lod)
+    #define URHO3D_FEATURE_CUBEMAP_LOD
+#endif
+
 /// URHO3D_FEATURE_FRAMEBUFFER_Y_INVERTED: Whether Y axis of clip space is the opposite of Y axis of render target texture.
 #ifdef D3D11
     #define URHO3D_FEATURE_FRAMEBUFFER_Y_INVERTED
@@ -174,7 +179,7 @@
     #endif
 #endif
 
-// Compatible texture samplers for GL3
+/// Compatible texture samplers for GL3
 #ifdef GL3
     #define texture2D texture
     #define texture2DProj textureProj
@@ -183,10 +188,17 @@
     #define textureCubeLod textureLod
     #define texture2DLod textureLod
     #define texture2DLodOffset textureLodOffset
+#elif defined(GL_ES) && defined(GL_EXT_shader_texture_lod)
+    #define textureCubeLod textureCubeLodEXT
 #endif
 
 
 /// =================================== Consolidate ShaderProgramCompositor defines ===================================
+
+/// Default to 0 (i.e. no specular) if not defined.
+#ifndef URHO3D_SPECULAR
+    #define URHO3D_SPECULAR 0
+#endif
 
 /// Default to 1 cascade if not defined.
 #ifndef URHO3D_MAX_SHADOW_CASCADES

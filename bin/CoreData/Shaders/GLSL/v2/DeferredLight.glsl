@@ -53,7 +53,7 @@ void main()
 
     DirectLightData lightData = GetDeferredDirectLightData(worldPos, depth);
 
-    #if defined(URHO3D_PHYSICAL_MATERIAL) || defined(URHO3D_LIGHT_HAS_SPECULAR)
+    #if defined(URHO3D_PHYSICAL_MATERIAL) || URHO3D_SPECULAR > 0
         half3 halfVec = normalize(eyeVec + lightData.lightVec.xyz);
     #endif
 
@@ -61,7 +61,7 @@ void main()
         half3 lightColor = Direct_PBR(lightData.lightColor, albedoInput.rgb, specularInput.rgb, roughness,
             lightData.lightVec.xyz, normal, eyeVec, halfVec);
     #else
-        #ifdef URHO3D_LIGHT_HAS_SPECULAR
+        #if URHO3D_SPECULAR > 0
             half3 lightColor = Direct_SimpleSpecular(lightData.lightColor,
                 albedoInput.rgb, specularInput.rgb,
                 lightData.lightVec.xyz, normal, halfVec, specularPower, cLightColor.a);

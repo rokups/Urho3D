@@ -6,7 +6,6 @@
 
 #include "_Config.glsl"
 #include "_GammaCorrection.glsl"
-#include "_SurfaceData.glsl"
 #include "_BRDF.glsl"
 
 #include "_Uniforms.glsl"
@@ -29,7 +28,9 @@
 #include "_Material_Vertex.glsl"
 #endif
 #ifdef URHO3D_PIXEL_SHADER
-#include "_Material_Pixel.glsl"
+#include "_Material_Pixel_SurfaceData.glsl"
+#include "_Material_Pixel_Fill.glsl"
+#include "_Material_Pixel_Evaluate.glsl"
 #endif
 
 #endif // _MATERIAL_GLSL_

@@ -20,39 +20,43 @@ VERTEX_OUTPUT_HIGHP(vec2 vDetailTexCoord)
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    vec2 texCoord = GetTransformedTexCoord();
-    vDetailTexCoord = texCoord * cDetailTiling;
-    FillCommonVertexOutput(vertexTransform, texCoord);
+    FillVertexOutputs(vertexTransform);
+    vDetailTexCoord = vTexCoord * cDetailTiling;
 }
 #endif
 
 #ifdef URHO3D_PIXEL_SHADER
 void main()
 {
-    FragmentData fragmentData = GetFragmentData();
-    SurfaceGeometryData surfaceGeometryData = GetSurfaceGeometryData();
+    SurfaceData surfaceData;
 
-    SetupFragmentReflectionColor(fragmentData, surfaceGeometryData);
-    SetupFragmentBackgroundDepth(fragmentData);
+    FillFragmentFogFactor(surfaceData);
+    FillFragmentAmbient(surfaceData);
+    FillFragmentEyeVector(surfaceData);
+    FillFragmentScreenPosition(surfaceData);
+    FillFragmentNormal(surfaceData);
+    FillFragmentMetallicRoughnessOcclusion(surfaceData);
 
-    SurfaceMaterialData surfaceMaterialData;
+    AdjustFragmentRoughness(surfaceData);
+    FillFragmentBackgroundDepth(surfaceData);
+    FillFragmentReflectionColor(surfaceData);
 
     half3 weights = texture2D(sDiffMap, vTexCoord).rgb;
     half sumWeights = weights.r + weights.g + weights.b;
     weights /= sumWeights;
-    surfaceMaterialData.albedo = cMatDiffColor * (
+    surfaceData.albedo = cMatDiffColor * (
         weights.r * texture2D(sNormalMap, vDetailTexCoord) +
         weights.g * texture2D(sSpecMap, vDetailTexCoord) +
         weights.b * texture2D(sEmissiveMap, vDetailTexCoord)
     );
 
-#ifdef URHO3D_IS_LIT
-    surfaceMaterialData.specular = cMatSpecColor.rgb;
-    surfaceMaterialData.emission = cMatEmissiveColor;
+    surfaceData.specular = cMatSpecColor.rgb;
+#ifdef URHO3D_SURFACE_NEED_EMISSION
+    surfaceData.emission = cMatEmissiveColor;
 #endif
 
-    half3 finalColor = GetFinalColor(fragmentData, surfaceGeometryData, surfaceMaterialData);
-    gl_FragColor.rgb = ApplyFog(finalColor, fragmentData.fogFactor);
-    gl_FragColor.a = GetFinalAlpha(fragmentData, surfaceMaterialData);
+    half3 finalColor = GetFinalColor(surfaceData);
+    gl_FragColor.rgb = ApplyFog(finalColor, surfaceData.fogFactor);
+    gl_FragColor.a = GetFinalAlpha(surfaceData);
 }
 #endif

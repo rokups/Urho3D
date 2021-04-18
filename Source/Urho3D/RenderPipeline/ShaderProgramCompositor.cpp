@@ -314,10 +314,11 @@ void ShaderProgramCompositor::ApplyDefinesForShadowPass(ShaderProgramDesc& resul
 
 void ShaderProgramCompositor::ApplyDefinesForLightVolumePass(ShaderProgramDesc& result) const
 {
+    result.commonShaderDefines_ += "URHO3D_LIGHT_VOLUME_PASS ";
     if (isCameraOrthographic_)
         result.commonShaderDefines_ += "URHO3D_ORTHOGRAPHIC_DEPTH ORTHO ";
     if (settings_.sceneProcessor_.lightingMode_ == DirectLightingMode::DeferredPBR)
-        result.commonShaderDefines_ += "URHO3D_PHYSICAL_MATERIAL ";
+        result.commonShaderDefines_ += "URHO3D_PHYSICAL_MATERIAL PBR ";
 }
 
 bool ShaderProgramCompositor::IsInstancingUsed(

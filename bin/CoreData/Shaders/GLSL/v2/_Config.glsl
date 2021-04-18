@@ -27,15 +27,19 @@
 // #define URHO3D_VERTEX_NEED_NORMAL
 // #define URHO3D_VERTEX_NEED_TANGENT
 
-/// Configures what data pixel shader needs:
+/// Configures what data pixel shader needs from vertex shader:
 // #define URHO3D_PIXEL_NEED_SCREEN_POSITION
 // #define URHO3D_PIXEL_NEED_EYE_VECTOR
 // #define URHO3D_PIXEL_NEED_NORMAL
-// #define URHO3D_PIXEL_NEED_NORMAL_IN_TANGENT_SPACE
 // #define URHO3D_PIXEL_NEED_TANGENT
 // #define URHO3D_PIXEL_NEED_VERTEX_COLOR
-// #define URHO3D_PIXEL_NEED_BACKGROUND_DEPTH
-// #define URHO3D_PIXEL_NEED_BACKGROUND_COLOR
+
+/// Configures what data pixel shader needs to prepare for user shader:
+// #define URHO3D_SURFACE_NEED_AMBIENT
+// #define URHO3D_SURFACE_NEED_NORMAL
+// #define URHO3D_SURFACE_NEED_NORMAL_IN_TANGENT_SPACE
+// #define URHO3D_SURFACE_NEED_BACKGROUND_DEPTH
+// #define URHO3D_SURFACE_NEED_BACKGROUND_COLOR
 
 /// Configures what built-in inputs should be ignored by built-in utilities.
 // #define URHO3D_IGNORE_MATERIAL_DIFFUSE

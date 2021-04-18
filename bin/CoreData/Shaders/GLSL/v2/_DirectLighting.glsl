@@ -5,7 +5,7 @@
     #error Include _Uniforms.glsl before _DirectLighting.glsl
 #endif
 
-#ifdef URHO3D_HAS_PIXEL_LIGHT
+#ifdef URHO3D_LIGHT_PASS
 
 /// Return light vector normalized to light range.
 #ifdef URHO3D_LIGHT_DIRECTIONAL
@@ -93,6 +93,6 @@
     }
 
 #endif // URHO3D_PIXEL_SHADER
-#endif // URHO3D_HAS_PIXEL_LIGHT
+#endif // URHO3D_LIGHT_PASS
 
 #endif // _DIRECT_LIGHTING_GLSL_

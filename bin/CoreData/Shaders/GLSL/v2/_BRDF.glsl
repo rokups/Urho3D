@@ -24,26 +24,25 @@ half3 F_Schlick(half3 specularColor, half u)
 
 #ifdef URHO3D_AMBIENT_PASS
 
-#ifndef _SURFACE_DATA_GLSL_
-    #error Include _SurfaceData.glsl before _BRDF.glsl
-#endif
-
-/// Calculate simple indirect diffuse and specular lighting.
-half3 Indirect_Simple(const FragmentData fragmentData, half3 albedo, half3 specular)
+/// Calculate simple indirect lighting for diffuse material.
+half3 Indirect_Simple(const half3 ambientLighting, const half3 albedo, const half3 specular)
 {
-    half3 diffuseAndSpecularColor = fragmentData.ambientLighting * albedo;
-#ifdef URHO3D_REFLECTION_MAPPING
-    diffuseAndSpecularColor += GammaToLightSpace(specular * fragmentData.reflectionColor.rgb);
-#endif
-    return diffuseAndSpecularColor;
+    return ambientLighting * albedo;
 }
 
 #ifdef URHO3D_REFLECTION_MAPPING
+    /// Calculate simple indirect lighting for reflective material.
+    half3 Indirect_SimpleReflection(const half3 ambientLighting, const half3 reflectionColor,
+        const half3 albedo, const half3 specular)
+    {
+        return ambientLighting * albedo + GammaToLightSpace(specular * reflectionColor);
+    }
+
     /// Calculate simple indirect lighting and transparency for water.
-    half4 Indirect_SimpleWater(const FragmentData fragmentData, const half3 specular, half NoV)
+    half4 Indirect_SimpleWater(const half3 reflectionColor, const half3 specular, const half NoV)
     {
         half fresnel = pow(1.0 - NoV, 5.0);
-        return vec4(GammaToLightSpace(specular * fragmentData.reflectionColor.rgb), fresnel);
+        return vec4(GammaToLightSpace(specular * reflectionColor), fresnel);
     }
 #endif
 
@@ -51,7 +50,7 @@ half3 Indirect_Simple(const FragmentData fragmentData, half3 albedo, half3 specu
 
 /// Evaluate approximated specular color for indirect lighting.
 /// https://www.unrealengine.com/en-US/blog/physically-based-shading-on-mobile
-half3 BRDF_IndirectSpecular(half3 specularColor, half roughness, half NoV)
+half3 BRDF_IndirectSpecular(const half3 specularColor, const half roughness, const half NoV)
 {
     const half4 c0 = vec4(-1, -0.0275, -0.572, 0.022);
     const half4 c1 = vec4(1, 0.0425, 1.04, -0.04);
@@ -62,7 +61,8 @@ half3 BRDF_IndirectSpecular(half3 specularColor, half roughness, half NoV)
 }
 
 /// Calculate indirect PBR lighting.
-half3 Indirect_PBR(const FragmentData fragmentData, half3 albedo, half3 specular, half roughness, half NoV)
+half3 Indirect_PBR(const half3 ambientLighting, const half3 reflectionColor,
+    const half3 albedo, const half3 specular, const half roughness, const half NoV)
 {
 #ifdef URHO3D_GAMMA_CORRECTION
     half3 brdf = BRDF_IndirectSpecular(specular, roughness, NoV);
@@ -70,17 +70,16 @@ half3 Indirect_PBR(const FragmentData fragmentData, half3 albedo, half3 specular
     half3 brdf = BRDF_IndirectSpecular(specular * specular, roughness, NoV);
 #endif
 
-    half3 diffuseColor = fragmentData.ambientLighting * albedo;
-    half3 specularColor = brdf * GammaToLinearSpace(fragmentData.reflectionColor.rgb);
+    half3 specularColor = brdf * GammaToLinearSpace(reflectionColor);
 #ifndef URHO3D_GAMMA_CORRECTION
     specularColor = sqrt(max(specularColor, 0.0));
 #endif
 
-    return diffuseColor + specularColor;
+    return ambientLighting * albedo + specularColor;
 }
 
 /// Calculate indirect PBR lighting for transparent object.
-half4 Indirect_PBRWater(const FragmentData fragmentData, half3 specular, half NoV)
+half4 Indirect_PBRWater(const half3 reflectionColor, half3 specular, half NoV)
 {
 #ifdef URHO3D_GAMMA_CORRECTION
     half3 brdf = F_Schlick(specular, NoV);
@@ -88,7 +87,7 @@ half4 Indirect_PBRWater(const FragmentData fragmentData, half3 specular, half No
     half3 brdf = F_Schlick(specular * specular, NoV);
 #endif
 
-    half3 specularColor = brdf * GammaToLinearSpace(fragmentData.reflectionColor.rgb);
+    half3 specularColor = brdf * GammaToLinearSpace(reflectionColor);
 
 #ifndef URHO3D_GAMMA_CORRECTION
     specularColor = sqrt(max(specularColor, 0.0));
@@ -101,7 +100,7 @@ half4 Indirect_PBRWater(const FragmentData fragmentData, half3 specular, half No
 
 #endif // URHO3D_AMBIENT_PASS
 
-#ifdef URHO3D_HAS_PIXEL_LIGHT
+#ifdef URHO3D_LIGHT_PASS
 
 /// Evaluate Blinn-Phong BRDF.
 half BRDF_Direct_BlinnPhongSpecular(half3 normal, half3 halfVec, half specularPower)
@@ -184,7 +183,7 @@ half3 Direct_PBR(half3 lightColor, half3 albedo, half3 specular, half roughness,
 
 #endif // URHO3D_PHYSICAL_MATERIAL
 
-#endif // URHO3D_HAS_PIXEL_LIGHT
+#endif // URHO3D_LIGHT_PASS
 
 #endif // URHO3D_IS_LIT
 

@@ -23,7 +23,7 @@
 #endif
 
 #ifdef URHO3D_PIXEL_SHADER
-#ifdef URHO3D_HAS_PIXEL_LIGHT
+#ifdef URHO3D_LIGHT_PASS
     /// Sample geometry buffer at position.
     #ifdef URHO3D_LIGHT_DIRECTIONAL
         #define SampleGeometryBuffer(texture, screenPos) texture2D(texture, screenPos.xy)
@@ -61,7 +61,7 @@
         return result;
     }
 
-#endif // URHO3D_HAS_PIXEL_LIGHT
+#endif // URHO3D_LIGHT_PASS
 #endif // URHO3D_PIXEL_SHADER
 
 #endif // _DEFERRED_LIGHTING_GLSL_

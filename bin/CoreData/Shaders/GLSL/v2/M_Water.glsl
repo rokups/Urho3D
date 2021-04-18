@@ -1,7 +1,7 @@
 #define URHO3D_PIXEL_NEED_EYE_VECTOR
-#define URHO3D_PIXEL_NEED_BACKGROUND_COLOR
-#define URHO3D_PIXEL_NEED_NORMAL
-#define URHO3D_PIXEL_NEED_NORMAL_IN_TANGENT_SPACE
+#define URHO3D_SURFACE_NEED_BACKGROUND_COLOR
+#define URHO3D_SURFACE_NEED_NORMAL
+#define URHO3D_SURFACE_NEED_NORMAL_IN_TANGENT_SPACE
 #define URHO3D_CUSTOM_MATERIAL_UNIFORMS
 
 #ifndef NORMALMAP
@@ -27,48 +27,55 @@ UNIFORM_BUFFER_END(4, Material)
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    vec2 uv = GetTransformedTexCoord() + cElapsedTime * cNoiseSpeed;
-    FillCommonVertexOutput(vertexTransform, uv);
+    FillVertexOutputs(vertexTransform);
+    vTexCoord += cElapsedTime * cNoiseSpeed;
 }
 #endif
 
 #ifdef URHO3D_PIXEL_SHADER
 void main()
 {
-    FragmentData fragmentData = GetFragmentData();
-    SurfaceGeometryData surfaceGeometryData = GetSurfaceGeometryData();
+    SurfaceData surfaceData;
+
+    FillFragmentFogFactor(surfaceData);
+    FillFragmentAmbient(surfaceData);
+    FillFragmentEyeVector(surfaceData);
+    FillFragmentScreenPosition(surfaceData);
+    FillFragmentNormal(surfaceData);
+    FillFragmentMetallicRoughnessOcclusion(surfaceData);
 
     // Apply noise to screen position used for background sampling
-    fragmentData.screenPos += surfaceGeometryData.normalInTangentSpace.xy * cNoiseStrength;
+    surfaceData.screenPos += surfaceData.normalInTangentSpace.xy * cNoiseStrength;
 
-    SetupFragmentReflectionColor(fragmentData, surfaceGeometryData);
-    SetupFragmentBackgroundColor(fragmentData);
+    FillFragmentReflectionColor(surfaceData);
+    FillFragmentBackgroundColor(surfaceData);
 
     // Water doesn't accept diffuse lighting, set albedo to zero
-    SurfaceMaterialData surfaceMaterialData;
-    surfaceMaterialData.albedo = vec4(0.0);
-    surfaceMaterialData.specular = cMatSpecColor.rgb * (1.0 - surfaceGeometryData.oneMinusReflectivity);
-    surfaceMaterialData.emission = cMatEmissiveColor;
+    surfaceData.albedo = vec4(0.0);
+    surfaceData.specular = cMatSpecColor.rgb * (1.0 - surfaceData.oneMinusReflectivity);
+#ifdef URHO3D_SURFACE_NEED_EMISSION
+    surfaceData.emission = cMatEmissiveColor;
+#endif
 
 #ifdef URHO3D_AMBIENT_PASS
-    half NoV = clamp(dot(surfaceGeometryData.normal, fragmentData.eyeVec), 0.0, 1.0);
+    half NoV = clamp(dot(surfaceData.normal, surfaceData.eyeVec), 0.0, 1.0);
     #ifdef URHO3D_PHYSICAL_MATERIAL
-        half4 reflectedColor = Indirect_PBRWater(fragmentData, surfaceMaterialData.specular, NoV);
+        half4 reflectedColor = Indirect_PBRWater(surfaceData.reflectionColor.rgb, surfaceData.specular, NoV);
     #else
-        half4 reflectedColor = Indirect_SimpleWater(fragmentData, cMatEnvMapColor, NoV);
+        half4 reflectedColor = Indirect_SimpleWater(surfaceData.reflectionColor.rgb, cMatEnvMapColor, NoV);
     #endif
 #else
     half4 reflectedColor = vec4(0.0);
 #endif
 
-#ifdef URHO3D_HAS_PIXEL_LIGHT
-    reflectedColor.rgb += CalculateDirectLighting(fragmentData, surfaceGeometryData, surfaceMaterialData);
+#ifdef URHO3D_LIGHT_PASS
+    reflectedColor.rgb += CalculateDirectLighting(surfaceData);
 #endif
 
 #ifdef URHO3D_ADDITIVE_LIGHT_PASS
-    gl_FragColor = vec4(ApplyFog(reflectedColor.rgb, fragmentData.fogFactor), 0.0);
+    gl_FragColor = vec4(ApplyFog(reflectedColor.rgb, surfaceData.fogFactor), 0.0);
 #else
-    gl_FragColor = vec4(mix(fragmentData.backgroundColor, reflectedColor.rgb, reflectedColor.a), 1.0);
+    gl_FragColor = vec4(mix(surfaceData.backgroundColor, reflectedColor.rgb, reflectedColor.a), 1.0);
 #endif
 
 }

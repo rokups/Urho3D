@@ -4,23 +4,31 @@
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    FillCommonVertexOutput(vertexTransform, GetTransformedTexCoord());
+    FillVertexOutputs(vertexTransform);
 }
 #endif
 
 #ifdef URHO3D_PIXEL_SHADER
 void main()
 {
-    FragmentData fragmentData = GetFragmentData();
-    SurfaceGeometryData surfaceGeometryData = GetSurfaceGeometryData();
+    SurfaceData surfaceData;
 
-    SetupFragmentReflectionColor(fragmentData, surfaceGeometryData);
-    SetupFragmentBackgroundDepth(fragmentData);
+    FillFragmentFogFactor(surfaceData);
+    FillFragmentAmbient(surfaceData);
+    FillFragmentEyeVector(surfaceData);
+    FillFragmentScreenPosition(surfaceData);
+    FillFragmentNormal(surfaceData);
+    FillFragmentMetallicRoughnessOcclusion(surfaceData);
 
-    SurfaceMaterialData surfaceMaterialData = GetSurfaceMaterialData(surfaceGeometryData.oneMinusReflectivity);
+    AdjustFragmentRoughness(surfaceData);
+    FillFragmentBackgroundDepth(surfaceData);
+    FillFragmentReflectionColor(surfaceData);
 
-    half3 finalColor = GetFinalColor(fragmentData, surfaceGeometryData, surfaceMaterialData);
-    gl_FragColor.rgb = ApplyFog(finalColor, fragmentData.fogFactor);
-    gl_FragColor.a = GetFinalAlpha(fragmentData, surfaceMaterialData);
+    FillFragmentAlbedoSpecular(surfaceData);
+    FillFragmentEmission(surfaceData);
+
+    half3 finalColor = GetFinalColor(surfaceData);
+    gl_FragColor.rgb = ApplyFog(finalColor, surfaceData.fogFactor);
+    gl_FragColor.a = GetFinalAlpha(surfaceData);
 }
 #endif
