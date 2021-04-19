@@ -2,6 +2,11 @@
 /// Don't include!
 /// Material attributes passed from vertex to pixel shader.
 
+/// Don't take chances: vertex position must be the same.
+#if defined(URHO3D_VERTEX_SHADER) && defined(GL_ES)
+    invariant gl_Position;
+#endif
+
 /// Vertex transform attributes:
 /// @{
 VERTEX_OUTPUT_HIGHP(float vWorldDepth)

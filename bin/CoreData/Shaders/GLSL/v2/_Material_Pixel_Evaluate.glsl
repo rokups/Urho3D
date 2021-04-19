@@ -3,12 +3,10 @@
 
 /// Return final alpha with optionally applied fade out.
 #ifdef URHO3D_SOFT_PARTICLES
-    half GetSoftParticleFade(float fragmentDepth, float backgroundDepth)
+    half GetSoftParticleFade(const half fragmentDepth, const half backgroundDepth)
     {
-        // TODO(renderer): Make these configurable
-        vec2 cMatParticleFadeParams = vec2(0.0, 1.0 * (cFarClip - cNearClip));
-        float depthDelta = backgroundDepth - fragmentDepth - cMatParticleFadeParams.x;
-        return clamp(depthDelta * cMatParticleFadeParams.y, 0.0, 1.0);
+        half depthDelta = backgroundDepth - fragmentDepth - cFadeOffsetScale.x;
+        return clamp(depthDelta * cFadeOffsetScale.y * (cFarClip - cNearClip), 0.0, 1.0);
     }
     #define GetFinalAlpha(surfaceData) \
         surfaceData.albedo.a * GetSoftParticleFade(vWorldDepth, surfaceData.backgroundDepth)
@@ -24,8 +22,14 @@
     {
     #ifdef URHO3D_PHYSICAL_MATERIAL
         half NoV = abs(dot(surfaceData.normal, surfaceData.eyeVec)) + 1e-5;
+        #ifdef URHO3D_BLUR_REFLECTION
+            half3 linearReflectionColor = GammaToLinearSpace(surfaceData.reflectionColor.rgb);
+        #else
+            half3 linearReflectionColor = mix(GammaToLinearSpace(surfaceData.reflectionColor.rgb),
+                cReflectionAverageColor, surfaceData.roughness * surfaceData.roughness);
+        #endif
         half3 diffuseAndSpecularColor = Indirect_PBR(
-            surfaceData.ambientLighting, surfaceData.reflectionColor.rgb,
+            surfaceData.ambientLighting, linearReflectionColor,
             surfaceData.albedo.rgb, surfaceData.specular,
             surfaceData.roughness, NoV);
     #elif defined(URHO3D_REFLECTION_MAPPING)
@@ -89,16 +93,16 @@
 half3 GetFinalColor(const SurfaceData surfaceData)
 {
 #ifdef URHO3D_AMBIENT_PASS
-    vec3 finalColor = CalculateAmbientLighting(surfaceData);
+    half3 finalColor = CalculateAmbientLighting(surfaceData);
 #else
-    vec3 finalColor = vec3(0.0);
+    half3 finalColor = vec3(0.0);
 #endif
 
 #ifdef URHO3D_GBUFFER_PASS
     #ifdef URHO3D_PHYSICAL_MATERIAL
-        float roughness = surfaceData.roughness;
+        half roughness = surfaceData.roughness;
     #else
-        float roughness = 1.0 - cMatSpecColor.a / 255.0;
+        half roughness = 1.0 - cMatSpecColor.a / 255.0;
     #endif
 
     gl_FragData[1] = vec4(surfaceData.fogFactor * surfaceData.albedo.rgb, 0.0);
@@ -115,7 +119,7 @@ half3 GetFinalColor(const SurfaceData surfaceData)
 /// Return color with optionally applied reflection, but without fog.
 half3 GetFinalColor(const SurfaceData surfaceData)
 {
-    vec3 finalColor = surfaceData.albedo.rgb;
+    half3 finalColor = surfaceData.albedo.rgb;
 #ifdef URHO3D_REFLECTION_MAPPING
     finalColor += GammaToLightSpace(cMatEnvMapColor * surfaceData.reflectionColor.rgb);
 #endif

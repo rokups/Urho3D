@@ -47,6 +47,8 @@ UNIFORM_BUFFER_END(1, Camera)
 /// Disabled if pass has no ambient lighting.
 #ifdef URHO3D_AMBIENT_PASS
 UNIFORM_BUFFER_BEGIN(2, Zone)
+    /// Average reflection color in linear space used to approximate roughness if textureCubeLod is not supported.
+    UNIFORM(half3 cReflectionAverageColor)
     /// Multiplier used to convert roughness factor to LOD of reflection cubemap.
     UNIFORM(half cRoughnessToLODFactor)
 UNIFORM_BUFFER_END(2, Zone)
@@ -103,6 +105,7 @@ UNIFORM_BUFFER_END(3, Light)
     UNIFORM(half3 cMatEnvMapColor) \
     UNIFORM(half cMetallic) \
     UNIFORM(half4 cMatSpecColor) \
+    UNIFORM(half2 cFadeOffsetScale) \
     UNIFORM(half cNormalScale) \
     UNIFORM(half cDielectricReflectance)
 
@@ -116,41 +119,39 @@ UNIFORM_BUFFER_END(4, Material)
 
 /// Object: Per-instance constants
 #ifdef URHO3D_VERTEX_SHADER
-INSTANCE_BUFFER_BEGIN(5, Object)
-    /// Object to world space matrix.
     #ifdef URHO3D_INSTANCING
         VERTEX_INPUT(vec4 iTexCoord4)
         VERTEX_INPUT(vec4 iTexCoord5)
         VERTEX_INPUT(vec4 iTexCoord6)
         #define cModel mat4(iTexCoord4, iTexCoord5, iTexCoord6, vec4(0.0, 0.0, 0.0, 1.0))
-    #else
-        UNIFORM_HIGHP(mat4 cModel)
-    #endif
 
-    /// Per-object ambient lighting.
-    /// If constant, in current color space.
-    /// If spherical harmonics, in linear space.
-    #ifdef URHO3D_INSTANCING
-        #if defined(URHO3D_AMBIENT_DIRECTIONAL)
-            VERTEX_INPUT(half4 iTexCoord7)
-            VERTEX_INPUT(half4 iTexCoord8)
-            VERTEX_INPUT(half4 iTexCoord9)
-            VERTEX_INPUT(half4 iTexCoord10)
-            VERTEX_INPUT(half4 iTexCoord11)
-            VERTEX_INPUT(half4 iTexCoord12)
-            VERTEX_INPUT(half4 iTexCoord13)
-            #define cSHAr iTexCoord7
-            #define cSHAg iTexCoord8
-            #define cSHAb iTexCoord9
-            #define cSHBr iTexCoord10
-            #define cSHBg iTexCoord11
-            #define cSHBb iTexCoord12
-            #define cSHC  iTexCoord13
-        #elif defined(URHO3D_AMBIENT_FLAT)
-            VERTEX_INPUT(half4 iTexCoord7)
-            #define cAmbient iTexCoord7
-        #endif
+    #if defined(URHO3D_AMBIENT_DIRECTIONAL)
+        VERTEX_INPUT(half4 iTexCoord7)
+        VERTEX_INPUT(half4 iTexCoord8)
+        VERTEX_INPUT(half4 iTexCoord9)
+        VERTEX_INPUT(half4 iTexCoord10)
+        VERTEX_INPUT(half4 iTexCoord11)
+        VERTEX_INPUT(half4 iTexCoord12)
+        VERTEX_INPUT(half4 iTexCoord13)
+        #define cSHAr iTexCoord7
+        #define cSHAg iTexCoord8
+        #define cSHAb iTexCoord9
+        #define cSHBr iTexCoord10
+        #define cSHBg iTexCoord11
+        #define cSHBb iTexCoord12
+        #define cSHC  iTexCoord13
+    #elif defined(URHO3D_AMBIENT_FLAT)
+        VERTEX_INPUT(half4 iTexCoord7)
+        #define cAmbient iTexCoord7
+    #endif
     #else
+        UNIFORM_BUFFER_BEGIN(5, Object)
+            /// Object to world space matrix.
+            UNIFORM_HIGHP(mat4 cModel)
+
+            /// Per-object ambient lighting.
+            /// If flat, in current color space.
+            /// If directional, in linear space.
         #if defined(URHO3D_AMBIENT_DIRECTIONAL)
             UNIFORM(half4 cSHAr)
             UNIFORM(half4 cSHAg)
@@ -162,20 +163,16 @@ INSTANCE_BUFFER_BEGIN(5, Object)
         #elif defined(URHO3D_AMBIENT_FLAT)
             UNIFORM(half4 cAmbient)
         #endif
+        #ifdef URHO3D_GEOMETRY_BILLBOARD
+            /// Rotation of billboard plane in world space.
+            UNIFORM(mediump mat3 cBillboardRot)
+        #endif
+        #ifdef URHO3D_GEOMETRY_SKINNED
+            /// Object to world space matrices for each bone.
+            UNIFORM_HIGHP(vec4 cSkinMatrices[MAXBONES * 3])
+        #endif
+        UNIFORM_BUFFER_END(5, Object)
     #endif
-
-    /// Non-instantiable parameters:
-    /// @{
-#ifdef URHO3D_GEOMETRY_BILLBOARD
-    /// Rotation of billboard plane in world space.
-    UNIFORM(mediump mat3 cBillboardRot)
-#endif
-#ifdef URHO3D_GEOMETRY_SKINNED
-    /// Object to world space matrices for each bone.
-    UNIFORM_HIGHP(vec4 cSkinMatrices[MAXBONES * 3])
-#endif
-    /// @}
-INSTANCE_BUFFER_END(5, Object)
 #endif // URHO3D_VERTEX_SHADER
 
 #endif // _UNIFORMS_GLSL_

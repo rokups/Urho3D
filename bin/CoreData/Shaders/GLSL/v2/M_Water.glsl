@@ -1,5 +1,8 @@
 #define URHO3D_PIXEL_NEED_EYE_VECTOR
 #define URHO3D_SURFACE_NEED_BACKGROUND_COLOR
+#ifdef URHO3D_HAS_READABLE_DEPTH
+    #define URHO3D_SURFACE_NEED_BACKGROUND_DEPTH
+#endif
 #define URHO3D_SURFACE_NEED_NORMAL
 #define URHO3D_SURFACE_NEED_NORMAL_IN_TANGENT_SPACE
 #define URHO3D_CUSTOM_MATERIAL_UNIFORMS
@@ -37,23 +40,19 @@ void main()
 {
     SurfaceData surfaceData;
 
-    FillFragmentFogFactor(surfaceData);
-    FillFragmentAmbient(surfaceData);
-    FillFragmentEyeVector(surfaceData);
-    FillFragmentScreenPosition(surfaceData);
-    FillFragmentNormal(surfaceData);
-    FillFragmentMetallicRoughnessOcclusion(surfaceData);
+    FillSurfaceCommon(surfaceData);
+    FillSurfaceNormal(surfaceData);
+    FillSurfaceMetallicRoughnessOcclusion(surfaceData);
 
     // Apply noise to screen position used for background sampling
     surfaceData.screenPos += surfaceData.normalInTangentSpace.xy * cNoiseStrength;
 
-    FillFragmentReflectionColor(surfaceData);
-    FillFragmentBackgroundColor(surfaceData);
+    FillSurfaceExternal(surfaceData);
 
     // Water doesn't accept diffuse lighting, set albedo to zero
     surfaceData.albedo = vec4(0.0);
     surfaceData.specular = cMatSpecColor.rgb * (1.0 - surfaceData.oneMinusReflectivity);
-#ifdef URHO3D_SURFACE_NEED_EMISSION
+#ifdef URHO3D_SURFACE_NEED_AMBIENT
     surfaceData.emission = cMatEmissiveColor;
 #endif
 
@@ -70,6 +69,14 @@ void main()
 
 #ifdef URHO3D_LIGHT_PASS
     reflectedColor.rgb += CalculateDirectLighting(surfaceData);
+#endif
+
+#ifdef URHO3D_HAS_READABLE_DEPTH
+    half depthDelta = surfaceData.backgroundDepth - vWorldDepth - cFadeOffsetScale.x;
+    half opacity = clamp(depthDelta * cFadeOffsetScale.y * (cFarClip - cNearClip), 0.0, 1.0);
+    surfaceData.backgroundColor = mix(surfaceData.backgroundColor, GammaToLightSpace(cMatDiffColor.rgb), opacity);
+#else
+    surfaceData.backgroundColor = mix(surfaceData.backgroundColor, GammaToLightSpace(cMatDiffColor.rgb), cMatDiffColor.a);
 #endif
 
 #ifdef URHO3D_ADDITIVE_LIGHT_PASS

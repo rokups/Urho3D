@@ -408,6 +408,8 @@ private:
 
     void AddReflectionProbeConstants()
     {
+        drawQueue_.AddShaderParameter(ShaderConsts::Zone_ReflectionAverageColor,
+            current_.reflectionProbe_->reflectionMapSH_.EvaluateAverage());
         drawQueue_.AddShaderParameter(ShaderConsts::Zone_RoughnessToLODFactor,
             current_.reflectionProbe_->roughnessToLODFactor_);
     }

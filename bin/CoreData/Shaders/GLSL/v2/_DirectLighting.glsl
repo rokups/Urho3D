@@ -19,12 +19,12 @@
     struct DirectLightData
     {
         /// Light color, with optional shape texture applied.
-        vec3 lightColor;
+        half3 lightColor;
         /// Normalized light vector. w component is normalized distance to light.
-        vec4 lightVec;
+        half4 lightVec;
     #ifdef URHO3D_HAS_SHADOW
         /// Shadow factor. 0 is fully shadowed.
-        float shadow;
+        fixed shadow;
     #endif
     };
 
@@ -32,10 +32,10 @@
     #ifdef URHO3D_LIGHT_DIRECTIONAL
         #define NormalizeLightVector(lightVec) vec4(lightVec, 0.0)
     #else
-        vec4 NormalizeLightVector(vec3 lightVec)
+        half4 NormalizeLightVector(const half3 lightVec)
         {
             // TODO(renderer): Revisit epsilon
-            float lightDist = max(0.001, length(lightVec));
+            half lightDist = max(0.001, length(lightVec));
             return vec4(lightVec / lightDist, lightDist);
         }
     #endif
@@ -46,9 +46,9 @@
     #elif defined(URHO3D_LIGHT_CUSTOM_RAMP)
         #define GetLightDistanceAttenuation(normalizedDistance) texture2D(sLightRampMap, vec2((normalizedDistance), 0.0)).r
     #else
-        float GetLightDistanceAttenuation(float normalizedDistance)
+        half GetLightDistanceAttenuation(const half normalizedDistance)
         {
-            float invDistance = max(0.0, 1.0 - normalizedDistance);
+            half invDistance = max(0.0, 1.0 - normalizedDistance);
             return invDistance * invDistance;
         }
     #endif
@@ -56,7 +56,7 @@
     /// Return light color at given direction.
     #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
         #if defined(URHO3D_LIGHT_SPOT)
-            vec3 GetLightColorFromShape(vec4 shapePos)
+            half3 GetLightColorFromShape(const vec4 shapePos)
             {
                 vec2 c = vec2(0.0, shapePos.w);
                 bvec3 binEnough = greaterThanEqual(shapePos.xyw, c.xxx);
@@ -66,7 +66,7 @@
                     : vec3(0.0, 0.0, 0.0);
             }
         #elif defined(URHO3D_LIGHT_POINT)
-            vec3 GetLightColorFromShape(vec4 shapePos)
+            half3 GetLightColorFromShape(const vec4 shapePos)
             {
                 return textureCube(sLightCubeMap, shapePos.xyz).rgb * cLightColor.rgb;
             }
@@ -83,9 +83,9 @@
     #endif
 
     /// Calculate light attenuation. Includes shadow and distance attenuation.
-    float GetDirectLightAttenuation(DirectLightData lightData)
+    half GetDirectLightAttenuation(const DirectLightData lightData)
     {
-        float attenuation = GetLightDistanceAttenuation(lightData.lightVec.w);
+        half attenuation = GetLightDistanceAttenuation(lightData.lightVec.w);
     #ifdef URHO3D_HAS_SHADOW
         attenuation *= lightData.shadow;
     #endif

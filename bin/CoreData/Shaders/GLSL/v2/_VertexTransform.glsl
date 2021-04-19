@@ -8,7 +8,7 @@
 #ifdef URHO3D_VERTEX_SHADER
 
 /// Return normal matrix from model matrix.
-mat3 GetNormalMatrix(mat4 modelMatrix)
+mediump mat3 GetNormalMatrix(mat4 modelMatrix)
 {
     return mat3(modelMatrix[0].xyz, modelMatrix[1].xyz, modelMatrix[2].xyz);
 }
@@ -53,13 +53,13 @@ struct VertexTransform
     vec4 position;
 #ifdef URHO3D_VERTEX_NEED_NORMAL
     /// Vertex normal in world space
-    vec3 normal;
+    half3 normal;
 #endif
 #ifdef URHO3D_VERTEX_NEED_TANGENT
     /// Vertex tangent in world space
-    vec3 tangent;
+    half3 tangent;
     /// Vertex bitangent in world space
-    vec3 bitangent;
+    half3 bitangent;
 #endif
 };
 
@@ -84,15 +84,15 @@ mat4 GetModelMatrix()
 
 /// Apply normal offset to position in world space.
 #ifdef URHO3D_SHADOW_NORMAL_OFFSET
-    void ApplyShadowNormalOffset(inout vec4 position, vec3 normal)
+    void ApplyShadowNormalOffset(inout vec4 position, const half3 normal)
     {
         #ifdef URHO3D_LIGHT_DIRECTIONAL
-            vec3 lightDir = cLightDir;
+            half3 lightDir = cLightDir;
         #else
-            vec3 lightDir = normalize(cLightPos.xyz - position.xyz);
+            half3 lightDir = normalize(cLightPos.xyz - position.xyz);
         #endif
-        float lightAngleCos = dot(normal, lightDir);
-        float lightAngleSin = sqrt(1.0 - lightAngleCos * lightAngleCos);
+        half lightAngleCos = dot(normal, lightDir);
+        half lightAngleSin = sqrt(1.0 - lightAngleCos * lightAngleCos);
         position.xyz -= normal * lightAngleSin * cNormalOffsetScale;
     }
 #else
@@ -133,7 +133,7 @@ mat4 GetModelMatrix()
         result.position = iPos * modelMatrix;
 
         #ifdef URHO3D_VERTEX_NEED_NORMAL
-            mat3 normalMatrix = GetNormalMatrix(modelMatrix);
+            mediump mat3 normalMatrix = GetNormalMatrix(modelMatrix);
             result.normal = normalize(iNormal * normalMatrix);
 
             ApplyShadowNormalOffset(result.position, result.normal);
@@ -168,12 +168,12 @@ mat4 GetModelMatrix()
         return result;
     }
 #elif defined(URHO3D_GEOMETRY_DIRBILLBOARD)
-    mat3 GetFaceCameraRotation(vec3 position, vec3 direction)
+    mediump mat3 GetFaceCameraRotation(vec3 position, half3 direction)
     {
-        vec3 cameraDir = normalize(position - cCameraPos);
-        vec3 front = normalize(direction);
-        vec3 right = normalize(cross(front, cameraDir));
-        vec3 up = normalize(cross(front, right));
+        half3 cameraDir = normalize(position - cCameraPos);
+        half3 front = normalize(direction);
+        half3 right = normalize(cross(front, cameraDir));
+        half3 up = normalize(cross(front, right));
 
         return mat3(
             right.x, up.x, front.x,
@@ -188,7 +188,7 @@ mat4 GetModelMatrix()
 
         VertexTransform result;
         result.position = iPos * modelMatrix;
-        mat3 rotation = GetFaceCameraRotation(result.position.xyz, iNormal);
+        mediump mat3 rotation = GetFaceCameraRotation(result.position.xyz, iNormal);
         result.position.xyz += vec3(iTexCoord1.x, 0.0, iTexCoord1.y) * rotation;
 
         #ifdef URHO3D_VERTEX_NEED_NORMAL
@@ -207,8 +207,8 @@ mat4 GetModelMatrix()
     VertexTransform GetVertexTransform()
     {
         mat4 modelMatrix = GetModelMatrix();
-        vec3 up = normalize(cCameraPos - iPos.xyz);
-        vec3 right = normalize(cross(iTangent.xyz, up));
+        half3 up = normalize(cCameraPos - iPos.xyz);
+        half3 right = normalize(cross(iTangent.xyz, up));
 
         VertexTransform result;
         result.position = vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix;
@@ -230,9 +230,9 @@ mat4 GetModelMatrix()
     VertexTransform GetVertexTransform()
     {
         mat4 modelMatrix = GetModelMatrix();
-        vec3 right = iTangent.xyz - iPos.xyz;
-        vec3 front = normalize(iNormal);
-        vec3 up = normalize(cross(front, right));
+        half3 right = iTangent.xyz - iPos.xyz;
+        half3 front = normalize(iNormal);
+        half3 up = normalize(cross(front, right));
 
         VertexTransform result;
         result.position = vec4((iPos.xyz + right * iTangent.w), 1.0) * modelMatrix;

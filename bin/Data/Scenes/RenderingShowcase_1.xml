@@ -19,7 +19,7 @@
 	</component>
 	<component type="RenderPipeline" id="372">
 		<attribute name="Color Space" value="LDR Linear" />
-		<attribute name="Specular Anti-Aliasing" value="true" />
+		<attribute name="Specular Quality" value="Antialiased" />
 		<attribute name="PCF Kernel Size" value="5" />
 		<attribute name="Bloom" value="true" />
 		<attribute name="Post Process Antialiasing" value="FXAA3" />

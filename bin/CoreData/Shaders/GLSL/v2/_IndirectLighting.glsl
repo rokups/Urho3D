@@ -8,9 +8,9 @@
 #ifdef URHO3D_VERTEX_SHADER
 
 // Evalualte linear part of spherical harmonics
-vec3 EvaluateSH01(vec4 normal, vec4 SHAr, vec4 SHAg, vec4 SHAb)
+half3 EvaluateSH01(const half4 normal, const half4 SHAr, const half4 SHAg, const half4 SHAb)
 {
-    vec3 value;
+    half3 value;
     value.r = dot(normal, SHAr);
     value.g = dot(normal, SHAg);
     value.b = dot(normal, SHAb);
@@ -18,12 +18,12 @@ vec3 EvaluateSH01(vec4 normal, vec4 SHAr, vec4 SHAg, vec4 SHAb)
 }
 
 // Evalualte quadratic part of spherical harmonics
-vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
+half3 EvaluateSH2(const half4 normal, const half4 SHBr, const half4 SHBg, const half4 SHBb, const half4 SHC)
 {
-    vec4 b = normal.xyzz * normal.yzzx;
-    float c = normal.x * normal.x - normal.y * normal.y;
+    half4 b = normal.xyzz * normal.yzzx;
+    half c = normal.x * normal.x - normal.y * normal.y;
 
-    vec3 value;
+    half3 value;
     value.r = dot(b, SHBr);
     value.g = dot(b, SHBg);
     value.b = dot(b, SHBb);
@@ -33,13 +33,13 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
 
 #ifdef URHO3D_NUM_VERTEX_LIGHTS
     // Calculate intensity of vertex light
-    float GetVertexLight(int index, vec3 worldPos, vec3 normal)
+    float GetVertexLight(const int index, const vec3 worldPos, const half3 normal)
     {
-        vec3 lightDir = cVertexLights[index * 3 + 1].xyz;
+        half3 lightDir = cVertexLights[index * 3 + 1].xyz;
         vec3 lightPos = cVertexLights[index * 3 + 2].xyz;
-        float invRange = cVertexLights[index * 3].w;
-        float cutoff = cVertexLights[index * 3 + 1].w;
-        float invCutoff = cVertexLights[index * 3 + 2].w;
+        half invRange = cVertexLights[index * 3].w;
+        half cutoff = cVertexLights[index * 3 + 1].w;
+        half invCutoff = cVertexLights[index * 3 + 2].w;
 
         // Directional light
         if (invRange == 0.0)
@@ -49,12 +49,12 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
         // Point/spot light
         else
         {
-            vec3 lightVec = (lightPos - worldPos) * invRange;
-            float lightDist = length(lightVec);
-            vec3 localDir = lightVec / lightDist;
-            float atten = max(0.0, 1.0 - lightDist);
-            float spotEffect = dot(localDir, lightDir);
-            float spotAtten = clamp((spotEffect - cutoff) * invCutoff, 0.0, 1.0);
+            half3 lightVec = (lightPos - worldPos) * invRange;
+            half lightDist = length(lightVec);
+            half3 localDir = lightVec / lightDist;
+            half atten = max(0.0, 1.0 - lightDist);
+            half spotEffect = dot(localDir, lightDir);
+            half spotAtten = clamp((spotEffect - cutoff) * invCutoff, 0.0, 1.0);
             return VERTEX_ADJUST_NoL(dot(normal, localDir)) * atten * atten * spotAtten;
         }
     }
@@ -78,9 +78,9 @@ vec3 EvaluateSH2(vec4 normal, vec4 SHBr, vec4 SHBg, vec4 SHBb, vec4 SHC)
 
     // Calculate combined ambient lighting from zones, spherical harmonics and vertex lights
     // cVertexLights should contain light color in light space.
-    vec3 GetAmbientAndVertexLights(vec3 position, vec3 normal)
+    half3 GetAmbientAndVertexLights(const vec3 position, const half3 normal)
     {
-        vec3 result = GetAmbientLight(vec4(normal, 1.0));
+        half3 result = GetAmbientLight(vec4(normal, 1.0));
 
         #ifdef URHO3D_NUM_VERTEX_LIGHTS
             for (int i = 0; i < URHO3D_NUM_VERTEX_LIGHTS; ++i)

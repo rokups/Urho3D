@@ -1,23 +1,99 @@
 /// _Config_Basic.glsl
 /// Don't include!
-/// Global shader configuration that is invariant to material properties.
+/// Shader configuration invariant to material properties.
 
-/// =================================== Global Constants ===================================
+/// =================================== Types and constants ===================================
+
+/// Medium-precision float with relative precision of 1/1024 and range [-16384, 16384].
+// #define half
+// #define half2
+// #define half3
+// #define half4
+
+/// Low-precision fixel point real number with absolute precision of 1/256 and range [-2, 2].
+// #define fixed
+// #define fixed2
+// #define fixed3
+// #define fixed4
+
+/// Compatible ivec4 vertex attribite. Cast to ivec4 before use.
+// #define ivec4_attrib
+
+/// =================================== Flow control defines ===================================
+
+/// Defined for corresponding shader stage.
+// #define URHO3D_VERTEX_SHADER
+// #define URHO3D_PIXEL_SHADER
+
+/// Whether high precision is supported for all shader stages.
+// #define URHO3D_FEATURE_HIGHP
+
+/// Whether high precision is supported for current shader stage.
+// #define URHO3D_FEATURE_HIGHP_IN_STAGE
+
+/// Whether standard derivatives are supported.
+// #define URHO3D_FEATURE_DERIVATIVES
+
+/// Whether textureCubeLod is supported.
+// #define URHO3D_FEATURE_CUBEMAP_LOD
+
+/// Whether Y axis of clip space is the opposite of Y axis of render target texture.
+// #define URHO3D_FEATURE_FRAMEBUFFER_Y_INVERTED
+
+/// URHO3D_DEPTH_ONLY_PASS: Whether there's no color output and caller needs only depth.
+// #define URHO3D_DEPTH_ONLY_PASS
+
+/// URHO3D_LIGHT_PASS: Whether there's active per-pixel light source in this pass (litbase, light and lightvolume passes).
+// #define URHO3D_LIGHT_PASS
+
+/// Whether vertex normal and/or tangent in object space is available.
+/// Some geometry types may deduce vertex tangent or normal and don't need them present in actual vertex layout.
+/// Don't rely on URHO3D_VERTEX_HAS_NORMAL and URHO3D_VERTEX_HAS_TANGENT.
+// #define URHO3D_VERTEX_NORMAL_AVAILABLE
+// #define URHO3D_VERTEX_TANGENT_AVAILABLE
+
+/// =================================== Utility defines ===================================
+
+/// Declare vertex input attribute received from vertex buffer.
+// #define VERTEX_INPUT([precision] type name)
+
+/// Declare vertex output variable passed to next stage.
+/// Don't use highp or unqualified variables because it may cause linker error if highp is not supported in pixel shader.
+// #define VERTEX_OUTPUT(precision type name)
+
+/// Declare vertex output that is highp (if supported) or mediump (otherwise).
+// #define VERTEX_OUTPUT_HIGHP(type name)
+
+/// Declare uniform buffer. All uniforms must belong to appropriate uniform buffer.
+// #define UNIFORM_BUFFER_BEGIN(slot, name)
+// #define UNIFORM_BUFFER_END(slot, name)
+
+/// Declare uniform.
+/// Don't use highp or unqualified variables because it may cause linker error if highp is not supported in pixel shader.
+// #define UNIFORM(precision type name)
+
+/// Declare uniform with high precision, excluded from stage if not supported for the stage.
+// #define UNIFORM_HIGHP(type name)
+
+/// Declare sampler.
+// #define SAMPLER([precision] type name)
+
+/// Declare sampler with high precision, with medium precision if not supported.
+// #define SAMPLER_HIGHP([precision] type name)
+
+/// =================================== Types and constants ===================================
 
 #define M_PI 3.14159265358979323846
 #define M_MEDIUMP_FLT_MAX 65504.0
 
-
-/// =================================== Type Aliases ===================================
-
-/// Disable precision modifiers if not GL ES
+/// Disable precision modifiers if not GL ES.
 #ifndef GL_ES
     #define highp
     #define mediump
     #define lowp
 #endif
 
-/// Define shortcuts for precision-qualified types
+/// Define shortcuts for precision-qualified types.
 #define half   mediump float
 #define half2  mediump vec2
 #define half3  mediump vec3
@@ -30,9 +106,6 @@
 
 /// =================================== Compiler features ===================================
 
-/// Current shader stage:
-/// - URHO3D_VERTEX_SHADER
-/// - URHO3D_PIXEL_SHADER
 #ifdef COMPILEVS
     #define URHO3D_VERTEX_SHADER
 #endif
@@ -40,27 +113,22 @@
     #define URHO3D_PIXEL_SHADER
 #endif
 
-/// URHO3D_FEATURE_HIGHP: Whether high precision is supported for all shader stages.
 #if !defined(GL_ES) || defined(GL_FRAGMENT_PRECISION_HIGH)
     #define URHO3D_FEATURE_HIGHP
 #endif
 
-/// URHO3D_FEATURE_HIGHP_IN_STAGE: Whether high precision is supported for current shader stage.
 #if !defined(GL_ES) || defined(GL_FRAGMENT_PRECISION_HIGH) || defined(URHO3D_VERTEX_SHADER)
     #define URHO3D_FEATURE_HIGHP_IN_STAGE
 #endif
 
-/// URHO3D_FEATURE_DERIVATIVES: Whether standard derivatives are supported.
 #if !defined(GL_ES) || defined(GL_OES_standard_derivatives)
     #define URHO3D_FEATURE_DERIVATIVES
 #endif
 
-/// URHO3D_FEATURE_CUBEMAP_LOD: Whether textureCubeLod is supported.
 #if !defined(GL_ES) || defined(GL_EXT_shader_texture_lod)
     #define URHO3D_FEATURE_CUBEMAP_LOD
 #endif
 
-/// URHO3D_FEATURE_FRAMEBUFFER_Y_INVERTED: Whether Y axis of clip space is the opposite of Y axis of render target texture.
 #ifdef D3D11
     #define URHO3D_FEATURE_FRAMEBUFFER_Y_INVERTED
 #endif
@@ -73,15 +141,12 @@
 
 /// =================================== Stage inputs and outputs ===================================
 
-/// ivec4_attrib: Compatible ivec4 vertex attribite. Cast to ivec4 before use.
 #ifdef D3D11
     #define ivec4_attrib ivec4
 #else
     #define ivec4_attrib vec4
 #endif
 
-/// VERTEX_INPUT: Declare vertex input variable;
-/// VERTEX_OUTPUT: Declare vertex output variable.
 #if defined(URHO3D_VERTEX_SHADER)
     #ifdef GL3
         #define VERTEX_INPUT(decl) in decl;
@@ -98,7 +163,6 @@
     #endif
 #endif
 
-/// VERTEX_OUTPUT_HIGHP: Declare vertex output that is preferred to be highp.
 #ifdef URHO3D_FEATURE_HIGHP
     #define VERTEX_OUTPUT_HIGHP(decl) VERTEX_OUTPUT(highp decl)
 #else
@@ -127,10 +191,6 @@
 
 /// =================================== Uniforms ===================================
 
-/// UNIFORM_BUFFER_BEGIN: Begin of uniform buffer declaration;
-/// UNIFORM_BUFFER_END: End of uniform buffer declaration;
-/// UNIFORM: Declares scalar, vector or matrix uniform;
-/// SAMPLER: Declares texture sampler.
 #ifdef URHO3D_USE_CBUFFERS
     #ifdef GL_ARB_shading_language_420pack
         #define _URHO3D_LAYOUT(index) layout(binding=index)
@@ -149,26 +209,12 @@
     #define SAMPLER(index, decl) uniform decl;
 #endif
 
-/// INSTANCE_BUFFER_BEGIN: Begin of uniform buffer or group of per-instance attributes
-/// INSTANCE_BUFFER_END: End of uniform buffer or instance attributes
-#ifdef URHO3D_VERTEX_SHADER
-    #ifdef URHO3D_INSTANCING
-        #define INSTANCE_BUFFER_BEGIN(index, name)
-        #define INSTANCE_BUFFER_END(index, name)
-    #else
-        #define INSTANCE_BUFFER_BEGIN(index, name) UNIFORM_BUFFER_BEGIN(index, name)
-        #define INSTANCE_BUFFER_END(index, name) UNIFORM_BUFFER_END(index, name)
-    #endif
-#endif
-
-/// UNIFORM_HIGHP: Uniform with max precision, undefined if not supported.
-/// SAMPLER_HIGHP: Sampler with max precision, mediump if not supported.
 #ifndef GL_ES
     #define UNIFORM_HIGHP(decl) UNIFORM(decl)
     #define SAMPLER_HIGHP(index, decl) SAMPLER(index, decl)
 #else
     /// Use max available precision by default
-    #if defined(GL_FRAGMENT_PRECISION_HIGH) || !defined(URHO3D_PIXEL_SHADER)
+    #ifdef URHO3D_FEATURE_HIGHP_IN_STAGE
         precision highp float;
         #define UNIFORM_HIGHP(decl) UNIFORM(decl)
         #define SAMPLER_HIGHP(index, decl) SAMPLER(index, highp decl)
@@ -195,22 +241,18 @@
 
 /// =================================== Consolidate ShaderProgramCompositor defines ===================================
 
-/// Default to 0 (i.e. no specular) if not defined.
 #ifndef URHO3D_SPECULAR
     #define URHO3D_SPECULAR 0
 #endif
 
-/// Default to 1 cascade if not defined.
 #ifndef URHO3D_MAX_SHADOW_CASCADES
     #define URHO3D_MAX_SHADOW_CASCADES 1
 #endif
 
-/// URHO3D_DEPTH_ONLY_PASS: Whether there's no color output and caller needs only depth.
 #if defined(URHO3D_SHADOW_PASS)
     #define URHO3D_DEPTH_ONLY_PASS
 #endif
 
-/// URHO3D_LIGHT_PASS: Whether there's active per-pixel light source in this pass (litbase, light and lightvolume passes).
 #if defined(URHO3D_LIGHT_DIRECTIONAL) || defined(URHO3D_LIGHT_POINT) || defined(URHO3D_LIGHT_SPOT)
     #define URHO3D_LIGHT_PASS
 #endif
@@ -241,10 +283,6 @@
         #endif
     #endif
 
-    /// URHO3D_VERTEX_NORMAL_AVAILABLE: Whether vertex normal in object space is available.
-    /// URHO3D_VERTEX_TANGENT_AVAILABLE: Whether vertex tangent in object space is available.
-    /// Some geometry types may deduce vertex tangent or normal and don't need them present in actual vertex layout.
-    /// Don't rely on URHO3D_VERTEX_HAS_NORMAL and URHO3D_VERTEX_HAS_TANGENT.
     #if defined(URHO3D_GEOMETRY_BILLBOARD) || defined(URHO3D_GEOMETRY_DIRBILLBOARD) || defined(URHO3D_GEOMETRY_TRAIL_FACE_CAMERA) || defined(URHO3D_GEOMETRY_TRAIL_BONE)
         #define URHO3D_VERTEX_NORMAL_AVAILABLE
         #define URHO3D_VERTEX_TANGENT_AVAILABLE
@@ -257,7 +295,7 @@
         #endif
     #endif
 
-    /// URHO3D_SHADOW_NORMAL_OFFSET is disabled if vertex normal is not available.
+    /// Normal offset is disabled if vertex normal is not available.
     #if defined(URHO3D_SHADOW_NORMAL_OFFSET) && !defined(URHO3D_VERTEX_NORMAL_AVAILABLE)
         #undef URHO3D_SHADOW_NORMAL_OFFSET
     #endif

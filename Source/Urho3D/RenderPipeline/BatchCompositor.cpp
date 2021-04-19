@@ -309,7 +309,7 @@ void BatchCompositor::BeginShadowBatchesComposition(unsigned lightIndex, ShadowS
     for (Drawable* drawable : shadowCasters)
     {
         // Check shadow mask now when zone is ready
-        if (drawable->GetShadowMaskInZone() & lightMask == 0)
+        if ((drawable->GetShadowMaskInZone() & lightMask) == 0)
             continue;
 
         // Check shadow distance

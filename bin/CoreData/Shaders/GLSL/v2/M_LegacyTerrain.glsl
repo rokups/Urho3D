@@ -30,16 +30,10 @@ void main()
 {
     SurfaceData surfaceData;
 
-    FillFragmentFogFactor(surfaceData);
-    FillFragmentAmbient(surfaceData);
-    FillFragmentEyeVector(surfaceData);
-    FillFragmentScreenPosition(surfaceData);
-    FillFragmentNormal(surfaceData);
-    FillFragmentMetallicRoughnessOcclusion(surfaceData);
-
-    AdjustFragmentRoughness(surfaceData);
-    FillFragmentBackgroundDepth(surfaceData);
-    FillFragmentReflectionColor(surfaceData);
+    FillSurfaceCommon(surfaceData);
+    FillSurfaceNormal(surfaceData);
+    FillSurfaceMetallicRoughnessOcclusion(surfaceData);
+    FillSurfaceExternal(surfaceData);
 
     half3 weights = texture2D(sDiffMap, vTexCoord).rgb;
     half sumWeights = weights.r + weights.g + weights.b;
@@ -51,7 +45,7 @@ void main()
     );
 
     surfaceData.specular = cMatSpecColor.rgb;
-#ifdef URHO3D_SURFACE_NEED_EMISSION
+#ifdef URHO3D_SURFACE_NEED_AMBIENT
     surfaceData.emission = cMatEmissiveColor;
 #endif
 

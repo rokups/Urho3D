@@ -13,19 +13,12 @@ void main()
 {
     SurfaceData surfaceData;
 
-    FillFragmentFogFactor(surfaceData);
-    FillFragmentAmbient(surfaceData);
-    FillFragmentEyeVector(surfaceData);
-    FillFragmentScreenPosition(surfaceData);
-    FillFragmentNormal(surfaceData);
-    FillFragmentMetallicRoughnessOcclusion(surfaceData);
-
-    AdjustFragmentRoughness(surfaceData);
-    FillFragmentBackgroundDepth(surfaceData);
-    FillFragmentReflectionColor(surfaceData);
-
-    FillFragmentAlbedoSpecular(surfaceData);
-    FillFragmentEmission(surfaceData);
+    FillSurfaceCommon(surfaceData);
+    FillSurfaceNormal(surfaceData);
+    FillSurfaceMetallicRoughnessOcclusion(surfaceData);
+    FillSurfaceExternal(surfaceData);
+    FillSurfaceAlbedoSpecular(surfaceData);
+    FillSurfaceEmission(surfaceData);
 
     half3 finalColor = GetFinalColor(surfaceData);
     gl_FragColor.rgb = ApplyFog(finalColor, surfaceData.fogFactor);

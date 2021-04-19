@@ -16,7 +16,7 @@
 #endif
 
 /// Evaluate Schlick Fresnel function.
-half3 F_Schlick(half3 specularColor, half u)
+half3 F_Schlick(const half3 specularColor, const half u)
 {
     half f = pow(1.0 - u, 5.0);
     return vec3(f) + specularColor * (vec3(1.0) - f);
@@ -61,7 +61,7 @@ half3 BRDF_IndirectSpecular(const half3 specularColor, const half roughness, con
 }
 
 /// Calculate indirect PBR lighting.
-half3 Indirect_PBR(const half3 ambientLighting, const half3 reflectionColor,
+half3 Indirect_PBR(const half3 ambientLighting, const half3 linearReflectionColor,
     const half3 albedo, const half3 specular, const half roughness, const half NoV)
 {
 #ifdef URHO3D_GAMMA_CORRECTION
@@ -70,7 +70,7 @@ half3 Indirect_PBR(const half3 ambientLighting, const half3 reflectionColor,
     half3 brdf = BRDF_IndirectSpecular(specular * specular, roughness, NoV);
 #endif
 
-    half3 specularColor = brdf * GammaToLinearSpace(reflectionColor);
+    half3 specularColor = brdf * linearReflectionColor;
 #ifndef URHO3D_GAMMA_CORRECTION
     specularColor = sqrt(max(specularColor, 0.0));
 #endif
@@ -79,7 +79,7 @@ half3 Indirect_PBR(const half3 ambientLighting, const half3 reflectionColor,
 }
 
 /// Calculate indirect PBR lighting for transparent object.
-half4 Indirect_PBRWater(const half3 reflectionColor, half3 specular, half NoV)
+half4 Indirect_PBRWater(const half3 reflectionColor, const half3 specular, const half NoV)
 {
 #ifdef URHO3D_GAMMA_CORRECTION
     half3 brdf = F_Schlick(specular, NoV);
@@ -103,27 +103,27 @@ half4 Indirect_PBRWater(const half3 reflectionColor, half3 specular, half NoV)
 #ifdef URHO3D_LIGHT_PASS
 
 /// Evaluate Blinn-Phong BRDF.
-half BRDF_Direct_BlinnPhongSpecular(half3 normal, half3 halfVec, half specularPower)
+half BRDF_Direct_BlinnPhongSpecular(const half3 normal, const half3 halfVec, const half specularPower)
 {
     return pow(max(dot(normal, halfVec), 0.0), specularPower);
 }
 
 /// Evaluate simple volumetric lighting for surface w/o normal.
-half3 Direct_Volumetric(half3 lightColor, half3 albedo)
+half3 Direct_Volumetric(const half3 lightColor, const half3 albedo)
 {
     return lightColor * albedo;
 }
 
 /// Evaluate simple directional lighting without specular.
-half3 Direct_Simple(half3 lightColor, half3 albedo, half3 lightVec, half3 normal)
+half3 Direct_Simple(const half3 lightColor, const half3 albedo, const half3 lightVec, const half3 normal)
 {
     half NoL = max(dot(normal, lightVec), 0.0);
     return NoL * lightColor * albedo;
 }
 
 /// Evaluate simple directional lighting with Blinn-Phong specular.
-half3 Direct_SimpleSpecular(half3 lightColor, half3 albedo, half3 specular,
-    half3 lightVec, half3 normal, half3 halfVec, half specularPower, half specularIntensity)
+half3 Direct_SimpleSpecular(const half3 lightColor, const half3 albedo, const half3 specular,
+    const half3 lightVec, const half3 normal, const half3 halfVec, const half specularPower, const half specularIntensity)
 {
     half NoL = max(dot(normal, lightVec), 0.0);
     float brdf = BRDF_Direct_BlinnPhongSpecular(normal, halfVec, specularPower);
@@ -133,7 +133,7 @@ half3 Direct_SimpleSpecular(half3 lightColor, half3 albedo, half3 specular,
 #ifdef URHO3D_PHYSICAL_MATERIAL
 
 /// Evaluate GGX distribution function.
-half D_GGX(half roughness2, half3 normal, half3 halfVec, half NoH)
+half D_GGX(const half roughness2, const half3 normal, const half3 halfVec, const half NoH)
 {
 #ifdef GL_ES
     half3 NxH = cross(normal, halfVec);
@@ -150,7 +150,7 @@ half D_GGX(half roughness2, half3 normal, half3 halfVec, half NoH)
 }
 
 /// Evaluate Smith-GGX visibility function.
-half V_SmithGGXCorrelatedFast(half roughness2, half NoV, half NoL)
+half V_SmithGGXCorrelatedFast(const half roughness2, const half NoV, const half NoL)
 {
     half GGXV = NoL * (NoV * (1.0 - roughness2) + roughness2);
     half GGXL = NoV * (NoL * (1.0 - roughness2) + roughness2);
@@ -158,8 +158,8 @@ half V_SmithGGXCorrelatedFast(half roughness2, half NoV, half NoL)
 }
 
 /// Calculate direct PBR lighting. Light attenuation is not applied.
-half3 BRDF_Direct_PBRSpecular(half3 specular, half roughness,
-    half3 normal, half3 halfVec, half NoH, half NoV, half NoL, half LoH)
+half3 BRDF_Direct_PBRSpecular(const half3 specular, const half roughness,
+    const half3 normal, const half3 halfVec, const half NoH, const half NoV, const half NoL, const half LoH)
 {
     half roughness2 = roughness * roughness;
     half D = D_GGX(roughness2, normal, halfVec, NoH);
@@ -169,8 +169,8 @@ half3 BRDF_Direct_PBRSpecular(half3 specular, half roughness,
 }
 
 /// Evaluate PBR lighting for direct light.
-half3 Direct_PBR(half3 lightColor, half3 albedo, half3 specular, half roughness,
-    half3 lightVec, half3 normal, half3 eyeVec, half3 halfVec)
+half3 Direct_PBR(const half3 lightColor, const half3 albedo, const half3 specular, const half roughness,
+    const half3 lightVec, const half3 normal, const half3 eyeVec, const half3 halfVec)
 {
     half NoL = max(dot(normal, lightVec), 0.0);
     half NoV = abs(dot(normal, eyeVec)) + 1e-5;

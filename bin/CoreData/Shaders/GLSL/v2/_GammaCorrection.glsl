@@ -10,13 +10,13 @@
 #endif
 
 /// Convert color from gamma to linear space.
-half3 GammaToLinearSpace(half3 color)
+half3 GammaToLinearSpace(const half3 color)
 {
     return color * (color * (color * 0.305306011 + 0.682171111) + 0.012522878);
 }
 
 /// Convert color from gamma to linear space (with alpha).
-half4 GammaToLinearSpaceAlpha(half4 color) { return vec4(GammaToLinearSpace(color.rgb), color.a); }
+half4 GammaToLinearSpaceAlpha(const half4 color) { return vec4(GammaToLinearSpace(color.rgb), color.a); }
 
 /// Convert color from linear to gamma space.
 half3 LinearToGammaSpace(half3 color)
@@ -27,7 +27,7 @@ half3 LinearToGammaSpace(half3 color)
 }
 
 /// Convert color from linear to gamma space (with alpha).
-half4 LinearToGammaSpaceAlpha(half4 color) { return vec4(LinearToGammaSpace(color.rgb), color.a); }
+half4 LinearToGammaSpaceAlpha(const half4 color) { return vec4(LinearToGammaSpace(color.rgb), color.a); }
 
 /// Convert from and to light space.
 #ifdef URHO3D_GAMMA_CORRECTION
@@ -58,15 +58,24 @@ half4 LinearToGammaSpaceAlpha(half4 color) { return vec4(LinearToGammaSpace(colo
 
 /// Utilities to read textures in given color space. Suffix is texture mode hint that equals to min(isLinear + sRGB, 1).
 /// @{
+#define Texture_ToGammaAlpha_0(color) (color)
+#define Texture_ToGammaAlpha_1(color) LinearToGammaSpaceAlpha(color)
+#define Texture_ToLinearAlpha_0(color) GammaToLinearSpaceAlpha(color)
+#define Texture_ToLinearAlpha_1(color) (color)
+
 #define Texture_ToGamma_0(color) (color)
-#define Texture_ToGamma_1(color) LinearToGammaSpaceAlpha(color)
-#define Texture_ToLinear_0(color) GammaToLinearSpaceAlpha(color)
+#define Texture_ToGamma_1(color) LinearToGammaSpace(color)
+#define Texture_ToLinear_0(color) GammaToLinearSpace(color)
 #define Texture_ToLinear_1(color) (color)
 
 #ifdef URHO3D_GAMMA_CORRECTION
+    #define Texture_ToLightAlpha_0(color) Texture_ToLinearAlpha_0(color)
+    #define Texture_ToLightAlpha_1(color) Texture_ToLinearAlpha_1(color)
     #define Texture_ToLight_0(color) Texture_ToLinear_0(color)
     #define Texture_ToLight_1(color) Texture_ToLinear_1(color)
 #else
+    #define Texture_ToLightAlpha_0(color) Texture_ToGammaAlpha_0(color)
+    #define Texture_ToLightAlpha_1(color) Texture_ToGammaAlpha_1(color)
     #define Texture_ToLight_0(color) Texture_ToGamma_0(color)
     #define Texture_ToLight_1(color) Texture_ToGamma_1(color)
 #endif

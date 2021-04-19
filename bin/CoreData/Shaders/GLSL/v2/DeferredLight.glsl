@@ -36,19 +36,19 @@ void main()
 void main()
 {
     float depth = ReconstructDepth(SampleGeometryBuffer(sDepthBuffer, vScreenPos).r);
-    vec4 albedoInput = SampleGeometryBuffer(sDiffMap, vScreenPos);
-    vec4 specularInput = SampleGeometryBuffer(sSpecMap, vScreenPos);
-    vec4 normalInput = SampleGeometryBuffer(sNormalMap, vScreenPos);
+    half4 albedoInput = SampleGeometryBuffer(sDiffMap, vScreenPos);
+    half4 specularInput = SampleGeometryBuffer(sSpecMap, vScreenPos);
+    half4 normalInput = SampleGeometryBuffer(sNormalMap, vScreenPos);
 
     vec4 worldPos = GetDeferredWorldPos(vScreenPos, depth);
-    vec3 eyeVec = normalize(-worldPos.xyz);
+    half3 eyeVec = normalize(-worldPos.xyz);
     worldPos.xyz += cCameraPos;
 
-    vec3 normal = normalize(normalInput.rgb * 2.0 - 1.0);
+    half3 normal = normalize(normalInput.rgb * 2.0 - 1.0);
     #ifdef URHO3D_PHYSICAL_MATERIAL
-        float roughness = specularInput.a;
+        half roughness = specularInput.a;
     #else
-        float specularPower = (1.0 - specularInput.a) * 255;
+        half specularPower = (1.0 - specularInput.a) * 255;
     #endif
 
     DirectLightData lightData = GetDeferredDirectLightData(worldPos, depth);
@@ -71,7 +71,7 @@ void main()
         #endif
     #endif
 
-    vec3 finalColor = lightColor * GetDirectLightAttenuation(lightData);
+    half3 finalColor = lightColor * GetDirectLightAttenuation(lightData);
     gl_FragColor = vec4(finalColor, 0.0);
 }
 #endif

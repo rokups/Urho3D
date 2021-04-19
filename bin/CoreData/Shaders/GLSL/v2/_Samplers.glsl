@@ -31,13 +31,13 @@ SAMPLER(9, samplerCube sLightCubeMap)
 
 #ifdef URHO3D_MATERIAL_DIFFUSE_HINT
     #if URHO3D_MATERIAL_DIFFUSE_HINT == 0
-        #define DiffMap_ToGamma(color)  Texture_ToGamma_0(color)
-        #define DiffMap_ToLinear(color) Texture_ToLinear_0(color)
-        #define DiffMap_ToLight(color)  Texture_ToLight_0(color)
+        #define DiffMap_ToGamma(color)  Texture_ToGammaAlpha_0(color)
+        #define DiffMap_ToLinear(color) Texture_ToLinearAlpha_0(color)
+        #define DiffMap_ToLight(color)  Texture_ToLightAlpha_0(color)
     #elif URHO3D_MATERIAL_DIFFUSE_HINT == 1
-        #define DiffMap_ToGamma(color)  Texture_ToGamma_1(color)
-        #define DiffMap_ToLinear(color) Texture_ToLinear_1(color)
-        #define DiffMap_ToLight(color)  Texture_ToLight_1(color)
+        #define DiffMap_ToGamma(color)  Texture_ToGammaAlpha_1(color)
+        #define DiffMap_ToLinear(color) Texture_ToLinearAlpha_1(color)
+        #define DiffMap_ToLight(color)  Texture_ToLightAlpha_1(color)
     #endif
 #endif
 

@@ -146,7 +146,7 @@ void ShaderProgramCompositor::ApplyCommonDefines(ShaderProgramDesc& result,
         }
 
         if (settings_.sceneProcessor_.reflectionQuality_ == ReflectionQuality::Vertex)
-            result.commonShaderDefines_ += "URHO3D_VERTEX_SHADER_REFLECTION ";
+            result.commonShaderDefines_ += "URHO3D_VERTEX_REFLECTION ";
     }
 
     if (flags.Test(DrawableProcessorPassFlag::NeedReadableDepth) && settings_.renderBufferManager_.readableDepth_)

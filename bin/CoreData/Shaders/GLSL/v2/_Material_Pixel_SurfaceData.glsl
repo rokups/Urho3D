@@ -1,11 +1,23 @@
 /// _Material_Pixel_SurfaceData.glsl
 /// Don't include!
-
 /// Input of pixel shader. Contains both data passed from vertex shader and data fetched by pixel shader.
+
 struct SurfaceData
 {
     /// Fog factor. 0 - fog color, 1 - material color.
     fixed fogFactor;
+
+    /// Perceptual roughness factor (0.5 in case of non-PBR shading)
+    half roughness;
+    /// 1 minus reflectivity (metalness in case of PBR shading).
+    half oneMinusReflectivity;
+    /// Occlusion factor. 0 - no ambient is received, 1 - full ambient is received.
+    half occlusion;
+
+    /// Albedo color and alpha channel.
+    half4 albedo;
+    /// Specular color.
+    half3 specular;
 
 #ifdef URHO3D_SURFACE_NEED_AMBIENT
     /// Ambient lighting for surface, including global ambient, vertex lights and lightmaps.
@@ -32,19 +44,7 @@ struct SurfaceData
     half3 normalInTangentSpace;
 #endif
 
-    /// Perceptual roughness factor (0.5 in case of non-PBR shading)
-    half roughness;
-    /// 1 minus reflectivity (metalness in case of PBR shading).
-    half oneMinusReflectivity;
-    /// Occlusion factor. 0 - no ambient is received, 1 - full ambient is received.
-    half occlusion;
-
-    /// Albedo color and alpha channel.
-    half4 albedo;
-    /// Specular color.
-    half3 specular;
-
-#ifdef URHO3D_SURFACE_NEED_EMISSION
+#ifdef URHO3D_SURFACE_NEED_AMBIENT
     /// Emission color.
     half3 emission;
 #endif
