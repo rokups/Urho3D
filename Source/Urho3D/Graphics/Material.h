@@ -30,6 +30,8 @@
 #include "../Resource/Resource.h"
 #include "../Scene/ValueAnimationInfo.h"
 
+#include <atomic>
+
 namespace Urho3D
 {
 
@@ -330,7 +332,7 @@ public:
     unsigned char GetRenderOrder() const { return renderOrder_; }
 
     /// Return last auxiliary view rendered frame number.
-    unsigned GetAuxViewFrameNumber() const { return auxViewFrameNumber_; }
+    unsigned GetAuxViewFrameNumber() const { return auxViewFrameNumber_.load(std::memory_order_relaxed); }
 
     /// Return whether should render occlusion.
     /// @property
@@ -401,7 +403,7 @@ private:
     /// Render order value.
     unsigned char renderOrder_{};
     /// Last auxiliary view rendered frame number.
-    unsigned auxViewFrameNumber_{};
+    std::atomic_uint32_t auxViewFrameNumber_{ 0 };
     /// Shader parameter hash value.
     unsigned shaderParameterHash_{};
     /// Alpha-to-coverage flag.

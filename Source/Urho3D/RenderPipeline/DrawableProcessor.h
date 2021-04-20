@@ -200,6 +200,7 @@ protected:
     void UpdateDrawableZone(const BoundingBox& boundingBox, Drawable* drawable) const;
     void QueueDrawableUpdate(Drawable* drawable);
     void QueueDrawableGeometryUpdate(unsigned threadIndex, Drawable* drawable);
+    void CheckMaterialForAuxiliaryRenderSurfaces(Material* material);
 
     FloatRange CalculateBoundingBoxZRange(const BoundingBox& boundingBox) const;
 
@@ -263,7 +264,7 @@ private:
     ea::vector<LightProcessor*> lightProcessors_;
     ea::vector<LightProcessor*> lightProcessorsByShadowMapSize_;
 
-    WorkQueueVector<Drawable*> queuedDrawableUpdates_{};
+    WorkQueueVector<Drawable*> queuedDrawableUpdates_;
 };
 
 }

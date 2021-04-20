@@ -28,6 +28,8 @@
 #include "../Graphics/OcclusionBuffer.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/Renderer.h"
+#include "../Graphics/Texture2D.h"
+#include "../Graphics/TextureCube.h"
 #include "../Graphics/Zone.h"
 #include "../IO/Log.h"
 #include "../RenderPipeline/DrawableProcessor.h"
@@ -305,6 +307,43 @@ void DrawableProcessor::QueueDrawableGeometryUpdate(unsigned threadIndex, Drawab
         threadedGeometryUpdates_.PushBack(threadIndex, drawable);
 }
 
+void DrawableProcessor::CheckMaterialForAuxiliaryRenderSurfaces(Material* material)
+{
+    // Skip if already checked or not main viewport
+    if (!material || material->GetAuxViewFrameNumber() == frameInfo_.frameNumber_ || frameInfo_.renderTarget_ != nullptr)
+        return;
+
+    for (const auto& item : material->GetTextures())
+    {
+        // Skip if not render targets
+        Texture* texture = item.second;
+        if (!texture || texture->GetUsage() != TEXTURE_RENDERTARGET)
+            continue;
+
+        // Have to check cube & 2D textures separately
+        if (texture->GetType() == Texture2D::GetTypeStatic())
+        {
+            auto* tex2D = static_cast<Texture2D*>(texture);
+            RenderSurface* target = tex2D->GetRenderSurface();
+            if (target && target->GetUpdateMode() == SURFACE_UPDATEVISIBLE)
+                target->QueueUpdate();
+        }
+        else if (texture->GetType() == TextureCube::GetTypeStatic())
+        {
+            auto* texCube = static_cast<TextureCube*>(texture);
+            for (unsigned j = 0; j < MAX_CUBEMAP_FACES; ++j)
+            {
+                RenderSurface* target = texCube->GetRenderSurface((CubeMapFace)j);
+                if (target && target->GetUpdateMode() == SURFACE_UPDATEVISIBLE)
+                    target->QueueUpdate();
+            }
+        }
+    }
+
+    // Flag as processed so we can early-out next time we come across this material on the same frame
+    material->MarkForAuxView(frameInfo_.frameNumber_);
+}
+
 void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
 {
     const unsigned drawableIndex = drawable->GetDrawableIndex();
@@ -352,6 +391,9 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
             Technique* technique = material->FindTechnique(drawable, materialQuality_);
             if (!technique)
                 continue;
+
+            // Check for aux views
+            CheckMaterialForAuxiliaryRenderSurfaces(sourceBatch.material_);
 
             // Update scene passes
             for (DrawableProcessorPass* pass : passes_)

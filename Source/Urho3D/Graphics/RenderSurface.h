@@ -25,6 +25,8 @@
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/Viewport.h"
 
+#include <atomic>
+
 namespace Urho3D
 {
 
@@ -109,7 +111,7 @@ public:
     RenderSurface* GetLinkedDepthStencil() const { return linkedDepthStencil_; }
 
     /// Return whether manual update queued. Called internally.
-    bool IsUpdateQueued() const { return updateQueued_; }
+    bool IsUpdateQueued() const { return updateQueued_.load(std::memory_order_relaxed); }
 
     /// Reset update queued flag. Called internally.
     void ResetUpdateQueued();
@@ -189,7 +191,7 @@ private:
     /// Update mode for viewports.
     RenderSurfaceUpdateMode updateMode_{SURFACE_UPDATEVISIBLE};
     /// Update queued flag.
-    bool updateQueued_{};
+    std::atomic_bool updateQueued_{ false };
     /// Multisampled resolve dirty flag.
     bool resolveDirty_{};
 };

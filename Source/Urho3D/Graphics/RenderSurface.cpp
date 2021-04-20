@@ -76,12 +76,12 @@ void RenderSurface::SetLinkedDepthStencil(RenderSurface* depthStencil)
 
 void RenderSurface::QueueUpdate()
 {
-    updateQueued_ = true;
+    updateQueued_.store(true, std::memory_order_relaxed);
 }
 
 void RenderSurface::ResetUpdateQueued()
 {
-    updateQueued_ = false;
+    updateQueued_.store(false, std::memory_order_relaxed);
 }
 
 int RenderSurface::GetWidth() const

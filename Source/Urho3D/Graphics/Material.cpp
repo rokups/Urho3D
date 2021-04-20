@@ -1180,7 +1180,7 @@ void Material::SortTechniques()
 
 void Material::MarkForAuxView(unsigned frameNumber)
 {
-    auxViewFrameNumber_ = frameNumber;
+    auxViewFrameNumber_.store(frameNumber, std::memory_order_relaxed);
 }
 
 const TechniqueEntry& Material::GetTechniqueEntry(unsigned index) const
