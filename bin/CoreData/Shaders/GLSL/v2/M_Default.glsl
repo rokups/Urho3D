@@ -11,6 +11,9 @@ void main()
 #ifdef URHO3D_PIXEL_SHADER
 void main()
 {
+#ifdef URHO3D_DEPTH_ONLY_PASS
+    DefaultPixelShader();
+#else
     SurfaceData surfaceData;
 
     FillSurfaceCommon(surfaceData);
@@ -23,5 +26,6 @@ void main()
     half3 finalColor = GetFinalColor(surfaceData);
     gl_FragColor.rgb = ApplyFog(finalColor, surfaceData.fogFactor);
     gl_FragColor.a = GetFinalAlpha(surfaceData);
+#endif
 }
 #endif

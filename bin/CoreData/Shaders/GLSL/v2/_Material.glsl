@@ -1,5 +1,4 @@
 /// _Material.glsl
-/// [No depth-only shaders]
 /// Helpers used to create material shaders
 #ifndef _MATERIAL_GLSL_
 #define _MATERIAL_GLSL_
@@ -23,14 +22,22 @@
 #endif
 #include "_Fog.glsl"
 
+#ifdef URHO3D_DEPTH_ONLY_PASS
+#include "_Material_DepthOnly.glsl"
+#else
+
 #include "_Material_Common.glsl"
+
 #ifdef URHO3D_VERTEX_SHADER
 #include "_Material_Vertex.glsl"
 #endif
+
 #ifdef URHO3D_PIXEL_SHADER
 #include "_Material_Pixel_SurfaceData.glsl"
 #include "_Material_Pixel_Fill.glsl"
 #include "_Material_Pixel_Evaluate.glsl"
+#endif
+
 #endif
 
 #endif // _MATERIAL_GLSL_
