@@ -89,6 +89,34 @@
 				<attribute name="Material" value="Material;Materials/Skybox.xml" />
 			</component>
 		</node>
+		<node id="1172">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="SDF Text" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="-0.884462 5.25913 -6.34333" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<component type="Text3D" id="1150">
+				<attribute name="Font" value="Font;Fonts/Anonymous Pro.sdf" />
+				<attribute name="Text" value="Signed Distance Field Text" />
+				<attribute name="Width" value="936" />
+			</component>
+		</node>
+		<node id="1227">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Simple Text" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0.635595 4.71882 -6.34333" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="1 1 1" />
+			<attribute name="Variables" />
+			<component type="Text3D" id="1205">
+				<attribute name="Font" value="Font;Fonts/Anonymous Pro.ttf" />
+				<attribute name="Text" value="Normal text. PS: Objects behind occluder are invisible" />
+				<attribute name="Width" value="486" />
+			</component>
+		</node>
 	</node>
 	<node id="3">
 		<attribute name="Is Enabled" value="true" />

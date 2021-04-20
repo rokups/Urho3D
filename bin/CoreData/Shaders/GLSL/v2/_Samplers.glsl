@@ -29,6 +29,7 @@ SAMPLER(9, samplerCube sLightCubeMap)
     SAMPLER(15, sampler3D sZoneVolumeMap)
 #endif
 
+/// Helpers to sample sDiffMap in specified color space.
 #ifdef URHO3D_MATERIAL_DIFFUSE_HINT
     #if URHO3D_MATERIAL_DIFFUSE_HINT == 0
         #define DiffMap_ToGamma(color)  Texture_ToGammaAlpha_0(color)
@@ -41,6 +42,7 @@ SAMPLER(9, samplerCube sLightCubeMap)
     #endif
 #endif
 
+/// Helpers to sample sEmissiveMap in specified color space.
 #ifdef URHO3D_MATERIAL_EMISSIVE_HINT
     #if URHO3D_MATERIAL_EMISSIVE_HINT == 0
         #define EmissiveMap_ToGamma(color)  Texture_ToGamma_0(color)
@@ -53,10 +55,20 @@ SAMPLER(9, samplerCube sLightCubeMap)
     #endif
 #endif
 
-vec3 DecodeNormal(vec4 normalInput)
+/// Extract alpha from alpha-only texture.
+/// GL3 doesn't support alpha format and used R8 instead.
+/// GL2 and DX11 are both ok with alpha-only format.
+#if defined(GL3) && !defined(D3D11)
+    #define DecodeAlphaMap(diffuseInput) diffuseInput.r
+#else
+    #define DecodeAlphaMap(diffuseInput) diffuseInput.a
+#endif
+
+/// Convert sampled value from sNormalMap to normal in tangent space.
+half3 DecodeNormal(half4 normalInput)
 {
     #ifdef PACKEDNORMAL
-        vec3 normal;
+        half3 normal;
         normal.xy = normalInput.ag * 2.0 - 1.0;
         normal.z = sqrt(max(1.0 - dot(normal.xy, normal.xy), 0.0));
         return normal;
@@ -65,6 +77,7 @@ vec3 DecodeNormal(vec4 normalInput)
     #endif
 }
 
+/// Convert sampled depth buffer value to linear depth in [0, 1] range.
 float ReconstructDepth(float hwDepth)
 {
     return dot(vec2(hwDepth, cDepthReconstruct.y / (hwDepth - cDepthReconstruct.x)), cDepthReconstruct.zw);

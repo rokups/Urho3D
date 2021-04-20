@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <material>
 	<technique name="Techniques/LitTransparent.xml" />
-	<shader vsdefines="PBR" psdefines="PBR" />
+	<shader vsdefines="PBR NORMALMAP" psdefines="PBR NORMALMAP" />
 	<texture unit="diffuse" name="Textures/PBR/HoverBike/Glass/Albedo.jpg" />
 	<texture unit="normal" name="Textures/PBR/HoverBike/Glass/Normal.jpg" />
 	<parameter name="UOffset" value="1 0 0 0" />
