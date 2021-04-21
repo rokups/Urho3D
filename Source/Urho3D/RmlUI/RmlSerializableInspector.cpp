@@ -191,7 +191,7 @@ void RmlSerializableInspector::Connect(Serializable* serializable)
             for (unsigned i = 0; attributeInfo.enumNames_[i] != nullptr; ++i)
                 attribute.enumNames_.push_back(attributeInfo.enumNames_[i]);
 
-            attribute.enumSelector_ = "<select data-value='attribute.value'>";
+            attribute.enumSelector_ = "<select data-value='attribute.value' style='width: 90%'>";
             for (const auto& option : attribute.enumNames_)
                 attribute.enumSelector_ += Format("<option value='{}'>{}</option>", option, option);
             attribute.enumSelector_ += "</select>";

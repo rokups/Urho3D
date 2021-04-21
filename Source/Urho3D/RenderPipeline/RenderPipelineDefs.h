@@ -150,7 +150,7 @@ enum class RenderPipelineColorSpace
 struct RenderBufferManagerSettings
 {
     /// Whether to inherit multisample level from output render texture.
-    bool inheritMultiSampleLevel_{};
+    bool inheritMultiSampleLevel_{ true };
     /// Multisample level of both output color buffers and depth buffer.
     int multiSampleLevel_{ 1 };
     /// Preferred color space of both output color buffers.
@@ -694,16 +694,14 @@ struct RenderPipelineSettings : public ShaderProgramCompositorSettings
     bool operator!=(const RenderPipelineSettings& rhs) const { return !(*this == rhs); }
     /// @}
 
-    /// Adjust to closest suported settings.
+    /// Adjust to closest settings suported by the platform.
     void AdjustToSupported(Context* context);
 
-    /// Validate settings and adjust to closest valid option.
-    void ValidateAndAdjust(Context* context)
-    {
-        Validate();
-        AdjustToSupported(context);
-        Validate();
-    }
+    /// Don't modify settings inplace after these calls! Always restore settings from external source.
+    /// @{
+    void PropagateImpliedSettings();
+    void AdjustForPostProcessing(PostProcessPassFlags flags);
+    /// @}
 };
 
 }

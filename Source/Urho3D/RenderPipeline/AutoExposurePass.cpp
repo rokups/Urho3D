@@ -171,7 +171,7 @@ void AutoExposurePass::Execute()
     if (!pipelineStates_->IsValid())
         return;
 
-    renderBufferManager_->PrepareForColorReadWrite(false);
+    renderBufferManager_->SwapColorBuffers(false);
 
     if (settings_.autoExposure_)
     {

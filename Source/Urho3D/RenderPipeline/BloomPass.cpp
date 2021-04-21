@@ -153,7 +153,7 @@ void BloomPass::Execute()
     luminanceWeights_ = renderBufferManager_->GetSettings().colorSpace_ == RenderPipelineColorSpace::GammaLDR
         ? Color::LUMINOSITY_GAMMA.ToVector3() : Color::LUMINOSITY_LINEAR.ToVector3();
 
-    renderBufferManager_->PrepareForColorReadWrite(false);
+    renderBufferManager_->SwapColorBuffers(false);
 
     const unsigned numIterations = GatherBrightRegions(textures_[0].final_);
     for (unsigned i = 0; i < numIterations; ++i)
@@ -170,7 +170,7 @@ void BloomPass::Execute()
     for (unsigned i = 0; i < numIterations; ++i)
         intensityMultipliers_[i] *= settings_.intensity_ / totalIntensity;
 
-    renderBufferManager_->PrepareForColorReadWrite(false);
+    renderBufferManager_->SwapColorBuffers(false);
     renderBufferManager_->SetOutputRenderTargers();
     for (unsigned i = 0; i < numIterations; ++i)
         ApplyBloom(textures_[i].final_, intensityMultipliers_[i]);

@@ -69,9 +69,9 @@ public:
 
     SharedPtr<RenderBuffer> CreateColorBuffer(const RenderBufferParams& params, const Vector2& size = Vector2::ONE);
 
-    /// Prepare for simultaneous reading from and writing to color buffer.
+    /// Swap color buffers used to render to and to read from.
     /// Invalid if SupportOutputColorReadWrite is not requested.
-    void PrepareForColorReadWrite(bool synchronizeInputAndOutput);
+    void SwapColorBuffers(bool synchronizeContents);
 
     /// Set depth-stencil and color buffers. At least one color or depth-stencil buffer should be set.
     /// All render buffers should have same multisample levels.
@@ -139,15 +139,15 @@ public:
 
     /// Return depth-stencil buffer. Stays the same during the frame.
     RenderBuffer* GetDepthStencilOutput() const { return depthStencilBuffer_; }
-    /// Return color render buffer. Changes on PrepareForColorReadWrite.
+    /// Return color render buffer. Changes on SwapColorBuffers.
     RenderBuffer* GetColorOutput() const { return writeableColorBuffer_; }
 
     /// Return readable depth texture.
     /// It's not allowed to write depth and read it from shader input simultaneously for same depth-stencil buffer.
     Texture2D* GetDepthStencilTexture() const { return depthStencilBuffer_->GetTexture2D(); };
     /// Return secondary color render buffer texture that can be used while writing to color render buffer.
-    /// Texture content is defined at the moment of previous PrepareForColorReadWrite.
-    /// Content is undefined if PrepareForColorReadWrite was not called during current frame.
+    /// Texture content is defined at the moment of previous SwapColorBuffers.
+    /// Content is undefined if SwapColorBuffers was not called during current frame.
     Texture2D* GetSecondaryColorTexture() const { return readableColorBuffer_ ? readableColorBuffer_->GetTexture2D() : nullptr; }
 
     /// Return size of output region (not size of output texture itself).

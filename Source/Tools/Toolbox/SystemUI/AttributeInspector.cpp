@@ -26,16 +26,12 @@
 #include <Urho3D/Core/StringUtils.h>
 #include <Urho3D/Scene/Serializable.h>
 #include <Urho3D/Scene/Scene.h>
-#include <Urho3D/Resource/BinaryFile.h>
 #include <Urho3D/Resource/ResourceCache.h>
 #include <Urho3D/IO/FileSystem.h>
 #include <Urho3D/IO/Log.h>
 #include <Urho3D/Input/Input.h>
 #include <Urho3D/Graphics/Material.h>
 #include <Urho3D/Graphics/Technique.h>
-#include <Urho3D/Graphics/Texture2D.h>
-#include <Urho3D/Graphics/Texture3D.h>
-#include <Urho3D/Graphics/TextureCube.h>
 #include <Urho3D/Graphics/Camera.h>
 #include <Urho3D/Graphics/Renderer.h>
 #include <Urho3D/Graphics/RenderPath.h>
@@ -121,21 +117,7 @@ bool RenderResourceRef(ResourceRef& ref, Object* eventSender)
     // Resources are assigned by dropping on to them.
     if (ui::BeginDragDropTarget())
     {
-        // TODO: Make real fix
-        ea::string expectedPayload = ref.type_.ToString();
-        if (ref.type_ == Texture2D::GetTypeStatic()
-            || ref.type_ == TextureCube::GetTypeStatic()
-            || ref.type_ == Texture3D::GetTypeStatic())
-        {
-            expectedPayload = Format("{},{},{},{},{}",
-                Texture2D::GetTypeStatic().ToString(),
-                TextureCube::GetTypeStatic().ToString(),
-                Texture3D::GetTypeStatic().ToString(),
-                XMLFile::GetTypeStatic().ToString(),
-                BinaryFile::GetTypeStatic().ToString());
-        }
-
-        const Variant& payload = ui::AcceptDragDropVariant(expectedPayload);
+        const Variant& payload = ui::AcceptDragDropVariant(ref.type_.ToString());
         if (!payload.IsEmpty())
         {
             ref.name_ = payload.GetString();

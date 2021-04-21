@@ -57,6 +57,7 @@ public:
 
     /// Setup. Slow, called rarely.
     /// @{
+    /// It's okay to pass null passes in vector.
     void SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes);
     void SetSettings(const ShaderProgramCompositorSettings& settings);
     /// @}

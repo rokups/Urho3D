@@ -77,7 +77,7 @@ void ToneMappingPass::Execute()
     if (!toneMappingState_->IsValid())
         return;
 
-    renderBufferManager_->PrepareForColorReadWrite(false);
+    renderBufferManager_->SwapColorBuffers(false);
 
     renderBufferManager_->SetOutputRenderTargers();
     renderBufferManager_->DrawFeedbackViewportQuad("Apply tone mapping", toneMappingState_, {}, {});

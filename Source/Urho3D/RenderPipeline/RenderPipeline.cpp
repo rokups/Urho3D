@@ -144,7 +144,9 @@ const FrameInfo& RenderPipelineView::GetFrameInfo() const
 void RenderPipelineView::SetSettings(const RenderPipelineSettings& settings)
 {
     settings_ = settings;
-    settings_.ValidateAndAdjust(context_);
+    settings_.Validate();
+    settings_.AdjustToSupported(context_);
+    settings_.PropagateImpliedSettings();
     settingsDirty_ = true;
     settingsPipelineStateHash_ = settings_.CalculatePipelineStateHash();
 }
@@ -253,12 +255,7 @@ void RenderPipelineView::ApplySettings()
     for (PostProcessPass* postProcessPass : postProcessPasses_)
         postProcessFlags_ |= postProcessPass->GetExecutionFlags();
 
-    const bool isDeferredLighting = settings_.sceneProcessor_.IsDeferredLighting();
-    settings_.renderBufferManager_.filteredColor_ = postProcessFlags_.Test(PostProcessPassFlag::NeedColorOutputBilinear);
-    settings_.renderBufferManager_.colorUsableWithMultipleRenderTargets_ = isDeferredLighting;
-    settings_.renderBufferManager_.stencilBuffer_ = isDeferredLighting;
-    settings_.renderBufferManager_.inheritMultiSampleLevel_ = !isDeferredLighting;
-    settings_.renderBufferManager_.readableDepth_ = settings_.sceneProcessor_.IsDeferredLighting();
+    settings_.AdjustForPostProcessing(postProcessFlags_);
     renderBufferManager_->SetSettings(settings_.renderBufferManager_);
 }
 
@@ -413,7 +410,7 @@ void RenderPipelineView::Render()
         postOpaquePass_->GetBaseRenderFlags(), postOpaquePass_->GetSortedBaseBatches());
 
     if (hasRefraction)
-        renderBufferManager_->PrepareForColorReadWrite(true);
+        renderBufferManager_->SwapColorBuffers(true);
 
 #ifdef DESKTOP_GRAPHICS
     ShaderResourceDesc depthAndColorTextures[] = {
@@ -474,7 +471,8 @@ RenderPipeline::RenderPipeline(Context* context)
 {
     // Enable instancing by default for default render pipeline
     settings_.instancingBuffer_.enableInstancing_ = true;
-    settings_.ValidateAndAdjust(context_);
+    settings_.Validate();
+    settings_.AdjustToSupported(context_);
 }
 
 RenderPipeline::~RenderPipeline()
@@ -518,7 +516,8 @@ void RenderPipeline::RegisterObject(Context* context)
 void RenderPipeline::SetSettings(const RenderPipelineSettings& settings)
 {
     settings_ = settings;
-    settings_.ValidateAndAdjust(context_);
+    settings_.Validate();
+    settings_.AdjustToSupported(context_);
     MarkSettingsDirty();
 }
 
@@ -529,7 +528,8 @@ SharedPtr<RenderPipelineView> RenderPipeline::Instantiate()
 
 void RenderPipeline::MarkSettingsDirty()
 {
-    settings_.ValidateAndAdjust(context_);
+    settings_.Validate();
+    settings_.AdjustToSupported(context_);
     OnSettingsChanged(this, settings_);
 }
 

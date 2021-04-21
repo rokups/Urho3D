@@ -73,7 +73,7 @@ void SimplePostProcessPass::Execute()
     const bool colorReadAndWrite = flags_.Test(PostProcessPassFlag::NeedColorOutputReadAndWrite);
 
     if (colorReadAndWrite)
-        renderBufferManager_->PrepareForColorReadWrite(false);
+        renderBufferManager_->SwapColorBuffers(false);
     renderBufferManager_->SetOutputRenderTargers();
 
     if (colorReadAndWrite)

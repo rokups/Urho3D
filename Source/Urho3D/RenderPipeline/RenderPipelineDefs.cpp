@@ -33,11 +33,26 @@
 namespace Urho3D
 {
 
+namespace
+{
+
+int GetClosestMutliSampleLevel(Graphics* graphics, int level)
+{
+    const auto& supportedLevels = graphics->GetMultiSampleLevels();
+    const auto iter = ea::upper_bound(supportedLevels.begin(), supportedLevels.end(), level);
+    return iter != supportedLevels.begin() ? *ea::prev(iter) : 1;
+}
+
+}
+
 void RenderPipelineSettings::AdjustToSupported(Context* context)
 {
     auto graphics = context->GetSubsystem<Graphics>();
+    const GraphicsCaps& caps = Graphics::GetCaps();
 
-    // Validate render target setup
+    // RenderBufferManagerSettings
+    renderBufferManager_.multiSampleLevel_ = GetClosestMutliSampleLevel(graphics, renderBufferManager_.multiSampleLevel_);
+
     if (renderBufferManager_.colorSpace_ == RenderPipelineColorSpace::LinearHDR
         && graphics->GetRGBAFloat16Format() == graphics->GetRGBAFormat())
     {
@@ -52,19 +67,69 @@ void RenderPipelineSettings::AdjustToSupported(Context* context)
         renderBufferManager_.colorSpace_ = RenderPipelineColorSpace::GammaLDR;
     }
 
-    shadowMapAllocator_.shadowAtlasPageSize_ = ea::min(
-        shadowMapAllocator_.shadowAtlasPageSize_, Graphics::GetCaps().maxRenderTargetSize_);
+#ifdef GL_ES_VERSION_2_0
+    renderBufferManager_.readableDepth_ = false;
+#endif
 
-    if (sceneProcessor_.IsDeferredLighting() && !graphics->GetDeferredSupport()
-        && !Graphics::GetReadableDepthStencilFormat())
+    // DrawableProcessorSettings
+
+    // OcclusionBufferSettings
+
+    // BatchRendererSettings
+
+    // SceneProcessorSettings
+    if (!graphics->GetShadowMapFormat() && !graphics->GetHiresShadowMapFormat())
+        sceneProcessor_.enableShadows_ = false;
+
+#ifdef GL_ES_VERSION_2_0
+    const bool deferredSupported = false;
+#else
+    const bool deferredSupported = caps.maxNumRenderTargets_ >= 4 && Graphics::GetReadableDepthStencilFormat();
+#endif
+    if (sceneProcessor_.IsDeferredLighting() && !deferredSupported)
         sceneProcessor_.lightingMode_ = DirectLightingMode::Forward;
 
-    if (!shadowMapAllocator_.use16bitShadowMaps_ && !graphics->GetHiresShadowMapFormat())
+    // ShadowMapAllocatorSettings
+    if (!graphics->GetRGFloat32Format())
+        shadowMapAllocator_.enableVarianceShadowMaps_ = false;
+
+    shadowMapAllocator_.varianceShadowMapMultiSample_ = GetClosestMutliSampleLevel(
+        graphics, shadowMapAllocator_.varianceShadowMapMultiSample_);
+
+    if (!graphics->GetHiresShadowMapFormat())
         shadowMapAllocator_.use16bitShadowMaps_ = true;
 
-    if (instancingBuffer_.enableInstancing_ && !graphics->GetInstancingSupport())
+    shadowMapAllocator_.shadowAtlasPageSize_ = ea::min(
+        shadowMapAllocator_.shadowAtlasPageSize_, caps.maxRenderTargetSize_);
+
+    // InstancingBufferSettings
+    if (!graphics->GetInstancingSupport())
         instancingBuffer_.enableInstancing_ = false;
 
+    // TODO: Check if instancing is actually supported, i.e. if there's enough vertex attributes
+
+    // RenderPipelineSettings
+#ifdef GL_ES_VERSION_2_0
+    if (antialiasing_ == PostProcessAntialiasing::FXAA3)
+    {
+        URHO3D_LOGWARNING("FXAA3 is not supported, falling back to FXAA2");
+        antialiasing_ = PostProcessAntialiasing::FXAA2;
+    }
+#endif
+}
+
+void RenderPipelineSettings::PropagateImpliedSettings()
+{
+    // Deferred rendering expects certain properties from render textures
+    if (sceneProcessor_.IsDeferredLighting())
+    {
+        renderBufferManager_.colorUsableWithMultipleRenderTargets_ = true;
+        renderBufferManager_.stencilBuffer_ = true;
+        renderBufferManager_.readableDepth_ = true;
+        renderBufferManager_.inheritMultiSampleLevel_ = false;
+    }
+
+    // Setup instancing buffer format
     if (instancingBuffer_.enableInstancing_)
     {
         instancingBuffer_.firstInstancingTexCoord_ = 4;
@@ -82,19 +147,16 @@ void RenderPipelineSettings::AdjustToSupported(Context* context)
         }
     }
 
+    // Synchronize misc settings
     sceneProcessor_.linearSpaceLighting_ =
         renderBufferManager_.colorSpace_ != RenderPipelineColorSpace::GammaLDR;
 
-    // Validate post-processing
-#ifdef GL_ES_VERSION_2_0
-    if (antialiasing_ == PostProcessAntialiasing::FXAA3)
-    {
-        URHO3D_LOGWARNING("FXAA3 is not supported, falling back to FXAA2");
-        antialiasing_ = PostProcessAntialiasing::FXAA2;
-    }
-#endif
-
     bloom_.hdr_ = renderBufferManager_.colorSpace_ == RenderPipelineColorSpace::LinearHDR;
+}
+
+void RenderPipelineSettings::AdjustForPostProcessing(PostProcessPassFlags flags)
+{
+    renderBufferManager_.filteredColor_ = flags.Test(PostProcessPassFlag::NeedColorOutputBilinear);
 }
 
 }

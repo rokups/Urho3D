@@ -239,6 +239,7 @@ void SceneProcessor::SetRenderCamera(Camera* camera)
 
 void SceneProcessor::SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes)
 {
+    passes.erase(ea::remove(passes.begin(), passes.end(), nullptr), passes.end());
     ea::vector<SharedPtr<DrawableProcessorPass>> drawableProcessorPasses(passes.begin(), passes.end());
     drawableProcessor_->SetPasses(ea::move(drawableProcessorPasses));
     batchCompositor_->SetPasses(ea::move(passes));

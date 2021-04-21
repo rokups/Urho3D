@@ -241,11 +241,11 @@ SharedPtr<RenderBuffer> RenderBufferManager::CreateColorBuffer(const RenderBuffe
     return MakeShared<TextureRenderBuffer>(renderPipeline_, params, size);
 }
 
-void RenderBufferManager::PrepareForColorReadWrite(bool synchronizeInputAndOutput)
+void RenderBufferManager::SwapColorBuffers(bool synchronizeContents)
 {
     if (!frameSettings_.supportColorReadWrite_)
     {
-        URHO3D_LOGERROR("Cannot call PrepareForColorReadWrite if 'supportColorReadWrite' flag is not set");
+        URHO3D_LOGERROR("Cannot call SwapColorBuffers if 'supportColorReadWrite' flag is not set");
         assert(0);
         return;
     }
@@ -253,7 +253,7 @@ void RenderBufferManager::PrepareForColorReadWrite(bool synchronizeInputAndOutpu
     assert(readableColorBuffer_ && writeableColorBuffer_);
     ea::swap(writeableColorBuffer_, readableColorBuffer_);
 
-    if (synchronizeInputAndOutput)
+    if (synchronizeContents)
     {
         SetRenderTargets(depthStencilBuffer_, { writeableColorBuffer_ });
         DrawTexture("Synchronize readable and writeable color buffers", readableColorBuffer_->GetTexture2D());
