@@ -25,6 +25,7 @@
 #include "../Graphics/GraphicsDefs.h"
 #include "../RenderPipeline/BatchStateCache.h"
 #include "../RenderPipeline/DrawableProcessor.h"
+#include "../RenderPipeline/InstancingBuffer.h"
 
 #include <EASTL/sort.h>
 

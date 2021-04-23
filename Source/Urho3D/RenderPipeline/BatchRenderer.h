@@ -26,6 +26,7 @@
 #include "../Graphics/DrawCommandQueue.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../RenderPipeline/RenderPipelineDefs.h"
+#include "../RenderPipeline/PipelineBatchSortKey.h"
 
 #include <EASTL/span.h>
 
@@ -36,8 +37,6 @@ class Camera;
 class DrawableProcessor;
 class InstancingBuffer;
 class ShadowSplitProcessor;
-struct PipelineBatchBackToFront;
-struct PipelineBatchByState;
 
 /// Common parameters of batch rendering
 struct BatchRenderingContext
@@ -74,7 +73,17 @@ public:
         ea::span<const PipelineBatchByState> batches);
     /// @}
 
+    /// Store instancing data for batches.
+    /// @{
+    void PrepareInstancingBuffer(PipelineBatchGroup<PipelineBatchByState>& batches);
+    void PrepareInstancingBuffer(PipelineBatchGroup<PipelineBatchBackToFront>& batches);
+    /// @}
+
 private:
+    template <class T>
+    void PrepareInstancingBufferImpl(PipelineBatchGroup<T>& batches);
+    BatchRenderFlags AdjustRenderFlags(BatchRenderFlags flags) const;
+
     /// External dependencies
     /// @{
     Renderer* renderer_{};

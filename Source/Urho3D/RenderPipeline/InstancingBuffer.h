@@ -47,6 +47,9 @@ public:
     /// End buffer composition and commit added instances to GPU.
     void End();
 
+    /// Return index of next added instance.
+    unsigned GetNextInstanceIndex() const { return vertexBuffer_->GetVertexCount(); }
+
     /// Add instance to buffer. Use SetElements to fill it after.
     unsigned AddInstance()
     {

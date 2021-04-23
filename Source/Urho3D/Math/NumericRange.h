@@ -84,4 +84,7 @@ struct NumericRange : ea::pair<T, T>
 /// Floating-point numerical range.
 using FloatRange = NumericRange<float>;
 
+/// Unsigned integer numerical range.
+using UintRange = NumericRange<unsigned>;
+
 }

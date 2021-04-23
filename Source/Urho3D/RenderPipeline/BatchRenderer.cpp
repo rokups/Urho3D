@@ -36,7 +36,6 @@
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/InstancingBuffer.h"
 #include "../RenderPipeline/LightProcessor.h"
-#include "../RenderPipeline/PipelineBatchSortKey.h"
 #include "../RenderPipeline/RenderPipelineDebugger.h"
 #include "../RenderPipeline/ShaderConsts.h"
 #include "../Scene/Scene.h"
@@ -100,6 +99,130 @@ Vector4 GetFogParameter(const Camera& camera)
     };
 }
 
+Vector4 GetAmbientLighting(const BatchRendererSettings& settings, const LightAccumulator& lightAccumulator)
+{
+    const Vector3 ambient = lightAccumulator.sphericalHarmonics_.EvaluateAverage();
+    if (settings.linearSpaceLighting_)
+        return Vector4(ambient, 1.0f);
+    else
+        return Color(ambient).LinearToGamma().ToVector4();
+}
+
+/// Helper class to process per-object parameters.
+class ObjectParameterBuilder : public NonCopyable
+{
+public:
+    ObjectParameterBuilder(const BatchRendererSettings& settings, BatchRenderFlags flags)
+        : instancingEnabled_(flags.Test(BatchRenderFlag::EnableInstancingForStaticGeometry))
+        , ambientEnabled_(flags.Test(BatchRenderFlag::EnableAmbientLighting))
+        , ambientMode_(settings.ambientMode_)
+        , linearSpaceLighting_(settings.linearSpaceLighting_)
+    {
+    }
+
+    bool IsInstancingSupported() const { return instancingEnabled_; }
+    bool IsAmbientEnabled() const { return ambientEnabled_; }
+
+    /// Whether the batch should be processed using instancing.
+    bool IsBatchInstanced(const PipelineBatch& pipelineBatch) const
+    {
+        return instancingEnabled_
+            && pipelineBatch.geometry_->IsInstanced(pipelineBatch.geometryType_);
+    }
+
+    /// Set batch ambient lighting.
+    void SetBatchAmbient(const LightAccumulator& lightAccumulator)
+    {
+        if (ambientMode_ == DrawableAmbientMode::Flat)
+        {
+            const Vector3 ambient = lightAccumulator.sphericalHarmonics_.EvaluateAverage();
+            if (linearSpaceLighting_)
+                ambientValueFlat_ = Vector4(ambient, 1.0f);
+            else
+                ambientValueFlat_ = Color(ambient).LinearToGamma().ToVector4();
+        }
+        else if (ambientMode_ == DrawableAmbientMode::Directional)
+        {
+            ambientValueSH_ = &lightAccumulator.sphericalHarmonics_;
+        }
+    }
+
+    /// Add uniforms to instancing buffer for instanced batches.
+    void AddBatchesToInstancingBuffer(InstancingBuffer& instancingBuffer,
+        const SourceBatch& sourceBatch, unsigned instanceIndex)
+    {
+        instancingBuffer.AddInstance();
+        instancingBuffer.SetElements(&sourceBatch.worldTransform_[instanceIndex], 0, 3);
+        if (ambientEnabled_)
+        {
+            if (ambientMode_ == DrawableAmbientMode::Flat)
+                instancingBuffer.SetElements(&ambientValueFlat_, 3, 1);
+            else if (ambientMode_ == DrawableAmbientMode::Directional)
+                instancingBuffer.SetElements(ambientValueSH_, 3, 7);
+        }
+    }
+
+    /// Add uniforms to draw queue for non-instanced batch.
+    void AddBatchUniformsToDrawQueue(DrawCommandQueue& drawQueue, const Node& cameraNode,
+        const SourceBatch& sourceBatch, unsigned instanceIndex)
+    {
+        drawQueue.BeginShaderParameterGroup(SP_OBJECT, true);
+
+        if (ambientEnabled_)
+        {
+            if (ambientMode_ == DrawableAmbientMode::Flat)
+                drawQueue.AddShaderParameter(ShaderConsts::Object_Ambient, ambientValueFlat_);
+            else if (ambientMode_ == DrawableAmbientMode::Directional)
+            {
+                drawQueue.AddShaderParameter(ShaderConsts::Object_SHAr, ambientValueSH_->Ar_);
+                drawQueue.AddShaderParameter(ShaderConsts::Object_SHAg, ambientValueSH_->Ag_);
+                drawQueue.AddShaderParameter(ShaderConsts::Object_SHAb, ambientValueSH_->Ab_);
+                drawQueue.AddShaderParameter(ShaderConsts::Object_SHBr, ambientValueSH_->Br_);
+                drawQueue.AddShaderParameter(ShaderConsts::Object_SHBg, ambientValueSH_->Bg_);
+                drawQueue.AddShaderParameter(ShaderConsts::Object_SHBb, ambientValueSH_->Bb_);
+                drawQueue.AddShaderParameter(ShaderConsts::Object_SHC, ambientValueSH_->C_);
+            }
+        }
+
+        switch (sourceBatch.geometryType_)
+        {
+        case GEOM_SKINNED:
+            drawQueue.AddShaderParameter(ShaderConsts::Object_SkinMatrices,
+                ea::span<const Matrix3x4>(sourceBatch.worldTransform_, sourceBatch.numWorldTransforms_));
+            break;
+
+        case GEOM_BILLBOARD:
+            drawQueue.AddShaderParameter(ShaderConsts::Object_Model, *sourceBatch.worldTransform_);
+            if (sourceBatch.numWorldTransforms_ > 1)
+            {
+                drawQueue.AddShaderParameter(ShaderConsts::Object_BillboardRot,
+                    sourceBatch.worldTransform_[1].RotationMatrix());
+            }
+            else
+            {
+                drawQueue.AddShaderParameter(ShaderConsts::Object_BillboardRot,
+                    cameraNode.GetWorldRotation().RotationMatrix());
+            }
+            break;
+
+        default:
+            drawQueue.AddShaderParameter(ShaderConsts::Object_Model, sourceBatch.worldTransform_[instanceIndex]);
+            break;
+        }
+
+        drawQueue.CommitShaderParameterGroup(SP_OBJECT);
+    }
+
+private:
+    const bool instancingEnabled_;
+    const bool ambientEnabled_;
+    const DrawableAmbientMode ambientMode_;
+    const bool linearSpaceLighting_;
+
+    Vector4 ambientValueFlat_;
+    const SphericalHarmonicsDot9* ambientValueSH_{};
+};
+
 /// Batch renderer to command queue.
 // TODO(renderer): Add template parameter to avoid branching?
 template <bool DebuggerEnabled>
@@ -107,8 +230,8 @@ class DrawCommandCompositor : public NonCopyable, private BatchRenderingContext
 {
 public:
     DrawCommandCompositor(const BatchRenderingContext& ctx, const BatchRendererSettings& settings,
-        RenderPipelineDebugger* debugger, const DrawableProcessor& drawableProcessor, InstancingBuffer& instancingBuffer,
-        BatchRenderFlags flags)
+        RenderPipelineDebugger* debugger, const DrawableProcessor& drawableProcessor, const InstancingBuffer& instancingBuffer,
+        BatchRenderFlags flags, unsigned startInstance)
         : BatchRenderingContext(ctx)
         , settings_(settings)
         , debugger_(debugger)
@@ -119,6 +242,8 @@ public:
         , lights_(drawableProcessor_.GetLightProcessors())
         , cameraNode_(*camera_.GetNode())
         , enabled_(flags, instancingBuffer)
+        , objectParameterBuilder_(settings_, flags)
+        , instanceIndex_(startInstance)
     {
     }
 
@@ -137,10 +262,15 @@ public:
         ProcessBatch(pipelineBatch, lightVolumeHelpers_.sourceBatch_);
     }
 
-    void FlushDrawCommands()
+    void FlushDrawCommands(unsigned nextInstanceIndex)
     {
         if (instancingGroup_.count_ > 0)
-            DrawObjectInstanced();
+            CommitInstancedDrawCalls();
+        if (nextInstanceIndex != instanceIndex_)
+        {
+            URHO3D_LOGERROR("Instancing buffer is malformed");
+            assert(0);
+        }
     }
     /// @}
 
@@ -231,29 +361,6 @@ private:
 
         dirty_.lightmapTextures_ = current_.lightmapTexture_ != lightmapTexture;
         current_.lightmapTexture_ = lightmapTexture;
-    }
-
-    void ExtractObjectConstants(const SourceBatch& sourceBatch, const LightAccumulator* lightAccumulator)
-    {
-        if (enabled_.ambientLighting_)
-        {
-            if (settings_.ambientMode_ == DrawableAmbientMode::Flat)
-            {
-                const Vector3 ambient = lightAccumulator->sphericalHarmonics_.EvaluateAverage();
-                if (settings_.linearSpaceLighting_)
-                    object_.ambient_ = Vector4(ambient, 1.0f);
-                else
-                    object_.ambient_ = Color(ambient).LinearToGamma().ToVector4();
-            }
-            else if (settings_.ambientMode_ == DrawableAmbientMode::Directional)
-            {
-                object_.sh_ = &lightAccumulator->sphericalHarmonics_;
-            }
-        }
-
-        object_.geometryType_ = sourceBatch.geometryType_;
-        object_.worldTransform_ = sourceBatch.worldTransform_;
-        object_.numWorldTransforms_ = sourceBatch.numWorldTransforms_;
     }
     /// @}
 
@@ -452,86 +559,29 @@ private:
             drawQueue_.AddShaderParameter(ShaderConsts::Light_VSMShadowParams, settings_.varianceShadowMapParams_);
         }
     }
-
-    void AddObjectConstants(unsigned instanceIndex)
-    {
-        if (enabled_.ambientLighting_)
-        {
-            if (settings_.ambientMode_ == DrawableAmbientMode::Flat)
-                drawQueue_.AddShaderParameter(ShaderConsts::Object_Ambient, object_.ambient_);
-            else if (settings_.ambientMode_ == DrawableAmbientMode::Directional)
-            {
-                const SphericalHarmonicsDot9& sh = *object_.sh_;
-                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHAr, sh.Ar_);
-                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHAg, sh.Ag_);
-                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHAb, sh.Ab_);
-                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHBr, sh.Br_);
-                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHBg, sh.Bg_);
-                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHBb, sh.Bb_);
-                drawQueue_.AddShaderParameter(ShaderConsts::Object_SHC, sh.C_);
-            }
-        }
-
-        switch (object_.geometryType_)
-        {
-        case GEOM_SKINNED:
-            drawQueue_.AddShaderParameter(ShaderConsts::Object_SkinMatrices,
-                ea::span<const Matrix3x4>(object_.worldTransform_, object_.numWorldTransforms_));
-            break;
-
-        case GEOM_BILLBOARD:
-            drawQueue_.AddShaderParameter(ShaderConsts::Object_Model, *object_.worldTransform_);
-            if (object_.numWorldTransforms_ > 1)
-            {
-                drawQueue_.AddShaderParameter(ShaderConsts::Object_BillboardRot,
-                    object_.worldTransform_[1].RotationMatrix());
-            }
-            else
-            {
-                drawQueue_.AddShaderParameter(ShaderConsts::Object_BillboardRot,
-                    cameraNode_.GetWorldRotation().RotationMatrix());
-            }
-            break;
-
-        default:
-            drawQueue_.AddShaderParameter(ShaderConsts::Object_Model, object_.worldTransform_[instanceIndex]);
-            break;
-        }
-    }
-
-    void AddObjectInstanceData(unsigned numInstances)
-    {
-        for (unsigned i = 0; i < numInstances; ++i)
-        {
-            if (i != 0)
-                instancingBuffer_.AddInstance();
-            instancingBuffer_.SetElements(&object_.worldTransform_[i], 0, 3);
-            if (enabled_.ambientLighting_)
-            {
-                if (settings_.ambientMode_ == DrawableAmbientMode::Flat)
-                    instancingBuffer_.SetElements(&object_.ambient_, 3, 1);
-                else if (settings_.ambientMode_ == DrawableAmbientMode::Directional)
-                    instancingBuffer_.SetElements(object_.sh_, 3, 7);
-            }
-        }
-    }
     /// @}
 
     /// Draw ops
     /// @{
-    void DrawObject()
+    void CommitDrawCalls(unsigned numInstances, const SourceBatch& sourceBatch)
     {
         IndexBuffer* indexBuffer = current_.geometry_->GetIndexBuffer();
+
         if (dirty_.geometry_)
             drawQueue_.SetBuffers({ current_.geometry_->GetVertexBuffers(), indexBuffer, nullptr });
 
-        if (indexBuffer != nullptr)
-            drawQueue_.DrawIndexed(current_.geometry_->GetIndexStart(), current_.geometry_->GetIndexCount());
-        else
-            drawQueue_.Draw(current_.geometry_->GetVertexStart(), current_.geometry_->GetVertexCount());
+        for (unsigned i = 0; i < numInstances; ++i)
+        {
+            objectParameterBuilder_.AddBatchUniformsToDrawQueue(drawQueue_, cameraNode_, sourceBatch, i);
+
+            if (indexBuffer != nullptr)
+                drawQueue_.DrawIndexed(current_.geometry_->GetIndexStart(), current_.geometry_->GetIndexCount());
+            else
+                drawQueue_.Draw(current_.geometry_->GetVertexStart(), current_.geometry_->GetVertexCount());
+        }
     }
 
-    void DrawObjectInstanced()
+    void CommitInstancedDrawCalls()
     {
         assert(instancingGroup_.count_ > 0);
         Geometry* geometry = instancingGroup_.geometry_;
@@ -549,8 +599,6 @@ private:
             ? &drawableProcessor_.GetGeometryLighting(pipelineBatch.drawableIndex_)
             : nullptr;
 
-        ExtractObjectConstants(sourceBatch, lightAccumulator);
-
         // Update dirty flags and cached state
         CheckDirtyCommonState(pipelineBatch);
         if (enabled_.pixelLighting_)
@@ -564,7 +612,7 @@ private:
         }
 
         const unsigned numBatchInstances = pipelineBatch.geometryType_ == GEOM_STATIC
-            ? object_.numWorldTransforms_ : 1u;
+            ? sourceBatch.numWorldTransforms_ : 1u;
 
         const bool resetInstancingGroup = instancingGroup_.count_ == 0 || dirty_.IsAnythingDirty();
         if constexpr (DebuggerEnabled)
@@ -572,7 +620,7 @@ private:
         if (resetInstancingGroup)
         {
             if (instancingGroup_.count_ > 0)
-                DrawObjectInstanced();
+                CommitInstancedDrawCalls();
 
             if (dirty_.pipelineState_)
                 drawQueue_.SetPipelineState(current_.pipelineState_);
@@ -580,33 +628,24 @@ private:
             UpdateDirtyConstants();
             UpdateDirtyResources();
 
-            const bool beginInstancingGroup = enabled_.staticInstancing_
-                && pipelineBatch.geometryType_ == GEOM_STATIC
-                && pipelineBatch.geometry_->GetIndexBuffer() != nullptr;
-            if (beginInstancingGroup)
+            if (objectParameterBuilder_.IsBatchInstanced(pipelineBatch))
             {
                 instancingGroup_.count_ = numBatchInstances;
-                instancingGroup_.start_ = instancingBuffer_.AddInstance();
+                instancingGroup_.start_ = instanceIndex_;
                 instancingGroup_.geometry_ = current_.geometry_;
-                AddObjectInstanceData(numBatchInstances);
+                instanceIndex_ += numBatchInstances;
             }
             else
             {
-                for (unsigned i = 0; i < numBatchInstances; ++i)
-                {
-                    drawQueue_.BeginShaderParameterGroup(SP_OBJECT, true);
-                    AddObjectConstants(i);
-                    drawQueue_.CommitShaderParameterGroup(SP_OBJECT);
-
-                    DrawObject();
-                }
+                if (objectParameterBuilder_.IsAmbientEnabled())
+                    objectParameterBuilder_.SetBatchAmbient(*lightAccumulator);
+                CommitDrawCalls(numBatchInstances, sourceBatch);
             }
         }
         else
         {
             instancingGroup_.count_ += numBatchInstances;
-            instancingBuffer_.AddInstance();
-            AddObjectInstanceData(numBatchInstances);
+            instanceIndex_ += numBatchInstances;
         }
     }
 
@@ -615,7 +654,7 @@ private:
     const BatchRendererSettings& settings_;
     RenderPipelineDebugger* debugger_{};
     const DrawableProcessor& drawableProcessor_;
-    InstancingBuffer& instancingBuffer_;
+    const InstancingBuffer& instancingBuffer_;
     const FrameInfo& frameInfo_;
     // TODO(renderer): Make it immutable so we can safely execute this code in multiple threads
     Scene& scene_;
@@ -625,13 +664,11 @@ private:
 
     struct EnabledFeatureFlags
     {
-        EnabledFeatureFlags(BatchRenderFlags flags, InstancingBuffer& instancingBuffer)
+        EnabledFeatureFlags(BatchRenderFlags flags, const InstancingBuffer& instancingBuffer)
             : ambientLighting_(flags.Test(BatchRenderFlag::EnableAmbientLighting))
             , vertexLighting_(flags.Test(BatchRenderFlag::EnableVertexLights))
             , pixelLighting_(flags.Test(BatchRenderFlag::EnablePixelLights))
             , anyLighting_(ambientLighting_ || vertexLighting_ || pixelLighting_)
-            , staticInstancing_(instancingBuffer.IsEnabled()
-                && flags.Test(BatchRenderFlag::EnableInstancingForStaticGeometry))
         {
         }
 
@@ -639,7 +676,6 @@ private:
         bool vertexLighting_;
         bool pixelLighting_;
         bool anyLighting_;
-        bool staticInstancing_;
     } const enabled_;
 
     struct DirtyStateFlags
@@ -712,15 +748,6 @@ private:
         Geometry* geometry_{};
     } current_;
 
-    struct ObjectState
-    {
-        const SphericalHarmonicsDot9* sh_{};
-        Vector4 ambient_;
-        GeometryType geometryType_{};
-        const Matrix3x4* worldTransform_{};
-        unsigned numWorldTransforms_{};
-    } object_;
-
     struct InstancingGroupState
     {
         Geometry* geometry_{};
@@ -733,6 +760,9 @@ private:
         Matrix3x4 transform_;
         SourceBatch sourceBatch_;
     } lightVolumeHelpers_;
+
+    ObjectParameterBuilder objectParameterBuilder_;
+    unsigned instanceIndex_{};
 };
 
 }
@@ -768,38 +798,52 @@ void BatchRenderer::SetSettings(const BatchRendererSettings& settings)
 void BatchRenderer::RenderBatches(const BatchRenderingContext& ctx,
     BatchRenderFlags flags, ea::span<const PipelineBatchByState> batches)
 {
+    PipelineBatchGroup<PipelineBatchByState> batchGroup;
+    batchGroup.flags_ = AdjustRenderFlags(flags);
+    batchGroup.batches_ = batches;
+    PrepareInstancingBuffer(batchGroup);
+
     if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
     {
-        DrawCommandCompositor<true> compositor(ctx, settings_, debugger_, *drawableProcessor_, *instancingBuffer_, flags);
-        for (const auto& sortedBatch : batches)
+        DrawCommandCompositor<true> compositor(ctx, settings_, debugger_,
+            *drawableProcessor_, *instancingBuffer_, batchGroup.flags_, batchGroup.startInstance_);
+        for (const auto& sortedBatch : batchGroup.batches_)
             compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
-        compositor.FlushDrawCommands();
+        compositor.FlushDrawCommands(batchGroup.startInstance_ + batchGroup.numInstances_);
     }
     else
     {
-        DrawCommandCompositor<false> compositor(ctx, settings_, nullptr, *drawableProcessor_, *instancingBuffer_, flags);
-        for (const auto& sortedBatch : batches)
+        DrawCommandCompositor<false> compositor(ctx, settings_, nullptr,
+            *drawableProcessor_, *instancingBuffer_, batchGroup.flags_, batchGroup.startInstance_);
+        for (const auto& sortedBatch : batchGroup.batches_)
             compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
-        compositor.FlushDrawCommands();
+        compositor.FlushDrawCommands(batchGroup.startInstance_ + batchGroup.numInstances_);
     }
 }
 
 void BatchRenderer::RenderBatches(const BatchRenderingContext& ctx,
     BatchRenderFlags flags, ea::span<const PipelineBatchBackToFront> batches)
 {
+    PipelineBatchGroup<PipelineBatchBackToFront> batchGroup;
+    batchGroup.flags_ = AdjustRenderFlags(flags);
+    batchGroup.batches_ = batches;
+    PrepareInstancingBuffer(batchGroup);
+
     if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
     {
-        DrawCommandCompositor<true> compositor(ctx, settings_, debugger_, *drawableProcessor_, *instancingBuffer_, flags);
-        for (const auto& sortedBatch : batches)
+        DrawCommandCompositor<true> compositor(ctx, settings_, debugger_,
+            *drawableProcessor_, *instancingBuffer_, batchGroup.flags_, batchGroup.startInstance_);
+        for (const auto& sortedBatch : batchGroup.batches_)
             compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
-        compositor.FlushDrawCommands();
+        compositor.FlushDrawCommands(batchGroup.startInstance_ + batchGroup.numInstances_);
     }
     else
     {
-        DrawCommandCompositor<false> compositor(ctx, settings_, nullptr, *drawableProcessor_, *instancingBuffer_, flags);
-        for (const auto& sortedBatch : batches)
+        DrawCommandCompositor<false> compositor(ctx, settings_, nullptr,
+            *drawableProcessor_, *instancingBuffer_, batchGroup.flags_, batchGroup.startInstance_);
+        for (const auto& sortedBatch : batchGroup.batches_)
             compositor.ProcessSceneBatch(*sortedBatch.pipelineBatch_);
-        compositor.FlushDrawCommands();
+        compositor.FlushDrawCommands(batchGroup.startInstance_ + batchGroup.numInstances_);
     }
 }
 
@@ -808,20 +852,68 @@ void BatchRenderer::RenderLightVolumeBatches(const BatchRenderingContext& ctx,
 {
     if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
     {
-        DrawCommandCompositor<true> compositor(ctx, settings_, debugger_, *drawableProcessor_, *instancingBuffer_,
-            BatchRenderFlag::EnablePixelLights);
+        DrawCommandCompositor<true> compositor(ctx, settings_, debugger_,
+            *drawableProcessor_, *instancingBuffer_, BatchRenderFlag::EnablePixelLights, 0);
         for (const auto& sortedBatch : batches)
             compositor.ProcessLightVolumeBatch(*sortedBatch.pipelineBatch_);
-        compositor.FlushDrawCommands();
+        compositor.FlushDrawCommands(0);
     }
     else
     {
-        DrawCommandCompositor<false> compositor(ctx, settings_, nullptr, *drawableProcessor_, *instancingBuffer_,
-            BatchRenderFlag::EnablePixelLights);
+        DrawCommandCompositor<false> compositor(ctx, settings_, nullptr,
+            *drawableProcessor_, *instancingBuffer_, BatchRenderFlag::EnablePixelLights, 0);
         for (const auto& sortedBatch : batches)
             compositor.ProcessLightVolumeBatch(*sortedBatch.pipelineBatch_);
-        compositor.FlushDrawCommands();
+        compositor.FlushDrawCommands(0);
     }
+}
+
+void BatchRenderer::PrepareInstancingBuffer(PipelineBatchGroup<PipelineBatchByState>& batches)
+{
+    PrepareInstancingBufferImpl(batches);
+}
+
+void BatchRenderer::PrepareInstancingBuffer(PipelineBatchGroup<PipelineBatchBackToFront>& batches)
+{
+    PrepareInstancingBufferImpl(batches);
+}
+
+template <class T>
+void BatchRenderer::PrepareInstancingBufferImpl(PipelineBatchGroup<T>& batches)
+{
+    batches.flags_ = AdjustRenderFlags(batches.flags_);
+    batches.startInstance_ = 0;
+    batches.numInstances_ = 0;
+
+    ObjectParameterBuilder objectParameterBuilder(settings_, batches.flags_);
+    if (!objectParameterBuilder.IsInstancingSupported())
+        return;
+
+    batches.startInstance_ = instancingBuffer_->GetNextInstanceIndex();
+    for (const T& sortedBatch : batches.batches_)
+    {
+        const PipelineBatch& pipelineBatch = *sortedBatch.pipelineBatch_;
+        if (!objectParameterBuilder.IsBatchInstanced(pipelineBatch))
+            continue;
+
+        const SourceBatch& sourceBatch = pipelineBatch.GetSourceBatch();
+        if (objectParameterBuilder.IsAmbientEnabled())
+        {
+            const LightAccumulator& lightAccumulator = drawableProcessor_->GetGeometryLighting(pipelineBatch.drawableIndex_);
+            objectParameterBuilder.SetBatchAmbient(lightAccumulator);
+        }
+
+        for (unsigned i = 0; i < sourceBatch.numWorldTransforms_; ++i)
+            objectParameterBuilder.AddBatchesToInstancingBuffer(*instancingBuffer_, sourceBatch, i);
+        batches.numInstances_ += sourceBatch.numWorldTransforms_;
+    }
+}
+
+BatchRenderFlags BatchRenderer::AdjustRenderFlags(BatchRenderFlags flags) const
+{
+    if (!instancingBuffer_->IsEnabled())
+        flags.Set(BatchRenderFlag::EnableInstancingForStaticGeometry, false);
+    return flags;
 }
 
 }

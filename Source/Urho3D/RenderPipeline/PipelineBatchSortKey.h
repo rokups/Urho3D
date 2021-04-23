@@ -29,6 +29,8 @@
 #include "../RenderPipeline/DrawableProcessor.h"
 #include "../RenderPipeline/BatchCompositor.h"
 
+#include <EASTL/span.h>
+
 namespace Urho3D
 {
 
@@ -145,6 +147,16 @@ struct PipelineBatchBackToFront
             return renderOrder_ < rhs.renderOrder_;
         return distance_ > rhs.distance_;
     }
+};
+
+/// Group of batches to be rendered.
+template <class PipelineBatchSorted>
+struct PipelineBatchGroup
+{
+    ea::span<const PipelineBatchSorted> batches_;
+    BatchRenderFlags flags_;
+    unsigned startInstance_{};
+    unsigned numInstances_{};
 };
 
 }

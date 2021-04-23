@@ -240,7 +240,8 @@ public:
         return indexAndData.first;
     }
 
-    VertexBuffer* GetVertexBuffer() { return vertexBuffer_; }
+    VertexBuffer* GetVertexBuffer() const { return vertexBuffer_; }
+    unsigned GetVertexCount() const { return numVertices_; }
 
 private:
     void GrowBuffer();
