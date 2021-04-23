@@ -38,10 +38,9 @@ class InstancingBuffer;
 class PipelineStateBuilder;
 class RenderPipelineInterface;
 class RenderSurface;
+class ScenePass;
 class ShadowMapAllocator;
 class Viewport;
-struct PipelineBatchBackToFront;
-struct PipelineBatchByState;
 struct ShaderParameterDesc;
 struct ShaderResourceDesc;
 
@@ -58,7 +57,7 @@ public:
     /// Setup. Slow, called rarely.
     /// @{
     /// It's okay to pass null passes in vector.
-    void SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes);
+    void SetPasses(ea::vector<SharedPtr<ScenePass>> passes);
     void SetSettings(const ShaderProgramCompositorSettings& settings);
     /// @}
 
@@ -83,12 +82,13 @@ public:
     void SetRenderCameras(ea::span<Camera* const> cameras);
 
     void Update();
+    void PrepareInstancingBuffer();
     void RenderShadowMaps();
     void RenderSceneBatches(ea::string_view debugName, Camera* camera,
-        BatchRenderFlags flags, ea::span<const PipelineBatchByState> batches,
+        const PipelineBatchGroup<PipelineBatchByState>& batchGroup,
         ea::span<const ShaderResourceDesc> globalResources = {}, ea::span<const ShaderParameterDesc> cameraParameters = {});
     void RenderSceneBatches(ea::string_view debugName, Camera* camera,
-        BatchRenderFlags flags, ea::span<const PipelineBatchBackToFront> batches,
+        const PipelineBatchGroup<PipelineBatchBackToFront>& batchGroup,
         ea::span<const ShaderResourceDesc> globalResources = {}, ea::span<const ShaderParameterDesc> cameraParameters = {});
     void RenderLightVolumeBatches(ea::string_view debugName, Camera* camera,
         ea::span<const ShaderResourceDesc> globalResources, ea::span<const ShaderParameterDesc> cameraParameters);
@@ -127,8 +127,7 @@ private:
 
     void DrawOccluders();
     template <class T>
-    void RenderBatchesInternal(ea::string_view debugName, Camera* camera,
-        BatchRenderFlags flags, ea::span<const T> batches,
+    void RenderBatchesInternal(ea::string_view debugName, Camera* camera, const PipelineBatchGroup<T>& batchGroup,
         ea::span<const ShaderResourceDesc> globalResources, ea::span<const ShaderParameterDesc> cameraParameters);
 
     RenderPipelineInterface* renderPipeline_{};
@@ -153,6 +152,7 @@ private:
     /// @}
 
     SceneProcessorSettings settings_;
+    ea::vector<SharedPtr<ScenePass>> passes_;
 
     FrameInfo frameInfo_;
     bool flipCameraForRendering_{};
@@ -160,8 +160,6 @@ private:
     OcclusionBuffer* currentOcclusionBuffer_{};
     ea::vector<Drawable*> occluders_;
     ea::vector<Drawable*> drawables_;
-
-    ea::vector<PipelineBatchByState> tempSortedShadowBatches_;
 };
 
 }

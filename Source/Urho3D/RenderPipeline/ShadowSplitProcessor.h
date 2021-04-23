@@ -65,6 +65,7 @@ public:
     /// @}
 
     void FinalizeShadow(const ShadowMapRegion& shadowMap, unsigned pcfKernelSize);
+    void FinalizeShadowBatches();
 
     /// Return immutable
     /// @{
@@ -88,10 +89,9 @@ public:
     Camera* GetShadowCamera() const { return shadowCamera_; }
     /// @}
 
-    /// Return mutable shadow batches for batch compositor.
-    auto& GetMutableShadowBatches() { return shadowCasterBatches_; }
-    /// Sort and return shadow batches. Array is cleared automatically.
-    void SortShadowBatches(ea::vector<PipelineBatchByState>& sortedBatches) const;
+    auto& GetMutableUnsortedShadowBatches() { return unsortedShadowBatches_; }
+    auto& GetMutableShadowBatches() { return shadowBatches_; }
+    const auto& GetShadowBatches() const { return shadowBatches_; }
 
 private:
     void InitializeBaseDirectionalCamera(Camera* cullCamera);
@@ -118,12 +118,17 @@ private:
     /// @{
     FloatRange cascadeZRange_{};
     FloatRange focusedCascadeZRange_{};
-
-    ea::vector<PipelineBatch> shadowCasterBatches_;
     ea::vector<Drawable*> shadowCasters_;
 
     ShadowMapRegion shadowMap_;
     float shadowMapWorldSpaceTexelSize_{};
+    /// @}
+
+    /// Shadow casters
+    /// @{
+    ea::vector<PipelineBatch> unsortedShadowBatches_;
+    ea::vector<PipelineBatchByState> sortedShadowBatches_;
+    PipelineBatchGroup<PipelineBatchByState> shadowBatches_;
     /// @}
 };
 

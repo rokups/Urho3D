@@ -53,12 +53,12 @@ int GetTextureColorSpaceHint(bool linearInput, bool srgbTexture)
 ShaderProgramCompositor::ShaderProgramCompositor(Context* context)
     : Object(context)
 {
+    auto graphics = GetSubsystem<Graphics>();
+    constantBuffersSupported_ = graphics->GetCaps().constantBuffersSupported_;
 }
 
 void ShaderProgramCompositor::SetSettings(const ShaderProgramCompositorSettings& settings)
 {
-    auto graphics = GetSubsystem<Graphics>();
-    constantBuffersSupported_ = graphics->GetCaps().constantBuffersSupported_;
     settings_ = settings;
 }
 

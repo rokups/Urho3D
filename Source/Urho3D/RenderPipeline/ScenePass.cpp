@@ -26,6 +26,7 @@
 #include "../Core/StringUtils.h"
 #include "../Graphics/Renderer.h"
 #include "../Graphics/Technique.h"
+#include "../RenderPipeline/BatchRenderer.h"
 #include "../RenderPipeline/ScenePass.h"
 
 #include <EASTL/sort.h>
@@ -50,59 +51,41 @@ ScenePass::ScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor*
 {
 }
 
-BatchRenderFlags UnorderedScenePass::GetDeferredRenderFlags() const
-{
-    const DrawableProcessorPassFlags passFlags = GetFlags();
-    BatchRenderFlags result;
-    if (passFlags.Test(DrawableProcessorPassFlag::HasAmbientLighting))
-        result |= BatchRenderFlag::EnableAmbientLighting;
-    if (HasLightPass())
-        result |= BatchRenderFlag::EnablePixelLights;
-    if (!passFlags.Test(DrawableProcessorPassFlag::DisableInstancing))
-        result |= BatchRenderFlag::EnableInstancingForStaticGeometry;
-    return result;
-}
-
-BatchRenderFlags UnorderedScenePass::GetBaseRenderFlags() const
-{
-    const DrawableProcessorPassFlags passFlags = GetFlags();
-    BatchRenderFlags result;
-    if (passFlags.Test(DrawableProcessorPassFlag::HasAmbientLighting))
-        result |= BatchRenderFlag::EnableAmbientAndVertexLighting;
-    if (HasLightPass())
-        result |= BatchRenderFlag::EnablePixelLights;
-    if (!passFlags.Test(DrawableProcessorPassFlag::DisableInstancing))
-        result |= BatchRenderFlag::EnableInstancingForStaticGeometry;
-    return result;
-}
-
-BatchRenderFlags UnorderedScenePass::GetLightRenderFlags() const
-{
-    const DrawableProcessorPassFlags passFlags = GetFlags();
-    BatchRenderFlags result = BatchRenderFlag::EnablePixelLights;
-    if (!passFlags.Test(DrawableProcessorPassFlag::DisableInstancing))
-        result |= BatchRenderFlag::EnableInstancingForStaticGeometry;
-    return result;
-}
-
 void UnorderedScenePass::OnBatchesReady()
 {
     BatchCompositor::SortBatches(sortedDeferredBatches_, deferredBatches_);
     BatchCompositor::SortBatches(sortedBaseBatches_, baseBatches_);
     BatchCompositor::SortBatches(sortedLightBatches_, lightBatches_);
+
+    deferredBatchGroup_ = { sortedDeferredBatches_ };
+    baseBatchGroup_ = { sortedBaseBatches_ };
+    lightBatchGroup_ = { sortedLightBatches_ };
+
+    if (!GetFlags().Test(DrawableProcessorPassFlag::DisableInstancing))
+    {
+        deferredBatchGroup_.flags_ |= BatchRenderFlag::EnableInstancingForStaticGeometry;
+        baseBatchGroup_.flags_ |= BatchRenderFlag::EnableInstancingForStaticGeometry;
+        lightBatchGroup_.flags_ |= BatchRenderFlag::EnableInstancingForStaticGeometry;
+    }
+
+    if (HasLightPass())
+    {
+        baseBatchGroup_.flags_ |= BatchRenderFlag::EnablePixelLights;
+        lightBatchGroup_.flags_ |= BatchRenderFlag::EnablePixelLights;
+    }
+
+    if (GetFlags().Test(DrawableProcessorPassFlag::HasAmbientLighting))
+    {
+        deferredBatchGroup_.flags_ |= BatchRenderFlag::EnableAmbientLighting;
+        baseBatchGroup_.flags_ |= BatchRenderFlag::EnableAmbientAndVertexLighting;
+    }
 }
 
-BatchRenderFlags BackToFrontScenePass::GetRenderFlags() const
+void UnorderedScenePass::PrepareInstacingBuffer(BatchRenderer* batchRenderer)
 {
-    const DrawableProcessorPassFlags passFlags = GetFlags();
-    BatchRenderFlags result;
-    if (passFlags.Test(DrawableProcessorPassFlag::HasAmbientLighting))
-        result |= BatchRenderFlag::EnableAmbientAndVertexLighting;
-    if (HasLightPass())
-        result |= BatchRenderFlag::EnablePixelLights;
-    if (!passFlags.Test(DrawableProcessorPassFlag::DisableInstancing))
-        result |= BatchRenderFlag::EnableInstancingForStaticGeometry;
-    return result;
+    batchRenderer->PrepareInstancingBuffer(deferredBatchGroup_);
+    batchRenderer->PrepareInstancingBuffer(baseBatchGroup_);
+    batchRenderer->PrepareInstancingBuffer(lightBatchGroup_);
 }
 
 void BackToFrontScenePass::OnBatchesReady()
@@ -122,6 +105,19 @@ void BackToFrontScenePass::OnBatchesReady()
             }
         }
     }
+
+    batchGroup_ = { sortedBatches_ };
+    if (GetFlags().Test(DrawableProcessorPassFlag::HasAmbientLighting))
+        batchGroup_.flags_ |= BatchRenderFlag::EnableAmbientAndVertexLighting;
+    if (HasLightPass())
+        batchGroup_.flags_ |= BatchRenderFlag::EnablePixelLights;
+    if (!GetFlags().Test(DrawableProcessorPassFlag::DisableInstancing))
+        batchGroup_.flags_ |= BatchRenderFlag::EnableInstancingForStaticGeometry;
+}
+
+void BackToFrontScenePass::PrepareInstacingBuffer(BatchRenderer* batchRenderer)
+{
+    batchRenderer->PrepareInstancingBuffer(batchGroup_);
 }
 
 }

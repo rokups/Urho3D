@@ -142,7 +142,8 @@ void ShadowSplitProcessor::ProcessDirectionalShadowCasters(
     DrawableProcessor* drawableProcessor, ea::vector<Drawable*>& shadowCastersBuffer)
 {
     shadowCasters_.clear();
-    shadowCasterBatches_.clear();
+    unsortedShadowBatches_.clear();
+    sortedShadowBatches_.clear();
 
     // Skip split if outside of the scene
     if (!drawableProcessor->GetSceneZRange().Interset(cascadeZRange_))
@@ -165,7 +166,8 @@ void ShadowSplitProcessor::ProcessSpotShadowCasters(
     DrawableProcessor* drawableProcessor, const ea::vector<Drawable*>& shadowCasterCandidates)
 {
     shadowCasters_.clear();
-    shadowCasterBatches_.clear();
+    unsortedShadowBatches_.clear();
+    sortedShadowBatches_.clear();
 
     // Preprocess shadow casters
     drawableProcessor->PreprocessShadowCasters(shadowCasters_, shadowCasterCandidates, {}, light_, shadowCamera_);
@@ -175,7 +177,8 @@ void ShadowSplitProcessor::ProcessPointShadowCasters(
     DrawableProcessor* drawableProcessor, const ea::vector<Drawable*>& shadowCasterCandidates)
 {
     shadowCasters_.clear();
-    shadowCasterBatches_.clear();
+    unsortedShadowBatches_.clear();
+    sortedShadowBatches_.clear();
 
     // Check that the face is visible: if not, can skip the split
     Camera* cullCamera = drawableProcessor->GetFrameInfo().camera_;
@@ -354,9 +357,10 @@ Matrix4 ShadowSplitProcessor::GetWorldToShadowSpaceMatrix(float subPixelOffset) 
     return texAdjust * shadowProj * shadowView;
 }
 
-void ShadowSplitProcessor::SortShadowBatches(ea::vector<PipelineBatchByState>& sortedBatches) const
+void ShadowSplitProcessor::FinalizeShadowBatches()
 {
-    BatchCompositor::SortBatches(sortedBatches, shadowCasterBatches_);
+    BatchCompositor::SortBatches(sortedShadowBatches_, unsortedShadowBatches_);
+    shadowBatches_ = { sortedShadowBatches_, BatchRenderFlag::EnableInstancingForStaticGeometry };
 }
 
 }

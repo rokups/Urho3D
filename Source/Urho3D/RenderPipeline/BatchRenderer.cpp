@@ -166,7 +166,8 @@ public:
     void AddBatchUniformsToDrawQueue(DrawCommandQueue& drawQueue, const Node& cameraNode,
         const SourceBatch& sourceBatch, unsigned instanceIndex)
     {
-        drawQueue.BeginShaderParameterGroup(SP_OBJECT, true);
+        if (!drawQueue.BeginShaderParameterGroup(SP_OBJECT, true))
+            return;
 
         if (ambientEnabled_)
         {
@@ -795,13 +796,9 @@ void BatchRenderer::SetSettings(const BatchRendererSettings& settings)
     settings_ = settings;
 }
 
-void BatchRenderer::RenderBatches(const BatchRenderingContext& ctx,
-    BatchRenderFlags flags, ea::span<const PipelineBatchByState> batches)
+void BatchRenderer::RenderBatches(const BatchRenderingContext& ctx, PipelineBatchGroup<PipelineBatchByState> batchGroup)
 {
-    PipelineBatchGroup<PipelineBatchByState> batchGroup;
-    batchGroup.flags_ = AdjustRenderFlags(flags);
-    batchGroup.batches_ = batches;
-    PrepareInstancingBuffer(batchGroup);
+    batchGroup.flags_ = AdjustRenderFlags(batchGroup.flags_);
 
     if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
     {
@@ -821,13 +818,9 @@ void BatchRenderer::RenderBatches(const BatchRenderingContext& ctx,
     }
 }
 
-void BatchRenderer::RenderBatches(const BatchRenderingContext& ctx,
-    BatchRenderFlags flags, ea::span<const PipelineBatchBackToFront> batches)
+void BatchRenderer::RenderBatches(const BatchRenderingContext& ctx, PipelineBatchGroup<PipelineBatchBackToFront> batchGroup)
 {
-    PipelineBatchGroup<PipelineBatchBackToFront> batchGroup;
-    batchGroup.flags_ = AdjustRenderFlags(flags);
-    batchGroup.batches_ = batches;
-    PrepareInstancingBuffer(batchGroup);
+    batchGroup.flags_ = AdjustRenderFlags(batchGroup.flags_);
 
     if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
     {

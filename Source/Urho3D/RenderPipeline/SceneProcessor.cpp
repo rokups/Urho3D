@@ -43,6 +43,7 @@
 #include "../RenderPipeline/PipelineStateBuilder.h"
 #include "../RenderPipeline/RenderPipelineDebugger.h"
 #include "../RenderPipeline/RenderPipelineDefs.h"
+#include "../RenderPipeline/ScenePass.h"
 #include "../RenderPipeline/SceneProcessor.h"
 #include "../RenderPipeline/ShadowMapAllocator.h"
 #include "../Scene/Scene.h"
@@ -237,12 +238,15 @@ void SceneProcessor::SetRenderCamera(Camera* camera)
     cameraProcessor_->SetCameras(cameras);
 }
 
-void SceneProcessor::SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passes)
+void SceneProcessor::SetPasses(ea::vector<SharedPtr<ScenePass>> passes)
 {
     passes.erase(ea::remove(passes.begin(), passes.end(), nullptr), passes.end());
-    ea::vector<SharedPtr<DrawableProcessorPass>> drawableProcessorPasses(passes.begin(), passes.end());
+    passes_ = ea::move(passes);
+
+    ea::vector<SharedPtr<DrawableProcessorPass>> drawableProcessorPasses(passes_.begin(), passes_.end());
     drawableProcessor_->SetPasses(ea::move(drawableProcessorPasses));
-    batchCompositor_->SetPasses(ea::move(passes));
+    ea::vector<SharedPtr<BatchCompositorPass>> batchCompositorPasses(passes_.begin(), passes_.end());
+    batchCompositor_->SetPasses(ea::move(batchCompositorPasses));
 }
 
 void SceneProcessor::SetSettings(const ShaderProgramCompositorSettings& settings)
@@ -324,6 +328,27 @@ void SceneProcessor::Update()
         batchCompositor_->ComposeLightVolumeBatches();
 }
 
+void SceneProcessor::PrepareInstancingBuffer()
+{
+    if (!instancingBuffer_->IsEnabled())
+        return;
+
+    instancingBuffer_->Begin();
+
+    const auto& visibleLights = drawableProcessor_->GetLightProcessors();
+
+    for (LightProcessor* sceneLight : visibleLights)
+    {
+        for (ShadowSplitProcessor& split : sceneLight->GetMutableSplits())
+            batchRenderer_->PrepareInstancingBuffer(split.GetMutableShadowBatches());
+    }
+
+    for (ScenePass* pass : passes_)
+        pass->PrepareInstacingBuffer(batchRenderer_);
+
+    instancingBuffer_->End();
+}
+
 void SceneProcessor::RenderShadowMaps()
 {
     if (!settings_.enableShadows_)
@@ -334,8 +359,6 @@ void SceneProcessor::RenderShadowMaps()
     {
         for (const ShadowSplitProcessor& split : sceneLight->GetSplits())
         {
-            split.SortShadowBatches(tempSortedShadowBatches_);
-
             if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
             {
                 const ea::string passName = Format("ShadowMap.[{}].{}",
@@ -344,12 +367,7 @@ void SceneProcessor::RenderShadowMaps()
             }
 
             drawQueue_->Reset();
-
-            instancingBuffer_->Begin();
-            batchRenderer_->RenderBatches({ *drawQueue_, split },
-                BatchRenderFlag::EnableInstancingForStaticGeometry, tempSortedShadowBatches_);
-            instancingBuffer_->End();
-
+            batchRenderer_->RenderBatches({ *drawQueue_, split }, split.GetShadowBatches());
             shadowMapAllocator_->BeginShadowMapRendering(split.GetShadowMap());
             drawQueue_->Execute();
 
@@ -362,17 +380,17 @@ void SceneProcessor::RenderShadowMaps()
 }
 
 void SceneProcessor::RenderSceneBatches(ea::string_view debugName, Camera* camera,
-    BatchRenderFlags flags, ea::span<const PipelineBatchByState> batches,
+    const PipelineBatchGroup<PipelineBatchByState>& batchGroup,
     ea::span<const ShaderResourceDesc> globalResources, ea::span<const ShaderParameterDesc> cameraParameters)
 {
-    RenderBatchesInternal(debugName, camera, flags, batches, globalResources, cameraParameters);
+    RenderBatchesInternal(debugName, camera, batchGroup, globalResources, cameraParameters);
 }
 
 void SceneProcessor::RenderSceneBatches(ea::string_view debugName, Camera* camera,
-    BatchRenderFlags flags, ea::span<const PipelineBatchBackToFront> batches,
+    const PipelineBatchGroup<PipelineBatchBackToFront>& batchGroup,
     ea::span<const ShaderResourceDesc> globalResources, ea::span<const ShaderParameterDesc> cameraParameters)
 {
-    RenderBatchesInternal(debugName, camera, flags, batches, globalResources, cameraParameters);
+    RenderBatchesInternal(debugName, camera, batchGroup, globalResources, cameraParameters);
 }
 
 void SceneProcessor::RenderLightVolumeBatches(ea::string_view debugName, Camera* camera,
@@ -396,23 +414,20 @@ void SceneProcessor::RenderLightVolumeBatches(ea::string_view debugName, Camera*
 }
 
 template <class T>
-void SceneProcessor::RenderBatchesInternal(ea::string_view debugName, Camera* camera,
-    BatchRenderFlags flags, ea::span<const T> batches,
+void SceneProcessor::RenderBatchesInternal(ea::string_view debugName, Camera* camera, const PipelineBatchGroup<T>& batchGroup,
     ea::span<const ShaderResourceDesc> globalResources, ea::span<const ShaderParameterDesc> cameraParameters)
 {
     if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
         debugger_->BeginPass(debugName);
 
     drawQueue_->Reset();
-    instancingBuffer_->Begin();
 
     BatchRenderingContext ctx{ *drawQueue_, *camera };
     ctx.globalResources_ = globalResources;
     ctx.cameraParameters_ = cameraParameters;
 
-    batchRenderer_->RenderBatches(ctx, flags, batches);
+    batchRenderer_->RenderBatches(ctx, batchGroup);
 
-    instancingBuffer_->End();
     drawQueue_->Execute();
 
     if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))

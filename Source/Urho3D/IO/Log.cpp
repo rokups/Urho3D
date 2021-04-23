@@ -341,7 +341,10 @@ void Log::SendMessageEvent(LogLevel level, time_t timestamp, const ea::string& l
         return;
 
 #if URHO3D_PROFILING
-    TracyMessageC(message.c_str(), message.size(), LOG_LEVEL_COLORS[level].ToUIntArgb());
+    // TODO: Slice message instead of trimming
+    const unsigned maxMessageLength = std::numeric_limits<uint16_t>::max() - 1;
+    const unsigned messageLength = ea::min(maxMessageLength, static_cast<unsigned>(message.size()));
+    TracyMessageC(message.c_str(), messageLength, LOG_LEVEL_COLORS[level].ToUIntArgb());
 #endif
 
     auto* logInstance = GetLog();

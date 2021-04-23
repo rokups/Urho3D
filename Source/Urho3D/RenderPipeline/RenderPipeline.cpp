@@ -347,6 +347,7 @@ void RenderPipelineView::Render()
     // TODO(renderer): Do something about this hack
     graphics_->SetVertexBuffer(nullptr);
 
+    sceneProcessor_->PrepareInstancingBuffer();
     sceneProcessor_->RenderShadowMaps();
 
     Camera* camera = sceneProcessor_->GetFrameInfo().camera_;
@@ -372,8 +373,7 @@ void RenderPipelineView::Render()
             deferred_->normalBuffer_
         };
         renderBufferManager_->SetRenderTargets(renderBufferManager_->GetDepthStencilOutput(), gBuffer);
-        sceneProcessor_->RenderSceneBatches("GeometryBuffer", camera,
-            opaquePass_->GetDeferredRenderFlags(), opaquePass_->GetSortedDeferredBatches());
+        sceneProcessor_->RenderSceneBatches("GeometryBuffer", camera, opaquePass_->GetDeferredBatches());
 
         // Draw deferred lights
         const ShaderResourceDesc geometryBuffer[] = {
@@ -402,12 +402,9 @@ void RenderPipelineView::Render()
         renderBufferManager_->SetOutputRenderTargers();
     }
 
-    sceneProcessor_->RenderSceneBatches("OpaqueBase", camera,
-        opaquePass_->GetBaseRenderFlags(), opaquePass_->GetSortedBaseBatches());
-    sceneProcessor_->RenderSceneBatches("OpaqueLight", camera,
-        opaquePass_->GetLightRenderFlags(), opaquePass_->GetSortedLightBatches());
-    sceneProcessor_->RenderSceneBatches("PostOpaque", camera,
-        postOpaquePass_->GetBaseRenderFlags(), postOpaquePass_->GetSortedBaseBatches());
+    sceneProcessor_->RenderSceneBatches("OpaqueBase", camera, opaquePass_->GetBaseBatches());
+    sceneProcessor_->RenderSceneBatches("OpaqueLight", camera, opaquePass_->GetLightBatches());
+    sceneProcessor_->RenderSceneBatches("PostOpaque", camera, postOpaquePass_->GetBaseBatches());
 
     if (hasRefraction)
         renderBufferManager_->SwapColorBuffers(true);
@@ -430,8 +427,7 @@ void RenderPipelineView::Render()
         { VSP_GBUFFEROFFSETS, renderBufferManager_->GetDefaultClipToUVSpaceOffsetAndScale() },
         { PSP_GBUFFERINVSIZE, renderBufferManager_->GetInvOutputSize() },
     };
-    sceneProcessor_->RenderSceneBatches("Alpha", camera,
-        alphaPass_->GetRenderFlags(), alphaPass_->GetSortedBatches(),
+    sceneProcessor_->RenderSceneBatches("Alpha", camera, alphaPass_->GetBatches(),
         depthAndColorTextures, cameraParameters);
 
     for (PostProcessPass* postProcessPass : postProcessPasses_)

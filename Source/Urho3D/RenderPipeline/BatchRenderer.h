@@ -65,10 +65,8 @@ public:
 
     /// Render batches
     /// @{
-    void RenderBatches(const BatchRenderingContext& ctx,
-        BatchRenderFlags flags, ea::span<const PipelineBatchByState> batches);
-    void RenderBatches(const BatchRenderingContext& ctx,
-        BatchRenderFlags flags, ea::span<const PipelineBatchBackToFront> batches);
+    void RenderBatches(const BatchRenderingContext& ctx, PipelineBatchGroup<PipelineBatchByState> batchGroup);
+    void RenderBatches(const BatchRenderingContext& ctx, PipelineBatchGroup<PipelineBatchBackToFront> batchGroup);
     void RenderLightVolumeBatches(const BatchRenderingContext& ctx,
         ea::span<const PipelineBatchByState> batches);
     /// @}

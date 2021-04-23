@@ -109,8 +109,7 @@ void LightmapRenderPipelineView::RenderGeometryBuffer(Viewport* viewport, int te
     drawQueue->Reset();
 
     instancingBuffer->Begin();
-    batchRenderer->RenderBatches({ *drawQueue, *viewport->GetCamera() },
-        pass->GetDeferredRenderFlags(), pass->GetSortedDeferredBatches());
+    batchRenderer->RenderBatches({ *drawQueue, *viewport->GetCamera() }, pass->GetDeferredBatches());
     instancingBuffer->End();
 
     drawQueue->Execute();

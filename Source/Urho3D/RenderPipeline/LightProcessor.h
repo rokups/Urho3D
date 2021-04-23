@@ -131,6 +131,7 @@ public:
     const ShadowSplitProcessor* GetSplit(unsigned splitIndex) const { return &splits_[splitIndex]; }
     ShadowSplitProcessor* GetMutableSplit(unsigned splitIndex) { return &splits_[splitIndex]; }
     ea::span<const ShadowSplitProcessor> GetSplits() const { return { splits_.data(), numActiveSplits_ }; }
+    ea::span<ShadowSplitProcessor> GetMutableSplits() { return { splits_.data(), numActiveSplits_ }; }
 
     ShadowMapRegion GetShadowMap() const { return shadowMap_; }
     const CookedLightParams& GetParams() const { return cookedParams_; }

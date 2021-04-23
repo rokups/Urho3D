@@ -34,6 +34,7 @@ namespace Urho3D
 {
 
 class RenderPipelineInterface;
+class BatchRenderer;
 
 /// Base type for scene pass.
 class ScenePass : public BatchCompositorPass
@@ -49,6 +50,9 @@ public:
     /// Construct pass without forward lighting.
     ScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor* drawableProcessor,
         BatchStateCacheCallback* callback, DrawableProcessorPassFlags flags, const ea::string& pass);
+
+    /// Prepare instancing buffer for scene pass.
+    virtual void PrepareInstacingBuffer(BatchRenderer* batchRenderer) = 0;
 };
 
 /// Scene pass with batches sorted by render order and pipeline state.
@@ -59,13 +63,11 @@ class URHO3D_API UnorderedScenePass : public ScenePass
 public:
     using ScenePass::ScenePass;
 
-    ea::span<const PipelineBatchByState> GetSortedDeferredBatches() const { return sortedDeferredBatches_; }
-    ea::span<const PipelineBatchByState> GetSortedBaseBatches() const { return sortedBaseBatches_; }
-    ea::span<const PipelineBatchByState> GetSortedLightBatches() const { return sortedLightBatches_; }
+    void PrepareInstacingBuffer(BatchRenderer* batchRenderer) override;
 
-    BatchRenderFlags GetDeferredRenderFlags() const;
-    BatchRenderFlags GetBaseRenderFlags() const;
-    BatchRenderFlags GetLightRenderFlags() const;
+    PipelineBatchGroup<PipelineBatchByState>& GetDeferredBatches() { return deferredBatchGroup_; }
+    PipelineBatchGroup<PipelineBatchByState>& GetBaseBatches() { return baseBatchGroup_; }
+    PipelineBatchGroup<PipelineBatchByState>& GetLightBatches() { return lightBatchGroup_; }
 
 protected:
     void OnBatchesReady() override;
@@ -73,6 +75,10 @@ protected:
     ea::vector<PipelineBatchByState> sortedDeferredBatches_;
     ea::vector<PipelineBatchByState> sortedBaseBatches_;
     ea::vector<PipelineBatchByState> sortedLightBatches_;
+
+    PipelineBatchGroup<PipelineBatchByState> deferredBatchGroup_;
+    PipelineBatchGroup<PipelineBatchByState> baseBatchGroup_;
+    PipelineBatchGroup<PipelineBatchByState> lightBatchGroup_;
 };
 
 /// Scene pass with batches sorted by render order and distance back to front.
@@ -83,9 +89,9 @@ class URHO3D_API BackToFrontScenePass : public ScenePass
 public:
     using ScenePass::ScenePass;
 
-    ea::span<const PipelineBatchBackToFront> GetSortedBatches() const { return sortedBatches_; }
+    void PrepareInstacingBuffer(BatchRenderer* batchRenderer) override;
 
-    BatchRenderFlags GetRenderFlags() const;
+    PipelineBatchGroup<PipelineBatchBackToFront>& GetBatches() { return batchGroup_; }
 
     bool HasRefractionBatches() const { return hasRefractionBatches_; }
 
@@ -94,6 +100,8 @@ protected:
 
     ea::vector<PipelineBatchBackToFront> sortedBatches_;
     bool hasRefractionBatches_{};
+
+    PipelineBatchGroup<PipelineBatchBackToFront> batchGroup_;
 };
 
 }

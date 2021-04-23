@@ -238,7 +238,7 @@ void BatchCompositor::ComposeShadowBatches()
     }
     workQueue_->Complete(M_MAX_UNSIGNED);
 
-    // Finalize shadow batches in main thread
+    // Finalize shadow batches
     FinalizeShadowBatchesComposition();
 }
 
@@ -303,7 +303,7 @@ void BatchCompositor::BeginShadowBatchesComposition(unsigned lightIndex, ShadowS
 
     const unsigned threadIndex = WorkQueue::GetThreadIndex();
     const auto& shadowCasters = splitProcessor->GetShadowCasters();
-    auto& shadowBatches = splitProcessor->GetMutableShadowBatches();
+    auto& shadowBatches = splitProcessor->GetMutableUnsortedShadowBatches();
     const unsigned lightMask = splitProcessor->GetLight()->GetLightMask();
 
     for (Drawable* drawable : shadowCasters)
@@ -364,10 +364,26 @@ void BatchCompositor::FinalizeShadowBatchesComposition()
         PipelineState* pipelineState = shadowCache_.GetOrCreatePipelineState(desc.GetKey(), ctx, batchStateCacheCallback_);
         if (pipelineState && pipelineState->IsValid())
         {
-            PipelineBatch& pipelineBatch = split.GetMutableShadowBatches().emplace_back(desc);
+            PipelineBatch& pipelineBatch = split.GetMutableUnsortedShadowBatches().emplace_back(desc);
             pipelineBatch.pipelineState_ = pipelineState;
         }
     }
+
+    // Finalize shadow batches
+    const auto& lightProcessors = drawableProcessor_->GetLightProcessors();
+    for (unsigned lightIndex = 0; lightIndex < lightProcessors.size(); ++lightIndex)
+    {
+        LightProcessor* lightProcessor = lightProcessors[lightIndex];
+        const unsigned numSplits = lightProcessor->GetNumSplits();
+        for (unsigned splitIndex = 0; splitIndex < numSplits; ++splitIndex)
+        {
+            workQueue_->AddWorkItem([=](unsigned threadIndex)
+            {
+                lightProcessor->GetMutableSplit(splitIndex)->FinalizeShadowBatches();
+            }, M_MAX_UNSIGNED);
+        }
+    }
+    workQueue_->Complete(M_MAX_UNSIGNED);
 }
 
 }
