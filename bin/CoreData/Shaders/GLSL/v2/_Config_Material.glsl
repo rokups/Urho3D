@@ -146,6 +146,9 @@
 
     #if defined(URHO3D_AMBIENT_PASS) && defined(ENVCUBEMAP)
         #define URHO3D_REFLECTION_MAPPING
+        #ifndef URHO3D_SURFACE_NEED_NORMAL
+            #define URHO3D_SURFACE_NEED_NORMAL
+        #endif
     #endif
 
     #if defined(URHO3D_VERTEX_HAS_COLOR)

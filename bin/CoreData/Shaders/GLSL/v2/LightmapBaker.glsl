@@ -64,7 +64,7 @@ void main()
 
 #ifdef URHO3D_MATERIAL_HAS_EMISSIVE
     vec4 emissiveInput = texture2D(sEmissiveMap, vTexCoord);
-    vec3 emissive = EmissiveMap_ToLinear(cMatEmissiveColor.rgb * emissiveInput);
+    vec3 emissive = EmissiveMap_ToLinear(cMatEmissiveColor.rgb * emissiveInput.rgb);
 #else
     vec3 emissive = GammaToLinearSpace(cMatEmissiveColor);
 #endif

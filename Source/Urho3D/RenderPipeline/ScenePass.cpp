@@ -53,9 +53,16 @@ ScenePass::ScenePass(RenderPipelineInterface* renderPipeline, DrawableProcessor*
 
 void UnorderedScenePass::OnBatchesReady()
 {
-    BatchCompositor::SortBatches(sortedDeferredBatches_, deferredBatches_);
-    BatchCompositor::SortBatches(sortedBaseBatches_, baseBatches_);
-    BatchCompositor::SortBatches(sortedLightBatches_, lightBatches_);
+    BatchCompositor::FillSortKeys(sortedDeferredBatches_, deferredBatches_);
+    BatchCompositor::FillSortKeys(sortedBaseBatches_, baseBatches_);
+    BatchCompositor::FillSortKeys(sortedLightBatches_, lightBatches_, negativeLightBatches_);
+
+    ea::sort(sortedDeferredBatches_.begin(), sortedDeferredBatches_.end());
+    ea::sort(sortedBaseBatches_.begin(), sortedBaseBatches_.end());
+
+    const unsigned numNegativeLightBatches = negativeLightBatches_.Size();
+    ea::sort(sortedLightBatches_.begin(), sortedLightBatches_.end() - numNegativeLightBatches);
+    ea::sort(sortedLightBatches_.end() - numNegativeLightBatches, sortedLightBatches_.end());
 
     deferredBatchGroup_ = { sortedDeferredBatches_ };
     baseBatchGroup_ = { sortedBaseBatches_ };
@@ -90,7 +97,19 @@ void UnorderedScenePass::PrepareInstacingBuffer(BatchRenderer* batchRenderer)
 
 void BackToFrontScenePass::OnBatchesReady()
 {
-    BatchCompositor::SortBatches(sortedBatches_, baseBatches_, lightBatches_);
+    BatchCompositor::FillSortKeys(sortedBatches_, baseBatches_, lightBatches_, negativeLightBatches_);
+
+    // Adjust distance of negative to render them after normal lit batches
+    const unsigned negativeLightBatchesBegin = sortedBatches_.size() - negativeLightBatches_.Size();
+    const unsigned negativeLightBatchesEnd = sortedBatches_.size();
+    for (unsigned i = negativeLightBatchesBegin; i < negativeLightBatchesEnd; ++i)
+    {
+        sortedBatches_[i].distance_ = sortedBatches_[i].distance_ > 0.0f
+            ? sortedBatches_[i].distance_ * (1 - M_EPSILON)
+            : std::numeric_limits<float>::lowest();
+    }
+
+    ea::sort(sortedBatches_.begin(), sortedBatches_.end());
 
     if (GetFlags().Test(DrawableProcessorPassFlag::RefractionPass))
     {

@@ -524,6 +524,7 @@ void LightProcessor::UpdateHashes()
 
     unsigned commonHash = 0;
     CombineHash(commonHash, light_->GetLightType());
+    CombineHash(commonHash, light_->IsNegative());
     CombineHash(commonHash, HasShadow());
     CombineHash(commonHash, !!light_->GetShapeTexture());
     CombineHash(commonHash, !!light_->GetRampTexture());

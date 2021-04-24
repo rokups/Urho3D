@@ -172,6 +172,7 @@ protected:
     WorkQueueVector<PipelineBatch> deferredBatches_;
     WorkQueueVector<PipelineBatch> baseBatches_;
     WorkQueueVector<PipelineBatch> lightBatches_;
+    WorkQueueVector<PipelineBatch> negativeLightBatches_;
 
 private:
     bool PreparePipelineBatch(PipelineBatchDesc& key, const GeometryBatch& geometryBatch) const;
@@ -194,6 +195,7 @@ private:
     WorkQueueVector<PipelineBatchDesc> delayedUnlitBaseBatches_;
     WorkQueueVector<PipelineBatchDesc> delayedLitBaseBatches_;
     WorkQueueVector<PipelineBatchDesc> delayedLightBatches_;
+    WorkQueueVector<PipelineBatchDesc> delayedNegativeLightBatches_;
     /// @}
 };
 
@@ -226,9 +228,9 @@ public:
     /// Return sorted light volume batches.
     const auto& GetLightVolumeBatches() const { return sortedLightVolumeBatches_; }
 
-    /// Sort batches and store result in vector.
+    /// Prepare vector of sorted batches w/o actual sorting.
     template <class T, class ... U>
-    static void SortBatches(ea::vector<T>& sortedBatches, const U& ... pipelineBatches)
+    static void FillSortKeys(ea::vector<T>& sortedBatches, const U& ... pipelineBatches)
     {
         using namespace std;
         const auto pipelineBatchesArray = { &pipelineBatches... };
@@ -246,9 +248,6 @@ public:
             for (const auto& pipelineBatch : *batches)
                 sortedBatches[i++] = T{ &pipelineBatch };
         }
-
-        // Sort
-        ea::sort(sortedBatches.begin(), sortedBatches.end());
     }
 
 protected:

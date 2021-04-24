@@ -267,8 +267,15 @@ void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& dra
     // Sort lights by component ID for stability
     lights_.resize(lightsTemp_.Size());
     ea::copy(lightsTemp_.Begin(), lightsTemp_.End(), lights_.begin());
-    const auto compareID = [](Light* lhs, Light* rhs) { return lhs->GetID() < rhs->GetID(); };
-    ea::sort(lights_.begin(), lights_.end(), compareID);
+    const auto compareLightsNegativeLast = [](Light* lhs, Light* rhs)
+    {
+        const bool lhsNegative = lhs->IsNegative();
+        const bool rhsNegative = rhs->IsNegative();
+        if (lhsNegative != rhsNegative)
+            return lhsNegative < rhsNegative;
+        return lhs->GetID() < rhs->GetID();
+    };
+    ea::sort(lights_.begin(), lights_.end(), compareLightsNegativeLast);
 
     lightProcessors_.clear();
     for (Light* light : lights_)

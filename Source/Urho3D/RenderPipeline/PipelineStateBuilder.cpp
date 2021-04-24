@@ -115,6 +115,16 @@ SharedPtr<PipelineState> PipelineStateBuilder::CreateBatchPipelineState(
         compositor_->ProcessUserBatch(shaderProgramDesc_, batchCompositorPass->GetFlags(),
             key.drawable_, key.geometry_, key.geometryType_, key.material_, key.pass_, light, hasShadow, subpass);
         SetupUserPassState(key.drawable_, key.material_, key.pass_, lightMaskToStencil);
+
+        // Support negative lights
+        if (light && light->IsNegative())
+        {
+            assert(subpass == BatchCompositorSubpass::Light);
+            if (pipelineStateDesc_.blendMode_ == BLEND_ADD)
+                pipelineStateDesc_.blendMode_ = BLEND_SUBTRACT;
+            else if (pipelineStateDesc_.blendMode_ == BLEND_ADDALPHA)
+                pipelineStateDesc_.blendMode_ = BLEND_SUBTRACTALPHA;
+        }
     }
 
     if (shaderProgramDesc_.isInstancingUsed_)

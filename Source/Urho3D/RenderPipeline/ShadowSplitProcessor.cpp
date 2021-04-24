@@ -359,7 +359,8 @@ Matrix4 ShadowSplitProcessor::GetWorldToShadowSpaceMatrix(float subPixelOffset) 
 
 void ShadowSplitProcessor::FinalizeShadowBatches()
 {
-    BatchCompositor::SortBatches(sortedShadowBatches_, unsortedShadowBatches_);
+    BatchCompositor::FillSortKeys(sortedShadowBatches_, unsortedShadowBatches_);
+    ea::sort(sortedShadowBatches_.begin(), sortedShadowBatches_.end());
     shadowBatches_ = { sortedShadowBatches_, BatchRenderFlag::EnableInstancingForStaticGeometry };
 }
 

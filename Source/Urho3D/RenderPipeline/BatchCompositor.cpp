@@ -82,6 +82,7 @@ void BatchCompositorPass::ComposeBatches()
     ResolveDelayedBatches(BatchCompositorSubpass::Base, delayedUnlitBaseBatches_, unlitBaseCache_, baseBatches_);
     ResolveDelayedBatches(BatchCompositorSubpass::Base, delayedLitBaseBatches_, litBaseCache_, baseBatches_);
     ResolveDelayedBatches(BatchCompositorSubpass::Light, delayedLightBatches_, lightCache_, lightBatches_);
+    ResolveDelayedBatches(BatchCompositorSubpass::Light, delayedNegativeLightBatches_, lightCache_, negativeLightBatches_);
 
     OnBatchesReady();
 }
@@ -93,11 +94,13 @@ void BatchCompositorPass::OnUpdateBegin(const CommonFrameInfo& frameInfo)
     deferredBatches_.Clear();
     baseBatches_.Clear();
     lightBatches_.Clear();
+    negativeLightBatches_.Clear();
 
     delayedDeferredBatches_.Clear();
     delayedUnlitBaseBatches_.Clear();
     delayedLitBaseBatches_.Clear();
     delayedLightBatches_.Clear();
+    delayedNegativeLightBatches_.Clear();
 }
 
 void BatchCompositorPass::OnPipelineStatesInvalidated()
@@ -137,9 +140,10 @@ void BatchCompositorPass::ProcessGeometryBatch(const GeometryBatch& geometryBatc
         if (geometryBatch.litBasePass_ && !pixelLights.empty())
         {
             const unsigned firstLightIndex = pixelLights[0].second;
-            // TODO(renderer): Make this check optional
             const Light* firstLight = drawableProcessor_->GetLight(firstLightIndex);
-            if (firstLight->GetLightType() == LIGHT_DIRECTIONAL)
+            // Make this check optional?
+            // It will increase number of possible permutations but may reduce number of draw calls.
+            if (firstLight->GetLightType() == LIGHT_DIRECTIONAL && !firstLight->IsNegative())
                 litBaseLightIndex = firstLightIndex;
         }
 
@@ -151,7 +155,11 @@ void BatchCompositorPass::ProcessGeometryBatch(const GeometryBatch& geometryBatc
             const unsigned lightIndex = pixelLights[i].second;
             LightProcessor* light = drawableProcessor_->GetLightProcessor(lightIndex);
             desc.InitializeLitBatch(light, lightIndex, light->GetForwardLitHash());
-            AddPipelineBatch(desc, lightCache_, lightBatches_, delayedLightBatches_);
+
+            if (light->GetLight()->IsNegative())
+                AddPipelineBatch(desc, lightCache_, negativeLightBatches_, delayedNegativeLightBatches_);
+            else
+                AddPipelineBatch(desc, lightCache_, lightBatches_, delayedLightBatches_);
         }
 
         // Initialize vertex lights after all light batches
@@ -280,7 +288,8 @@ void BatchCompositor::ComposeLightVolumeBatches()
         }
     }
 
-    SortBatches(sortedLightVolumeBatches_, lightVolumeBatches_);
+    FillSortKeys(sortedLightVolumeBatches_, lightVolumeBatches_);
+    ea::sort(sortedLightVolumeBatches_.begin(), sortedLightVolumeBatches_.end());
 }
 
 void BatchCompositor::OnUpdateBegin(const CommonFrameInfo& frameInfo)
