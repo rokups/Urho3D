@@ -41,7 +41,7 @@ vec3 Uncharted2(vec3 x)
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    gl_Position = GetClipPos(vertexTransform.position.xyz);
+    gl_Position = WorldToClipSpace(vertexTransform.position.xyz);
     vTexCoord = GetQuadTexCoord(gl_Position);
     vScreenPos = GetScreenPosPreDiv(gl_Position);
 }

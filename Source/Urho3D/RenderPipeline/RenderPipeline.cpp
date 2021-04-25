@@ -172,6 +172,16 @@ void RenderPipelineView::ApplySettings()
     instancingBuffer_->SetSettings(settings_.instancingBuffer_);
     shadowMapAllocator_->SetSettings(settings_.shadowMapAllocator_);
 
+    if (settings_.sceneProcessor_.depthPrePass_ && !depthPrePass_)
+    {
+        depthPrePass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(
+            DrawableProcessorPassFlag::DepthOnlyPass, "depth");
+    }
+    else
+    {
+        depthPrePass_ = nullptr;
+    }
+
     if (!opaquePass_ || settings_.sceneProcessor_.IsDeferredLighting() != deferred_.has_value())
     {
         if (settings_.sceneProcessor_.IsDeferredLighting())
@@ -195,7 +205,7 @@ void RenderPipelineView::ApplySettings()
         }
     }
 
-    sceneProcessor_->SetPasses({ opaquePass_, refractPass_, alphaPass_, postOpaquePass_ });
+    sceneProcessor_->SetPasses({ depthPrePass_, opaquePass_, alphaPass_, postOpaquePass_ });
 
     postProcessPasses_.clear();
 
@@ -269,7 +279,6 @@ bool RenderPipelineView::Define(RenderSurface* renderTarget, Viewport* viewport)
         instancingBuffer_ = MakeShared<InstancingBuffer>(context_);
         sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow", shadowMapAllocator_, instancingBuffer_);
 
-        refractPass_ = sceneProcessor_->CreatePass<BackToFrontScenePass>(DrawableProcessorPassFlag::None, "refract");
         alphaPass_ = sceneProcessor_->CreatePass<BackToFrontScenePass>(
             DrawableProcessorPassFlag::HasAmbientLighting | DrawableProcessorPassFlag::NeedReadableDepth
             | DrawableProcessorPassFlag::RefractionPass, "", "alpha", "alpha", "litalpha");
@@ -333,7 +342,7 @@ void RenderPipelineView::Update(const FrameInfo& frameInfo)
 
 void RenderPipelineView::Render()
 {
-    const bool hasRefraction = refractPass_->HasBatches() || alphaPass_->HasRefractionBatches();
+    const bool hasRefraction = alphaPass_->HasRefractionBatches();
     RenderBufferManagerFrameSettings frameSettings;
     frameSettings.supportColorReadWrite_ = postProcessFlags_.Test(PostProcessPassFlag::NeedColorOutputReadAndWrite);
     if (hasRefraction)
@@ -355,7 +364,6 @@ void RenderPipelineView::Render()
     const Color effectiveFogColor = settings_.sceneProcessor_.linearSpaceLighting_
         ? fogColorInGammaSpace.GammaToLinear()
         : fogColorInGammaSpace;
-    auto drawQueue = renderer_->GetDefaultDrawQueue();
 
     // TODO(renderer): Remove this guard
 #ifdef DESKTOP_GRAPHICS
@@ -365,6 +373,9 @@ void RenderPipelineView::Render()
         renderBufferManager_->ClearColor(deferred_->albedoBuffer_, Color::TRANSPARENT_BLACK);
         renderBufferManager_->ClearColor(deferred_->specularBuffer_, Color::TRANSPARENT_BLACK);
         renderBufferManager_->ClearOutput(effectiveFogColor, 1.0f, 0);
+
+        if (depthPrePass_)
+            sceneProcessor_->RenderSceneBatches("DepthPrePass", camera, depthPrePass_->GetBaseBatches());
 
         RenderBuffer* const gBuffer[] = {
             renderBufferManager_->GetColorOutput(),
@@ -388,10 +399,6 @@ void RenderPipelineView::Render()
             { PSP_GBUFFERINVSIZE, renderBufferManager_->GetInvOutputSize() },
         };
 
-        BatchRenderingContext ctx{ *drawQueue, *sceneProcessor_->GetFrameInfo().camera_ };
-        ctx.globalResources_ = geometryBuffer;
-        ctx.cameraParameters_ = cameraParameters;
-
         renderBufferManager_->SetOutputRenderTargers();
         sceneProcessor_->RenderLightVolumeBatches("LightVolumes", camera, geometryBuffer, cameraParameters);
     }
@@ -400,6 +407,9 @@ void RenderPipelineView::Render()
     {
         renderBufferManager_->ClearOutput(effectiveFogColor, 1.0f, 0);
         renderBufferManager_->SetOutputRenderTargers();
+
+        if (depthPrePass_)
+            sceneProcessor_->RenderSceneBatches("DepthPrePass", camera, depthPrePass_->GetBaseBatches());
     }
 
     sceneProcessor_->RenderSceneBatches("OpaqueBase", camera, opaquePass_->GetBaseBatches());
@@ -419,9 +429,6 @@ void RenderPipelineView::Render()
         { TU_EMISSIVE, renderBufferManager_->GetSecondaryColorTexture() },
     };
 #endif
-
-    drawQueue->Reset();
-    instancingBuffer_->Begin();
 
     const ShaderParameterDesc cameraParameters[] = {
         { VSP_GBUFFEROFFSETS, renderBufferManager_->GetDefaultClipToUVSpaceOffsetAndScale() },
@@ -487,6 +494,7 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE_EX("Max Pixel Lights", int, settings_.sceneProcessor_.maxPixelLights_, MarkSettingsDirty, 4, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Ambient Mode", settings_.sceneProcessor_.ambientMode_, MarkSettingsDirty, ambientModeNames, DrawableAmbientMode::Directional, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Enable Instancing", bool, settings_.instancingBuffer_.enableInstancing_, MarkSettingsDirty, true, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Depth Pre-Pass", bool, settings_.sceneProcessor_.depthPrePass_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Enable Shadows", bool, settings_.sceneProcessor_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Lighting Mode", settings_.sceneProcessor_.lightingMode_, MarkSettingsDirty, directLightingModeNames, DirectLightingMode::Forward, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("PCF Kernel Size", unsigned, settings_.sceneProcessor_.pcfKernelSize_, MarkSettingsDirty, 1, AM_DEFAULT);

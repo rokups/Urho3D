@@ -22,7 +22,7 @@ void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
     vec3 worldPos = vertexTransform.position.xyz;
-    gl_Position = GetClipPos(worldPos);
+    gl_Position = WorldToClipSpace(worldPos);
 
     vScreenPos = GetDeferredScreenPos(gl_Position);
     vFarRay = GetDeferredFarRay(gl_Position);

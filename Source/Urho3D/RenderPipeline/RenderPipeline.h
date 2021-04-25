@@ -101,9 +101,9 @@ private:
     SharedPtr<InstancingBuffer> instancingBuffer_;
     SharedPtr<SceneProcessor> sceneProcessor_;
 
+    SharedPtr<UnorderedScenePass> depthPrePass_;
     SharedPtr<UnorderedScenePass> opaquePass_;
     SharedPtr<UnorderedScenePass> postOpaquePass_;
-    SharedPtr<BackToFrontScenePass> refractPass_;
     SharedPtr<BackToFrontScenePass> alphaPass_;
 
     struct DeferredLightingData

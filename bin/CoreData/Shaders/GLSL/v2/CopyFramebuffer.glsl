@@ -13,7 +13,7 @@ VERTEX_OUTPUT_HIGHP(vec2 vScreenPos)
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    gl_Position = GetClipPos(vertexTransform.position.xyz);
+    gl_Position = WorldToClipSpace(vertexTransform.position.xyz);
     vScreenPos = GetScreenPosPreDiv(gl_Position);
 }
 #endif

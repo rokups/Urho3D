@@ -37,9 +37,6 @@ vec4 WorldToClipSpace(vec3 worldPos)
     return vec4(worldPos, 1.0) * cViewProj;
 }
 
-// TODO(renderer): Deprecated
-#define GetClipPos(x) WorldToClipSpace(x)
-
 /// Return depth from position in clip space.
 float GetDepth(vec4 clipPos)
 {

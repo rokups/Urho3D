@@ -35,7 +35,7 @@ half3 BrightFilter(half3 inputColor)
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    gl_Position = GetClipPos(vertexTransform.position.xyz);
+    gl_Position = WorldToClipSpace(vertexTransform.position.xyz);
     vTexCoord = GetQuadTexCoord(gl_Position);
     vScreenPos = GetScreenPosPreDiv(gl_Position);
 }

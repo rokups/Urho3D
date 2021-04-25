@@ -729,7 +729,7 @@ vec4 FxaaPixelShader(
 void main()
 {
     VertexTransform vertexTransform = GetVertexTransform();
-    gl_Position = GetClipPos(vertexTransform.position.xyz);
+    gl_Position = WorldToClipSpace(vertexTransform.position.xyz);
     vScreenPos = GetScreenPosPreDiv(gl_Position);
 }
 #endif

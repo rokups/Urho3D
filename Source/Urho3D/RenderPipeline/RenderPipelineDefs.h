@@ -478,6 +478,7 @@ struct SceneProcessorSettings
 {
     SpecularQuality specularQuality_{ SpecularQuality::Simple };
     ReflectionQuality reflectionQuality_{ ReflectionQuality::Pixel };
+    bool depthPrePass_{ false };
     bool enableShadows_{ true };
     DirectLightingMode lightingMode_{};
     unsigned directionalShadowSize_{ 1024 };
@@ -528,6 +529,7 @@ struct SceneProcessorSettings
             && BatchRendererSettings::operator==(rhs)
             && specularQuality_ == rhs.specularQuality_
             && reflectionQuality_ == rhs.reflectionQuality_
+            && depthPrePass_ == rhs.depthPrePass_
             && enableShadows_ == rhs.enableShadows_
             && lightingMode_ == rhs.lightingMode_
             && directionalShadowSize_ == rhs.directionalShadowSize_
