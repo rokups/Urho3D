@@ -354,8 +354,8 @@ void SceneProcessor::RenderShadowMaps()
     if (!settings_.enableShadows_)
         return;
 
-    const auto& visibleLights = drawableProcessor_->GetLightProcessors();
-    for (LightProcessor* sceneLight : visibleLights)
+    const auto& lightsByShadowMap = drawableProcessor_->GetLightProcessorsByShadowMap();
+    for (LightProcessor* sceneLight : lightsByShadowMap)
     {
         for (const ShadowSplitProcessor& split : sceneLight->GetSplits())
         {

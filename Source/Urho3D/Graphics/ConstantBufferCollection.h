@@ -82,8 +82,17 @@ public:
     /// Return number of buffers.
     unsigned GetNumBuffers() const { return currentBufferIndex_ + 1; }
 
-    /// Return size of the buffer.
-    unsigned GetBufferSize(unsigned index) const { return bufferSize_; }
+    /// Return used size of the CPU buffer.
+    unsigned GetBufferSize(unsigned index) const
+    {
+        return buffers_[index].second;
+    }
+
+    /// Return best size of GPU buffer. Round up to next power of two.
+    unsigned GetGPUBufferSize(unsigned index) const
+    {
+        return ea::max(256u, NextPowerOfTwo(GetBufferSize(index)));
+    }
 
     /// Return buffer data.
     const void* GetBufferData(unsigned index) const { return buffers_[index].first.data(); }

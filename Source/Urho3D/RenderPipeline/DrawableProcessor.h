@@ -169,6 +169,8 @@ public:
 
     const auto& GetLightProcessors() const { return lightProcessors_; }
     LightProcessor* GetLightProcessor(unsigned lightIndex) const { return lightProcessors_[lightIndex]; }
+
+    const auto& GetLightProcessorsByShadowMap() const { return lightProcessorsByShadowMapTexture_; }
     /// @}
 
     /// Return information from global drawable index. May be invalid for invisible drawables.
@@ -204,7 +206,8 @@ protected:
 
     FloatRange CalculateBoundingBoxZRange(const BoundingBox& boundingBox) const;
 
-    void SortLightProcessorsByShadowMap();
+    void SortLightProcessorsByShadowMapSize();
+    void SortLightProcessorsByShadowMapTexture();
 
 private:
     /// Whether the drawable is already updated for this pipeline and frame.
@@ -263,6 +266,7 @@ private:
     ea::vector<Light*> lights_;
     ea::vector<LightProcessor*> lightProcessors_;
     ea::vector<LightProcessor*> lightProcessorsByShadowMapSize_;
+    ea::vector<LightProcessor*> lightProcessorsByShadowMapTexture_;
 
     WorkQueueVector<Drawable*> queuedDrawableUpdates_;
 };

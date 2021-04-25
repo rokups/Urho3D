@@ -122,42 +122,33 @@ bool ShadowMapAllocator::BeginShadowMapRendering(const ShadowMapRegion& shadowMa
         // The shadow map is a depth stencil texture
         graphics_->SetDepthStencil(shadowMapTexture);
         graphics_->SetRenderTarget(0, shadowMapTexture->GetRenderSurface()->GetLinkedRenderTarget());
-        // Disable other render targets
-        for (unsigned i = 1; i < MAX_RENDERTARGETS; ++i)
-            graphics_->SetRenderTarget(i, (RenderSurface*) nullptr);
-
-        // Clear whole texture if needed
-        if (poolElement.clearBeforeRendering_)
-        {
-            poolElement.clearBeforeRendering_ = false;
-
-            graphics_->SetViewport(shadowMapTexture->GetRect());
-            graphics_->Clear(CLEAR_DEPTH);
-        }
-
-        graphics_->SetViewport(shadowMap.rect_);
     }
     else
     {
         // The shadow map is a color rendertarget
-        graphics_->SetRenderTarget(0, shadowMapTexture);
-        // Disable other render targets
-        for (unsigned i = 1; i < MAX_RENDERTARGETS; ++i)
-            graphics_->SetRenderTarget(i, (RenderSurface*) nullptr);
         graphics_->SetDepthStencil(renderer_->GetDepthStencil(shadowMapTexture->GetWidth(), shadowMapTexture->GetHeight(),
             shadowMapTexture->GetMultiSample(), shadowMapTexture->GetAutoResolve()));
-
-        // Clear whole texture if needed
-        if (poolElement.clearBeforeRendering_)
-        {
-            poolElement.clearBeforeRendering_ = false;
-
-            graphics_->SetViewport(shadowMapTexture->GetRect());
-            graphics_->Clear(CLEAR_DEPTH | CLEAR_COLOR, Color::WHITE);
-        }
-
-        graphics_->SetViewport(shadowMap.rect_);
+        graphics_->SetRenderTarget(0, shadowMapTexture);
     }
+
+    // Disable other render targets
+    for (unsigned i = 1; i < MAX_RENDERTARGETS; ++i)
+        graphics_->SetRenderTarget(i, (RenderSurface*) nullptr);
+
+    // Clear whole texture if needed
+    if (poolElement.clearBeforeRendering_)
+    {
+        poolElement.clearBeforeRendering_ = false;
+
+        graphics_->SetViewport(shadowMapTexture->GetRect());
+        ClearTargetFlags clearFlags = CLEAR_DEPTH;
+        if (settings_.enableVarianceShadowMaps_ || dummyColorTexture_)
+            clearFlags |= CLEAR_COLOR;
+        graphics_->Clear(clearFlags, Color::WHITE);
+    }
+
+    graphics_->SetViewport(shadowMap.rect_);
+
     return true;
 }
 

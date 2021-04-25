@@ -38,8 +38,6 @@ struct LightAccumulatorContext
 {
     unsigned maxVertexLights_{ 4 };
     unsigned maxPixelLights_{ 1 };
-    LightImportance lightImportance_{};
-    unsigned lightIndex_{};
     /// Array of lights to be indexed.
     const ea::vector<Light*>* lights_;
 };
@@ -69,19 +67,18 @@ struct LightAccumulator
     }
 
     /// Accumulate light.
-    void AccumulateLight(const LightAccumulatorContext& ctx, float penalty)
+    void AccumulateLight(const LightAccumulatorContext& ctx, LightImportance lightImportance, unsigned lightIndex, float penalty)
     {
         assert(vertexLightsHash_ == 0);
-
-        if (ctx.lightImportance_ == LI_IMPORTANT)
+        if (lightImportance == LI_IMPORTANT)
             ++numImportantLights_;
-        else if (ctx.lightImportance_ == LI_AUTO)
+        else if (lightImportance == LI_AUTO)
             ++numAutoLights_;
 
         // Add new light
         const auto lessPenalty = [&](const LightData& pair) { return penalty <= pair.first; };
         auto iter = ea::find_if(lights_.begin(), lights_.end(), lessPenalty);
-        lights_.emplace(iter, penalty, ctx.lightIndex_);
+        lights_.emplace(iter, penalty, lightIndex);
 
         // First N important plus automatic lights are per-pixel
         firstVertexLight_ = ea::max(numImportantLights_,

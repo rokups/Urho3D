@@ -73,6 +73,9 @@ void DrawCommandQueue::Reset(bool preferConstantBuffers)
 
 void DrawCommandQueue::Execute()
 {
+    if (drawCommands_.empty())
+        return;
+
     // Constant buffers to store all shader parameters for queue
     ea::vector<SharedPtr<ConstantBuffer>> constantBuffers;
 
@@ -86,7 +89,7 @@ void DrawCommandQueue::Execute()
         constantBuffers.resize(numConstantBuffers);
         for (unsigned i = 0; i < numConstantBuffers; ++i)
         {
-            constantBuffers[i] = graphics_->GetOrCreateConstantBuffer(VS, i, constantBuffers_.collection_.GetBufferSize(i));
+            constantBuffers[i] = graphics_->GetOrCreateConstantBuffer(VS, i, constantBuffers_.collection_.GetGPUBufferSize(i));
             constantBuffers[i]->Update(constantBuffers_.collection_.GetBufferData(i));
         }
     }

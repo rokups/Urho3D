@@ -53,12 +53,12 @@ namespace
 /// -1:      Important point and spot lights;
 ///  0 .. 2: Automatic lights;
 ///  3 .. 5: Not important lights.
-float GetDrawableLightPenalty(float intensityPenalty, LightImportance importance, LightType type)
+float GetDrawableLightPenalty(float intensityPenalty, bool isNegative, LightImportance importance, LightType type)
 {
     switch (importance)
     {
     case LI_IMPORTANT:
-        return type == LIGHT_DIRECTIONAL ? -2 : -1;
+        return type == LIGHT_DIRECTIONAL && !isNegative ? -2 : -1;
     case LI_AUTO:
         return intensityPenalty <= 1.0f ? intensityPenalty : 2.0f - 1.0f / intensityPenalty;
     case LI_NOT_IMPORTANT:
@@ -480,9 +480,10 @@ void DrawableProcessor::ProcessLights(LightProcessorCallback* callback)
         lightProcessor->Update(this, callback);
     });
 
-    SortLightProcessorsByShadowMap();
+    SortLightProcessorsByShadowMapSize();
     for (LightProcessor* lightProcessor : lightProcessorsByShadowMapSize_)
         lightProcessor->EndUpdate(this, callback, settings_.pcfKernelSize_);
+    SortLightProcessorsByShadowMapTexture();
 
     ProcessShadowCasters();
 }
@@ -498,12 +499,13 @@ void DrawableProcessor::ProcessForwardLighting(unsigned lightIndex, const ea::ve
     Light* light = lights_[lightIndex];
     const LightType lightType = light->GetLightType();
     const float lightIntensityPenalty = 1.0f / light->GetIntensityDivisor();
+    const bool hasShadow = lightProcessors_[lightIndex]->HasShadow();
+    const bool isNegative = light->IsNegative();
+    const LightImportance lightImportance = hasShadow ? LI_IMPORTANT : light->GetLightImportance();
 
     LightAccumulatorContext ctx;
     ctx.maxVertexLights_ = settings_.maxVertexLights_;
     ctx.maxPixelLights_ = settings_.maxPixelLights_;
-    ctx.lightImportance_ = light->GetLightImportance();
-    ctx.lightIndex_ = lightIndex;
     ctx.lights_ = &lights_;
 
     ForEachParallel(workQueue_, litGeometries,
@@ -520,8 +522,9 @@ void DrawableProcessor::ProcessForwardLighting(unsigned lightIndex, const ea::ve
         }
 
         const float distance = ea::max(light->GetDistanceTo(geometry), M_LARGE_EPSILON);
-        const float penalty = GetDrawableLightPenalty(distance * lightIntensityPenalty, ctx.lightImportance_, lightType);
-        geometryLighting_[drawableIndex].AccumulateLight(ctx, penalty);
+        const float penalty = GetDrawableLightPenalty(distance * lightIntensityPenalty,
+            isNegative, lightImportance, lightType);
+        geometryLighting_[drawableIndex].AccumulateLight(ctx, lightImportance, lightIndex, penalty);
     });
 }
 
@@ -605,7 +608,7 @@ void DrawableProcessor::ProcessQueuedDrawable(Drawable* drawable)
     QueueDrawableGeometryUpdate(WorkQueue::GetThreadIndex(), drawable);
 }
 
-void DrawableProcessor::SortLightProcessorsByShadowMap()
+void DrawableProcessor::SortLightProcessorsByShadowMapSize()
 {
     lightProcessorsByShadowMapSize_ = lightProcessors_;
 
@@ -618,6 +621,16 @@ void DrawableProcessor::SortLightProcessorsByShadowMap()
         return lhs->GetLight()->GetID() < rhs->GetLight()->GetID();
     };
     ea::sort(lightProcessorsByShadowMapSize_.begin(), lightProcessorsByShadowMapSize_.end(), compareShadowMapSize);
+}
+
+void DrawableProcessor::SortLightProcessorsByShadowMapTexture()
+{
+    lightProcessorsByShadowMapTexture_ = lightProcessors_;
+    const auto compareShadowMapTexture = [](const LightProcessor* lhs, const LightProcessor* rhs)
+    {
+        return lhs->GetShadowMap().texture_ < rhs->GetShadowMap().texture_;
+    };
+    ea::sort(lightProcessorsByShadowMapTexture_.begin(), lightProcessorsByShadowMapTexture_.end(), compareShadowMapTexture);
 }
 
 void DrawableProcessor::UpdateGeometries()
