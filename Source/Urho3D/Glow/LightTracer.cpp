@@ -880,15 +880,13 @@ void TraceIndirectLight(T sharedKernel, const ea::vector<const LightmapChartBake
                         RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, RaytracerScene::LightmapUVAttribute, &lightmapUV.x_, 2);
 
                     // Modify incoming flux
-                    const float probability = 1 / (2 * M_PI);
                     const float cosTheta = ea::max(0.0f, currentRayDirection.DotProduct(currentSmoothNormal));
-                    const float reflectance = 1 / M_PI;
-                    const float brdf = reflectance / M_PI;
+                    const float reflectivity = 1.0f;
 
                     const unsigned lightmapIndex = geometry.lightmapIndex_;
                     const IntVector2 sampleLocation = bakedDirect[lightmapIndex]->GetNearestLocation(lightmapUV);
                     incomingSamples[bounceIndex] = bakedDirect[lightmapIndex]->GetSurfaceLight(sampleLocation);
-                    incomingFactors[bounceIndex] = brdf * cosTheta / probability;
+                    incomingFactors[bounceIndex] = reflectivity * cosTheta * 0.5f;
                     ++numBounces;
 
                     // Go to next hemisphere
@@ -1046,8 +1044,9 @@ void BakeEmissionLight(LightmapChartBakedDirect& bakedDirect, const LightmapChar
             const Vector3& albedo = geometryBuffer.albedo_[i];
             const Vector3& emission = geometryBuffer.emission_[i];
 
+            // Instead of dividing direct light by pi, we multiply it here
             bakedDirect.directLight_[i] += emission;
-            bakedDirect.surfaceLight_[i] += indirectBrightnessMultiplier * emission;
+            bakedDirect.surfaceLight_[i] += M_PI * indirectBrightnessMultiplier * emission;
             bakedDirect.albedo_[i] = albedo;
         }
     });

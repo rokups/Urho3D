@@ -1,0 +1,153 @@
+<?xml version="1.0"?>
+<scene id="1">
+	<attribute name="Name" value="" />
+	<attribute name="Time Scale" value="1.000000" />
+	<attribute name="Smoothing Constant" value="50.000000" />
+	<attribute name="Snap Threshold" value="5.000000" />
+	<attribute name="Elapsed Time" value="0.000000" />
+	<attribute name="Next Replicated Node ID" value="562" />
+	<attribute name="Next Replicated Component ID" value="545" />
+	<attribute name="Next Local Node ID" value="16777308" />
+	<attribute name="Next Local Component ID" value="16777357" />
+	<attribute name="Variables" />
+	<attribute name="Variable Names" value="" />
+	<attribute name="Lightmaps" value="Texture2D;Scenes/BakingTests/EmissionIndirect/Textures/Lightmap-0.png" />
+	<component type="Octree" id="1" />
+	<component type="EditorSceneSettings" id="16777216">
+		<attribute name="Camera Position" value="8.64077 3.5974 0.395045" />
+		<attribute name="Camera Rotation" value="0.682663 0.121268 -0.709485 0.126078" />
+	</component>
+	<component type="RenderPipeline" id="315">
+		<attribute name="Color Space" value="LDR Linear" />
+	</component>
+	<component type="LightBaker" id="436">
+		<attribute name="Texel Density" value="20.000000" />
+		<attribute name="Quality" value="High" />
+		<attribute name="Direct Samples (Lightmap)" value="32" />
+		<attribute name="Indirect Samples (Texture)" value="256" />
+		<attribute name="Indirect Samples (Light Probes)" value="256" />
+	</component>
+	<component type="GlobalIllumination" id="441">
+		<attribute name="Data File" value="BinaryFile;Scenes/BakingTests/EmissionIndirect/GI.bin" />
+	</component>
+	<node id="504">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Room" />
+		<attribute name="Tags" />
+		<attribute name="Position" value="0 0 0" />
+		<attribute name="Rotation" value="1 0 0 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<node id="507">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Floor" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0 0" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="4 1 4" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="490">
+				<attribute name="Model" value="Model;Models/Plane.mdl" />
+				<attribute name="Material" value="Material;Materials/Constant/MattWhite.xml" />
+				<attribute name="Global Illumination" value="Use LightMap" />
+				<attribute name="Bake Lightmap" value="true" />
+				<attribute name="Scale in Lightmap" value="0.100000" />
+				<attribute name="Lightmap Scale &amp; Offset" value="0.0175781 0.0175781 0.00195313 0.00195313" />
+			</component>
+		</node>
+		<node id="552">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Front Wall" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0 -2" />
+			<attribute name="Rotation" value="0.707107 0.707107 0 0" />
+			<attribute name="Scale" value="4 1 4" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="535">
+				<attribute name="Model" value="Model;Models/Plane.mdl" />
+				<attribute name="Material" value="Material;Materials/Constant/GlowingGreen.xml" />
+				<attribute name="Bake Lightmap" value="true" />
+				<attribute name="Scale in Lightmap" value="0.100000" />
+				<attribute name="Lightmap Scale &amp; Offset" value="0.0175781 0.0175781 0.0234375 0.00195313" />
+			</component>
+		</node>
+		<node id="556">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Back Wall" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0 2" />
+			<attribute name="Rotation" value="-0.707107 0.707107 -0 -0" />
+			<attribute name="Scale" value="4 1 4" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="539">
+				<attribute name="Model" value="Model;Models/Plane.mdl" />
+				<attribute name="Material" value="Material;Materials/Constant/GlowingGreen.xml" />
+				<attribute name="Bake Lightmap" value="true" />
+				<attribute name="Scale in Lightmap" value="0.100000" />
+				<attribute name="Lightmap Scale &amp; Offset" value="0.0175781 0.0175781 0.0449219 0.00195313" />
+			</component>
+		</node>
+		<node id="557">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Left Wall" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="-2 0 0" />
+			<attribute name="Rotation" value="0.5 0.5 0.5 -0.5" />
+			<attribute name="Scale" value="4 1 4" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="540">
+				<attribute name="Model" value="Model;Models/Plane.mdl" />
+				<attribute name="Material" value="Material;Materials/Constant/GlowingGreen.xml" />
+				<attribute name="Bake Lightmap" value="true" />
+				<attribute name="Scale in Lightmap" value="0.100000" />
+				<attribute name="Lightmap Scale &amp; Offset" value="0.0175781 0.0175781 0.0664063 0.00195313" />
+			</component>
+		</node>
+		<node id="558">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Right Wall" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="2 0 0" />
+			<attribute name="Rotation" value="-0.5 -0.5 0.5 -0.5" />
+			<attribute name="Scale" value="4 1 4" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="541">
+				<attribute name="Model" value="Model;Models/Plane.mdl" />
+				<attribute name="Material" value="Material;Materials/Constant/GlowingGreen.xml" />
+				<attribute name="Bake Lightmap" value="true" />
+				<attribute name="Scale in Lightmap" value="0.100000" />
+				<attribute name="Lightmap Scale &amp; Offset" value="0.0175781 0.0175781 0.0878906 0.00195313" />
+			</component>
+		</node>
+		<node id="559">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Roof" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 2 0" />
+			<attribute name="Rotation" value="-4.37114e-08 1 -0 -0" />
+			<attribute name="Scale" value="4 1 4" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="542">
+				<attribute name="Model" value="Model;Models/Plane.mdl" />
+				<attribute name="Material" value="Material;Materials/Constant/GlowingGreen.xml" />
+				<attribute name="Bake Lightmap" value="true" />
+				<attribute name="Scale in Lightmap" value="0.100000" />
+				<attribute name="Lightmap Scale &amp; Offset" value="0.0175781 0.0175781 0.109375 0.00195313" />
+			</component>
+		</node>
+	</node>
+	<node id="526">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Camera Zone" />
+		<attribute name="Tags" />
+		<attribute name="Position" value="0 0 0" />
+		<attribute name="Rotation" value="1 0 0 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<component type="Zone" id="509">
+			<attribute name="Bounding Box Min" value="-100 -100 -100" />
+			<attribute name="Bounding Box Max" value="100 100 100" />
+			<attribute name="Ambient Color" value="0 0 0 0" />
+		</component>
+	</node>
+</scene>
