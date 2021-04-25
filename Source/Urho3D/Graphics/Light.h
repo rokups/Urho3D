@@ -69,6 +69,7 @@ static const unsigned MAX_CASCADE_SPLITS = 1;
 #endif
 
 static const LightType DEFAULT_LIGHTTYPE = LIGHT_POINT;
+static const LightImportance DEFAULT_LIGHTIMPORTANCE = LI_AUTO;
 static const float DEFAULT_RANGE = 10.0f;
 static const float DEFAULT_LIGHT_FOV = 30.0f;
 static const float DEFAULT_SPECULARINTENSITY = 1.0f;
@@ -207,11 +208,10 @@ public:
     /// Set light type.
     /// @property
     void SetLightType(LightType type);
+    /// Set light importance.
+    void SetLightImportance(LightImportance importance);
     /// Set light mode.
     void SetLightMode(LightMode mode);
-    /// Set vertex lighting mode.
-    /// @property
-    void SetPerVertex(bool enable);
     /// Set color.
     /// @property
     void SetColor(const Color& color);
@@ -286,14 +286,14 @@ public:
     LightMode GetLightMode() const { return lightMode_; }
 
     /// Return light importance.
-    LightImportance GetLightImportance() const;
+    LightImportance GetLightImportance() const { return lightImportance_; }
 
     /// Return effective light mask. Baked lights have zero light mask.
     unsigned GetLightMaskEffective() const { return lightMode_ == LM_BAKED ? 0 : GetLightMask(); }
 
     /// Return vertex lighting mode.
     /// @property
-    bool GetPerVertex() const { return perVertex_; }
+    bool GetPerVertex() const { return lightImportance_ == LI_NOT_IMPORTANT; }
 
     /// Return color.
     /// @property
@@ -453,6 +453,8 @@ private:
     void ValidateShadowBias() { shadowBias_.Validate(); }
     /// Light type.
     LightType lightType_;
+    /// Light importance.
+    LightImportance lightImportance_{};
     /// Light baking mode.
     LightMode lightMode_{};
     /// Color.
@@ -501,8 +503,6 @@ private:
     float shadowNearFarRatio_;
     /// Directional shadow max. extrusion distance.
     float shadowMaxExtrusion_;
-    /// Per-vertex lighting flag.
-    bool perVertex_;
     /// Use physical light values flag.
     bool usePhysicalValues_;
 };

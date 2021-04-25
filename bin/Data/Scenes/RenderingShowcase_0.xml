@@ -340,6 +340,7 @@
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
 			<component type="Light" id="1068">
+				<attribute name="Light Importance" value="Important" />
 				<attribute name="Color" value="0.498039 1 0.498039 1" />
 				<attribute name="Brightness Multiplier" value="-1.000000" />
 				<attribute name="Range" value="1.000000" />
@@ -702,9 +703,9 @@
 			<attribute name="Variables" />
 			<component type="Light" id="121">
 				<attribute name="Light Type" value="Spot" />
+				<attribute name="Light Importance" value="Not Important" />
 				<attribute name="Specular Intensity" value="0.000000" />
 				<attribute name="Range" value="5.000000" />
-				<attribute name="Per Vertex" value="true" />
 			</component>
 		</node>
 		<node id="132">
@@ -731,9 +732,9 @@
 			<attribute name="Variables" />
 			<component type="Light" id="125">
 				<attribute name="Light Type" value="Spot" />
+				<attribute name="Light Importance" value="Not Important" />
 				<attribute name="Specular Intensity" value="0.000000" />
 				<attribute name="Range" value="5.000000" />
-				<attribute name="Per Vertex" value="true" />
 			</component>
 		</node>
 		<node id="136">
@@ -759,10 +760,10 @@
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
 			<component type="Light" id="129">
+				<attribute name="Light Importance" value="Not Important" />
 				<attribute name="Specular Intensity" value="0.000000" />
 				<attribute name="Range" value="1.000000" />
 				<attribute name="Light Shape Texture" value="TextureCube;" />
-				<attribute name="Per Vertex" value="true" />
 			</component>
 		</node>
 		<node id="140">
@@ -872,6 +873,7 @@
 			<attribute name="Variables" />
 			<component type="Light" id="204">
 				<attribute name="Light Type" value="Spot" />
+				<attribute name="Light Importance" value="Important" />
 				<attribute name="Specular Intensity" value="0.000000" />
 				<attribute name="Brightness Multiplier" value="3.000000" />
 				<attribute name="Range" value="5.000000" />
@@ -889,6 +891,7 @@
 			<attribute name="Variables" />
 			<component type="Light" id="230">
 				<attribute name="Light Type" value="Spot" />
+				<attribute name="Light Importance" value="Important" />
 				<attribute name="Specular Intensity" value="0.000000" />
 				<attribute name="Brightness Multiplier" value="3.000000" />
 				<attribute name="Range" value="5.000000" />
@@ -905,6 +908,7 @@
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
 			<component type="Light" id="232">
+				<attribute name="Light Importance" value="Important" />
 				<attribute name="Specular Intensity" value="0.000000" />
 				<attribute name="Brightness Multiplier" value="3.000000" />
 				<attribute name="Range" value="1.000000" />
@@ -1294,6 +1298,7 @@
 			<attribute name="Scale" value="1 1 1" />
 			<attribute name="Variables" />
 			<component type="Light" id="925">
+				<attribute name="Light Importance" value="Important" />
 				<attribute name="Color" value="0 0.996429 0.227755 1" />
 				<attribute name="Brightness Multiplier" value="2.000000" />
 				<attribute name="Range" value="3.000000" />
