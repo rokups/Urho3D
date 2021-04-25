@@ -59,6 +59,10 @@ public:
     XMLFile* GetParametersXML() const { return parametersXml_; }
     /// Return image data from a face's zero mip level.
     Image* GetImage(CubeMapFace face) const { return faceImages_[face]; }
+    /// Return mip level used for SH calculation.
+    unsigned GetSphericalHarmonicsMipLevel() const;
+    /// Return decompressed cube image mip level.
+    SharedPtr<ImageCube> GetDecompressedImageLevel(unsigned index) const;
     /// Return decompressed cube image.
     SharedPtr<ImageCube> GetDecompressedImage() const;
 

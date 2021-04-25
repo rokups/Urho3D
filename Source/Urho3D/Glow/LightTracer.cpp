@@ -648,21 +648,24 @@ struct ChartIndirectTracingKernel
     /// Settings.
     const IndirectLightTracingSettings* settings_{};
 
-    /// Current position.
+    /// Static within element:
+    /// @{
     Vector3 currentPosition_;
-    /// Current normal of actual geometry face.
     Vector3 currentFaceNormal_;
-    /// Current smooth interpolated normal.
     Vector3 currentSmoothNormal_;
-    /// Current geometry ID.
     unsigned currentGeometryId_;
     unsigned currentBackgroundIndex_{};
+    /// Last sampled tetrahedron, used for LOD indirect lighting.
+    unsigned lightProbesMeshHint_{};
+    /// @}
+
+    /// Static within sample:
+    /// @{
+    Vector3 currentSampleDirection_;
+    /// @}
 
     /// Accumulated indirect light value.
     Vector4 accumulatedIndirectLight_;
-
-    /// Last sampled tetrahedron.
-    unsigned lightProbesMeshHint_{};
 
     /// Return number of elements to trace.
     unsigned GetNumElements() const { return bakedIndirect_->light_.size(); }
@@ -705,19 +708,21 @@ struct ChartIndirectTracingKernel
 
     /// Begin sample. Return position, normal and initial ray direction.
     void BeginSample(unsigned /*sampleIndex*/,
-        Vector3& position, Vector3& faceNormal, Vector3& smoothNormal, Vector3& rayDirection, Vector3& albedo) const
+        Vector3& position, Vector3& faceNormal, Vector3& smoothNormal, Vector3& rayDirection, Vector3& albedo)
     {
         position = currentPosition_;
         faceNormal = currentFaceNormal_;
         smoothNormal = currentSmoothNormal_;
         albedo = Vector3::ONE;
-        rayDirection = RandomHemisphereDirection(currentFaceNormal_);
+        currentSampleDirection_ = RandomHemisphereDirection(currentFaceNormal_);
+        rayDirection = currentSampleDirection_;
     }
 
     /// End sample.
     void EndSample(const Vector3& light)
     {
-        accumulatedIndirectLight_ += Vector4(light, 1.0f);
+        const float NoL = currentSmoothNormal_.DotProduct(currentSampleDirection_);
+        accumulatedIndirectLight_ += Vector4(NoL * light, NoL);
     }
 
     /// End tracing element.

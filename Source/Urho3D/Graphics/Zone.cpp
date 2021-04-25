@@ -265,6 +265,7 @@ void Zone::SetZoneTextureAttr(const ResourceRef& value)
     zoneTexture_ = static_cast<Texture*>(cache->GetResource(value.type_, value.name_));
     cachedTextureLighting_.Invalidate();
     reflectionProbeData_.Invalidate();
+    MarkCachedAmbientDirty();
 }
 
 ResourceRef Zone::GetZoneTextureAttr() const

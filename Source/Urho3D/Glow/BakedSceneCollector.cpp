@@ -191,7 +191,10 @@ void DefaultBakedSceneCollector::LockScene(Scene* scene, const Vector3& chunkSiz
             auto cache = scene_->GetSubsystem<ResourceCache>();
             background.image_ = cache->GetResource<ImageCube>(texture->GetName());
             if (background.image_)
-                background.image_ = background.image_->GetDecompressedImage();
+            {
+                const unsigned bestLevel = background.image_->GetSphericalHarmonicsMipLevel();
+                background.image_ = background.image_->GetDecompressedImageLevel(bestLevel);
+            }
         }
         background.color_ = background.image_ ? Color::WHITE : zone->GetFogColor();
         background.intensity_ = zone->GetBackgroundBrightness();
