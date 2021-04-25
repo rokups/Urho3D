@@ -230,11 +230,15 @@ template <bool DebuggerEnabled>
 class DrawCommandCompositor : public NonCopyable, private BatchRenderingContext
 {
 public:
+    /// Number of vec4 elements per vertex light.
+    static const unsigned VertexLightStride = 3;
+
     DrawCommandCompositor(const BatchRenderingContext& ctx, const BatchRendererSettings& settings,
         RenderPipelineDebugger* debugger, const DrawableProcessor& drawableProcessor, const InstancingBuffer& instancingBuffer,
         BatchRenderFlags flags, unsigned startInstance)
         : BatchRenderingContext(ctx)
         , settings_(settings)
+        , numVertexLights_(drawableProcessor.GetSettings().maxVertexLights_)
         , debugger_(debugger)
         , drawableProcessor_(drawableProcessor)
         , instancingBuffer_(instancingBuffer)
@@ -342,9 +346,9 @@ private:
                 ? lights_[current_.vertexLights_[i]]->GetParams() : nullVertexLight;
             const Vector3& color = params.GetColor(settings_.linearSpaceLighting_);
 
-            current_.vertexLightsData_[i * 3] = { color, params.inverseRange_ };
-            current_.vertexLightsData_[i * 3 + 1] = { params.direction_, params.spotCutoff_ };
-            current_.vertexLightsData_[i * 3 + 2] = { params.position_, params.inverseSpotCutoff_ };
+            current_.vertexLightsData_[i * VertexLightStride] = { color, params.inverseRange_ };
+            current_.vertexLightsData_[i * VertexLightStride + 1] = { params.direction_, params.spotCutoff_ };
+            current_.vertexLightsData_[i * VertexLightStride + 2] = { params.position_, params.inverseSpotCutoff_ };
         }
     }
 
@@ -524,7 +528,8 @@ private:
 
     void AddVertexLightConstants()
     {
-        drawQueue_.AddShaderParameter(ShaderConsts::Light_VertexLights, ea::span<const Vector4>{ current_.vertexLightsData_ });
+        drawQueue_.AddShaderParameter(ShaderConsts::Light_VertexLights,
+            ea::span<const Vector4>{ current_.vertexLightsData_, numVertexLights_ * VertexLightStride });
     }
 
     void AddPixelLightConstants(const CookedLightParams& params)
@@ -653,6 +658,7 @@ private:
     /// External state (required)
     /// @{
     const BatchRendererSettings& settings_;
+    const unsigned numVertexLights_{};
     RenderPipelineDebugger* debugger_{};
     const DrawableProcessor& drawableProcessor_;
     const InstancingBuffer& instancingBuffer_;
@@ -740,7 +746,7 @@ private:
         Texture* pixelLightShadowMap_{};
 
         LightAccumulator::VertexLightContainer vertexLights_{};
-        Vector4 vertexLightsData_[MAX_VERTEX_LIGHTS * 3]{};
+        Vector4 vertexLightsData_[MAX_VERTEX_LIGHTS * VertexLightStride]{};
 
         Texture* lightmapTexture_{};
         const Vector4* lightmapScaleOffset_{};

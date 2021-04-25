@@ -14,7 +14,7 @@ void VS()
     mat4 modelMatrix = iModelMatrix;
     vec3 worldPos = GetWorldPos(modelMatrix);
     gl_Position = GetClipPos(worldPos);
-    
+
     #ifdef DIFFMAP
         vTexCoord = iTexCoord;
     #endif
@@ -31,16 +31,13 @@ void PS()
         diffColor *= vColor;
     #endif
 
-    #if (!defined(DIFFMAP)) && (!defined(ALPHAMAP))
-        gl_FragColor = diffColor;
-    #endif
     #ifdef DIFFMAP
         vec4 diffInput = texture2D(sDiffMap, vTexCoord);
         #ifdef ALPHAMASK
             if (diffInput.a < 0.5)
                 discard;
         #endif
-        gl_FragColor = diffColor * diffInput;
+        diffColor *= diffInput;
     #endif
     #ifdef ALPHAMAP
         #if defined(GL3) && defined(DESKTOP_GRAPHICS)
@@ -48,6 +45,11 @@ void PS()
         #else
             float alphaInput = texture2D(sDiffMap, vTexCoord).a;
         #endif
-        gl_FragColor = vec4(diffColor.rgb, diffColor.a * alphaInput);
+        diffColor.a *= alphaInput;
     #endif
+
+    #ifdef URHO3D_LINEAR_OUTPUT
+        diffColor.rgb *= diffColor.rgb * (diffColor.rgb * 0.305306011 + 0.682171111) + 0.012522878;
+    #endif
+    gl_FragColor = diffColor;
 }

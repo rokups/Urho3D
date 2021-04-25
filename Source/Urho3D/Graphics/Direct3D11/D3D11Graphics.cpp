@@ -160,6 +160,12 @@ static const D3D11_FILL_MODE d3dFillMode[] =
     D3D11_FILL_WIREFRAME // Point fill mode not supported
 };
 
+struct ClearFramebufferConstantBuffer
+{
+    Matrix3x4 matrix_;
+    Vector4 color_;
+};
+
 static void GetD3DPrimitiveType(unsigned elementCount, PrimitiveType type, unsigned& primitiveCount,
     D3D_PRIMITIVE_TOPOLOGY& d3dPrimitiveType)
 {
@@ -552,9 +558,14 @@ void Graphics::Clear(ClearTargetFlags flags, const Color& color, float depth, un
 
         Geometry* geometry = renderer->GetQuadGeometry();
 
-        Matrix3x4 model = Matrix3x4::IDENTITY;
-        Matrix4 projection = Matrix4::IDENTITY;
-        model.m23_ = Clamp(depth, 0.0f, 1.0f);
+        ClearFramebufferConstantBuffer bufferData;
+        bufferData.matrix_.m23_ = Clamp(depth, 0.0f, 1.0f);
+        bufferData.color_ = color.ToVector4();
+
+        ConstantBufferRange buffers[MAX_SHADER_PARAMETER_GROUPS];
+        buffers[0].constantBuffer_ = GetOrCreateConstantBuffer(VS, 0, sizeof(bufferData));
+        buffers[0].constantBuffer_->Update(&bufferData);
+        buffers[0].size_ = sizeof(bufferData);
 
         SetBlendMode(BLEND_REPLACE);
         SetColorWrite(flags & CLEAR_COLOR);
@@ -565,9 +576,7 @@ void Graphics::Clear(ClearTargetFlags flags, const Color& color, float depth, un
         SetScissorTest(false);
         SetStencilTest(flags & CLEAR_STENCIL, CMP_ALWAYS, OP_REF, OP_KEEP, OP_KEEP, stencil);
         SetShaders(GetShader(VS, "ClearFramebuffer"), GetShader(PS, "ClearFramebuffer"));
-        SetShaderParameter(VSP_MODEL, model);
-        SetShaderParameter(VSP_VIEWPROJ, projection);
-        SetShaderParameter(PSP_MATDIFFCOLOR, color);
+        SetShaderConstantBuffers(buffers);
 
         geometry->Draw(this);
 

@@ -927,6 +927,7 @@ void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsign
 
     unsigned alphaFormat = Graphics::GetAlphaFormat();
     RenderSurface* surface = graphics_->GetRenderTarget(0);
+    const bool isSurfaceSRGB = RenderSurface::GetSRGB(graphics_, surface);
     IntVector2 viewSize = graphics_->GetViewport().Size();
     Vector2 invScreenSize(1.0f / (float)viewSize.x_, 1.0f / (float)viewSize.y_);
     Vector2 scale(2.0f * invScreenSize.x_, -2.0f * invScreenSize.y_);
@@ -962,7 +963,7 @@ void UI::Render(VertexBuffer* buffer, const ea::vector<UIBatch>& batches, unsign
             continue;
 
         Material* material = GetBatchMaterial(batch);
-        const UIBatchStateKey key{ material, material->GetDefaultPass(), batch.blendMode_ };
+        const UIBatchStateKey key{ isSurfaceSRGB, material, material->GetDefaultPass(), batch.blendMode_ };
         PipelineState* pipelineState = batchStateCache_->GetOrCreatePipelineState(key, batchStateCreateContext);
         if (!pipelineState || !pipelineState->IsValid())
             continue;

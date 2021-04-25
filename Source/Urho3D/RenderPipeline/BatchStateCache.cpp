@@ -141,8 +141,17 @@ SharedPtr<PipelineState> DefaultUIBatchStateCache::CreateUIBatchPipelineState(
     desc.blendMode_ = key.blendMode_;
     desc.scissorTestEnabled_ = true;
 
-    desc.vertexShader_ = graphics->GetShader(VS, key.pass_->GetVertexShader(), key.pass_->GetEffectiveVertexShaderDefines());
-    desc.pixelShader_ = graphics->GetShader(PS, key.pass_->GetPixelShader(), key.pass_->GetEffectivePixelShaderDefines());
+    vertexShaderDefines_ = key.pass_->GetEffectiveVertexShaderDefines();
+    pixelShaderDefines_ = key.pass_->GetEffectivePixelShaderDefines();
+
+    if (key.linearOutput_)
+    {
+        vertexShaderDefines_ += " URHO3D_LINEAR_OUTPUT";
+        pixelShaderDefines_ += " URHO3D_LINEAR_OUTPUT";
+    }
+
+    desc.vertexShader_ = graphics->GetShader(VS, key.pass_->GetVertexShader(), vertexShaderDefines_);
+    desc.pixelShader_ = graphics->GetShader(PS, key.pass_->GetPixelShader(), pixelShaderDefines_);
 
     return renderer->GetOrCreatePipelineState(desc);
 }

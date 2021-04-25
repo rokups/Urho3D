@@ -136,13 +136,15 @@ private:
 /// It's assumed that all UI batches use the same vertex and index buffer formats and material pass.
 struct UIBatchStateKey
 {
+    bool linearOutput_{};
     Material* material_{};
     Pass* pass_{};
     BlendMode blendMode_{};
 
     bool operator ==(const UIBatchStateKey& rhs) const
     {
-        return material_ == rhs.material_
+        return linearOutput_ == rhs.linearOutput_
+            && material_ == rhs.material_
             && pass_ == rhs.pass_
             && blendMode_ == rhs.blendMode_;
     }
@@ -150,6 +152,7 @@ struct UIBatchStateKey
     unsigned ToHash() const
     {
         unsigned hash = 0;
+        CombineHash(hash, MakeHash(linearOutput_));
         CombineHash(hash, MakeHash(material_));
         CombineHash(hash, MakeHash(pass_));
         CombineHash(hash, MakeHash(blendMode_));
@@ -215,6 +218,9 @@ private:
     /// @{
     SharedPtr<PipelineState> CreateUIBatchPipelineState(const UIBatchStateKey& key, const UIBatchStateCreateContext& ctx) override;
     /// @}
+
+    ea::string vertexShaderDefines_;
+    ea::string pixelShaderDefines_;
 };
 
 }

@@ -273,7 +273,7 @@ void ShaderProgramCompositor::ApplyAmbientLightingVertexAndCommonDefinesForUserP
     result.commonShaderDefines_ += "URHO3D_AMBIENT_PASS ";
     if (isGeometryBufferPass)
         result.commonShaderDefines_ += "URHO3D_GBUFFER_PASS ";
-    else
+    else if (settings_.sceneProcessor_.maxVertexLights_ > 0)
         result.commonShaderDefines_ += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", settings_.sceneProcessor_.maxVertexLights_);
 
     if (drawable->GetGlobalIlluminationType() == GlobalIlluminationType::UseLightMap)

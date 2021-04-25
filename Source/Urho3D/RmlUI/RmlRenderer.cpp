@@ -89,6 +89,7 @@ void RmlRenderer::BeginRendering()
     batchStateCreateContext_.indexBuffer_ = indexBuffer;
 
     renderSurface_ = graphics->GetRenderTarget(0);
+    isRenderSurfaceSRGB_ = RenderSurface::GetSRGB(graphics, renderSurface_);
     viewportSize_ = graphics->GetViewport().Size();
 
     const Vector2 invScreenSize = Vector2::ONE / static_cast<Vector2>(viewportSize_);
@@ -190,7 +191,7 @@ void RmlRenderer::RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* i
 
     Material* material = GetBatchMaterial(texture);
     Pass* pass = material->GetDefaultPass();
-    const UIBatchStateKey batchStateKey{ material, pass, BLEND_ALPHA };
+    const UIBatchStateKey batchStateKey{ isRenderSurfaceSRGB_, material, pass, BLEND_ALPHA };
     PipelineState* pipelineState = batchStateCache_->GetOrCreatePipelineState(batchStateKey, batchStateCreateContext_);
 
     const IntRect scissor = scissorEnabled_ ? scissor_ : IntRect{ IntVector2::ZERO, viewportSize_ };

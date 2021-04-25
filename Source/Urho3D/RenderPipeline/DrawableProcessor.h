@@ -145,8 +145,8 @@ public:
     void OnUpdateBegin(const FrameInfo& frameInfo);
     /// @}
 
-    /// Return current frame info.
     const FrameInfo& GetFrameInfo() const { return frameInfo_; }
+    const DrawableProcessorSettings& GetSettings() const { return settings_; }
 
     /// Process occluders. UpdateBatches for occluders may be called twice, but never reentrantly.
     void ProcessOccluders(const ea::vector<Drawable*>& occluders, float sizeThreshold);

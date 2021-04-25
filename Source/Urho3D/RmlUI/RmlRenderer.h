@@ -85,6 +85,7 @@ private:
     /// @{
     UIBatchStateCreateContext batchStateCreateContext_;
     RenderSurface* renderSurface_{};
+    bool isRenderSurfaceSRGB_{};
     IntVector2 viewportSize_{};
     DrawCommandQueue* drawQueue_{};
     Matrix4 projection_;
