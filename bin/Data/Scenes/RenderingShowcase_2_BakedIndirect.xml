@@ -5,16 +5,16 @@
 	<attribute name="Smoothing Constant" value="50.000000" />
 	<attribute name="Snap Threshold" value="5.000000" />
 	<attribute name="Elapsed Time" value="0.000000" />
-	<attribute name="Next Replicated Node ID" value="567" />
-	<attribute name="Next Replicated Component ID" value="551" />
-	<attribute name="Next Local Node ID" value="16777308" />
-	<attribute name="Next Local Component ID" value="16777357" />
+	<attribute name="Next Replicated Node ID" value="575" />
+	<attribute name="Next Replicated Component ID" value="559" />
+	<attribute name="Next Local Node ID" value="16777312" />
+	<attribute name="Next Local Component ID" value="16777363" />
 	<attribute name="Variables" />
 	<attribute name="Variable Names" value="" />
 	<attribute name="Lightmaps" value="Texture2D;Scenes/RenderingShowcase_2_BakedIndirect/Textures/Lightmap-0.png" />
 	<component type="Octree" id="1" />
 	<component type="EditorSceneSettings" id="16777216">
-		<attribute name="Camera Position" value="3.20352 7.70956 -7.10789" />
+		<attribute name="Camera Position" value="3.20356 7.70957 -7.10789" />
 		<attribute name="Camera Rotation" value="0.925304 0.378852 -0.0157436 0.00595402" />
 	</component>
 	<component type="RenderPipeline" id="315">
