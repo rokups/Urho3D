@@ -78,6 +78,8 @@ void Water::CreateScene()
 {
     auto* cache = GetSubsystem<ResourceCache>();
 
+    waterMaterial_ = cache->GetResource<Material>("Materials/LitWaterTiled.xml")->Clone();
+
     scene_ = new Scene(context_);
 
     // Create octree, use default volume (-1000, -1000, -1000) to (1000, 1000, 1000)
@@ -149,7 +151,7 @@ void Water::CreateScene()
     waterNode_->SetPosition(Vector3(0.0f, 5.0f, 0.0f));
     auto* water = waterNode_->CreateComponent<StaticModel>();
     water->SetModel(cache->GetResource<Model>("Models/Plane.mdl"));
-    water->SetMaterial(cache->GetResource<Material>("Materials/Water.xml"));
+    water->SetMaterial(waterMaterial_);
     // Set a different viewmask on the water plane to be able to hide it from the reflection camera
     water->SetViewMask(0x80000000);
 
@@ -222,8 +224,7 @@ void Water::SetupViewport()
     RenderSurface* surface = renderTexture->GetRenderSurface();
     SharedPtr<Viewport> rttViewport(new Viewport(context_, scene_, reflectionCamera));
     surface->SetViewport(0, rttViewport);
-    auto* waterMat = cache->GetResource<Material>("Materials/Water.xml");
-    waterMat->SetTexture(TU_DIFFUSE, renderTexture);
+    waterMaterial_->SetTexture(TU_ENVIRONMENT, renderTexture);
 }
 
 void Water::SubscribeToEvents()
@@ -253,6 +254,14 @@ void Water::MoveCamera(float timeStep)
 
     // Construct new orientation for the camera scene node from yaw and pitch. Roll is fixed to zero
     cameraNode_->SetRotation(Quaternion(pitch_, yaw_, 0.0f));
+
+    const float distortionBias = 0.01f;
+    const float distortionStrength = 0.1f;
+    const Vector3 planeNormal = Vector3::UP;
+    const Vector3 planeRight = cameraNode_->GetWorldRight();
+    const Vector3 planeForward = planeRight.CrossProduct(planeNormal).Normalized();
+    waterMaterial_->SetShaderParameter("ReflectionPlaneX", Vector4(distortionStrength * planeRight, 0.0));
+    waterMaterial_->SetShaderParameter("ReflectionPlaneY", Vector4(distortionStrength * planeForward, distortionBias));
 
     // Read WASD keys and move the camera scene node to the corresponding direction if they are pressed
     if (input->GetKeyDown(KEY_W))

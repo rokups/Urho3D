@@ -76,32 +76,32 @@ void FillLightOutputs(const VertexTransform vertexTransform)
 /// Fill eye vector:
 /// - vEyeVec
 #ifdef URHO3D_PIXEL_NEED_EYE_VECTOR
-    #define _FillEyeVectorOutput(worldPos) \
+    #define FillEyeVectorOutput(worldPos) \
         vEyeVec = cCameraPos - worldPos
 #else
-    #define _FillEyeVectorOutput(worldPos)
+    #define FillEyeVectorOutput(worldPos)
 #endif
 
 /// Fill reflection vector:
 /// - vReflectionVec
 #ifdef URHO3D_PIXEL_NEED_REFLECTION_VECTOR
     #ifdef URHO3D_PIXEL_NEED_EYE_VECTOR
-        #define _FillReflectionVectorOutput(worldPos) \
+        #define FillReflectionVectorOutput(worldPos) \
             vReflectionVec = reflect(-vEyeVec, vNormal)
     #else
-        #define _FillReflectionVectorOutput(worldPos) \
+        #define FillReflectionVectorOutput(worldPos) \
             vReflectionVec = reflect(worldPos - cCameraPos, vNormal)
     #endif
 #else
-    #define _FillReflectionVectorOutput(worldPos)
+    #define FillReflectionVectorOutput(worldPos)
 #endif
 
 /// Fill eye and/or reflection vector:
 /// - vEyeVec
 /// - vReflectionVec
 #define FillEyeAndReflectionVectorOutputs(worldPos) \
-    _FillEyeVectorOutput(worldPos); \
-    _FillReflectionVectorOutput(worldPos)
+    FillEyeVectorOutput(worldPos); \
+    FillReflectionVectorOutput(worldPos)
 
 /// Fill all abovementioned outputs.
 #define FillVertexOutputs(vertexTransform) \

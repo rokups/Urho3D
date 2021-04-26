@@ -95,10 +95,21 @@ UNIFORM_BUFFER_BEGIN(3, Light)
 #endif
 UNIFORM_BUFFER_END(3, Light)
 
-#define DEFAULT_MATERIAL_UNIFORMS \
+/// Uniforms needed for UV transformation.
+#define UNIFORMS_UV_TRANSFORM \
     UNIFORM(half4 cUOffset) \
-    UNIFORM(half4 cVOffset) \
-    UNIFORM(half4 cLMOffset) \
+    UNIFORM(half4 cVOffset)
+
+/// Uniforms needed for lightmapped material.
+#ifdef URHO3D_HAS_LIGHTMAP
+    #define UNIFORMS_LIGHTMAP \
+        UNIFORM(half4 cLMOffset)
+#else
+    #define UNIFORMS_LIGHTMAP
+#endif
+
+/// Unifroms needed for material surface evaluation.
+#define UNIFORMS_SURFACE \
     UNIFORM(half4 cMatDiffColor) \
     UNIFORM(half3 cMatEmissiveColor) \
     UNIFORM(half cRoughness) \
@@ -108,6 +119,21 @@ UNIFORM_BUFFER_END(3, Light)
     UNIFORM(half2 cFadeOffsetScale) \
     UNIFORM(half cNormalScale) \
     UNIFORM(half cDielectricReflectance)
+
+/// Uniforms needed for planar reflections.
+#ifdef URHO3D_MATERIAL_HAS_PLANAR_ENVIRONMENT
+    #define UNIFORMS_PLANAR_REFLECTION \
+        UNIFORM(half4 cReflectionPlaneX) \
+        UNIFORM(half4 cReflectionPlaneY)
+#else
+    #define UNIFORMS_PLANAR_REFLECTION
+#endif
+
+#define DEFAULT_MATERIAL_UNIFORMS \
+    UNIFORMS_UV_TRANSFORM \
+    UNIFORMS_LIGHTMAP \
+    UNIFORMS_SURFACE \
+    UNIFORMS_PLANAR_REFLECTION
 
 /// cLMOffset.xy: Scale applied to lightmap UVs;
 /// cLMOffset.zw: Offset applied to lightmap UVs.

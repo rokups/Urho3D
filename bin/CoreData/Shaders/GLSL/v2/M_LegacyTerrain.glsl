@@ -33,7 +33,8 @@ void main()
     FillSurfaceCommon(surfaceData);
     FillSurfaceNormal(surfaceData);
     FillSurfaceMetallicRoughnessOcclusion(surfaceData);
-    FillSurfaceExternal(surfaceData);
+    FillSurfaceReflectionColor(surfaceData);
+    FillSurfaceBackground(surfaceData);
 
     half3 weights = texture2D(sDiffMap, vTexCoord).rgb;
     half sumWeights = weights.r + weights.g + weights.b;

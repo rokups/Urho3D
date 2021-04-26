@@ -219,23 +219,33 @@ void _GetFragmentAlbedoSpecular(const half oneMinusReflectivity, out half4 albed
 /// Fill surface reflection color.
 /// out: SurfaceData.reflectionColor
 #ifdef URHO3D_SURFACE_NEED_REFLECTION_COLOR
-    half4 _GetReflectionColor(const half3 normal, const half3 eyeVec, const half roughness)
-    {
-    #ifdef URHO3D_BLUR_REFLECTION
-        half3 reflectionVec = reflect(-eyeVec, normal);
-        return textureCubeLod(sEnvCubeMap, reflectionVec, roughness * cRoughnessToLODFactor);
-    #else
-        #ifdef URHO3D_VERTEX_REFLECTION
-            return textureCube(sEnvCubeMap, vReflectionVec);
-        #else
-            half3 reflectionVec = reflect(-eyeVec, normal);
-            return textureCube(sEnvCubeMap, reflectionVec);
-        #endif
-    #endif
-    }
+    #ifdef URHO3D_MATERIAL_HAS_PLANAR_ENVIRONMENT
+        half4 SamplePlanarReflectionColor(const vec2 screenPos, const half3 normal)
+        {
+            return texture2D(sEnvMap, GetPlanarReflectionUV(screenPos, half4(normal, 1.0)));
+        }
 
-    #define FillSurfaceReflectionColor(surfaceData) \
-        surfaceData.reflectionColor = _GetReflectionColor(surfaceData.normal, surfaceData.eyeVec, surfaceData.roughness)
+        #define FillSurfaceReflectionColor(surfaceData) \
+            surfaceData.reflectionColor = SamplePlanarReflectionColor(surfaceData.screenPos, surfaceData.normal)
+    #else
+        half4 SampleCubeReflectionColor(const half3 normal, const half3 eyeVec, const half roughness)
+        {
+        #ifdef URHO3D_BLUR_REFLECTION
+            half3 reflectionVec = reflect(-eyeVec, normal);
+            return textureCubeLod(sEnvCubeMap, reflectionVec, roughness * cRoughnessToLODFactor);
+        #else
+            #ifdef URHO3D_VERTEX_REFLECTION
+                return textureCube(sEnvCubeMap, vReflectionVec);
+            #else
+                half3 reflectionVec = reflect(-eyeVec, normal);
+                return textureCube(sEnvCubeMap, reflectionVec);
+            #endif
+        #endif
+        }
+
+        #define FillSurfaceReflectionColor(surfaceData) \
+            surfaceData.reflectionColor = SampleCubeReflectionColor(surfaceData.normal, surfaceData.eyeVec, surfaceData.roughness)
+    #endif
 #else
     #define FillSurfaceReflectionColor(surfaceData)
 #endif
@@ -265,9 +275,8 @@ void _GetFragmentAlbedoSpecular(const half oneMinusReflectivity, out half4 albed
     FillSurfaceEyeVector(surfaceData); \
     FillSurfaceScreenPosition(surfaceData)
 
-/// Fill surface external data (background and reflection) from samplers.
-#define FillSurfaceExternal(surfaceData) \
-    FillSurfaceReflectionColor(surfaceData); \
+/// Fill surface background from samplers.
+#define FillSurfaceBackground(surfaceData) \
     FillSurfaceBackgroundColor(surfaceData); \
     FillSurfaceBackgroundDepth(surfaceData)
 

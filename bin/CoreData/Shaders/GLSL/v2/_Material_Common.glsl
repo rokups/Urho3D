@@ -67,3 +67,20 @@ VERTEX_OUTPUT_HIGHP(vec2 vTexCoord)
     VERTEX_OUTPUT(half3 vReflectionVec)
 #endif
 /// @}
+
+/// Calculate planar reflection vector.
+#ifdef URHO3D_MATERIAL_HAS_PLANAR_ENVIRONMENT
+    half2 GetPlanarReflectionUV(vec2 screenPos, half4 normal)
+    {
+        // Screen position y has different direction for DX and GL.
+        // Flip reflection vertically unless it's already flipped.
+        #ifndef URHO3D_FEATURE_FRAMEBUFFER_Y_INVERTED
+            screenPos.y = 1.0 - screenPos.y;
+        #endif
+
+        // Apply normal distortion, don't undershoot Y
+        screenPos.x += dot(cReflectionPlaneX, normal);
+        screenPos.y += max(0.0, dot(cReflectionPlaneY, normal));
+        return screenPos;
+    }
+#endif

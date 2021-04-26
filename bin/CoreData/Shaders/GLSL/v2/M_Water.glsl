@@ -43,11 +43,12 @@ void main()
     FillSurfaceCommon(surfaceData);
     FillSurfaceNormal(surfaceData);
     FillSurfaceMetallicRoughnessOcclusion(surfaceData);
+    FillSurfaceReflectionColor(surfaceData);
 
     // Apply noise to screen position used for background sampling
     surfaceData.screenPos += surfaceData.normalInTangentSpace.xy * cNoiseStrength;
 
-    FillSurfaceExternal(surfaceData);
+    FillSurfaceBackground(surfaceData);
 
     // Water doesn't accept diffuse lighting, set albedo to zero
     surfaceData.albedo = vec4(0.0);
