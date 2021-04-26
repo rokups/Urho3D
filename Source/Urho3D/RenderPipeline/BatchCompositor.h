@@ -278,7 +278,9 @@ private:
     /// @{
     ea::vector<SharedPtr<BatchCompositorPass>> passes_;
     MaterialQuality shadowMaterialQuality_{};
-    SharedPtr<Pass> lightVolumePass_{};
+    SharedPtr<Material> lightVolumeMaterial_;
+    SharedPtr<Material> negativeLightVolumeMaterial_;
+    SharedPtr<Pass> lightVolumePass_;
 
     BatchStateCache shadowCache_;
     BatchStateCache lightVolumeCache_;

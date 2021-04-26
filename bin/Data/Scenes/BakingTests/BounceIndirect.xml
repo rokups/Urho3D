@@ -1,0 +1,106 @@
+<?xml version="1.0"?>
+<scene id="1">
+	<attribute name="Name" value="" />
+	<attribute name="Time Scale" value="1.000000" />
+	<attribute name="Smoothing Constant" value="50.000000" />
+	<attribute name="Snap Threshold" value="5.000000" />
+	<attribute name="Elapsed Time" value="0.000000" />
+	<attribute name="Next Replicated Node ID" value="553" />
+	<attribute name="Next Replicated Component ID" value="536" />
+	<attribute name="Next Local Node ID" value="16777300" />
+	<attribute name="Next Local Component ID" value="16777345" />
+	<attribute name="Variables" />
+	<attribute name="Variable Names" value="" />
+	<attribute name="Lightmaps" value="Texture2D;Scenes/BakingTests/BounceIndirect/Textures/Lightmap-0.png" />
+	<component type="Octree" id="1" />
+	<component type="EditorSceneSettings" id="16777216">
+		<attribute name="Camera Position" value="1.85725 3.34452 5.22458" />
+		<attribute name="Camera Rotation" value="-0.134246 -0.0346835 0.958841 -0.247788" />
+	</component>
+	<component type="RenderPipeline" id="315">
+		<attribute name="Color Space" value="LDR Linear" />
+	</component>
+	<component type="LightBaker" id="436">
+		<attribute name="Texel Density" value="20.000000" />
+		<attribute name="Quality" value="High" />
+		<attribute name="Direct Samples (Lightmap)" value="32" />
+		<attribute name="Indirect Samples (Texture)" value="256" />
+		<attribute name="Indirect Samples (Light Probes)" value="256" />
+	</component>
+	<component type="GlobalIllumination" id="441">
+		<attribute name="Data File" value="BinaryFile;Scenes/BakingTests/BounceIndirect/GI.bin" />
+	</component>
+	<node id="504">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Objects" />
+		<attribute name="Tags" />
+		<attribute name="Position" value="0 0 0" />
+		<attribute name="Rotation" value="1 0 0 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<node id="507">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Lit Plane" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 0 0" />
+			<attribute name="Rotation" value="1 0 0 0" />
+			<attribute name="Scale" value="10 1 10" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="490">
+				<attribute name="Model" value="Model;Models/Plane.mdl" />
+				<attribute name="Material" value="Material;Materials/Constant/MattWhite.xml" />
+				<attribute name="Light Mask" value="-2" />
+				<attribute name="Global Illumination" value="Use LightMap" />
+				<attribute name="Bake Lightmap" value="true" />
+				<attribute name="Scale in Lightmap" value="0.100000" />
+				<attribute name="Lightmap Scale &amp; Offset" value="0.0429688 0.0429688 0.0917969 0.00195313" />
+			</component>
+		</node>
+		<node id="552">
+			<attribute name="Is Enabled" value="true" />
+			<attribute name="Name" value="Unlit Plane" />
+			<attribute name="Tags" />
+			<attribute name="Position" value="0 1 0" />
+			<attribute name="Rotation" value="0.707107 0.707107 0 0" />
+			<attribute name="Scale" value="2 1 2" />
+			<attribute name="Variables" />
+			<component type="StaticModel" id="535">
+				<attribute name="Model" value="Model;Models/Plane.mdl" />
+				<attribute name="Material" value="Material;Materials/Constant/MattWhite.xml" />
+				<attribute name="Light Mask" value="-2" />
+				<attribute name="Global Illumination" value="Use LightMap" />
+				<attribute name="Bake Lightmap" value="true" />
+				<attribute name="Lightmap Scale &amp; Offset" value="0.0859375 0.0859375 0.00195313 0.00195313" />
+			</component>
+		</node>
+	</node>
+	<node id="526">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Camera Zone" />
+		<attribute name="Tags" />
+		<attribute name="Position" value="0 0 0" />
+		<attribute name="Rotation" value="1 0 0 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<component type="Zone" id="509">
+			<attribute name="Bounding Box Min" value="-100 -100 -100" />
+			<attribute name="Bounding Box Max" value="100 100 100" />
+			<attribute name="Ambient Color" value="0 0 0 0" />
+			<attribute name="Priority" value="-1" />
+		</component>
+	</node>
+	<node id="545">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Static Light" />
+		<attribute name="Tags" />
+		<attribute name="Position" value="0 0 0" />
+		<attribute name="Rotation" value="0.707107 0.707107 0 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<component type="Light" id="528">
+			<attribute name="Light Type" value="Directional" />
+			<attribute name="Light Mode" value="Baked" />
+			<attribute name="Brightness Multiplier" value="0.700000" />
+		</component>
+	</node>
+</scene>

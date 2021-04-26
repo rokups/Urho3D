@@ -461,9 +461,8 @@ struct ChartDirectTracingKernel
 
         if (bakeIndirect_)
         {
-            // Instead of dividing direct light by pi, we multiply it here
             const Vector3& albedo = geometryBuffer_->albedo_[elementIndex];
-            bakedDirect_->surfaceLight_[elementIndex] += M_PI * indirectBrightness_ * albedo * directLight;
+            bakedDirect_->surfaceLight_[elementIndex] += indirectBrightness_ * albedo * directLight;
         }
     }
 };
@@ -721,8 +720,7 @@ struct ChartIndirectTracingKernel
     /// End sample.
     void EndSample(const Vector3& light)
     {
-        const float NoL = currentSmoothNormal_.DotProduct(currentSampleDirection_);
-        accumulatedIndirectLight_ += Vector4(NoL * light, NoL);
+        accumulatedIndirectLight_ += Vector4(light, 1.0f);
     }
 
     /// End tracing element.
@@ -792,7 +790,9 @@ struct LightProbeIndirectTracingKernel
     /// End tracing element.
     void EndElement(unsigned elementIndex)
     {
-        const float weight = 4.0f * M_PI / GetNumSamples();
+        // BRDF assumes flat surface and multiplies light by 2 to compensate N.L variation.
+        // Light probe N.L is constant (1.0) so we have to revert this compensation now.
+        const float weight = 0.5f * 4.0f * M_PI / GetNumSamples();
         const SphericalHarmonicsDot9 sh{ accumulatedLightSH_ * weight };
         bakedData_->sphericalHarmonics_[elementIndex] += sh;
     }
@@ -860,11 +860,14 @@ void TraceIndirectLight(T sharedKernel, const ea::vector<const LightmapChartBake
                     rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
                     rtcIntersect1(scene, &rayContext, &rayHit);
 
+                    // Apply angle between receiving surface and ray, multiply by two to normalize
+                    const float cosTheta = ea::max(0.0f, currentRayDirection.DotProduct(currentSmoothNormal));
+                    incomingFactors[bounceIndex] = cosTheta * 2.0f;
+
                     // If hit background, pick light and break
                     if (rayHit.hit.geomID == RTC_INVALID_GEOMETRY_ID)
                     {
                         incomingSamples[bounceIndex] = background.SampleLinear(currentRayDirection);
-                        incomingFactors[bounceIndex] = 1.0f;
                         ++numBounces;
                         break;
                     }
@@ -880,13 +883,9 @@ void TraceIndirectLight(T sharedKernel, const ea::vector<const LightmapChartBake
                         RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, RaytracerScene::LightmapUVAttribute, &lightmapUV.x_, 2);
 
                     // Modify incoming flux
-                    const float cosTheta = ea::max(0.0f, currentRayDirection.DotProduct(currentSmoothNormal));
-                    const float reflectivity = 1.0f;
-
                     const unsigned lightmapIndex = geometry.lightmapIndex_;
                     const IntVector2 sampleLocation = bakedDirect[lightmapIndex]->GetNearestLocation(lightmapUV);
                     incomingSamples[bounceIndex] = bakedDirect[lightmapIndex]->GetSurfaceLight(sampleLocation);
-                    incomingFactors[bounceIndex] = reflectivity * cosTheta * 0.5f;
                     ++numBounces;
 
                     // Go to next hemisphere
@@ -1044,9 +1043,8 @@ void BakeEmissionLight(LightmapChartBakedDirect& bakedDirect, const LightmapChar
             const Vector3& albedo = geometryBuffer.albedo_[i];
             const Vector3& emission = geometryBuffer.emission_[i];
 
-            // Instead of dividing direct light by pi, we multiply it here
             bakedDirect.directLight_[i] += emission;
-            bakedDirect.surfaceLight_[i] += M_PI * indirectBrightnessMultiplier * emission;
+            bakedDirect.surfaceLight_[i] += indirectBrightnessMultiplier * emission;
             bakedDirect.albedo_[i] = albedo;
         }
     });

@@ -209,9 +209,12 @@ BatchCompositor::BatchCompositor(RenderPipelineInterface* renderPipeline,
     , renderer_(GetSubsystem<Renderer>())
     , drawableProcessor_(drawableProcessor)
     , defaultMaterial_(renderer_->GetDefaultMaterial())
-    , lightVolumePass_(MakeShared<Pass>(""))
+    , lightVolumeMaterial_(defaultMaterial_->Clone("[Internal]/LightVolume"))
+    , negativeLightVolumeMaterial_(defaultMaterial_->Clone("[Internal]/NegativeLightVolume"))
+    , lightVolumePass_(MakeShared<Pass>("lightvolume"))
     , batchStateCacheCallback_(callback)
 {
+    negativeLightVolumeMaterial_->SetRenderOrder(DEFAULT_RENDER_ORDER + 1);
     lightVolumePass_->SetVertexShader("DeferredLight");
     lightVolumePass_->SetPixelShader("DeferredLight");
 
@@ -269,15 +272,17 @@ void BatchCompositor::ComposeLightVolumeBatches()
         if (!lightProcessor->HasLitGeometries())
             continue;
 
+        Light* light = lightProcessor->GetLight();
+
         PipelineBatchDesc desc;
         desc.InitializeLitBatch(lightProcessor, lightIndex, lightProcessor->GetLightVolumeHash());
         desc.drawableHash_ = 0;
         desc.sourceBatchIndex_ = M_MAX_UNSIGNED;
         desc.geometryType_ = GEOM_STATIC_NOINSTANCING;
-        desc.geometry_ = renderer_->GetLightGeometry(lightProcessor->GetLight());
-        desc.material_ = defaultMaterial_;
+        desc.geometry_ = renderer_->GetLightGeometry(light);
+        desc.material_ = light->IsNegative() ? negativeLightVolumeMaterial_ : lightVolumeMaterial_;
         desc.pass_ = lightVolumePass_;
-        desc.drawable_ = lightProcessor->GetLight();
+        desc.drawable_ = light;
         desc.vertexLightsHash_ = 0;
 
         PipelineState* pipelineState = lightVolumeCache_.GetOrCreatePipelineState(desc.GetKey(), ctx, batchStateCacheCallback_);
