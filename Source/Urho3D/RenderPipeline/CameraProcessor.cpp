@@ -48,20 +48,23 @@ void CameraProcessor::SetCameras(ea::span<Camera* const> cameras)
     isCameraOrthographic_ = false;
     isCameraFlippedByUser_ = false;
     isReflectionCamera_ = false;
+    isCameraClipped_ = false;
 
     if (numCameras > 0)
     {
         isCameraOrthographic_ = cameras[0]->IsOrthographic();
         isCameraFlippedByUser_ = cameras[0]->GetFlipVertical();
         isReflectionCamera_ = cameras[0]->GetUseReflection();
+        isCameraClipped_ = cameras[0]->GetUseClipping();
         for (unsigned i = 1; i < numCameras; ++i)
         {
             if (isCameraFlippedByUser_ != cameras[i]->GetFlipVertical()
                 || isCameraOrthographic_ != cameras[i]->IsOrthographic()
-                || isReflectionCamera_ != cameras[i]->GetUseReflection())
+                || isReflectionCamera_ != cameras[i]->GetUseReflection()
+                || isCameraClipped_ != cameras[i]->GetUseClipping())
             {
-                URHO3D_LOGERROR("All Cameras used in one SceneProcessor should have the same following settings: "
-                    "Flip Vertical, Orthographic, Use Reflection");
+                URHO3D_LOGERROR("All Cameras used in one SceneProcessor should use the same settings: "
+                    "Flip Vertical, Orthographic, Use Reflection, Use Clipping");
                 assert(0);
             }
         }
@@ -120,6 +123,7 @@ unsigned CameraProcessor::GetPipelineStateHash() const
     CombineHash(hash, isCameraOrthographic_);
     CombineHash(hash, isCameraFlippedByUser_);
     CombineHash(hash, isReflectionCamera_);
+    CombineHash(hash, isCameraClipped_);
     CombineHash(hash, flipCameraForRendering_);
     return hash;
 }
@@ -132,6 +136,11 @@ bool CameraProcessor::IsCameraReversed() const
 bool CameraProcessor::IsCameraOrthographic() const
 {
     return isCameraOrthographic_;
+}
+
+bool CameraProcessor::IsCameraClipped() const
+{
+    return isCameraClipped_;
 }
 
 }

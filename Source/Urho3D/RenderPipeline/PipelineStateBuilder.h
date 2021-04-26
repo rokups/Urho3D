@@ -47,7 +47,7 @@ public:
     PipelineStateBuilder(Context* context, const SceneProcessor* sceneProcessor, const CameraProcessor* cameraProcessor,
         const ShadowMapAllocator* shadowMapAllocator, const InstancingBuffer* instancingBuffer);
     void SetSettings(const ShaderProgramCompositorSettings& settings);
-    void SetFrameSettings(bool isCameraOrthographic);
+    void UpdateFrameSettings();
 
     /// Implement BatchStateCacheCallback
     /// @{

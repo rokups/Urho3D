@@ -108,6 +108,14 @@ Vector4 GetAmbientLighting(const BatchRendererSettings& settings, const LightAcc
         return Color(ambient).LinearToGamma().ToVector4();
 }
 
+Vector4 GetClipPlane(const Camera& camera)
+{
+    if (!camera.GetUseClipping())
+        return { 0, 0, 0, 1 };
+    const Matrix4 viewProj = camera.GetGPUProjection() * camera.GetView();
+    return camera.GetClipPlane().Transformed(viewProj).ToVector4();
+}
+
 /// Helper class to process per-object parameters.
 class ObjectParameterBuilder : public NonCopyable
 {
@@ -246,6 +254,8 @@ public:
         , scene_(*frameInfo_.scene_)
         , lights_(drawableProcessor_.GetLightProcessors())
         , cameraNode_(*camera_.GetNode())
+        , depthRange_(camera_.GetFarClip() - camera_.GetNearClip())
+        , clipPlane_(GetClipPlane(camera_))
         , enabled_(flags, instancingBuffer)
         , objectParameterBuilder_(settings_, flags)
         , instanceIndex_(startInstance)
@@ -423,7 +433,16 @@ private:
         {
             const auto& materialParameters = current_.material_->GetShaderParameters();
             for (const auto& parameter : materialParameters)
-                drawQueue_.AddShaderParameter(parameter.first, parameter.second.value_);
+            {
+                if (parameter.first == ShaderConsts::Material_FadeOffsetScale)
+                {
+                    const Vector2 param = parameter.second.value_.GetVector2();
+                    const Vector2 paramAdjusted{param.x_ / depthRange_, param.y_ * depthRange_ };
+                    drawQueue_.AddShaderParameter(parameter.first, paramAdjusted);
+                }
+                else
+                    drawQueue_.AddShaderParameter(parameter.first, parameter.second.value_);
+            }
 
             if (enabled_.ambientLighting_ && current_.lightmapScaleOffset_)
                 drawQueue_.AddShaderParameter(ShaderConsts::Material_LMOffset, *current_.lightmapScaleOffset_);
@@ -510,6 +529,7 @@ private:
         drawQueue_.AddShaderParameter(ShaderConsts::Camera_FrustumSize, farVector);
 
         drawQueue_.AddShaderParameter(ShaderConsts::Camera_ViewProj, camera_.GetEffectiveGPUViewProjection(constantDepthBias));
+        drawQueue_.AddShaderParameter(ShaderConsts::Camera_ClipPlane, clipPlane_);
 
         const Color ambientColorGamma = camera_.GetEffectiveAmbientColor() * camera_.GetEffectiveAmbientBrightness();
         drawQueue_.AddShaderParameter(ShaderConsts::Camera_AmbientColor,
@@ -667,6 +687,8 @@ private:
     Scene& scene_;
     const ea::vector<LightProcessor*>& lights_;
     const Node& cameraNode_;
+    const float depthRange_{};
+    const Vector4 clipPlane_{};
     /// @}
 
     struct EnabledFeatureFlags

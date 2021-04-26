@@ -37,6 +37,19 @@ vec4 WorldToClipSpace(vec3 worldPos)
     return vec4(worldPos, 1.0) * cViewProj;
 }
 
+/// Clip vertex if needed.
+#if defined(URHO3D_CLIP_PLANE) && !defined(GL_ES)
+    #ifdef GL3
+        #define ApplyClipPlane(clipPos) \
+            gl_ClipDistance[0] = dot(cClipPlane, clipPos)
+    #else
+        #define ApplyClipPlane(clipPos) \
+            gl_ClipVertex = clipPos
+    #endif
+#else
+    #define ApplyClipPlane(clipPos)
+#endif
+
 /// Return depth from position in clip space.
 float GetDepth(vec4 clipPos)
 {

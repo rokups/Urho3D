@@ -130,6 +130,7 @@ private:
     void RenderBatchesInternal(ea::string_view debugName, Camera* camera, const PipelineBatchGroup<T>& batchGroup,
         ea::span<const ShaderResourceDesc> globalResources, ea::span<const ShaderParameterDesc> cameraParameters);
 
+    Graphics* graphics_{};
     RenderPipelineInterface* renderPipeline_{};
     RenderPipelineDebugger* debugger_{};
 

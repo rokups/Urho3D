@@ -6,7 +6,7 @@
     half GetSoftParticleFade(const half fragmentDepth, const half backgroundDepth)
     {
         half depthDelta = backgroundDepth - fragmentDepth - cFadeOffsetScale.x;
-        return clamp(depthDelta * cFadeOffsetScale.y * (cFarClip - cNearClip), 0.0, 1.0);
+        return clamp(depthDelta * cFadeOffsetScale.y, 0.0, 1.0);
     }
     #define GetFinalAlpha(surfaceData) \
         surfaceData.albedo.a * GetSoftParticleFade(vWorldDepth, surfaceData.backgroundDepth)

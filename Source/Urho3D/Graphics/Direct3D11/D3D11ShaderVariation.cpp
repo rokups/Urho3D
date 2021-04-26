@@ -159,11 +159,6 @@ void ShaderVariation::Release()
 void ShaderVariation::SetDefines(const ea::string& defines)
 {
     defines_ = defines;
-
-    // Internal mechanism for appending the CLIPPLANE define, prevents runtime (every frame) string manipulation
-    definesClipPlane_ = defines;
-    if (!definesClipPlane_.ends_with(" CLIPPLANE"))
-        definesClipPlane_ += " CLIPPLANE";
 }
 
 bool ShaderVariation::LoadByteCode(const ea::string& binaryShaderName)

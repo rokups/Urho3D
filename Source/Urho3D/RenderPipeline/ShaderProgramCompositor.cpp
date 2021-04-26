@@ -62,9 +62,10 @@ void ShaderProgramCompositor::SetSettings(const ShaderProgramCompositorSettings&
     settings_ = settings;
 }
 
-void ShaderProgramCompositor::SetFrameSettings(bool isCameraOrthographic)
+void ShaderProgramCompositor::SetFrameSettings(bool isCameraOrthographic, bool isCameraClipped)
 {
     isCameraOrthographic_ = isCameraOrthographic;
+    isCameraClipped_ = isCameraClipped;
 }
 
 void ShaderProgramCompositor::ProcessUserBatch(ShaderProgramDesc& result, DrawableProcessorPassFlags flags,
@@ -77,6 +78,9 @@ void ShaderProgramCompositor::ProcessUserBatch(ShaderProgramDesc& result, Drawab
 
     ApplyLayoutVertexAndCommonDefinesForUserPass(result, geometry->GetVertexBuffer(0));
     ApplyMaterialPixelDefinesForUserPass(result, material);
+
+    if (isCameraClipped_)
+        result.vertexShaderDefines_ += "URHO3D_CLIP_PLANE ";
 
     const bool isDeferred = subpass == BatchCompositorSubpass::Deferred;
     const bool isDepthOnly = flags.Test(DrawableProcessorPassFlag::DepthOnlyPass);
@@ -255,6 +259,12 @@ void ShaderProgramCompositor::ApplyMaterialPixelDefinesForUserPass(ShaderProgram
 
     if (material->GetTexture(TU_SPECULAR))
         result.pixelShaderDefines_ += "URHO3D_MATERIAL_HAS_SPECULAR ";
+
+    if (Texture* envTexture = material->GetTexture(TU_ENVIRONMENT))
+    {
+        if (envTexture->IsInstanceOf<Texture2D>())
+            result.commonShaderDefines_ += "URHO3D_MATERIAL_HAS_PLANAR_ENVIRONMENT ";
+    }
 
     if (Texture* emissiveTexture = material->GetTexture(TU_EMISSIVE))
     {

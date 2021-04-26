@@ -82,7 +82,7 @@ ea::vector<ea::string> SliceTextByNewline(const ea::string& str, unsigned maxChu
     unsigned startPosition = 0;
     while (startPosition < str.size())
     {
-        const unsigned maxSize = ea::min(str.size() - startPosition, maxChunkSize);
+        const unsigned maxSize = ea::min<unsigned>(str.size() - startPosition, maxChunkSize);
         const unsigned sliceIndex = startPosition + maxSize != str.size()
             ? FindLastNewlineInRange(str, startPosition, maxSize) : str.size() - 1;
         const unsigned chunkSize = sliceIndex != ea::string::npos

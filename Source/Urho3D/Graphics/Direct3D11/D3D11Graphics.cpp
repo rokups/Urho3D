@@ -925,15 +925,6 @@ ShaderProgramLayout* Graphics::GetShaderProgramLayout(ShaderVariation* vs, Shade
 
 void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 {
-    // Switch to the clip plane variations if necessary
-    if (useClipPlane_)
-    {
-        if (vs)
-            vs = vs->GetOwner()->GetVariation(VS, vs->GetDefinesClipPlane());
-        if (ps)
-            ps = ps->GetOwner()->GetVariation(PS, ps->GetDefinesClipPlane());
-    }
-
     if (vs == vertexShader_ && ps == pixelShader_)
         return;
 
@@ -1004,10 +995,6 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
     // Store shader combination if shader dumping in progress
     if (shaderPrecache_)
         shaderPrecache_->StoreShaders(vertexShader_, pixelShader_);
-
-    // Update clip plane parameter if necessary
-    if (useClipPlane_)
-        SetShaderParameter(VSP_CLIPPLANE, clipPlane_);
 }
 
 void Graphics::SetShaderConstantBuffers(ea::span<const ConstantBufferRange, MAX_SHADER_PARAMETER_GROUPS> constantBuffers)
@@ -1535,14 +1522,8 @@ void Graphics::SetStencilTest(bool enable, CompareMode mode, StencilOp pass, Ste
 
 void Graphics::SetClipPlane(bool enable, const Plane& clipPlane, const Matrix3x4& view, const Matrix4& projection)
 {
+    // Basically no-op for DX11, clip plane has to be managed in user code
     useClipPlane_ = enable;
-
-    if (enable)
-    {
-        Matrix4 viewProj = projection * view;
-        clipPlane_ = clipPlane.Transformed(viewProj).ToVector4();
-        SetShaderParameter(VSP_CLIPPLANE, clipPlane_);
-    }
 }
 
 bool Graphics::IsInitialized() const

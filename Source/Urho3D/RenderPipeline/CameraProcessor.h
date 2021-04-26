@@ -45,6 +45,7 @@ public:
     unsigned GetPipelineStateHash() const;
     bool IsCameraReversed() const;
     bool IsCameraOrthographic() const;
+    bool IsCameraClipped() const;
 
     /// Callbacks from SceneProcessor
     /// @{
@@ -59,6 +60,7 @@ private:
     bool isCameraOrthographic_{};
     bool isCameraFlippedByUser_{};
     bool isReflectionCamera_{};
+    bool isCameraClipped_{};
     bool flipCameraForRendering_{};
     ea::vector<WeakPtr<Camera>> cameras_{};
 };

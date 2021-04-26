@@ -184,6 +184,7 @@ unsigned GetMaxShadowSplitSize(const SceneProcessorSettings& settings, unsigned 
 SceneProcessor::SceneProcessor(RenderPipelineInterface* renderPipeline, const ea::string& shadowTechnique,
     ShadowMapAllocator* shadowMapAllocator, InstancingBuffer* instancingBuffer)
     : Object(renderPipeline->GetContext())
+    , graphics_(GetSubsystem<Graphics>())
     , renderPipeline_(renderPipeline)
     , debugger_(renderPipeline_->GetDebugger())
     , shadowMapAllocator_(shadowMapAllocator)
@@ -407,6 +408,7 @@ void SceneProcessor::RenderLightVolumeBatches(ea::string_view debugName, Camera*
 
     batchRenderer_->RenderLightVolumeBatches(ctx, GetLightVolumeBatches());
 
+    graphics_->SetClipPlane(false);
     drawQueue_->Execute();
 
     if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
@@ -428,6 +430,8 @@ void SceneProcessor::RenderBatchesInternal(ea::string_view debugName, Camera* ca
 
     batchRenderer_->RenderBatches(ctx, batchGroup);
 
+    graphics_->SetClipPlane(camera->GetUseClipping(),
+        camera->GetClipPlane(), camera->GetView(), camera->GetGPUProjection());
     drawQueue_->Execute();
 
     if (RenderPipelineDebugger::IsSnapshotInProgress(debugger_))
@@ -452,7 +456,7 @@ void SceneProcessor::OnUpdateBegin(const CommonFrameInfo& frameInfo)
 
     cameraProcessor_->OnUpdateBegin(frameInfo_);
     drawableProcessor_->OnUpdateBegin(frameInfo_);
-    pipelineStateBuilder_->SetFrameSettings(cameraProcessor_->IsCameraOrthographic());
+    pipelineStateBuilder_->UpdateFrameSettings();
 }
 
 void SceneProcessor::OnRenderBegin(const CommonFrameInfo& frameInfo)

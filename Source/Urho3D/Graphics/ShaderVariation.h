@@ -134,9 +134,6 @@ public:
     /// Return constant buffer data sizes.
     const unsigned* GetConstantBufferSizes() const { return &constantBufferSizes_[0]; }
 
-    /// Return defines with the CLIPPLANE define appended. Used internally on Direct3D11 only, will be empty on other APIs.
-    const ea::string& GetDefinesClipPlane() { return definesClipPlane_; }
-
     /// D3D11 vertex semantic names. Used internally.
     static const char* elementSemanticNames[];
 
@@ -170,8 +167,6 @@ private:
     ea::string name_;
     /// Defines to use in compiling.
     ea::string defines_;
-    /// Defines to use in compiling + CLIPPLANE define appended. Used only on Direct3D11.
-    ea::string definesClipPlane_;
     /// Shader compile error string.
     ea::string compilerOutput_;
 };

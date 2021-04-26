@@ -109,4 +109,5 @@ void FillLightOutputs(const VertexTransform vertexTransform)
     FillTexCoordOutputs(); \
     FillLightOutputs(vertexTransform); \
     FillScreenPosOutput(gl_Position); \
-    FillEyeAndReflectionVectorOutputs(vertexTransform.position.xyz)
+    FillEyeAndReflectionVectorOutputs(vertexTransform.position.xyz) \
+    ApplyClipPlane(gl_Position)

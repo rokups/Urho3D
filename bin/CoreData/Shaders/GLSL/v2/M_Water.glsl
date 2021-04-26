@@ -73,7 +73,7 @@ void main()
 
 #ifdef URHO3D_HAS_READABLE_DEPTH
     half depthDelta = surfaceData.backgroundDepth - vWorldDepth - cFadeOffsetScale.x;
-    half opacity = clamp(depthDelta * cFadeOffsetScale.y * (cFarClip - cNearClip), 0.0, 1.0);
+    half opacity = clamp(depthDelta * cFadeOffsetScale.y, 0.0, 1.0);
     surfaceData.backgroundColor = mix(surfaceData.backgroundColor, GammaToLightSpace(cMatDiffColor.rgb), opacity);
 #else
     surfaceData.backgroundColor = mix(surfaceData.backgroundColor, GammaToLightSpace(cMatDiffColor.rgb), cMatDiffColor.a);

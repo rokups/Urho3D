@@ -77,9 +77,9 @@ void PipelineStateBuilder::SetSettings(const ShaderProgramCompositorSettings& se
     compositor_->SetSettings(settings);
 }
 
-void PipelineStateBuilder::SetFrameSettings(bool isCameraOrthographic)
+void PipelineStateBuilder::UpdateFrameSettings()
 {
-    compositor_->SetFrameSettings(isCameraOrthographic);
+    compositor_->SetFrameSettings(cameraProcessor_->IsCameraOrthographic(), cameraProcessor_->IsCameraClipped());
 }
 
 SharedPtr<PipelineState> PipelineStateBuilder::CreateBatchPipelineState(

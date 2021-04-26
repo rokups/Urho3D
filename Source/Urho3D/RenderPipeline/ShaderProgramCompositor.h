@@ -65,7 +65,7 @@ class URHO3D_API ShaderProgramCompositor : public Object
 public:
     explicit ShaderProgramCompositor(Context* context);
     void SetSettings(const ShaderProgramCompositorSettings& settings);
-    void SetFrameSettings(bool isCameraOrthographic);
+    void SetFrameSettings(bool isCameraOrthographic, bool isCameraClipped);
 
     /// Process batches
     /// @{
@@ -111,6 +111,7 @@ private:
     bool constantBuffersSupported_{};
     ShaderProgramCompositorSettings settings_;
     bool isCameraOrthographic_{};
+    bool isCameraClipped_{};
     /// @}
 };
 

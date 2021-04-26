@@ -1172,6 +1172,13 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
         }
     }
 
+    // Update the clip plane uniform on GL3
+    // TODO(legacy): Remove it when legacy renderer is removed
+#ifndef GL_ES_VERSION_2_0
+    if (gl3Support && impl_->shaderProgram_)
+        SetShaderParameter(VSP_CLIPPLANE, useClipPlane_ ? clipPlane_ : Vector4(0.0f, 0.0f, 0.0f, 1.0f));
+#endif
+
     // Store shader combination if shader dumping in progress
     if (shaderPrecache_)
         shaderPrecache_->StoreShaders(vertexShader_, pixelShader_);

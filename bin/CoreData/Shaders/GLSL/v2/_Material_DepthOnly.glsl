@@ -11,6 +11,7 @@ VERTEX_OUTPUT_HIGHP(vec2 vTexCoord)
 void FillVertexOutputs(const VertexTransform vertexTransform)
 {
     gl_Position = WorldToClipSpace(vertexTransform.position.xyz);
+    ApplyClipPlane(gl_Position);
     vTexCoord = GetTransformedTexCoord();
 #ifdef URHO3D_VARIANCE_SHADOW_MAP
     vDepth = gl_Position.zw;
