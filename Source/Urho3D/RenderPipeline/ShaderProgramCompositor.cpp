@@ -208,7 +208,7 @@ void ShaderProgramCompositor::ApplyPixelLightPixelAndCommonDefines(ShaderProgram
 
     if (hasShadow)
     {
-        /// TODO(renderer): Make more flexible
+        // TODO(renderer): Make more flexible
     #if defined(GL_ES_VERSION_2_0) && !defined(__EMSCRIPTEN__)
         const unsigned maxCascades = 1;
     #else

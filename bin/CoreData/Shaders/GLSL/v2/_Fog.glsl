@@ -5,7 +5,7 @@
     #error Include _Uniforms.glsl before _Fog.glsl
 #endif
 
-/// Evaluate fog factor for given texel depth, in units
+/// Evaluate fog factor for given linear depth. 0 is pure fog, 1 is pure color.
 fixed GetFogFactor(const half depth)
 {
     return clamp((cFogParams.x - depth) * cFogParams.y, 0.0, 1.0);

@@ -8,9 +8,9 @@
 #endif
 
 UNIFORM_BUFFER_BEGIN(0, Frame)
-    /// Time elapsed since previous frame.
+    /// Time elapsed since previous frame, in seconds.
     UNIFORM_HIGHP(float cDeltaTime)
-    /// Time elapsed since scene started updating. Avoid using it.
+    /// Time elapsed since scene started updating, in seconds. Avoid using it.
     UNIFORM_HIGHP(float cElapsedTime)
 UNIFORM_BUFFER_END(0, Frame)
 
@@ -21,23 +21,44 @@ UNIFORM_BUFFER_BEGIN(1, Camera)
     UNIFORM_HIGHP(mat4 cViewInv)
     /// World to clip space matrix.
     UNIFORM_HIGHP(mat4 cViewProj)
-    /// Clip plane.
+    /// Clip plane in clip space.
     UNIFORM_HIGHP(vec4 cClipPlane)
     /// Camera position in world space.
     UNIFORM_HIGHP(vec3 cCameraPos)
-    /// Near clip distance of camera.
+    /// Distance to near clip plane in units.
     UNIFORM_HIGHP(float cNearClip)
-    /// Far clip distance of camera.
+    /// Distance to far clip plane in units.
     UNIFORM_HIGHP(float cFarClip)
+    /// x: 1 for orthographic projection, 0 for perspective projection.
+    /// y: Unused.
+    /// zw: Factors used to convert clip position zw to linear depth. depth=1 is far plane.
+    ///     For orthographic projection depth=0 is near plane.
+    ///     For perspective projection depth=0 is focus point.
+    /// TODO(legacy): Don't need xy, can use cDepthReconstruct instead.
     UNIFORM_HIGHP(vec4 cDepthMode)
+    /// xy: Linear dimensions of far clip plane in units.
+    /// z: Distance to far clip plane.
+    /// TODO(legacy): Probably don't need z component, should be identical to cFarClip.
     UNIFORM_HIGHP(vec3 cFrustumSize)
+    /// Transform that is applied to clip position xy to get underlying texture uv.
+    /// Basically describes current viewport.
+    /// xy: Translation part.
+    /// zw: Scaling part.
     UNIFORM_HIGHP(vec4 cGBufferOffsets)
+    /// xy: Factors used to convert value from depth buffer to linear depth for perspective projection.
+    /// z: 1 for orthographic projection, 0 for perspective projection.
+    /// w: 0 for orthographic projection, 1 for perspective projection.
     UNIFORM_HIGHP(vec4 cDepthReconstruct)
+    /// (1, 1) divided by viewport size.
     UNIFORM_HIGHP(vec2 cGBufferInvSize)
-    /// Constant ambient color in current color space.
+    /// xyz: Constant ambient color in current color space.
+    /// w: Unused.
     UNIFORM(half4 cAmbientColor)
+    /// x: Linear depth corresponding to fog end.
+    /// y: Inverted difference between linear depth where fog ends and where fog begins.
+    /// zw: Unused.
     UNIFORM(half4 cFogParams)
-    /// Color of fog.
+    /// Color of the fog in current color space.
     UNIFORM(half3 cFogColor)
     /// Scale of normal shadow bias.
     UNIFORM(half cNormalOffsetScale)
@@ -59,8 +80,8 @@ UNIFORM_BUFFER_BEGIN(3, Light)
     UNIFORM_HIGHP(vec4 cLightPos)
     /// Light direction in world space.
     UNIFORM(half3 cLightDir)
-    /// x: cos(spotAngle / 2);
-    /// y: 1 / (1 - x).
+#ifndef URHO3D_DEPTH_ONLY_PASS
+    /// Spot light cutoff parameters, see Light::GetCutoffParams() for details.
     UNIFORM(half2 cSpotAngle)
 #ifdef URHO3D_LIGHT_CUSTOM_SHAPE
     /// Matrix from world to light texture space.
@@ -77,30 +98,51 @@ UNIFORM_BUFFER_BEGIN(3, Light)
 #endif
     /// For directional and spot lights: Matrices from world to shadow texture space.
     /// For point lights: unused.
-    UNIFORM_HIGHP(mat4 cLightMatrices[4])
+    UNIFORM_HIGHP(mat4 cLightMatrices[URHO3D_MAX_SHADOW_CASCADES])
     /// Light color in current color space.
     UNIFORM(half4 cLightColor)
+    /// Transforms cubemap UV in range [0, 3]x[0, 2] to actual shadow map UVs.
+    /// xy: Scaling.
+    /// zw: Translation.
     UNIFORM(half4 cShadowCubeAdjust)
+    /// Size of actual used shadow map (without padding) relative to size of split region.
     UNIFORM(half2 cShadowCubeUVBias)
+    /// xy: Used to convert inverted linear depth to shadow map depth in range [0, 1] for point and spot lights.
+    /// z: Linear depth where shadow fade out begins, for directional lights.
+    /// w: Inverted difference between linear depth where shadow fade out ends and where shadow fade out begins.
     UNIFORM(half4 cShadowDepthFade)
+    /// x: One minus light intensity in shadow. Also multiplied by 0.25 for 2x2 PCF shadows.
+    /// y: Light intensity in shadow
     UNIFORM(half2 cShadowIntensity)
+    /// (1, 1) divided by shadow map size, used to emulate pixel offsets when necessary.
     UNIFORM(half2 cShadowMapInvSize)
+    /// x: Depth where 2nd split begins.
+    /// y: Depth where 3rd split begins.
+    /// z: Depth where 4th split begins.
+    /// w: Unused.
     UNIFORM(half4 cShadowSplits)
 #ifdef URHO3D_VARIANCE_SHADOW_MAP
-    UNIFORM(half2 cVSMShadowParams)
+    /// Variance shadow map parameters.
+    UNIFORM_HIGHP(vec2 cVSMShadowParams)
 #endif
 #ifdef URHO3D_PHYSICAL_MATERIAL
+    /// Radius of sphere and tube lights. Unused.
     UNIFORM(half cLightRad)
+    /// Length of tube lights. Unused.
     UNIFORM(half cLightLength)
+#endif
 #endif
 UNIFORM_BUFFER_END(3, Light)
 
 /// Uniforms needed for UV transformation.
+/// cUOffset: U coordinate transformation: u <- dot(uv, xy) + w.
+/// cVOffset: V coordinate transformation: v <- dot(uv, xy) + w.
 #define UNIFORMS_UV_TRANSFORM \
     UNIFORM(half4 cUOffset) \
     UNIFORM(half4 cVOffset)
 
 /// Uniforms needed for lightmapped material.
+/// cLMOffset: Transforms model lightmap UVs to UVs in lightmap: uv <- uv*xy + zw.
 #ifdef URHO3D_HAS_LIGHTMAP
     #define UNIFORMS_LIGHTMAP \
         UNIFORM(half4 cLMOffset)
@@ -109,6 +151,14 @@ UNIFORM_BUFFER_END(3, Light)
 #endif
 
 /// Unifroms needed for material surface evaluation.
+/// cMatDiffColor.rgb: Material diffuse color in gamma space, or base color for PBR rendering.
+/// cMatDiffColor.a: Material transparency.
+/// cMatEmissiveColor: Material emissive color in gamma space.
+/// cRoughness: Perceptual roughness of PBR material.
+/// cMatEnvMapColor: Environment reflection color for non-PBR material.
+/// cMetallic: Metallness of PBR material.
+/// cMatSpecColor.rgb: Color of specular reflection for non-PBR material.
+/// cMatSpecColor.a: Specular reflection power for non-PBR material.
 #define UNIFORMS_SURFACE \
     UNIFORM(half4 cMatDiffColor) \
     UNIFORM(half3 cMatEmissiveColor) \

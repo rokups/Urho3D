@@ -531,6 +531,9 @@ private:
         drawQueue_.AddShaderParameter(ShaderConsts::Camera_ViewProj, camera_.GetEffectiveGPUViewProjection(constantDepthBias));
         drawQueue_.AddShaderParameter(ShaderConsts::Camera_ClipPlane, clipPlane_);
 
+        if (!enabled_.colorOutput_)
+            return;
+
         const Color ambientColorGamma = camera_.GetEffectiveAmbientColor() * camera_.GetEffectiveAmbientBrightness();
         drawQueue_.AddShaderParameter(ShaderConsts::Camera_AmbientColor,
             settings_.linearSpaceLighting_ ? ambientColorGamma.GammaToLinear() : ambientColorGamma);
@@ -540,6 +543,9 @@ private:
 
     void AddReflectionProbeConstants()
     {
+        if (!enabled_.colorOutput_)
+            return;
+
         drawQueue_.AddShaderParameter(ShaderConsts::Zone_ReflectionAverageColor,
             current_.reflectionProbe_->reflectionMapSH_.EvaluateAverage());
         drawQueue_.AddShaderParameter(ShaderConsts::Zone_RoughnessToLODFactor,
@@ -557,6 +563,11 @@ private:
         drawQueue_.AddShaderParameter(ShaderConsts::Light_LightDir, params.direction_);
         drawQueue_.AddShaderParameter(ShaderConsts::Light_LightPos,
             Vector4{ params.position_, params.inverseRange_ });
+
+        // Shadow maps need only light position and direction for normal bias
+        if (!enabled_.colorOutput_)
+            return;
+
         drawQueue_.AddShaderParameter(ShaderConsts::Light_LightColor,
             Vector4{ params.GetColor(settings_.linearSpaceLighting_), params.effectiveSpecularIntensity_ });
 
@@ -698,6 +709,7 @@ private:
             , vertexLighting_(flags.Test(BatchRenderFlag::EnableVertexLights))
             , pixelLighting_(flags.Test(BatchRenderFlag::EnablePixelLights))
             , anyLighting_(ambientLighting_ || vertexLighting_ || pixelLighting_)
+            , colorOutput_(!flags.Test(BatchRenderFlag::DisableColorOutput))
         {
         }
 
@@ -705,6 +717,7 @@ private:
         bool vertexLighting_;
         bool pixelLighting_;
         bool anyLighting_;
+        bool colorOutput_;
     } const enabled_;
 
     struct DirtyStateFlags

@@ -44,6 +44,7 @@ void main()
         weights.g * texture2D(sSpecMap, vDetailTexCoord) +
         weights.b * texture2D(sEmissiveMap, vDetailTexCoord)
     );
+    surfaceData.albedo.rgb = GammaToLightSpace(surfaceData.albedo.rgb);
 
     surfaceData.specular = cMatSpecColor.rgb;
 #ifdef URHO3D_SURFACE_NEED_AMBIENT

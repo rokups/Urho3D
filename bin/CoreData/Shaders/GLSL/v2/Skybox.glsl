@@ -26,6 +26,6 @@ void main()
 #ifdef URHO3D_PIXEL_SHADER
 void main()
 {
-    gl_FragColor = DiffMap_ToLight(cMatDiffColor * textureCube(sDiffCubeMap, vTexCoord));
+    gl_FragColor = cMatDiffColor * DiffMap_ToLight(textureCube(sDiffCubeMap, vTexCoord));
 }
 #endif

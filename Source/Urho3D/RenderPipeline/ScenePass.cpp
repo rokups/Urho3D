@@ -86,6 +86,12 @@ void UnorderedScenePass::OnBatchesReady()
         deferredBatchGroup_.flags_ |= BatchRenderFlag::EnableAmbientLighting;
         baseBatchGroup_.flags_ |= BatchRenderFlag::EnableAmbientAndVertexLighting;
     }
+
+    if (GetFlags().Test(DrawableProcessorPassFlag::DepthOnlyPass))
+    {
+        deferredBatchGroup_.flags_ |= BatchRenderFlag::DisableColorOutput;
+        baseBatchGroup_.flags_ |= BatchRenderFlag::DisableColorOutput;
+    }
 }
 
 void UnorderedScenePass::PrepareInstacingBuffer(BatchRenderer* batchRenderer)

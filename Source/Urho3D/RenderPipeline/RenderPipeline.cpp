@@ -46,6 +46,7 @@
 #include "../RenderPipeline/AutoExposurePass.h"
 #include "../RenderPipeline/ToneMappingPass.h"
 #include "../RenderPipeline/BloomPass.h"
+#include "../RenderPipeline/ShaderConsts.h"
 #include "../Scene/Scene.h"
 #if URHO3D_SYSTEMUI
     #include "../SystemUI/SystemUI.h"
@@ -402,8 +403,8 @@ void RenderPipelineView::Render()
         };
 
         const ShaderParameterDesc cameraParameters[] = {
-            { VSP_GBUFFEROFFSETS, renderBufferManager_->GetDefaultClipToUVSpaceOffsetAndScale() },
-            { PSP_GBUFFERINVSIZE, renderBufferManager_->GetInvOutputSize() },
+            { ShaderConsts::Camera_GBufferOffsets, renderBufferManager_->GetDefaultClipToUVSpaceOffsetAndScale() },
+            { ShaderConsts::Camera_GBufferInvSize, renderBufferManager_->GetInvOutputSize() },
         };
 
         renderBufferManager_->SetOutputRenderTargers();

@@ -97,6 +97,7 @@ enum class BatchRenderFlag
     EnableVertexLights = 1 << 1,
     EnablePixelLights = 1 << 2,
     EnableInstancingForStaticGeometry = 1 << 3,
+    DisableColorOutput = 1 << 4,
 
     EnableAmbientAndVertexLighting = EnableAmbientLighting | EnableVertexLights,
 };

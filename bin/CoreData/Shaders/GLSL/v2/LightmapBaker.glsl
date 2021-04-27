@@ -57,7 +57,7 @@ void main()
 {
 #ifdef URHO3D_MATERIAL_HAS_DIFFUSE
     vec4 albedoInput = texture2D(sDiffMap, vTexCoord);
-    vec4 albedo = DiffMap_ToLinear(cMatDiffColor * albedoInput);
+    vec4 albedo = cMatDiffColor * DiffMap_ToLinear(albedoInput);
 #else
     vec4 albedo = GammaToLinearSpaceAlpha(cMatDiffColor);
 #endif

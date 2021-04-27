@@ -29,6 +29,7 @@
 #include "../RenderPipeline/RenderBufferManager.h"
 #include "../RenderPipeline/RenderPipelineDebugger.h"
 #include "../RenderPipeline/RenderPipelineDefs.h"
+#include "../RenderPipeline/ShaderConsts.h"
 
 #include <EASTL/optional.h>
 
@@ -417,21 +418,21 @@ void RenderBufferManager::DrawQuad(ea::string_view debugComment, const DrawQuadP
 
     if (drawQueue_->BeginShaderParameterGroup(SP_FRAME))
     {
-        drawQueue_->AddShaderParameter(VSP_DELTATIME, timeStep_);
+        drawQueue_->AddShaderParameter(ShaderConsts::Frame_DeltaTime, timeStep_);
         drawQueue_->CommitShaderParameterGroup(SP_FRAME);
     }
 
     if (drawQueue_->BeginShaderParameterGroup(SP_CAMERA))
     {
-        drawQueue_->AddShaderParameter(VSP_GBUFFEROFFSETS, params.clipToUVOffsetAndScale_);
-        drawQueue_->AddShaderParameter(PSP_GBUFFERINVSIZE, params.invInputSize_);
-        drawQueue_->AddShaderParameter(VSP_VIEWPROJ, projection);
+        drawQueue_->AddShaderParameter(ShaderConsts::Camera_GBufferOffsets, params.clipToUVOffsetAndScale_);
+        drawQueue_->AddShaderParameter(ShaderConsts::Camera_GBufferInvSize, params.invInputSize_);
+        drawQueue_->AddShaderParameter(ShaderConsts::Camera_ViewProj, projection);
         drawQueue_->CommitShaderParameterGroup(SP_CAMERA);
     }
 
     if (drawQueue_->BeginShaderParameterGroup(SP_OBJECT))
     {
-        drawQueue_->AddShaderParameter(VSP_MODEL, modelMatrix);
+        drawQueue_->AddShaderParameter(ShaderConsts::Object_Model, modelMatrix);
         drawQueue_->CommitShaderParameterGroup(SP_OBJECT);
     }
 

@@ -45,13 +45,13 @@ vec3 DirectionToUV(const vec3 vec, const vec2 bias)
     float invDominantAxis;
     vec2 uv;
     vec2 faceOffset;
-    if(vecAbs.z >= vecAbs.x && vecAbs.z >= vecAbs.y)
+    if (vecAbs.z >= vecAbs.x && vecAbs.z >= vecAbs.y)
     {
         faceOffset = vec.z < 0.0 ? vec2(2.0, 1.0) : vec2(1.0, 1.0);
         invDominantAxis = 1.0 / vecAbs.z;
         uv = vec2(vec.z < 0.0 ? -vec.x : vec.x, -vec.y);
     }
-    else if(vecAbs.y >= vecAbs.x)
+    else if (vecAbs.y >= vecAbs.x)
     {
         faceOffset = vec.y < 0.0 ? vec2(0.0, 1.0) : vec2(2.0, 0.0);
         invDominantAxis = 1.0 / vecAbs.y;

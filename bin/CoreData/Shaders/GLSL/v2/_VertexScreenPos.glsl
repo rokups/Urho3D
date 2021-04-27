@@ -69,12 +69,7 @@ vec3 GetNearRay(const vec4 clipPos)
         clipPos.y / clipPos.w * cFrustumSize.y,
         0.0);
 
-    // TODO(renderer): DX11 uses cDepthMode.z instead, why?
-#ifdef D3D11
-    return (viewRay * GetCameraRot()) * cDepthMode.z;
-#else
     return (viewRay * GetCameraRot()) * cDepthMode.x;
-#endif
 }
 
 #endif // URHO3D_VERTEX_SHADER

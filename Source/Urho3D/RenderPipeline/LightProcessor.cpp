@@ -409,7 +409,13 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernel
     switch (lightType)
     {
     case LIGHT_DIRECTIONAL:
+        // TODO(renderer): Make more flexible, get rid of copypaste with
+        // ShaderProgramCompositor::ApplyPixelLightPixelAndCommonDefines
+    #if defined(GL_ES_VERSION_2_0) && !defined(__EMSCRIPTEN__)
+        cookedParams_.numLightMatrices_ = 1;
+    #else
         cookedParams_.numLightMatrices_ = MAX_CASCADE_SPLITS;
+    #endif
         for (unsigned splitIndex = 0; splitIndex < numActiveSplits_; ++splitIndex)
             cookedParams_.lightMatrices_[splitIndex] = splits_[splitIndex].GetWorldToShadowSpaceMatrix(subPixelOffset);
         break;
@@ -469,11 +475,10 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernel
         const float fadeEnd = light_->GetShadowDistance();
         if (fadeStart > 0.0f && fadeEnd > 0.0f && fadeEnd > fadeStart)
             intensity = Lerp(intensity, 1.0f, Clamp((light_->GetDistance() - fadeStart) / (fadeEnd - fadeStart), 0.0f, 1.0f));
-        const float pcfValues = (1.0f - intensity);
 
         // Include number of samples for PCF 1x1 and 2x2 only, bigger PCFs need non-uniform factors
         const float samples = pcfKernelSize == 2 ? 4.0f : 1.0f;
-        cookedParams_.shadowIntensity_ = { pcfValues / samples, intensity, 0.0f, 0.0f };
+        cookedParams_.shadowIntensity_ = { (1.0f - intensity) / samples, intensity, 0.0f, 0.0f };
     }
 
     cookedParams_.shadowSplitDistances_ = { M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE };

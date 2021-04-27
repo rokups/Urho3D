@@ -78,6 +78,8 @@ half3 DecodeNormal(half4 normalInput)
 }
 
 /// Convert sampled depth buffer value to linear depth in [0, 1] range.
+/// For orthographic cameras, 0 is near plane.
+/// For perspective cameras, 0 is focus point and is never actually returned.
 float ReconstructDepth(float hwDepth)
 {
     return dot(vec2(hwDepth, cDepthReconstruct.y / (hwDepth - cDepthReconstruct.x)), cDepthReconstruct.zw);

@@ -429,8 +429,11 @@ public:
     }
 
     /// Return spot cutoff parameters.
-    /// first: cosine of the inner spot angle.
-    /// second: falloff rate beyond inner angle.
+    /// Considering the angle between spot light axis and direction from light to object, returns:
+    /// first: cosine of the angle where lighting is zero.
+    /// second: inverted difference between zero and full light cosines.
+    /// For point and directional lights, (-2, 1) is returned,
+    /// which corresponds to max lighting at angles with cosine >= -1, i.e all angles altogether.
     ea::pair<float, float> GetCutoffParams() const
     {
         if (lightType_ == LIGHT_SPOT)

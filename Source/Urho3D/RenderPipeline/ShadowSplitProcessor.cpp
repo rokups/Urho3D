@@ -361,7 +361,8 @@ void ShadowSplitProcessor::FinalizeShadowBatches()
 {
     BatchCompositor::FillSortKeys(sortedShadowBatches_, unsortedShadowBatches_);
     ea::sort(sortedShadowBatches_.begin(), sortedShadowBatches_.end());
-    shadowBatches_ = { sortedShadowBatches_, BatchRenderFlag::EnableInstancingForStaticGeometry };
+    shadowBatches_ = { sortedShadowBatches_,
+        BatchRenderFlag::EnableInstancingForStaticGeometry | BatchRenderFlag::DisableColorOutput };
 }
 
 }
