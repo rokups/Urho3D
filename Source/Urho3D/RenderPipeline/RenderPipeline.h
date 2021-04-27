@@ -107,6 +107,7 @@ private:
     SharedPtr<UnorderedScenePass> opaquePass_;
     SharedPtr<UnorderedScenePass> postOpaquePass_;
     SharedPtr<BackToFrontScenePass> alphaPass_;
+    SharedPtr<BackToFrontScenePass> postAlphaPass_;
 
     struct DeferredLightingData
     {

@@ -188,6 +188,11 @@
     #endif
 #endif
 
+/// Don't take chances: vertex position must be the same.
+#if defined(URHO3D_VERTEX_SHADER) && defined(GL_ES)
+    invariant gl_Position;
+#endif
+
 
 /// =================================== Uniforms ===================================
 

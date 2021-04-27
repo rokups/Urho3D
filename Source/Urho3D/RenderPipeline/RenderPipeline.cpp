@@ -205,7 +205,7 @@ void RenderPipelineView::ApplySettings()
         }
     }
 
-    sceneProcessor_->SetPasses({ depthPrePass_, opaquePass_, alphaPass_, postOpaquePass_ });
+    sceneProcessor_->SetPasses({ depthPrePass_, opaquePass_, postOpaquePass_, alphaPass_, postAlphaPass_ });
 
     postProcessPasses_.clear();
 
@@ -281,10 +281,11 @@ bool RenderPipelineView::Define(RenderSurface* renderTarget, Viewport* viewport)
         instancingBuffer_ = MakeShared<InstancingBuffer>(context_);
         sceneProcessor_ = MakeShared<SceneProcessor>(this, "shadow", shadowMapAllocator_, instancingBuffer_);
 
+        postOpaquePass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(DrawableProcessorPassFlag::None, "postopaque");
         alphaPass_ = sceneProcessor_->CreatePass<BackToFrontScenePass>(
             DrawableProcessorPassFlag::HasAmbientLighting | DrawableProcessorPassFlag::NeedReadableDepth
             | DrawableProcessorPassFlag::RefractionPass, "", "alpha", "alpha", "litalpha");
-        postOpaquePass_ = sceneProcessor_->CreatePass<UnorderedScenePass>(DrawableProcessorPassFlag::None, "postopaque");
+        postAlphaPass_ = sceneProcessor_->CreatePass<BackToFrontScenePass>(DrawableProcessorPassFlag::None, "postalpha");
     }
 
     frameInfo_.viewport_ = viewport;
@@ -442,6 +443,7 @@ void RenderPipelineView::Render()
     };
     sceneProcessor_->RenderSceneBatches("Alpha", camera, alphaPass_->GetBatches(),
         depthAndColorTextures, cameraParameters);
+    sceneProcessor_->RenderSceneBatches("PostAlpha", camera, postAlphaPass_->GetBatches());
 
     for (PostProcessPass* postProcessPass : postProcessPasses_)
         postProcessPass->Execute();

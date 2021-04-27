@@ -85,6 +85,9 @@
 
 /// =================================== Deprecated material defines ===================================
 
+// TODO(legacy): Remove deprecated defines
+// #define DIFFMAP
+// #define VERTEXCOLOR
 // #define NOUV
 // #define AMBIENT
 // #define DEFERRED
