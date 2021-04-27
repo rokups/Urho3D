@@ -187,10 +187,26 @@ class URHO3D_API LightProcessorCache : public NonCopyable
 public:
     LightProcessorCache();
     ~LightProcessorCache();
+    void SetSettings(const LightProcessorCacheSettings& settings) { settings_ = settings; }
+
+    void Update(float timeStep);
+
+    /// Should be called on every frame to notify LRU cache.
     LightProcessor* GetLightProcessor(Light* light);
 
 private:
-    ea::unordered_map<WeakPtr<Light>, ea::unique_ptr<LightProcessor>> cache_;
+    struct CachedLightProcessor
+    {
+        ea::unique_ptr<LightProcessor> lightProcessor_;
+        unsigned lastUsedGeneration_{};
+    };
+    using CacheMap = ea::unordered_map<WeakPtr<Light>, CachedLightProcessor>;
+
+    LightProcessorCacheSettings settings_;
+    float timeAccumulator_{};
+    unsigned currentGeneration_{};
+
+    CacheMap cache_;
 };
 
 }

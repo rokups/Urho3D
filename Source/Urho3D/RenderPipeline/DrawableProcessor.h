@@ -138,7 +138,7 @@ public:
     explicit DrawableProcessor(RenderPipelineInterface* renderPipeline);
     ~DrawableProcessor() override;
     void SetPasses(ea::vector<SharedPtr<DrawableProcessorPass>> passes);
-    void SetSettings(const DrawableProcessorSettings& settings) { settings_ = settings; }
+    void SetSettings(const DrawableProcessorSettings& settings);
 
     /// RenderPipeline callbacks
     /// @{

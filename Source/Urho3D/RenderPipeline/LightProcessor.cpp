@@ -571,13 +571,39 @@ LightProcessorCache::~LightProcessorCache()
 {
 }
 
+void LightProcessorCache::Update(float timeStep)
+{
+    bool generationChanged = false;
+    timeAccumulator_ += timeStep;
+    while (timeAccumulator_ >= 1.0f)
+    {
+        ++currentGeneration_;
+        timeAccumulator_ -= 1.0f;
+        generationChanged = true;
+    }
+
+    if (generationChanged)
+    {
+        const unsigned maxAge = cache_.size() <= settings_.budget_
+            ? settings_.normalTimeToLive_ : settings_.agressiveTimeToLive_;
+        ea::erase_if(cache_, [&](const CacheMap::value_type& item)
+        {
+            if (item.first.Expired())
+                return true;
+            const unsigned age = currentGeneration_ - item.second.lastUsedGeneration_;
+            return age > maxAge;
+        });
+    }
+}
+
 LightProcessor* LightProcessorCache::GetLightProcessor(Light* light)
 {
     WeakPtr<Light> weakLight(light);
-    auto& lightProcessor = cache_[weakLight];
-    if (!lightProcessor)
-        lightProcessor = ea::make_unique<LightProcessor>(light);
-    return lightProcessor.get();
+    CachedLightProcessor& entry = cache_[weakLight];
+    if (!entry.lightProcessor_)
+        entry.lightProcessor_ = ea::make_unique<LightProcessor>(light);
+    entry.lastUsedGeneration_ = currentGeneration_;
+    return entry.lightProcessor_.get();
 }
 
 }

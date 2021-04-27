@@ -287,12 +287,35 @@ public:
     virtual ShadowMapRegion AllocateTransientShadowMap(const IntVector2& size) = 0;
 };
 
+struct LightProcessorCacheSettings
+{
+    /// How many lights there could be before cache is cleaned up aggressively.
+    unsigned budget_{ 64 };
+    /// Number of seconds to keep cached LightProcessor if cache size is within the budget.
+    unsigned normalTimeToLive_{ 60 };
+    /// Number of seconds to keep cached LightProcessor if cache size is out of the budget.
+    unsigned agressiveTimeToLive_{ 2 };
+
+    /// Utility operators
+    /// @{
+    bool operator==(const LightProcessorCacheSettings& rhs) const
+    {
+        return budget_ == rhs.budget_
+            && normalTimeToLive_ == rhs.normalTimeToLive_
+            && agressiveTimeToLive_ == rhs.agressiveTimeToLive_;
+    }
+
+    bool operator!=(const LightProcessorCacheSettings& rhs) const { return !(*this == rhs); }
+    /// @}
+};
+
 struct DrawableProcessorSettings
 {
     MaterialQuality materialQuality_{ QUALITY_HIGH };
     unsigned maxVertexLights_{ 4 };
     unsigned maxPixelLights_{ 4 };
     unsigned pcfKernelSize_{ 1 };
+    LightProcessorCacheSettings lightProcessorCache_;
 
     /// Utility operators
     /// @{
@@ -320,7 +343,8 @@ struct DrawableProcessorSettings
         return materialQuality_ == rhs.materialQuality_
             && maxVertexLights_ == rhs.maxVertexLights_
             && maxPixelLights_ == rhs.maxPixelLights_
-            && pcfKernelSize_ == rhs.pcfKernelSize_;
+            && pcfKernelSize_ == rhs.pcfKernelSize_
+            && lightProcessorCache_ == rhs.lightProcessorCache_;
     }
 
     bool operator!=(const DrawableProcessorSettings& rhs) const { return !(*this == rhs); }

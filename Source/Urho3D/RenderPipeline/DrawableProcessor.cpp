@@ -169,6 +169,12 @@ void DrawableProcessor::SetPasses(ea::vector<SharedPtr<DrawableProcessorPass>> p
     passes_ = ea::move(passes);
 }
 
+void DrawableProcessor::SetSettings(const DrawableProcessorSettings& settings)
+{
+    settings_ = settings;
+    lightProcessorCache_->SetSettings(settings_.lightProcessorCache_);
+}
+
 void DrawableProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
 {
     // Initialize frame constants
@@ -207,6 +213,9 @@ void DrawableProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
     lightsTemp_.Clear();
 
     queuedDrawableUpdates_.Clear();
+
+    // Update caches
+    lightProcessorCache_->Update(frameInfo.timeStep_);
 }
 
 void DrawableProcessor::OnCollectStatistics(RenderPipelineStats& stats)
