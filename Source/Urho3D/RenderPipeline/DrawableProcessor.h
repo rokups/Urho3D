@@ -267,6 +267,7 @@ private:
 
     WorkQueueVector<Light*> lightsTemp_;
     ea::vector<Light*> lights_;
+    ea::vector<LightDataForAccumulator> lightDataForAccumulator_;
     ea::vector<LightProcessor*> lightProcessors_;
     ea::vector<LightProcessor*> lightProcessorsByShadowMapSize_;
     ea::vector<LightProcessor*> lightProcessorsByShadowMapTexture_;

@@ -300,6 +300,11 @@ void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& dra
     for (Light* light : lights_)
         lightProcessors_.push_back(lightProcessorCache_->GetLightProcessor(light));
 
+    // Cook lights for forward light evaluation on CPU
+    lightDataForAccumulator_.resize(lights_.size());
+    for (unsigned i = 0; i < lights_.size(); ++i)
+        lightDataForAccumulator_[i] = LightDataForAccumulator{ lights_[i] };
+
     // Expand scene Z range so it's never too small
     for (const FloatRange& range : sceneZRangeTemp_)
         sceneZRange_ |= range;
@@ -535,7 +540,7 @@ void DrawableProcessor::ProcessForwardLightingForLight(
     LightAccumulatorContext ctx;
     ctx.maxVertexLights_ = settings_.maxVertexLights_;
     ctx.maxPixelLights_ = settings_.maxPixelLights_;
-    ctx.lights_ = &lights_;
+    ctx.lights_ = &lightDataForAccumulator_;
 
     ForEachParallel(workQueue_, litGeometries,
         [&](unsigned /*index*/, Drawable* geometry)
@@ -553,7 +558,7 @@ void DrawableProcessor::ProcessForwardLightingForLight(
         const float distance = ea::max(light->GetDistanceTo(geometry), M_LARGE_EPSILON);
         const float penalty = GetDrawableLightPenalty(distance * lightIntensityPenalty,
             isNegative, lightImportance, lightType);
-        geometryLighting_[drawableIndex].AccumulateLight(ctx, lightImportance, lightIndex, penalty);
+        geometryLighting_[drawableIndex].AccumulateLight(ctx, geometry, lightImportance, lightIndex, penalty);
     });
 }
 

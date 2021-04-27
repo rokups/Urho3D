@@ -369,16 +369,9 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernel
     cookedParams_.effectiveSpecularIntensity_ = fade * light_->GetEffectiveSpecularIntensity();
 
     // Setup vertex light parameters
-    if (lightType == LIGHT_SPOT)
-    {
-        cookedParams_.spotCutoff_ = Cos(light_->GetFov() * 0.5f);
-        cookedParams_.inverseSpotCutoff_ = 1.0f / (1.0f - cookedParams_.spotCutoff_);
-    }
-    else
-    {
-        cookedParams_.spotCutoff_ = -2.0f;
-        cookedParams_.inverseSpotCutoff_ = 1.0f;
-    }
+    const auto cutoffParams = light_->GetCutoffParams();
+    cookedParams_.spotCutoff_ = cutoffParams.first;
+    cookedParams_.inverseSpotCutoff_ = cutoffParams.second;
 
     cookedParams_.numLightMatrices_ = 0;
     if (cookedParams_.lightShape_)

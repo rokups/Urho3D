@@ -428,6 +428,20 @@ public:
         return Max(GetEffectiveColor().SumRGB(), 0.0f) * attenuation + M_EPSILON;
     }
 
+    /// Return spot cutoff parameters.
+    /// first: cosine of the inner spot angle.
+    /// second: falloff rate beyond inner angle.
+    ea::pair<float, float> GetCutoffParams() const
+    {
+        if (lightType_ == LIGHT_SPOT)
+        {
+            const float cutoff = Cos(fov_ * 0.5f);
+            const float invCutoff = 1.0f / (1.0f - cutoff);
+            return { cutoff, invCutoff };
+        }
+        return { -2.0f, 1.0f };
+    }
+
     /// Set ramp texture attribute.
     void SetRampTextureAttr(const ResourceRef& value);
     /// Set shape texture attribute.
