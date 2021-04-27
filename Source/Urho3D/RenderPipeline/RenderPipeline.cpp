@@ -271,6 +271,8 @@ void RenderPipelineView::ApplySettings()
 
 bool RenderPipelineView::Define(RenderSurface* renderTarget, Viewport* viewport)
 {
+    URHO3D_PROFILE("SetupRenderPipeline");
+
     // Lazy initialize heavy objects
     if (!sceneProcessor_)
     {
@@ -306,6 +308,8 @@ bool RenderPipelineView::Define(RenderSurface* renderTarget, Viewport* viewport)
 
 void RenderPipelineView::Update(const FrameInfo& frameInfo)
 {
+    URHO3D_PROFILE("UpdateRenderPipeline");
+
     frameInfo_.frameNumber_ = frameInfo.frameNumber_;
     frameInfo_.timeStep_ = frameInfo.timeStep_;
 
@@ -342,6 +346,8 @@ void RenderPipelineView::Update(const FrameInfo& frameInfo)
 
 void RenderPipelineView::Render()
 {
+    URHO3D_PROFILE("ExecuteRenderPipeline");
+
     const bool hasRefraction = alphaPass_->HasRefractionBatches();
     RenderBufferManagerFrameSettings frameSettings;
     frameSettings.supportColorReadWrite_ = postProcessFlags_.Test(PostProcessPassFlag::NeedColorOutputReadAndWrite);
@@ -451,6 +457,10 @@ void RenderPipelineView::Render()
     SendViewEvent(E_ENDVIEWRENDER);
     OnRenderEnd(this, frameInfo_);
     graphics_->SetColorWrite(true);
+
+    // Update statistics
+    stats_ = {};
+    OnCollectStatistics(this, stats_);
 
     // End debug snapshot
     if (debugger_.IsSnapshotInProgress())

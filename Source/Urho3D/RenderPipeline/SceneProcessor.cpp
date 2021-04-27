@@ -266,10 +266,11 @@ void SceneProcessor::SetSettings(const ShaderProgramCompositorSettings& settings
 void SceneProcessor::Update()
 {
     // Collect occluders
-    // TODO(renderer): Make optional
     currentOcclusionBuffer_ = nullptr;
     if (settings_.maxOccluderTriangles_ > 0)
     {
+        URHO3D_PROFILE("ProcessOccluders");
+
         OccluderOctreeQuery occluderQuery(occluders_,
             frameInfo_.camera_->GetFrustum(), frameInfo_.camera_->GetViewMask());
         frameInfo_.octree_->GetDrawables(occluderQuery);
@@ -292,12 +293,14 @@ void SceneProcessor::Update()
     // Collect visible drawables
     if (currentOcclusionBuffer_)
     {
+        URHO3D_PROFILE("QueryVisibleDrawables");
         OccludedFrustumOctreeQuery query(drawables_, frameInfo_.camera_->GetFrustum(),
             currentOcclusionBuffer_, DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, frameInfo_.camera_->GetViewMask());
         frameInfo_.octree_->GetDrawables(query);
     }
     else
     {
+        URHO3D_PROFILE("QueryVisibleDrawables");
         FrustumOctreeQuery drawableQuery(drawables_, frameInfo_.camera_->GetFrustum(),
             DRAWABLE_GEOMETRY | DRAWABLE_LIGHT, frameInfo_.camera_->GetViewMask());
         frameInfo_.octree_->GetDrawables(drawableQuery);
@@ -306,20 +309,8 @@ void SceneProcessor::Update()
     // Process drawables
     drawableProcessor_->ProcessVisibleDrawables(drawables_, currentOcclusionBuffer_);
     drawableProcessor_->ProcessLights(this);
+    drawableProcessor_->ProcessForwardLighting();
 
-    const auto& lightProcessors = drawableProcessor_->GetLightProcessors();
-    bool hasForwardLights = false;
-    for (unsigned i = 0; i < lightProcessors.size(); ++i)
-    {
-        const LightProcessor* lightProcessor = lightProcessors[i];
-        if (lightProcessor->HasForwardLitGeometries())
-        {
-            drawableProcessor_->ProcessForwardLighting(i, lightProcessor->GetLitGeometries());
-            hasForwardLights = true;
-        }
-    }
-    if (hasForwardLights)
-        drawableProcessor_->FinalizeForwardLighting();
     drawableProcessor_->UpdateGeometries();
 
     batchCompositor_->ComposeSceneBatches();
@@ -333,6 +324,8 @@ void SceneProcessor::PrepareInstancingBuffer()
 {
     if (!instancingBuffer_->IsEnabled())
         return;
+
+    URHO3D_PROFILE("PrepareInstancingBuffer");
 
     instancingBuffer_->Begin();
 
@@ -354,6 +347,8 @@ void SceneProcessor::RenderShadowMaps()
 {
     if (!settings_.enableShadows_)
         return;
+
+    URHO3D_PROFILE("RenderShadowMaps");
 
     const auto& lightsByShadowMap = drawableProcessor_->GetLightProcessorsByShadowMap();
     for (LightProcessor* sceneLight : lightsByShadowMap)

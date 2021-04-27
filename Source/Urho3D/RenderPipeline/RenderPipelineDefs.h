@@ -232,6 +232,17 @@ public:
     virtual SharedPtr<PipelineState> CreateUIBatchPipelineState(const UIBatchStateKey& key, const UIBatchStateCreateContext& ctx) = 0;
 };
 
+/// Render pipeline frame statistics.
+struct RenderPipelineStats
+{
+    /// Total number of lights processed.
+    unsigned numLights_{};
+    /// Total number of lights with shadows processed.
+    unsigned numShadowedLights_{};
+    /// Number of occluders rendered.
+    unsigned numOccluders_{};
+};
+
 /// Base interface of render pipeline required by Render Pipeline classes.
 class URHO3D_API RenderPipelineInterface
 {
@@ -246,6 +257,7 @@ public:
     Signal<void(const CommonFrameInfo& frameInfo)> OnRenderBegin;
     Signal<void(const CommonFrameInfo& frameInfo)> OnRenderEnd;
     Signal<void()> OnPipelineStatesInvalidated;
+    Signal<void(RenderPipelineStats& stats)> OnCollectStatistics;
     /// @}
 };
 

@@ -64,6 +64,7 @@ public:
 
     RenderPipeline* GetRenderPipeline() const { return renderPipeline_; }
     const FrameInfo& GetFrameInfo() const;
+    const RenderPipelineStats& GetStats() const { return stats_; }
     const RenderPipelineSettings& GetSettings() const { return settings_; }
     void SetSettings(const RenderPipelineSettings& settings);
 
@@ -94,6 +95,7 @@ private:
     CommonFrameInfo frameInfo_;
     PostProcessPassFlags postProcessFlags_;
 
+    RenderPipelineStats stats_;
     RenderPipelineDebugger debugger_;
 
     SharedPtr<RenderBufferManager> renderBufferManager_;

@@ -143,6 +143,7 @@ public:
     /// RenderPipeline callbacks
     /// @{
     void OnUpdateBegin(const FrameInfo& frameInfo);
+    void OnCollectStatistics(RenderPipelineStats& stats);
     /// @}
 
     const FrameInfo& GetFrameInfo() const { return frameInfo_; }
@@ -189,9 +190,11 @@ public:
     /// Process lights: collect lit geometries, query shadow casters, update shadow maps.
     void ProcessLights(LightProcessorCallback* callback);
     /// Accumulate forward lighting for specified light source and geometries.
-    void ProcessForwardLighting(unsigned lightIndex, const ea::vector<Drawable*>& litGeometries);
+    void ProcessForwardLightingForLight(unsigned lightIndex, const ea::vector<Drawable*>& litGeometries);
     /// Should be called after all forward lighting is processed.
     void FinalizeForwardLighting();
+    /// Process forward lighting for all lights.
+    void ProcessForwardLighting();
 
     /// Update drawable geometries if needed.
     void UpdateGeometries();
@@ -267,6 +270,7 @@ private:
     ea::vector<LightProcessor*> lightProcessors_;
     ea::vector<LightProcessor*> lightProcessorsByShadowMapSize_;
     ea::vector<LightProcessor*> lightProcessorsByShadowMapTexture_;
+    unsigned numShadowedLights_{};
 
     WorkQueueVector<Drawable*> queuedDrawableUpdates_;
 };

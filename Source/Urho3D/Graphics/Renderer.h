@@ -434,7 +434,7 @@ public:
 
     /// Return number of views rendered.
     /// @property
-    unsigned GetNumViews() const { return views_.size(); }
+    unsigned GetNumViews() const { return views_.size() + renderPipelineViews_.size(); }
 
     /// Return number of primitives rendered.
     /// @property

@@ -671,6 +671,16 @@ unsigned Renderer::GetNumLights(bool allViews) const
         numLights += view->GetLights().size();
     }
 
+    if (allViews)
+    {
+        for (const RenderPipelineView* view : renderPipelineViews_)
+        {
+            if (!view)
+                continue;
+            numLights += view->GetStats().numLights_;
+        }
+    }
+
     return numLights;
 }
 
@@ -693,6 +703,16 @@ unsigned Renderer::GetNumShadowMaps(bool allViews) const
         }
     }
 
+    if (allViews)
+    {
+        for (const RenderPipelineView* view : renderPipelineViews_)
+        {
+            if (!view)
+                continue;
+            numShadowMaps += view->GetStats().numShadowedLights_;
+        }
+    }
+
     return numShadowMaps;
 }
 
@@ -708,6 +728,16 @@ unsigned Renderer::GetNumOccluders(bool allViews) const
             continue;
 
         numOccluders += view->GetNumActiveOccluders();
+    }
+
+    if (allViews)
+    {
+        for (const RenderPipelineView* view : renderPipelineViews_)
+        {
+            if (!view)
+                continue;
+            numOccluders += view->GetStats().numOccluders_;
+        }
     }
 
     return numOccluders;

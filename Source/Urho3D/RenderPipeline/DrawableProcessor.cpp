@@ -157,6 +157,7 @@ DrawableProcessor::DrawableProcessor(RenderPipelineInterface* renderPipeline)
     , defaultMaterial_(GetSubsystem<Renderer>()->GetDefaultMaterial())
     , lightProcessorCache_(ea::make_unique<LightProcessorCache>())
 {
+    renderPipeline->OnCollectStatistics.Subscribe(this, &DrawableProcessor::OnCollectStatistics);
 }
 
 DrawableProcessor::~DrawableProcessor()
@@ -208,6 +209,13 @@ void DrawableProcessor::OnUpdateBegin(const FrameInfo& frameInfo)
     queuedDrawableUpdates_.Clear();
 }
 
+void DrawableProcessor::OnCollectStatistics(RenderPipelineStats& stats)
+{
+    stats.numOccluders_ += sortedOccluders_.size();
+    stats.numLights_ += lights_.size();
+    stats.numShadowedLights_ += numShadowedLights_;
+}
+
 void DrawableProcessor::ProcessOccluders(const ea::vector<Drawable*>& occluders, float sizeThreshold)
 {
     Camera* cullCamera = frameInfo_.camera_;
@@ -255,6 +263,8 @@ void DrawableProcessor::ProcessOccluders(const ea::vector<Drawable*>& occluders,
 
 void DrawableProcessor::ProcessVisibleDrawables(const ea::vector<Drawable*>& drawables, OcclusionBuffer* occlusionBuffer)
 {
+    URHO3D_PROFILE("ProcessVisibleDrawables");
+
     ForEachParallel(workQueue_, drawables,
         [&](unsigned /*index*/, Drawable* drawable)
     {
@@ -471,6 +481,8 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
 
 void DrawableProcessor::ProcessLights(LightProcessorCallback* callback)
 {
+    URHO3D_PROFILE("ProcessVisibleLights");
+
     for (LightProcessor* lightProcessor : lightProcessors_)
         lightProcessor->BeginUpdate(this, callback);
 
@@ -481,14 +493,22 @@ void DrawableProcessor::ProcessLights(LightProcessorCallback* callback)
     });
 
     SortLightProcessorsByShadowMapSize();
+
+    numShadowedLights_ = 0;
     for (LightProcessor* lightProcessor : lightProcessorsByShadowMapSize_)
+    {
         lightProcessor->EndUpdate(this, callback, settings_.pcfKernelSize_);
+        if (lightProcessor->HasShadow())
+            ++numShadowedLights_;
+    }
+
     SortLightProcessorsByShadowMapTexture();
 
     ProcessShadowCasters();
 }
 
-void DrawableProcessor::ProcessForwardLighting(unsigned lightIndex, const ea::vector<Drawable*>& litGeometries)
+void DrawableProcessor::ProcessForwardLightingForLight(
+    unsigned lightIndex, const ea::vector<Drawable*>& litGeometries)
 {
     if (lightIndex >= lights_.size())
     {
@@ -541,6 +561,24 @@ void DrawableProcessor::FinalizeForwardLighting()
             lightAccumulator.Cook();
         }
     });
+}
+
+void DrawableProcessor::ProcessForwardLighting()
+{
+    URHO3D_PROFILE("ProcessForwardLighting");
+
+    bool hasForwardLights = false;
+    for (unsigned i = 0; i < lightProcessors_.size(); ++i)
+    {
+        const LightProcessor* lightProcessor = lightProcessors_[i];
+        if (lightProcessor->HasForwardLitGeometries())
+        {
+            ProcessForwardLightingForLight(i, lightProcessor->GetLitGeometries());
+            hasForwardLights = true;
+        }
+    }
+    if (hasForwardLights)
+        FinalizeForwardLighting();
 }
 
 void DrawableProcessor::PreprocessShadowCasters(ea::vector<Drawable*>& shadowCasters,
@@ -635,6 +673,8 @@ void DrawableProcessor::SortLightProcessorsByShadowMapTexture()
 
 void DrawableProcessor::UpdateGeometries()
 {
+    URHO3D_PROFILE("UpdateGeometries");
+
     // Update in worker threads
     ForEachParallel(workQueue_, threadedGeometryUpdates_,
         [&](unsigned /*index*/, Drawable* drawable)

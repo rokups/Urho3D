@@ -233,6 +233,8 @@ void BatchCompositor::SetPasses(ea::vector<SharedPtr<BatchCompositorPass>> passe
 
 void BatchCompositor::ComposeShadowBatches()
 {
+    URHO3D_PROFILE("PrepareShadowBatches");
+
     // Collect shadow caster batches in worker threads
     const auto& lightProcessors = drawableProcessor_->GetLightProcessors();
     for (unsigned lightIndex = 0; lightIndex < lightProcessors.size(); ++lightIndex)
@@ -255,12 +257,16 @@ void BatchCompositor::ComposeShadowBatches()
 
 void BatchCompositor::ComposeSceneBatches()
 {
+    URHO3D_PROFILE("PrepareSceneBatches");
+
     for (BatchCompositorPass* pass : passes_)
         pass->ComposeBatches();
 }
 
 void BatchCompositor::ComposeLightVolumeBatches()
 {
+    URHO3D_PROFILE("PrepareLightVolumeBatches");
+
     BatchStateCreateContext ctx;
     ctx.pass_ = this;
     ctx.subpassIndex_ = LitVolumeSubpass;
