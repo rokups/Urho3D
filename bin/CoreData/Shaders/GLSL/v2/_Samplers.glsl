@@ -82,7 +82,9 @@ half3 DecodeNormal(half4 normalInput)
 /// For perspective cameras, 0 is focus point and is never actually returned.
 float ReconstructDepth(float hwDepth)
 {
-    return dot(vec2(hwDepth, cDepthReconstruct.y / (hwDepth - cDepthReconstruct.x)), cDepthReconstruct.zw);
+    // May be undefined for orthographic projection
+    float depth = cDepthReconstruct.y / (hwDepth - cDepthReconstruct.x);
+    return cDepthReconstruct.z != 0.0 ? hwDepth : depth;
 }
 
 #endif // URHO3D_PIXEL_SHADER
