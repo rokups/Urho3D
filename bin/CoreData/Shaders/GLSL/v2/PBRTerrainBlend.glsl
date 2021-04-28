@@ -1,2 +1,1 @@
-#define PBR
-#include "LitSolid.glsl"
+#error Not implemented

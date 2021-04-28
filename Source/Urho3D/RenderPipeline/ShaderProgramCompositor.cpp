@@ -190,9 +190,6 @@ void ShaderProgramCompositor::ApplyGeometryVertexDefines(ShaderProgramDesc& resu
 void ShaderProgramCompositor::ApplyPixelLightPixelAndCommonDefines(ShaderProgramDesc& result,
     Light* light, bool hasShadow, bool materialHasSpecular) const
 {
-    if (light->GetSpecularIntensity() > 0.0f && materialHasSpecular)
-        result.commonShaderDefines_ += "URHO3D_LIGHT_HAS_SPECULAR SPECULAR ";
-
     if (light->GetShapeTexture())
         result.commonShaderDefines_ += "URHO3D_LIGHT_CUSTOM_SHAPE ";
 
@@ -200,9 +197,9 @@ void ShaderProgramCompositor::ApplyPixelLightPixelAndCommonDefines(ShaderProgram
         result.pixelShaderDefines_ += "URHO3D_LIGHT_CUSTOM_RAMP ";
 
     static const ea::string lightTypeDefines[] = {
-        "URHO3D_LIGHT_DIRECTIONAL DIRLIGHT PERPIXEL ",
-        "URHO3D_LIGHT_SPOT SPOTLIGHT PERPIXEL ",
-        "URHO3D_LIGHT_POINT POINTLIGHT PERPIXEL "
+        "URHO3D_LIGHT_DIRECTIONAL ",
+        "URHO3D_LIGHT_SPOT ",
+        "URHO3D_LIGHT_POINT "
     };
     result.commonShaderDefines_ += lightTypeDefines[static_cast<int>(light->GetLightType())];
 
@@ -215,13 +212,13 @@ void ShaderProgramCompositor::ApplyPixelLightPixelAndCommonDefines(ShaderProgram
         const unsigned maxCascades = light->GetLightType() == LIGHT_DIRECTIONAL ? 4 : 1;
     #endif
 
-        result.commonShaderDefines_ += "URHO3D_HAS_SHADOW SHADOW ";
+        result.commonShaderDefines_ += "URHO3D_HAS_SHADOW ";
         if (maxCascades > 1)
             result.commonShaderDefines_ += Format("URHO3D_MAX_SHADOW_CASCADES={} ", maxCascades);
         if (settings_.shadowMapAllocator_.enableVarianceShadowMaps_)
-            result.commonShaderDefines_ += "URHO3D_VARIANCE_SHADOW_MAP VSM_SHADOW ";
+            result.commonShaderDefines_ += "URHO3D_VARIANCE_SHADOW_MAP ";
         else
-            result.commonShaderDefines_ += Format("URHO3D_SHADOW_PCF_SIZE={} SIMPLE_SHADOW ",
+            result.commonShaderDefines_ += Format("URHO3D_SHADOW_PCF_SIZE={} ",
                 settings_.sceneProcessor_.pcfKernelSize_);
     }
 }
@@ -287,7 +284,7 @@ void ShaderProgramCompositor::ApplyAmbientLightingVertexAndCommonDefinesForUserP
         result.commonShaderDefines_ += Format("URHO3D_NUM_VERTEX_LIGHTS={} ", settings_.sceneProcessor_.maxVertexLights_);
 
     if (drawable->GetGlobalIlluminationType() == GlobalIlluminationType::UseLightMap)
-        result.commonShaderDefines_ += "URHO3D_HAS_LIGHTMAP LIGHTMAP ";
+        result.commonShaderDefines_ += "URHO3D_HAS_LIGHTMAP ";
 
     static const ea::string ambientModeDefines[] = {
         "URHO3D_AMBIENT_CONSTANT ",
@@ -317,7 +314,7 @@ void ShaderProgramCompositor::ApplyDefinesForShadowPass(ShaderProgramDesc& resul
 
     result.commonShaderDefines_ += "URHO3D_SHADOW_PASS ";
     if (settings_.shadowMapAllocator_.enableVarianceShadowMaps_)
-        result.commonShaderDefines_ += "URHO3D_VARIANCE_SHADOW_MAP VSM_SHADOW ";
+        result.commonShaderDefines_ += "URHO3D_VARIANCE_SHADOW_MAP ";
     else
         result.commonShaderDefines_ += "URHO3D_NUM_RENDER_TARGETS=0 ";
 }
@@ -326,9 +323,9 @@ void ShaderProgramCompositor::ApplyDefinesForLightVolumePass(ShaderProgramDesc& 
 {
     result.commonShaderDefines_ += "URHO3D_LIGHT_VOLUME_PASS ";
     if (isCameraOrthographic_)
-        result.commonShaderDefines_ += "URHO3D_ORTHOGRAPHIC_DEPTH ORTHO ";
+        result.commonShaderDefines_ += "URHO3D_ORTHOGRAPHIC_DEPTH ";
     if (settings_.sceneProcessor_.lightingMode_ == DirectLightingMode::DeferredPBR)
-        result.commonShaderDefines_ += "URHO3D_PHYSICAL_MATERIAL PBR ";
+        result.commonShaderDefines_ += "URHO3D_PHYSICAL_MATERIAL ";
 }
 
 bool ShaderProgramCompositor::IsInstancingUsed(

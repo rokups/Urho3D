@@ -82,17 +82,23 @@
 /// If not defined, object fades out completely when alpha approaches zero.
 // #define TRANSPARENT
 
+/// Whether to unpack normal from red and alpha channels of normal map.
+// #define PACKEDNORMAL
+
 
 /// =================================== Deprecated material defines ===================================
 
 // TODO(legacy): Remove deprecated defines
 // #define DIFFMAP
+// #define SPECMAP
+// #define EMISSIVEMAP
+// #define METALLIC
+// #define ROUGHNESS
 // #define VERTEXCOLOR
 // #define NOUV
 // #define AMBIENT
 // #define DEFERRED
-// #define METALLIC
-// #define ROUGHNESS
+// #define IBL
 
 #include "_Config_Basic.glsl"
 #include "_Config_Material.glsl"

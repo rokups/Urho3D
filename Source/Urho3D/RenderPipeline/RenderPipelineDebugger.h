@@ -80,10 +80,12 @@ struct URHO3D_API DebugFrameSnapshot
     ea::vector<DebugFrameSnapshotPass> passes_;
     ea::unordered_set<PipelineState*> scenePipelineStates_{};
     ea::unordered_set<Material*> sceneMaterials_{};
+    ea::unordered_set<ShaderVariation*> sceneShaders_{};
 
     ea::string ToString() const;
     ea::string ScenePipelineStatesToString() const;
     ea::string SceneMaterialsToString() const;
+    ea::string SceneShadersToString() const;
 };;
 
 /// Debug utility that takes snapshot of current frame.

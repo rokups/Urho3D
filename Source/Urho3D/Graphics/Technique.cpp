@@ -306,8 +306,12 @@ bool Technique::BeginLoad(Deserializer& source)
                 newPass->SetPixelShaderDefines(globalPSDefines + passElem.GetAttribute("psdefines"));
             }
 
-            newPass->SetVertexShaderDefineExcludes(passElem.GetAttribute("vsexcludes"));
-            newPass->SetPixelShaderDefineExcludes(passElem.GetAttribute("psexcludes"));
+            ea::string passExcludes = passElem.GetAttribute("excludes");
+            if (!passExcludes.empty())
+                passExcludes += ' ';
+
+            newPass->SetVertexShaderDefineExcludes(passExcludes + passElem.GetAttribute("vsexcludes"));
+            newPass->SetPixelShaderDefineExcludes(passExcludes + passElem.GetAttribute("psexcludes"));
 
             if (passElem.HasAttribute("lighting"))
             {

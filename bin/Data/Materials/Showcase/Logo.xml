@@ -1,0 +1,7 @@
+<material>
+    <technique name="Techniques/LitOpaque.xml" />
+    <cull value="none" />
+    <texture unit="diffuse" name="Textures/Logo.png" />
+    <shader psdefines="ALPHAMASK" />
+    <parameter name="MatDiffColor" value="1 1 1 1" />
+</material>

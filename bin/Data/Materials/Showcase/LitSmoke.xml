@@ -1,0 +1,6 @@
+<material>
+    <technique name="Techniques/LitTransparentFade.xml" />
+    <shader vsdefines="VOLUMETRIC" psdefines="VOLUMETRIC" />
+    <parameter name="MatDiffColor" value="0.5 0.5 0.5 0.5" />
+    <texture unit="diffuse" name="Textures/Smoke.dds" />
+</material>

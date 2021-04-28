@@ -34,8 +34,42 @@
 
 #include "../DebugNew.h"
 
+#include <EASTL/tuple.h>
+
 namespace Urho3D
 {
+
+namespace
+{
+
+ea::tuple<ea::string, ea::string> MakeSortKey(const PipelineState& pipelineState)
+{
+    const PipelineStateDesc& desc = pipelineState.GetDesc();
+    return { desc.vertexShader_->GetName(), desc.pixelShader_->GetName() };
+}
+
+ea::tuple<ea::string> MakeSortKey(const Material& material)
+{
+    return { material.GetName() };
+}
+
+ea::tuple<ShaderType, ea::string, ea::string> MakeSortKey(const ShaderVariation& shader)
+{
+    return { shader.GetShaderType(), shader.GetName(), shader.GetDefines() };
+}
+
+template <class T>
+ea::vector<T*> GetSortedObjects(const ea::unordered_set<T*>& set)
+{
+    ea::vector<T*> vector(set.begin(), set.end());
+    ea::sort(vector.begin(), vector.end(), [](T* lhs, T* rhs)
+    {
+        return MakeSortKey(*lhs) < MakeSortKey(*rhs);
+    });
+    return vector;
+}
+
+}
 
 DebugFrameSnapshotBatch::DebugFrameSnapshotBatch(const DrawableProcessor& drawableProcessor,
     const PipelineBatch& pipelineBatch, bool newInstancingGroup)
@@ -110,18 +144,18 @@ ea::string DebugFrameSnapshot::ToString() const
         result += pass.ToString();
     result += Format("Pipeline states in scene ({}): \n\n{}\n", scenePipelineStates_.size(), ScenePipelineStatesToString());
     result += Format("Materials in scene ({}): \n\n{}\n", sceneMaterials_.size(), SceneMaterialsToString());
+    result += Format("Shaders in scene ({}): \n\n{}\n", sceneShaders_.size(), SceneShadersToString());
     return result;
 }
 
 ea::string DebugFrameSnapshot::ScenePipelineStatesToString() const
 {
     ea::string result;
-    for (PipelineState* pipelineState : scenePipelineStates_)
+    for (PipelineState* pipelineState : GetSortedObjects(scenePipelineStates_))
     {
         const PipelineStateDesc& desc = pipelineState->GetDesc();
-        result += Format("- {}: VS={}({}) PS={}({})\n", static_cast<void*>(pipelineState),
-            desc.vertexShader_->GetName(), desc.vertexShader_->GetDefines(),
-            desc.pixelShader_->GetName(), desc.pixelShader_->GetDefines());
+        result += Format("- {}: VS={} PS={}\n", static_cast<void*>(pipelineState),
+            static_cast<void*>(desc.vertexShader_), static_cast<void*>(desc.pixelShader_));
     }
     return result;
 }
@@ -129,10 +163,24 @@ ea::string DebugFrameSnapshot::ScenePipelineStatesToString() const
 ea::string DebugFrameSnapshot::SceneMaterialsToString() const
 {
     ea::string result;
-    for (Material* material : sceneMaterials_)
+    for (Material* material : GetSortedObjects(sceneMaterials_))
     {
         const ea::string name = !material->GetName().empty() ? material->GetName() : "Unnamed";
         result += Format("- {}: {}\n", static_cast<void*>(material), name);
+    }
+    return result;
+}
+
+ea::string DebugFrameSnapshot::SceneShadersToString() const
+{
+    static const ea::string shaderTypes[] = { "VS", "PS" };
+
+    ea::string result;
+    for (ShaderVariation* shader : GetSortedObjects(sceneShaders_))
+    {
+        const ea::string& shaderType = shaderTypes[shader->GetShaderType()];
+        result += Format("- {}: [{}]{}: {}\n",
+            static_cast<void*>(shader), shaderType, shader->GetName(), shader->GetDefines());
     }
     return result;
 }
@@ -163,6 +211,10 @@ void RenderPipelineDebugger::ReportSceneBatch(const DebugFrameSnapshotBatch& sce
     snapshot_.passes_.back().batches_.push_back(sceneBatch);
     snapshot_.scenePipelineStates_.insert(sceneBatch.pipelineState_);
     snapshot_.sceneMaterials_.insert(sceneBatch.material_);
+
+    const PipelineStateDesc& pipelineStateDesc = sceneBatch.pipelineState_->GetDesc();
+    snapshot_.sceneShaders_.insert(pipelineStateDesc.vertexShader_);
+    snapshot_.sceneShaders_.insert(pipelineStateDesc.pixelShader_);
 }
 
 void RenderPipelineDebugger::ReportQuad(ea::string_view debugComment, const IntVector2& size)
