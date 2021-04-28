@@ -254,7 +254,7 @@ public:
         , scene_(*frameInfo_.scene_)
         , lights_(drawableProcessor_.GetLightProcessors())
         , cameraNode_(*camera_.GetNode())
-        , depthRange_(camera_.GetFarClip() - camera_.GetNearClip())
+        , depthRange_(camera_.GetFarClip())
         , clipPlane_(GetClipPlane(camera_))
         , enabled_(flags, instancingBuffer)
         , objectParameterBuilder_(settings_, flags)
@@ -437,7 +437,7 @@ private:
                 if (parameter.first == ShaderConsts::Material_FadeOffsetScale)
                 {
                     const Vector2 param = parameter.second.value_.GetVector2();
-                    const Vector2 paramAdjusted{param.x_ / depthRange_, param.y_ * depthRange_ };
+                    const Vector2 paramAdjusted{param.x_ / depthRange_, depthRange_ / param.y_ };
                     drawQueue_.AddShaderParameter(parameter.first, paramAdjusted);
                 }
                 else

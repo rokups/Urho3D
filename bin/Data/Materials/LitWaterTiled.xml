@@ -8,5 +8,5 @@
     <parameter name="NoiseSpeed" value="0.05 0.05" />
     <parameter name="NoiseStrength" value="0.02" />
     <parameter name="NormalScale" value="0.1" />
-    <parameter name="FadeOffsetScale" value="0 0.05" />
+    <parameter name="FadeOffsetScale" value="0 20" />
 </material>

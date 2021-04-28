@@ -159,6 +159,13 @@ UNIFORM_BUFFER_END(3, Light)
 /// cMetallic: Metallness of PBR material.
 /// cMatSpecColor.rgb: Color of specular reflection for non-PBR material.
 /// cMatSpecColor.a: Specular reflection power for non-PBR material.
+/// cFadeOffsetScale.x: Difference in linear depth between background surface and geometry
+///                     where geometry with soft fade out is completely transparent.
+/// cFadeOffsetScale.y: Inverted difference between linear depths
+///                     where geometry is fully visible and is fully invisible.
+/// cNormalScale: Scale applied to normals in normal map.
+/// cDielectricReflectance: Normalized reflectance of dielectric surfaces.
+///                         Physical range is [0, 1] but it's okay to push beyond.
 #define UNIFORMS_SURFACE \
     UNIFORM(half4 cMatDiffColor) \
     UNIFORM(half3 cMatEmissiveColor) \
@@ -171,6 +178,8 @@ UNIFORM_BUFFER_END(3, Light)
     UNIFORM(half cDielectricReflectance)
 
 /// Uniforms needed for planar reflections.
+/// cReflectionPlaneX: Dot with world normal to get distortion in screen texture X component.
+/// cReflectionPlaneY: Dot with world normal to get distortion in screen texture Y component.
 #ifdef URHO3D_MATERIAL_HAS_PLANAR_ENVIRONMENT
     #define UNIFORMS_PLANAR_REFLECTION \
         UNIFORM(half4 cReflectionPlaneX) \
@@ -193,7 +202,12 @@ UNIFORM_BUFFER_BEGIN(4, Material)
 UNIFORM_BUFFER_END(4, Material)
 #endif
 
-/// Object: Per-instance constants
+/// Object: Per-instance constants.
+/// cModel: Object to world space matrix.
+/// cAmbient: Per-object ambient lighting in current color space.
+/// cSH*: Per-object ambient lighting in linear color space.
+/// cBillboardRot: Rotation of billboard plane in world space.
+/// cSkinMatrices: Object to world space matrices for each bone.
 #ifdef URHO3D_VERTEX_SHADER
     #ifdef URHO3D_INSTANCING
         VERTEX_INPUT(vec4 iTexCoord4)
@@ -222,12 +236,8 @@ UNIFORM_BUFFER_END(4, Material)
     #endif
     #else
         UNIFORM_BUFFER_BEGIN(5, Object)
-            /// Object to world space matrix.
             UNIFORM_HIGHP(mat4 cModel)
 
-            /// Per-object ambient lighting.
-            /// If flat, in current color space.
-            /// If directional, in linear space.
         #if defined(URHO3D_AMBIENT_DIRECTIONAL)
             UNIFORM(half4 cSHAr)
             UNIFORM(half4 cSHAg)
