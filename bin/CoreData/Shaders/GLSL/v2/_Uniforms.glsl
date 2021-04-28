@@ -116,10 +116,10 @@ UNIFORM_BUFFER_BEGIN(3, Light)
     UNIFORM(half2 cShadowIntensity)
     /// (1, 1) divided by shadow map size, used to emulate pixel offsets when necessary.
     UNIFORM(half2 cShadowMapInvSize)
-    /// x: Depth where 2nd split begins.
-    /// y: Depth where 3rd split begins.
-    /// z: Depth where 4th split begins.
-    /// w: Unused.
+    /// x: Depth where 1st split ends.
+    /// y: Depth where 2nd split ends.
+    /// z: Depth where 3rd split ends.
+    /// w: Depth where 4th split ends.
     UNIFORM(half4 cShadowSplits)
 #ifdef URHO3D_VARIANCE_SHADOW_MAP
     /// Variance shadow map parameters.

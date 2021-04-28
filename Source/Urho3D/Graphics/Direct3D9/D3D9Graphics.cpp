@@ -1063,7 +1063,7 @@ ShaderProgramLayout* Graphics::GetShaderProgramLayout(ShaderVariation* vs, Shade
     if (iter != impl_->shaderPrograms_.end())
         return iter->second;
 
-    // TODO(renderer): Some overhead due to redundant setting of shader program
+    // TODO: Some overhead due to redundant setting of shader program
     ShaderVariation* prevVertexShader = vertexShader_;
     ShaderVariation* prevPixelShader = pixelShader_;
     SetShaders(vs, ps);

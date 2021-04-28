@@ -34,7 +34,6 @@
     #else
         half4 NormalizeLightVector(const half3 lightVec)
         {
-            // TODO(renderer): Revisit epsilon
             half lightDist = max(0.001, length(lightVec));
             return vec4(lightVec / lightDist, lightDist);
         }

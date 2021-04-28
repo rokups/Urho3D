@@ -361,7 +361,7 @@ void RenderPipelineView::Render()
     SendViewEvent(E_BEGINVIEWRENDER);
     SendViewEvent(E_VIEWBUFFERSREADY);
 
-    // TODO(renderer): Do something about this hack
+    // HACK: Graphics may keep expired vertex buffers for some reason, reset it just in case
     graphics_->SetVertexBuffer(nullptr);
 
     sceneProcessor_->PrepareInstancingBuffer();
@@ -373,7 +373,6 @@ void RenderPipelineView::Render()
         ? fogColorInGammaSpace.GammaToLinear()
         : fogColorInGammaSpace;
 
-    // TODO(renderer): Remove this guard
 #ifdef DESKTOP_GRAPHICS
     if (settings_.sceneProcessor_.IsDeferredLighting())
     {

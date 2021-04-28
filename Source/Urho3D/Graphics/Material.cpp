@@ -1201,7 +1201,7 @@ Technique* Material::FindTechnique(Drawable* drawable, MaterialQuality materialQ
     if (techniques.size() == 1)
         return techniques[0].technique_;
 
-    // TODO(renderer): Consider optimizing this loop
+    // TODO: Consider optimizing this loop
     const float lodDistance = drawable->GetLodDistance();
     for (unsigned i = 0; i < techniques.size(); ++i)
     {

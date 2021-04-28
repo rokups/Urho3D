@@ -173,7 +173,6 @@ public:
             const auto& paramInfo = constantBuffers_.currentLayout_->GetConstantBufferParameter(name);
             if (paramInfo.offset_ != M_MAX_UNSIGNED)
             {
-                // TODO(renderer): Profile performance impact
                 if (constantBuffers_.currentGroup_ != paramInfo.group_)
                 {
                     URHO3D_LOGERROR("Shader parameter #{} '{}' shall be stored in group {} instead of group {}",

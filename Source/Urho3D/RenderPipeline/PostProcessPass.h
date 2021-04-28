@@ -25,10 +25,6 @@
 #include "../Container/FlagSet.h"
 #include "../Core/Object.h"
 
-// TODO(renderer): Extract post-process effects to separate file(s)
-#include "../RenderPipeline/RenderBuffer.h"
-#include "../RenderPipeline/RenderBufferManager.h"
-
 namespace Urho3D
 {
 

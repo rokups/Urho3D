@@ -238,7 +238,6 @@ void ForEachParallel(WorkQueue* workQueue, unsigned bucket, Collection&& collect
     ForEachParallel(workQueue, bucket, collectionSize,
         [iter = begin(collection), iterIndex = 0u, &callback](unsigned beginIndex, unsigned endIndex) mutable
     {
-        // TODO(renderer): Consider using ea::advance
         iter += beginIndex - iterIndex;
         for (iterIndex = beginIndex; iterIndex < endIndex; ++iterIndex, ++iter)
             callback(iterIndex, *iter);

@@ -41,7 +41,7 @@ class Light;
 ///
 /// These restrictions are imposed to simplify possible shader preprocessing.
 ///
-/// TODO(renderer): Consider replacing define string with tokenized define lists
+/// TODO: Consider replacing define string with tokenized define lists
 struct ShaderProgramDesc
 {
     ea::string vertexShaderName_;

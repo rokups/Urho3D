@@ -164,21 +164,19 @@ void PipelineStateBuilder::SetupShadowPassState(unsigned splitIndex, const Light
         pipelineStateDesc_.colorWriteEnabled_ = false;
         pipelineStateDesc_.constantDepthBias_ = biasMultiplier * biasParameters.constantBias_;
         pipelineStateDesc_.slopeScaledDepthBias_ = biasMultiplier * biasParameters.slopeScaledBias_;
+
+#ifdef GL_ES_VERSION_2_0
+        const float multiplier = renderer_->GetMobileShadowBiasMul();
+        const float addition = renderer_->GetMobileShadowBiasAdd();
+        desc.constantDepthBias_ = desc.constantDepthBias_ * multiplier + addition;
+        desc.slopeScaledDepthBias_ *= multiplier;
+#endif
     }
 
     pipelineStateDesc_.depthWriteEnabled_ = pass->GetDepthWrite();
     pipelineStateDesc_.depthCompareFunction_ = pass->GetDepthTestMode();
 
     pipelineStateDesc_.cullMode_ = GetEffectiveCullMode(pass->GetCullMode(), material->GetShadowCullMode(), false);
-
-    // TODO(renderer): Revisit this place
-    // Perform further modification of depth bias on OpenGL ES, as shadow calculations' precision is limited
-/*#ifdef GL_ES_VERSION_2_0
-    const float multiplier = renderer_->GetMobileShadowBiasMul();
-    const float addition = renderer_->GetMobileShadowBiasAdd();
-    desc.constantDepthBias_ = desc.constantDepthBias_ * multiplier + addition;
-    desc.slopeScaledDepthBias_ *= multiplier;
-#endif*/
 }
 
 void PipelineStateBuilder::SetupLightVolumePassState(const LightProcessor* lightProcessor)
@@ -222,7 +220,6 @@ void PipelineStateBuilder::SetupUserPassState(const Drawable* drawable,
     pipelineStateDesc_.colorWriteEnabled_ = true;
     pipelineStateDesc_.blendMode_ = pass->GetBlendMode();
     pipelineStateDesc_.alphaToCoverageEnabled_ = pass->GetAlphaToCoverage();
-    // TODO(renderer): Revisit this place
     pipelineStateDesc_.constantDepthBias_ = material->GetDepthBias().constantBias_;
     pipelineStateDesc_.slopeScaledDepthBias_ = material->GetDepthBias().slopeScaledBias_;
 

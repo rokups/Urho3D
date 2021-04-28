@@ -296,7 +296,6 @@ void LightProcessor::EndUpdate(DrawableProcessor* drawableProcessor,
         }
     }
 
-    // TODO(renderer): Fill second parameter
     Camera* cullCamera = drawableProcessor->GetFrameInfo().camera_;
     CookShaderParameters(cullCamera, pcfKernelSize);
     UpdateHashes();
@@ -481,21 +480,10 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernel
         cookedParams_.shadowIntensity_ = { (1.0f - intensity) / samples, intensity, 0.0f, 0.0f };
     }
 
-    cookedParams_.shadowSplitDistances_ = { M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE };
-    if (numActiveSplits_ > 1)
-        cookedParams_.shadowSplitDistances_.x_ = splits_[0].GetCascadeZRange().second / cullCamera->GetFarClip();
-    if (numActiveSplits_ > 2)
-        cookedParams_.shadowSplitDistances_.y_ = splits_[1].GetCascadeZRange().second / cullCamera->GetFarClip();
-    if (numActiveSplits_ > 3)
-        cookedParams_.shadowSplitDistances_.z_ = splits_[2].GetCascadeZRange().second / cullCamera->GetFarClip();
-
-    // TODO(renderer): Implement me
-    /*if (light->GetShadowBias().normalOffset_ > 0.0f)
-    {
-#ifdef GL_ES_VERSION_2_0
-        normalOffsetScale *= renderer->GetMobileNormalOffsetMul();
-#endif
-    }*/
+    float splitDistances[4]{ M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE };
+    for (unsigned i = 0; i < numActiveSplits_; ++i)
+        splitDistances[i] = splits_[i].GetCascadeZRange().second / cullCamera->GetFarClip();
+    cookedParams_.shadowSplitDistances_ = Vector4{ splitDistances };
 
     cookedParams_.shadowDepthBiasMultiplier_.fill(1.0f);
     if (light_->GetLightType() == LIGHT_DIRECTIONAL)
@@ -511,7 +499,12 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernel
         }
     }
 
-    const float normalOffset = light_->GetShadowBias().normalOffset_;
+    float normalOffset = light_->GetShadowBias().normalOffset_;
+#ifdef GL_ES_VERSION_2_0
+    if (normalOffset > 0.0f)
+        normalOffset *= renderer->GetMobileNormalOffsetMul();
+#endif
+
     for (unsigned i = 0; i < numActiveSplits_; ++i)
         cookedParams_.shadowNormalBias_[i] = splits_[i].GetShadowMapTexelSizeInWorldSpace() * normalOffset;
 }

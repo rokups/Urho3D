@@ -914,7 +914,7 @@ ShaderProgramLayout* Graphics::GetShaderProgramLayout(ShaderVariation* vs, Shade
     if (iter != impl_->shaderPrograms_.end())
         return iter->second;
 
-    // TODO(renderer): Some overhead due to redundant setting of shader program
+    // TODO: Some overhead due to redundant setting of shader program
     ShaderVariation* prevVertexShader = vertexShader_;
     ShaderVariation* prevPixelShader = pixelShader_;
     SetShaders(vs, ps);
@@ -1014,7 +1014,7 @@ void Graphics::SetShaderConstantBuffers(ea::span<const ConstantBufferRange, MAX_
 
     if (buffersDirty)
     {
-        // TODO(renderer): Optimize unused buffers
+        // TODO: Optimize unused buffers
         impl_->deviceContext_->VSSetConstantBuffers1(0, MAX_SHADER_PARAMETER_GROUPS,
             impl_->constantBuffers_, impl_->constantBuffersStartSlots_, impl_->constantBuffersNumSlots_);
         impl_->deviceContext_->PSSetConstantBuffers1(0, MAX_SHADER_PARAMETER_GROUPS,

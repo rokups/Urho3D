@@ -301,7 +301,6 @@ void ShadowSplitProcessor::AdjustDirectionalLightCamera(const BoundingBox& light
     // If the shadow map viewport is known, snap to whole texels
     if (shadowMapSize > 0.0f)
     {
-        // TODO(renderer): Refactor me
         const Vector3 lightSpacePosition(lightRotation.Inverse() * shadowCameraNode_->GetWorldPosition());
         // Take into account that shadow map border will not be used
         const float invActualSize = 1.0f / (shadowMapSize - 2.0f);

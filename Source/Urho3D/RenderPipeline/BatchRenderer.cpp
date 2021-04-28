@@ -233,7 +233,6 @@ private:
 };
 
 /// Batch renderer to command queue.
-// TODO(renderer): Add template parameter to avoid branching?
 template <bool DebuggerEnabled>
 class DrawCommandCompositor : public NonCopyable, private BatchRenderingContext
 {
@@ -574,7 +573,6 @@ private:
         drawQueue_.AddShaderParameter(ShaderConsts::Light_LightRad, params.volumetricRadius_);
         drawQueue_.AddShaderParameter(ShaderConsts::Light_LightLength, params.volumetricLength_);
 
-        // TODO(renderer): Cleanup constants
         drawQueue_.AddShaderParameter(ShaderConsts::Light_SpotAngle, Vector2{ params.spotCutoff_, params.inverseSpotCutoff_ });
         if (params.lightShape_)
             drawQueue_.AddShaderParameter(ShaderConsts::Light_LightShapeMatrix, params.lightShapeMatrix_);

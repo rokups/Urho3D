@@ -15,7 +15,6 @@ VERTEX_INPUT(vec4 iPos)
 #endif
 
 // Optional parameters
-// TODO(renderer): move geometry checks to config
 #ifdef URHO3D_VERTEX_HAS_TEXCOORD0
     VERTEX_INPUT(vec2 iTexCoord)
 #endif

@@ -307,7 +307,6 @@ public:
     unsigned GetNumViewports() const { return viewports_.size(); }
 
     /// Return new or existing pipeline state.
-    // TODO(renderer): Consider making cache non-owning
     SharedPtr<PipelineState> GetOrCreatePipelineState(const PipelineStateDesc& desc);
     /// Return default draw queue that can be used to cook and execute draw commands from main thread.
     DrawCommandQueue* GetDefaultDrawQueue() { return defaultDrawQueue_.Get(); }

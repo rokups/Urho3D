@@ -136,7 +136,6 @@ void ShaderProgramCompositor::ApplyCommonDefines(ShaderProgramDesc& result,
         if (settings_.sceneProcessor_.linearSpaceLighting_)
             result.commonShaderDefines_ += "URHO3D_GAMMA_CORRECTION ";
 
-        // TODO(renderer): Check for lighting too?
         switch (settings_.sceneProcessor_.specularQuality_)
         {
         case SpecularQuality::Simple:

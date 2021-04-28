@@ -68,7 +68,7 @@ ea::optional<RenderSurface*> GetLinkedDepthStencil(RenderSurface* renderSurface)
 
 bool HasStencilBuffer(RenderSurface* renderSurface)
 {
-    // TODO(renderer): Assume that backbuffer always has stencil, otherwise we cannot do anything about it.
+    // Assume that backbuffer always has stencil, otherwise we cannot do anything about it.
     if (!renderSurface)
         return true;
 

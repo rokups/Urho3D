@@ -181,7 +181,6 @@ private:
 };
 
 /// Cache of light processors.
-// TODO(renderer): Add automatic expiration by time, add cache cleanup
 class URHO3D_API LightProcessorCache : public NonCopyable
 {
 public:

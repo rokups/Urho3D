@@ -246,76 +246,9 @@ void RmlRenderer::SetScissorRegion(int x, int y, int width, int height)
         scissor_.bottom_ = viewportSize_.y_ - top;
     }
 #endif
+
+    // TODO: Support transformed scissors by doing scissor test on CPU
 }
-
-// TODO(renderer): Support transformed scissors
-#if 0
-    if (transformEnabled_)
-    {
-        graphics_->SetColorWrite(false);
-
-        // Do not test the current value in the stencil buffer
-        // always accept any value on there for drawing
-        graphics_->SetStencilTest(true,
-            Urho3D::CompareMode::CMP_ALWAYS,
-            // Make every test succeed
-            Urho3D::StencilOp::OP_REF,
-            Urho3D::StencilOp::OP_KEEP,
-            Urho3D::StencilOp::OP_KEEP, 1);
-
-        Urho3D::VertexBuffer vertices(context_);
-        vertices.SetSize(4, Urho3D::MASK_POSITION, true);
-
-        float* vBuf = (float*)vertices.Lock(0, 4, true);
-        // Vertex 1
-        vBuf[0] = static_cast<float>(scissor.left_);
-        vBuf[1] = static_cast<float>(scissor.top_);
-        vBuf[2] = 0.f;
-        // Vertex 2
-        vBuf[3] = static_cast<float>(scissor.left_);
-        vBuf[4] = static_cast<float>(scissor.bottom_);
-        vBuf[5] = 0.f;
-        // Vertex 3
-        vBuf[6] = static_cast<float>(scissor.right_);
-        vBuf[7] = static_cast<float>(scissor.bottom_);
-        vBuf[8] = 0.f;
-        // Vertex 4
-        vBuf[9] = static_cast<float>(scissor.right_);
-        vBuf[10] = static_cast<float>(scissor.top_);
-        vBuf[11] = 0.f;
-        vertices.Unlock();
-
-        Urho3D::IndexBuffer indices(context_);
-        indices.SetSize(4, true);
-
-        int* iBuf = (int*)indices.Lock(0, 4, true);
-        iBuf[0] = 1;
-        iBuf[1] = 2;
-        iBuf[2] = 0;
-        iBuf[3] = 3;
-        indices.Unlock();
-
-        graphics_->SetVertexBuffer(&vertices);
-        graphics_->SetIndexBuffer(&indices);
-        graphics_->SetShaders(stencilVS_, stencilPS_);
-
-        if (graphics_->NeedParameterUpdate(Urho3D::SP_OBJECT, this))
-            graphics_->SetShaderParameter(Urho3D::VSP_MODEL, Urho3D::Matrix4::IDENTITY);
-        if (graphics_->NeedParameterUpdate(Urho3D::SP_CAMERA, this))
-            graphics_->SetShaderParameter(Urho3D::VSP_VIEWPROJ, projection_);
-
-        graphics_->Draw(Urho3D::TRIANGLE_STRIP, 0, 4, 0, 4);
-
-        graphics_->SetColorWrite(true);
-
-        // Now we will only draw pixels where the corresponding stencil buffer value equals 1
-        graphics_->SetStencilTest(true,
-            Urho3D::CompareMode::CMP_EQUAL,
-            // Make sure you will no longer (over)write stencil values, even if any test succeeds
-            Urho3D::StencilOp::OP_KEEP,
-            Urho3D::StencilOp::OP_KEEP,
-            Urho3D::StencilOp::OP_KEEP, 1);
-#endif
 
 bool RmlRenderer::LoadTexture(Rml::TextureHandle& textureOut, Rml::Vector2i& sizeOut, const Rml::String& source)
 {

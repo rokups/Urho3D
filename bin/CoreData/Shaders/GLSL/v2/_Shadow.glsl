@@ -207,15 +207,12 @@ half SampleShadowFiltered(const vec4 shadowPos)
 #if URHO3D_MAX_SHADOW_CASCADES == 4
     vec4 ShadowCoordToUV(const vec4 shadowPos[URHO3D_MAX_SHADOW_CASCADES], const float depth)
     {
-        // TODO(renderer): Optimize this?
-        if (depth < cShadowSplits.x)
-            return shadowPos[0];
-        else if (depth < cShadowSplits.y)
-            return shadowPos[1];
-        else if (depth < cShadowSplits.z)
-            return shadowPos[2];
-        else
-            return shadowPos[3];
+        // If split contains depth, all further splits contain it too
+        fixed4 splitSelector = vec4(lessThan(vec4(depth), cShadowSplits));
+        // Subtract with offset to leave only one 1
+        splitSelector.yzw = max(splitSelector.yzw - splitSelector.xyz, 0.0);
+        return shadowPos[0] * splitSelector.x + shadowPos[1] * splitSelector.y
+             + shadowPos[2] * splitSelector.z + shadowPos[3] * splitSelector.w;
     }
 #elif defined(URHO3D_LIGHT_POINT)
     vec4 PointShadowCoordToUV(const vec3 shadowPos)
