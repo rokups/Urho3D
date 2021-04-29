@@ -136,27 +136,25 @@ void BatchCompositorPass::ProcessGeometryBatch(const GeometryBatch& geometryBatc
         const LightAccumulator& lightAccumulator = drawableProcessor_->GetGeometryLighting(drawableIndex);
         const auto pixelLights = lightAccumulator.GetPixelLights();
 
-        // Add lit base batch if supported and first light is directional (to reduce shader permutations).
-        if (geometryBatch.litBasePass_ && !pixelLights.empty())
-        {
-            const unsigned firstLightIndex = pixelLights[0].second;
-            const Light* firstLight = drawableProcessor_->GetLight(firstLightIndex);
-            // Make this check optional?
-            // It will increase number of possible permutations but may reduce number of draw calls.
-            if (firstLight->GetLightType() == LIGHT_DIRECTIONAL && !firstLight->IsNegative())
-                litBaseLightIndex = firstLightIndex;
-        }
-
         // Add light batches
         desc.pass_ = geometryBatch.lightPass_;
-        const bool hasLitBase = litBaseLightIndex != M_MAX_UNSIGNED;
-        for (unsigned i = hasLitBase ? 1 : 0; i < pixelLights.size(); ++i)
+        for (unsigned i = 0; i < pixelLights.size(); ++i)
         {
             const unsigned lightIndex = pixelLights[i].second;
-            LightProcessor* light = drawableProcessor_->GetLightProcessor(lightIndex);
-            desc.InitializeLitBatch(light, lightIndex, light->GetForwardLitHash());
+            LightProcessor* lightProcessor = drawableProcessor_->GetLightProcessor(lightIndex);
+            const Light* light = lightProcessor->GetLight();
 
-            if (light->GetLight()->IsNegative())
+            // Combine first directional additive light with base pass, if possible
+            if (geometryBatch.litBasePass_ && litBaseLightIndex == M_MAX_UNSIGNED
+                && light->GetLightType() == LIGHT_DIRECTIONAL && !light->IsNegative())
+            {
+                litBaseLightIndex = lightIndex;
+                continue;
+            }
+
+            desc.InitializeLitBatch(lightProcessor, lightIndex, lightProcessor->GetForwardLitHash());
+
+            if (lightProcessor->GetLight()->IsNegative())
                 AddPipelineBatch(desc, lightCache_, negativeLightBatches_, delayedNegativeLightBatches_);
             else
                 AddPipelineBatch(desc, lightCache_, lightBatches_, delayedLightBatches_);

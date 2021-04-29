@@ -222,7 +222,7 @@ void _GetFragmentAlbedoSpecular(const half oneMinusReflectivity, out half4 albed
     #ifdef URHO3D_MATERIAL_HAS_PLANAR_ENVIRONMENT
         half4 SamplePlanarReflectionColor(const vec2 screenPos, const half3 normal)
         {
-            return texture2D(sEnvMap, GetPlanarReflectionUV(screenPos, half4(normal, 1.0)));
+            return texture2D(sEnvMap, GetPlanarReflectionUV(screenPos, vec4(normal, 1.0)));
         }
 
         #define FillSurfaceReflectionColor(surfaceData) \

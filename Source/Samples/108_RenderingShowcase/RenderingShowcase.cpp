@@ -111,6 +111,7 @@ void RenderingShowcase::CreateScene()
     probeObject_ = probeObjectNode->CreateComponent<StaticModel>();
     probeObject_->SetModel(cache->GetResource<Model>("Models/Teapot.mdl"));
     probeObject_->SetCastShadows(true);
+    probeObject_->SetGlobalIlluminationType(GlobalIlluminationType::BlendLightProbes);
 }
 
 void RenderingShowcase::SetupSelectedScene(bool resetCamera)

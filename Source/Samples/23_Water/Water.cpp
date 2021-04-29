@@ -78,7 +78,7 @@ void Water::CreateScene()
 {
     auto* cache = GetSubsystem<ResourceCache>();
 
-    waterMaterial_ = cache->GetResource<Material>("Materials/LitWaterTiled.xml")->Clone();
+    waterMaterial_ = cache->GetResource<Material>("Materials/Showcase/LitWaterTiled.xml")->Clone();
 
     scene_ = new Scene(context_);
 

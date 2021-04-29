@@ -105,15 +105,25 @@ void BackToFrontScenePass::OnBatchesReady()
 {
     BatchCompositor::FillSortKeys(sortedBatches_, baseBatches_, lightBatches_, negativeLightBatches_);
 
-    // Adjust distance of negative to render them after normal lit batches
-    const unsigned negativeLightBatchesBegin = sortedBatches_.size() - negativeLightBatches_.Size();
-    const unsigned negativeLightBatchesEnd = sortedBatches_.size();
-    for (unsigned i = negativeLightBatchesBegin; i < negativeLightBatchesEnd; ++i)
-    {
-        sortedBatches_[i].distance_ = sortedBatches_[i].distance_ > 0.0f
-            ? sortedBatches_[i].distance_ * (1 - M_EPSILON)
-            : std::numeric_limits<float>::lowest();
-    }
+    // When rendering back-to-front, it's still important to render batches for each object in order:
+    // - Base batch;
+    // - Additive light batches;
+    // - Substractive light batches.
+    // Multiply distance by some factor close to 1 if distance is greater than 0, ignore otherwise.
+
+    const unsigned substractiveLightBatchesBegin = sortedBatches_.size() - negativeLightBatches_.Size();
+    const unsigned substractiveLightBatchesEnd = sortedBatches_.size();
+    const unsigned additiveLightBatchesBegin = substractiveLightBatchesBegin - lightBatches_.Size();
+    const unsigned additiveLightBatchesEnd = substractiveLightBatchesBegin;
+
+    static const float additiveDistanceFactor = 1 - M_EPSILON;
+    static const float substractiveDistanceFactor = 1 - 2 * M_EPSILON;
+
+    for (unsigned i = additiveLightBatchesBegin; i < additiveLightBatchesEnd; ++i)
+        sortedBatches_[i].distance_ *= additiveDistanceFactor;
+
+    for (unsigned i = substractiveLightBatchesBegin; i < substractiveLightBatchesEnd; ++i)
+        sortedBatches_[i].distance_ *= substractiveDistanceFactor;
 
     ea::sort(sortedBatches_.begin(), sortedBatches_.end());
 
