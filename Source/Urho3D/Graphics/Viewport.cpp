@@ -77,7 +77,7 @@ void Viewport::RegisterObject(Context* context)
 
 void Viewport::SetScene(Scene* scene)
 {
-#if !defined(URHO3D_D3D9) && !defined(URHO3D_LEGACY_RENDERER)
+#ifndef URHO3D_LEGACY_RENDERER
     if (!!scene_ != !!scene)
     {
         renderPipeline_ = nullptr;
@@ -258,7 +258,7 @@ Vector3 Viewport::ScreenToWorldPoint(int x, int y, float depth) const
 
 void Viewport::AllocateView()
 {
-#if !defined(URHO3D_D3D9) && !defined(URHO3D_LEGACY_RENDERER)
+#ifndef URHO3D_LEGACY_RENDERER
     if (!GetRenderPipelineView())
     {
         renderPipelineComponent_ = nullptr;

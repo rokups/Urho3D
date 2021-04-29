@@ -78,7 +78,11 @@ void Water::CreateScene()
 {
     auto* cache = GetSubsystem<ResourceCache>();
 
+#ifndef URHO3D_LEGACY_RENDERER
     waterMaterial_ = cache->GetResource<Material>("Materials/Showcase/LitWaterTiled.xml")->Clone();
+#else
+    waterMaterial_ = cache->GetResource<Material>("Materials/Water.xml")->Clone();
+#endif
 
     scene_ = new Scene(context_);
 
@@ -224,7 +228,11 @@ void Water::SetupViewport()
     RenderSurface* surface = renderTexture->GetRenderSurface();
     SharedPtr<Viewport> rttViewport(new Viewport(context_, scene_, reflectionCamera));
     surface->SetViewport(0, rttViewport);
+#ifndef URHO3D_LEGACY_RENDERER
     waterMaterial_->SetTexture(TU_ENVIRONMENT, renderTexture);
+#else
+    waterMaterial_->SetTexture(TU_DIFFUSE, renderTexture);
+#endif
 }
 
 void Water::SubscribeToEvents()
