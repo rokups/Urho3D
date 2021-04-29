@@ -206,6 +206,8 @@ private:
     RenderBuffer* depthStencilBuffer_{};
     RenderBuffer* writeableColorBuffer_{};
     RenderBuffer* readableColorBuffer_{};
+
+    bool flipColorBuffersNextTime_{};
     /// @}
 };
 

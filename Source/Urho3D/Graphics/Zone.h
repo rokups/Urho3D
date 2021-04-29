@@ -188,8 +188,10 @@ protected:
     void UpdateAmbientGradient();
     /// Mark node transform dirty.
     void MarkNodeDirty() { OnMarkedDirty(node_); }
-    // TODO(renderer): Call this when texture is reloaded
+
+    void UpdateZoneTextureSubscription();
     void MarkCachedAmbientDirty();
+    void MarkCachedTextureDirty();
 
     /// Cached inverse world transform matrix.
     mutable Matrix3x4 inverseWorld_;

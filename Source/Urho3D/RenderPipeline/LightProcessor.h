@@ -140,7 +140,7 @@ public:
 private:
     void InitializeShadowSplits(DrawableProcessor* drawableProcessor);
     void UpdateHashes();
-    void CookShaderParameters(Camera* cullCamera, unsigned pcfKernelSize);
+    void CookShaderParameters(Camera* cullCamera, const DrawableProcessorSettings& settings);
     IntVector2 GetNumSplitsInGrid() const;
 
     Light* light_{};

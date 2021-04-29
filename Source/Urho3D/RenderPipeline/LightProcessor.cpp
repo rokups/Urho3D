@@ -297,7 +297,7 @@ void LightProcessor::EndUpdate(DrawableProcessor* drawableProcessor,
     }
 
     Camera* cullCamera = drawableProcessor->GetFrameInfo().camera_;
-    CookShaderParameters(cullCamera, pcfKernelSize);
+    CookShaderParameters(cullCamera, drawableProcessor->GetSettings());
     UpdateHashes();
 }
 
@@ -334,7 +334,7 @@ void LightProcessor::InitializeShadowSplits(DrawableProcessor* drawableProcessor
 
 }
 
-void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernelSize)
+void LightProcessor::CookShaderParameters(Camera* cullCamera, const DrawableProcessorSettings& settings)
 {
     Node* lightNode = light_->GetNode();
     const LightType lightType = light_->GetLightType();
@@ -396,7 +396,7 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernel
         return;
 
     // Add subpixel offset if PCF kernel is even
-    const float subPixelOffset = pcfKernelSize % 2 == 0 ? 0.5f : 0.0f;
+    const float subPixelOffset = settings.pcfKernelSize_ % 2 == 0 ? 0.5f : 0.0f;
 
     // Initialize size of shadow map
     const float textureSizeX = static_cast<float>(shadowMap_.texture_->GetWidth());
@@ -408,13 +408,7 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernel
     switch (lightType)
     {
     case LIGHT_DIRECTIONAL:
-        // TODO(renderer): Make more flexible, get rid of copypaste with
-        // ShaderProgramCompositor::ApplyPixelLightPixelAndCommonDefines
-    #if defined(GL_ES_VERSION_2_0) && !defined(__EMSCRIPTEN__)
-        cookedParams_.numLightMatrices_ = 1;
-    #else
         cookedParams_.numLightMatrices_ = MAX_CASCADE_SPLITS;
-    #endif
         for (unsigned splitIndex = 0; splitIndex < numActiveSplits_; ++splitIndex)
             cookedParams_.lightMatrices_[splitIndex] = splits_[splitIndex].GetWorldToShadowSpaceMatrix(subPixelOffset);
         break;
@@ -476,7 +470,7 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, unsigned pcfKernel
             intensity = Lerp(intensity, 1.0f, Clamp((light_->GetDistance() - fadeStart) / (fadeEnd - fadeStart), 0.0f, 1.0f));
 
         // Include number of samples for PCF 1x1 and 2x2 only, bigger PCFs need non-uniform factors
-        const float samples = pcfKernelSize == 2 ? 4.0f : 1.0f;
+        const float samples = settings.pcfKernelSize_ == 2 ? 4.0f : 1.0f;
         cookedParams_.shadowIntensity_ = { (1.0f - intensity) / samples, intensity, 0.0f, 0.0f };
     }
 

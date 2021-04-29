@@ -204,12 +204,7 @@ void ShaderProgramCompositor::ApplyPixelLightPixelAndCommonDefines(ShaderProgram
 
     if (hasShadow)
     {
-        // TODO(renderer): Make more flexible
-    #if defined(GL_ES_VERSION_2_0) && !defined(__EMSCRIPTEN__)
-        const unsigned maxCascades = 1;
-    #else
-        const unsigned maxCascades = light->GetLightType() == LIGHT_DIRECTIONAL ? 4 : 1;
-    #endif
+        const unsigned maxCascades = light->GetLightType() == LIGHT_DIRECTIONAL ? MAX_CASCADE_SPLITS : 1u;
 
         result.commonShaderDefines_ += "URHO3D_HAS_SHADOW ";
         if (maxCascades > 1)
@@ -243,7 +238,6 @@ void ShaderProgramCompositor::ApplyMaterialPixelDefinesForUserPass(ShaderProgram
     if (Texture* diffuseTexture = material->GetTexture(TU_DIFFUSE))
     {
         result.pixelShaderDefines_ += "URHO3D_MATERIAL_HAS_DIFFUSE ";
-        // TODO(renderer): Throttle logging
         const int hint = GetTextureColorSpaceHint(diffuseTexture->GetLinear(), diffuseTexture->GetSRGB());
         if (hint > 1)
             URHO3D_LOGWARNING("Texture {} cannot be both sRGB and Linear", diffuseTexture->GetName());
@@ -265,7 +259,6 @@ void ShaderProgramCompositor::ApplyMaterialPixelDefinesForUserPass(ShaderProgram
     if (Texture* emissiveTexture = material->GetTexture(TU_EMISSIVE))
     {
         result.pixelShaderDefines_ += "URHO3D_MATERIAL_HAS_EMISSIVE ";
-        // TODO(renderer): Throttle logging
         const int hint = GetTextureColorSpaceHint(emissiveTexture->GetLinear(), emissiveTexture->GetSRGB());
         if (hint > 1)
             URHO3D_LOGWARNING("Texture {} cannot be both sRGB and Linear", emissiveTexture->GetName());

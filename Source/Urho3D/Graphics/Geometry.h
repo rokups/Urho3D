@@ -150,11 +150,11 @@ private:
     /// Vertex buffers.
     ea::vector<SharedPtr<VertexBuffer> > vertexBuffers_;
     /// Vertex buffers dependencies.
-    ea::vector<PipelineStateDependency> vertexBuffersDependencies_;
+    ea::vector<PipelineStateSubscription> vertexBuffersDependencies_;
     /// Index buffer.
     SharedPtr<IndexBuffer> indexBuffer_;
     /// Index buffer dependency.
-    PipelineStateDependency indexBufferDependency_;
+    PipelineStateSubscription indexBufferDependency_;
     /// Primitive type.
     PrimitiveType primitiveType_;
     /// Start index.

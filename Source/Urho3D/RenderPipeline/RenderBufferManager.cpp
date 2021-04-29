@@ -582,17 +582,22 @@ void RenderBufferManager::OnRenderBegin(const CommonFrameInfo& frameInfo)
     depthStencilBuffer_ = needSubstituteDepthBuffer ? substituteDepthBuffer_.Get() : viewportDepthBuffer_.Get();
     writeableColorBuffer_ = needSubstitutePrimaryBuffer ? substituteRenderBuffers_[0].Get() : viewportColorBuffer_.Get();
     readableColorBuffer_ = needSecondaryBuffer ? substituteRenderBuffers_[1].Get() : nullptr;
+
+    if (flipColorBuffersNextTime_ && readableColorBuffer_)
+        ea::swap(writeableColorBuffer_, readableColorBuffer_);
 }
 
 void RenderBufferManager::OnRenderEnd(const CommonFrameInfo& frameInfo)
 {
-    // TODO(renderer): Try to optimize it
     if (writeableColorBuffer_ != viewportColorBuffer_.Get())
     {
         Texture* colorTexture = writeableColorBuffer_->GetTexture();
         CopyTextureRegion("Copy final color to output RenderSurface", colorTexture,
             colorTexture->GetRect(), viewportColorBuffer_->GetRenderSurface(),
             viewportColorBuffer_->GetViewportRect(), ColorSpaceTransition::Automatic, false);
+
+        // If viewport is reused for ping-ponging, optimize away final copy
+        flipColorBuffersNextTime_ ^= viewportColorBuffer_ == readableColorBuffer_;
     }
 }
 

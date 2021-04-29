@@ -25,48 +25,48 @@
 namespace Urho3D
 {
 
-void PipelineStateDependency::Reset(PipelineStateTracker* dependency, PipelineStateTracker* dependant)
+void PipelineStateSubscription::Reset(PipelineStateTracker* sender, PipelineStateTracker* subscriber)
 {
     // Add new reference first
-    if (dependant && dependency)
-        dependency->AddObserverReference(dependant);
+    if (subscriber && sender)
+        sender->AddSubscriberReference(subscriber);
 
     // Remove old reference
-    if (dependant_ && dependency_)
-        dependency_->RemoveObserverReference(dependant_);
+    if (subscriber_ && sender_)
+        sender_->RemoveSubscriberReference(subscriber_);
 
     // Relink pointers
-    dependant_ = dependant;
-    dependency_ = dependency;
+    subscriber_ = subscriber;
+    sender_ = sender;
 }
 
-PipelineStateDependency PipelineStateTracker::CreateDependency(PipelineStateTracker* dependency)
+PipelineStateSubscription PipelineStateTracker::CreateDependency(PipelineStateTracker* sender)
 {
-    return { dependency, this };
+    return { sender, this };
 }
 
-void PipelineStateTracker::AddObserverReference(PipelineStateTracker* dependant)
+void PipelineStateTracker::AddSubscriberReference(PipelineStateTracker* subscriber)
 {
-    if (!dependant)
+    if (!subscriber)
         return;
-    auto iter = FindDependantTrackerIter(dependant);
-    if (iter != dependantTrackers_.end())
+    auto iter = FindSubscriberIter(subscriber);
+    if (iter != subscribers_.end())
         ++iter->second;
     else
-        dependantTrackers_.emplace_back(dependant, 1u);
-    dependant->MarkPipelineStateHashDirty();
+        subscribers_.emplace_back(subscriber, 1u);
+    subscriber->MarkPipelineStateHashDirty();
 }
 
-void PipelineStateTracker::RemoveObserverReference(PipelineStateTracker* dependant)
+void PipelineStateTracker::RemoveSubscriberReference(PipelineStateTracker* subscriber)
 {
-    if (!dependant)
+    if (!subscriber)
         return;
-    auto iter = FindDependantTrackerIter(dependant);
-    assert(iter != dependantTrackers_.end());
+    auto iter = FindSubscriberIter(subscriber);
+    assert(iter != subscribers_.end());
     --iter->second;
     if (iter->second == 0)
-        dependantTrackers_.erase(iter);
-    dependant->MarkPipelineStateHashDirty();
+        subscribers_.erase(iter);
+    subscriber->MarkPipelineStateHashDirty();
 }
 
 void PipelineStateTracker::MarkPipelineStateHashDirty()
@@ -74,15 +74,15 @@ void PipelineStateTracker::MarkPipelineStateHashDirty()
     const unsigned oldHash = pipelineStateHash_.exchange(0, std::memory_order_relaxed);
     if (oldHash != 0)
     {
-        for (const auto& item : dependantTrackers_)
+        for (const auto& item : subscribers_)
             item.first->MarkPipelineStateHashDirty();
     }
 }
 
-PipelineStateTracker::DependantVector::iterator PipelineStateTracker::FindDependantTrackerIter(PipelineStateTracker* dependant)
+PipelineStateTracker::DependantVector::iterator PipelineStateTracker::FindSubscriberIter(PipelineStateTracker* subscriber)
 {
-    const auto pred = [&](const ea::pair<PipelineStateTracker*, unsigned>& elem) { return elem.first == dependant; };
-    return ea::find_if(dependantTrackers_.begin(), dependantTrackers_.end(), pred);
+    const auto pred = [&](const ea::pair<PipelineStateTracker*, unsigned>& elem) { return elem.first == subscriber; };
+    return ea::find_if(subscribers_.begin(), subscribers_.end(), pred);
 }
 
 }

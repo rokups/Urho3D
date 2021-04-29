@@ -223,8 +223,7 @@ void PipelineStateBuilder::SetupUserPassState(const Drawable* drawable,
     pipelineStateDesc_.constantDepthBias_ = material->GetDepthBias().constantBias_;
     pipelineStateDesc_.slopeScaledDepthBias_ = material->GetDepthBias().slopeScaledBias_;
 
-    // TODO(renderer): Implement fill mode
-    pipelineStateDesc_.fillMode_ = FILL_SOLID;
+    pipelineStateDesc_.fillMode_ = ea::max(cameraProcessor_->GetCameraFillMode(), material->GetFillMode());
     pipelineStateDesc_.cullMode_ = GetEffectiveCullMode(pass->GetCullMode(),
         material->GetCullMode(), cameraProcessor_->IsCameraReversed());
 

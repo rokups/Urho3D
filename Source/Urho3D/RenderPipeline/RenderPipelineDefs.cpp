@@ -71,8 +71,6 @@ void RenderPipelineSettings::AdjustToSupported(Context* context)
     renderBufferManager_.readableDepth_ = false;
 #endif
 
-    // DrawableProcessorSettings
-
     // OcclusionBufferSettings
 
     // BatchRendererSettings

@@ -692,8 +692,7 @@ private:
     const DrawableProcessor& drawableProcessor_;
     const InstancingBuffer& instancingBuffer_;
     const FrameInfo& frameInfo_;
-    // TODO(renderer): Make it immutable so we can safely execute this code in multiple threads
-    Scene& scene_;
+    const Scene& scene_;
     const ea::vector<LightProcessor*>& lights_;
     const Node& cameraNode_;
     const float depthRange_{};

@@ -31,6 +31,7 @@
 #include "../Graphics/Zone.h"
 #include "../Resource/ImageCube.h"
 #include "../Resource/ResourceCache.h"
+#include "../Resource/ResourceEvents.h"
 #include "../Scene/Node.h"
 #include "../Scene/Scene.h"
 
@@ -181,8 +182,8 @@ void Zone::SetPriority(int priority)
 void Zone::SetZoneTexture(Texture* texture)
 {
     zoneTexture_ = texture;
-    cachedTextureLighting_.Invalidate();
-    reflectionProbeData_.Invalidate();
+    UpdateZoneTextureSubscription();
+    MarkCachedTextureDirty();
     MarkNetworkUpdate();
 }
 
@@ -263,8 +264,8 @@ void Zone::SetZoneTextureAttr(const ResourceRef& value)
 {
     auto* cache = GetSubsystem<ResourceCache>();
     zoneTexture_ = static_cast<Texture*>(cache->GetResource(value.type_, value.name_));
-    cachedTextureLighting_.Invalidate();
-    reflectionProbeData_.Invalidate();
+    UpdateZoneTextureSubscription();
+    MarkCachedTextureDirty();
     MarkCachedAmbientDirty();
 }
 
@@ -412,7 +413,7 @@ void Zone::UpdateCachedData()
         {
             const ea::string& zoneTextureName = zoneTexture_->GetName();
             auto cache = GetSubsystem<ResourceCache>();
-            auto zoneImage = !zoneTextureName.empty() ? cache->GetResource<ImageCube>(zoneTextureName) : nullptr;
+            auto zoneImage = !zoneTextureName.empty() ? cache->GetTempResource<ImageCube>(zoneTextureName) : nullptr;
             if (zoneImage)
                 sh = SphericalHarmonicsDot9(zoneImage->CalculateSphericalHarmonics());
             else
@@ -454,10 +455,29 @@ void Zone::UpdateCachedData()
     }
 }
 
+void Zone::UpdateZoneTextureSubscription()
+{
+    UnsubscribeFromEvent(E_RELOADFINISHED);
+    if (zoneTexture_)
+    {
+        SubscribeToEvent(zoneTexture_, E_RELOADFINISHED,
+            [&](StringHash eventType, VariantMap& eventData)
+        {
+            MarkCachedTextureDirty();
+        });
+    }
+}
+
 void Zone::MarkCachedAmbientDirty()
 {
     cachedAmbientLighting_.Invalidate();
     cachedAmbientAndBackgroundLighting_.Invalidate();
+}
+
+void Zone::MarkCachedTextureDirty()
+{
+    cachedTextureLighting_.Invalidate();
+    reflectionProbeData_.Invalidate();
 }
 
 }

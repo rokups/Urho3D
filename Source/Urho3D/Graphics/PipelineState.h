@@ -86,8 +86,7 @@ private:
 /// Should contain all relevant information about input layout,
 /// shader resources and parameters and pipeline configuration.
 /// PipelineState is automatically updated on shader reload.
-/// TODO(renderer): Add scissor test
-/// TODO(renderer): Add information about render targets too
+/// TODO: Store render target formats here as well
 struct PipelineStateDesc
 {
     static const unsigned MaxNumVertexElements = 32;

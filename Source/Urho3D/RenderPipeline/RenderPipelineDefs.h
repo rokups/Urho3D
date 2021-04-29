@@ -26,6 +26,7 @@
 #include "../Container/Hash.h"
 #include "../Core/Signal.h"
 #include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/Light.h"
 #include "../Math/Vector2.h"
 
 namespace Urho3D

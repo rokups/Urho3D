@@ -34,58 +34,58 @@ namespace Urho3D
 
 class PipelineStateTracker;
 
-/// Dependency from one PipelineStateTracker to another. Neither checks nor affects objects lifetime.
-class URHO3D_API PipelineStateDependency
+/// Holds subscription from one PipelineStateTracker to another. Neither checks nor affects objects lifetime.
+class URHO3D_API PipelineStateSubscription
 {
 public:
     /// Construct default.
-    PipelineStateDependency() = default;
+    PipelineStateSubscription() = default;
 
     /// Construct valid.
-    PipelineStateDependency(PipelineStateTracker* dependency, PipelineStateTracker* dependant) { Reset(dependency, dependant); }
+    PipelineStateSubscription(PipelineStateTracker* sender, PipelineStateTracker* subscriber) { Reset(sender, subscriber); }
 
     /// Copy-construct.
-    PipelineStateDependency(const PipelineStateDependency& other) { Reset(other.dependency_, other.dependant_); }
+    PipelineStateSubscription(const PipelineStateSubscription& other) { Reset(other.sender_, other.subscriber_); }
 
     /// Move-construct.
-    PipelineStateDependency(PipelineStateDependency&& other)
+    PipelineStateSubscription(PipelineStateSubscription&& other)
     {
-        ea::swap(dependency_, other.dependency_);
-        ea::swap(dependant_, other.dependant_);
+        ea::swap(sender_, other.sender_);
+        ea::swap(subscriber_, other.subscriber_);
     }
 
     /// Destruct.
-    ~PipelineStateDependency() { Reset(nullptr, nullptr); }
+    ~PipelineStateSubscription() { Reset(nullptr, nullptr); }
 
     /// Assign.
-    PipelineStateDependency& operator =(const PipelineStateDependency& other)
+    PipelineStateSubscription& operator =(const PipelineStateSubscription& other)
     {
-        Reset(other.dependency_, other.dependant_);
+        Reset(other.sender_, other.subscriber_);
         return *this;
     }
 
     /// Move-assign.
-    PipelineStateDependency& operator =(PipelineStateDependency&& other)
+    PipelineStateSubscription& operator =(PipelineStateSubscription&& other)
     {
-        ea::swap(dependency_, other.dependency_);
-        ea::swap(dependant_, other.dependant_);
+        ea::swap(sender_, other.sender_);
+        ea::swap(subscriber_, other.subscriber_);
         return *this;
     }
 
 private:
     /// Reset and update dependency.
-    void Reset(PipelineStateTracker* dependency, PipelineStateTracker* dependant);
+    void Reset(PipelineStateTracker* sender, PipelineStateTracker* subscriber);
 
     /// Owned pointer.
-    PipelineStateTracker* dependency_{};
+    PipelineStateTracker* sender_{};
     /// Owner.
-    PipelineStateTracker* dependant_{};
+    PipelineStateTracker* subscriber_{};
 };
 
 /// Helper class to track pipeline state changes caused by derived class.
 class URHO3D_API PipelineStateTracker
 {
-    friend class PipelineStateDependency;
+    friend class PipelineStateSubscription;
 
 public:
     /// Return (partial) pipeline state hash. Save to call from multiple threads as long as the object is not changing.
@@ -105,24 +105,24 @@ public:
 
 protected:
     /// Create dependency onto another pipeline state.
-    PipelineStateDependency CreateDependency(PipelineStateTracker* dependency);
-    /// Add reference to dependant pipeline state tracker.
-    void AddObserverReference(PipelineStateTracker* dependant);
-    /// Remove reference to dependant pipeline state tracker.
-    void RemoveObserverReference(PipelineStateTracker* dependant);
+    PipelineStateSubscription CreateDependency(PipelineStateTracker* dependency);
+    /// Add reference to subscriber pipeline state tracker.
+    void AddSubscriberReference(PipelineStateTracker* subscriber);
+    /// Remove reference to subscriber pipeline state tracker.
+    void RemoveSubscriberReference(PipelineStateTracker* subscriber);
 
 private:
-    /// Vector of dependants with reference counters.
+    /// Vector of subscribers with reference counters.
     using DependantVector = ea::vector<ea::pair<PipelineStateTracker*, unsigned>>;
     /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
     virtual unsigned RecalculatePipelineStateHash() const = 0;
-    /// Find dependant by pointer.
-    DependantVector::iterator FindDependantTrackerIter(PipelineStateTracker* dependant);
+    /// Find subscriber iterator by pointer.
+    DependantVector::iterator FindSubscriberIter(PipelineStateTracker* subscriber);
 
     /// Cached hash.
     mutable std::atomic_uint32_t pipelineStateHash_;
     /// Other pipeline state trackers depending on this tracker.
-    DependantVector dependantTrackers_;
+    DependantVector subscribers_;
 };
 
 }
