@@ -377,7 +377,7 @@ void Zone::OnRemoveFromOctree()
 void Zone::ClearDrawablesZone()
 {
     const BoundingBox& currentWorldBoundingBox = GetWorldBoundingBox();
-    const BoundingBox dirtyWorldBoundingBox = currentWorldBoundingBox.Megred(lastWorldBoundingBox_);
+    const BoundingBox dirtyWorldBoundingBox = currentWorldBoundingBox.Merged(lastWorldBoundingBox_);
     if (octant_)
     {
         ea::vector<Drawable*> result;

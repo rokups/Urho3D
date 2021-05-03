@@ -256,7 +256,7 @@ public:
 
     /// Return this bounding box merged with another shape.
     template <class T>
-    BoundingBox Megred(const T& other) const
+    BoundingBox Merged(const T& other) const
     {
         BoundingBox copy = *this;
         copy.Merge(other);

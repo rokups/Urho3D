@@ -475,8 +475,11 @@ void LightProcessor::CookShaderParameters(Camera* cullCamera, const DrawableProc
     }
 
     float splitDistances[4]{ M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE, M_LARGE_VALUE };
-    for (unsigned i = 0; i < numActiveSplits_; ++i)
-        splitDistances[i] = splits_[i].GetCascadeZRange().second / cullCamera->GetFarClip();
+    if (lightType == LIGHT_DIRECTIONAL)
+    {
+        for (unsigned i = 0; i < numActiveSplits_; ++i)
+            splitDistances[i] = splits_[i].GetCascadeZRange().second / cullCamera->GetFarClip();
+    }
     cookedParams_.shadowSplitDistances_ = Vector4{ splitDistances };
 
     cookedParams_.shadowDepthBiasMultiplier_.fill(1.0f);

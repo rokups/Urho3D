@@ -203,7 +203,7 @@ void _GetFragmentAlbedoSpecular(const half oneMinusReflectivity, out half4 albed
     #ifndef URHO3D_HAS_LIGHTMAP
         #if defined(URHO3D_MATERIAL_HAS_EMISSIVE) && !defined(AO)
             #define FillSurfaceEmission(surfaceData) \
-                surfaceData.emission = EmissiveMap_ToLight(cMatEmissiveColor * texture2D(sEmissiveMap, vTexCoord))
+                surfaceData.emission = EmissiveMap_ToLight(cMatEmissiveColor * texture2D(sEmissiveMap, vTexCoord).rgb)
         #else
             #define FillSurfaceEmission(surfaceData) \
                 surfaceData.emission = GammaToLightSpace(cMatEmissiveColor)
