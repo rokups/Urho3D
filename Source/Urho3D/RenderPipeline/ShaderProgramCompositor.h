@@ -29,6 +29,7 @@ namespace Urho3D
 {
 
 class Light;
+class CameraProcessor;
 
 /// Description of shader program used for rendering.
 ///
@@ -65,7 +66,7 @@ class URHO3D_API ShaderProgramCompositor : public Object
 public:
     explicit ShaderProgramCompositor(Context* context);
     void SetSettings(const ShaderProgramCompositorSettings& settings);
-    void SetFrameSettings(bool isCameraOrthographic, bool isCameraClipped);
+    void SetFrameSettings(const CameraProcessor* cameraProcessor);
 
     /// Process batches
     /// @{
@@ -112,6 +113,7 @@ private:
     ShaderProgramCompositorSettings settings_;
     bool isCameraOrthographic_{};
     bool isCameraClipped_{};
+    bool isCameraReversed_{};
     /// @}
 };
 

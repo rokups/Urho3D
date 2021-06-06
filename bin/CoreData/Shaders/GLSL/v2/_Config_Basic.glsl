@@ -81,6 +81,12 @@
 /// Declare sampler with high precision, with medium precision if not supported.
 // #define SAMPLER_HIGHP([precision] type name)
 
+/// [Pixel shader only] Condition whether the pixel corresponds to front face.
+// #define IS_FRONT_FACE
+
+/// [Pixel shader only] Select value for front and back faces separately.
+// #define SELECT_FRONT_BACK_FACE(frontValue, backValue)
+
 /// =================================== Types and constants ===================================
 
 #define M_PI 3.14159265358979323846
@@ -305,3 +311,13 @@
         #undef URHO3D_SHADOW_NORMAL_OFFSET
     #endif
 #endif // URHO3D_VERTEX_SHADER
+
+#ifdef URHO3D_PIXEL_SHADER
+    #if defined(D3D11) || defined(URHO3D_CAMERA_REVERSED)
+        #define IS_FRONT_FACE gl_FrontFacing
+        #define SELECT_FRONT_BACK_FACE(frontValue, backValue) (gl_FrontFacing ? (frontValue) : (backValue))
+    #else
+        #define IS_FRONT_FACE (!gl_FrontFacing)
+        #define SELECT_FRONT_BACK_FACE(frontValue, backValue) (gl_FrontFacing ? (backValue) : (frontValue))
+    #endif
+#endif // URHO3D_PIXEL_SHADER

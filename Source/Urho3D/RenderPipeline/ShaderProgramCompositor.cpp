@@ -62,10 +62,11 @@ void ShaderProgramCompositor::SetSettings(const ShaderProgramCompositorSettings&
     settings_ = settings;
 }
 
-void ShaderProgramCompositor::SetFrameSettings(bool isCameraOrthographic, bool isCameraClipped)
+void ShaderProgramCompositor::SetFrameSettings(const CameraProcessor* cameraProcessor)
 {
-    isCameraOrthographic_ = isCameraOrthographic;
-    isCameraClipped_ = isCameraClipped;
+    isCameraOrthographic_ = cameraProcessor->IsCameraOrthographic();
+    isCameraClipped_ = cameraProcessor->IsCameraClipped();
+    isCameraReversed_ = cameraProcessor->IsCameraReversed();
 }
 
 void ShaderProgramCompositor::ProcessUserBatch(ShaderProgramDesc& result, DrawableProcessorPassFlags flags,
@@ -130,6 +131,9 @@ void ShaderProgramCompositor::ApplyCommonDefines(ShaderProgramDesc& result,
 {
     if (constantBuffersSupported_)
         result.commonShaderDefines_ += "URHO3D_USE_CBUFFERS ";
+
+    if (isCameraReversed_)
+        result.commonShaderDefines_ += "URHO3D_CAMERA_REVERSED ";
 
     if (!flags.Test(DrawableProcessorPassFlag::DepthOnlyPass))
     {

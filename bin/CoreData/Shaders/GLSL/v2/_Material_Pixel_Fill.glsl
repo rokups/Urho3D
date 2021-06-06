@@ -59,7 +59,7 @@
     #endif
 
     #ifdef URHO3D_SURFACE_TWO_SIDED
-        normal *= gl_FrontFacing ? 1.0 : -1.0;
+        normal *= SELECT_FRONT_BACK_FACE(1.0, -1.0);
     #endif
 
         return normal;
