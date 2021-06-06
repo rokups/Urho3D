@@ -120,6 +120,9 @@ void RenderingShowcase::SetupSelectedScene(bool resetCamera)
 
     const bool isProbeObjectVisible = probeObject_->IsInOctree();
 
+    if (isProbeObjectVisible)
+        scene_->GetComponent<Octree>()->RemoveManualDrawable(probeObject_);
+
     // Load scene content prepared in the editor (XML format). GetFile() returns an open file from the resource system
     // which scene.LoadXML() will read
     const ea::string fileName = Format("Scenes/RenderingShowcase_{}.xml", sceneNames_[sceneIndex_][sceneMode_]);
