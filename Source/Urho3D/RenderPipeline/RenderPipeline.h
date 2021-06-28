@@ -45,7 +45,7 @@ class RenderSurface;
 class Viewport;
 class ShadowMapAllocator;
 
-///
+/// Base interface of render pipeline viewport instance.
 class URHO3D_API RenderPipelineView
     : public Object
     , public RenderPipelineInterface
@@ -54,25 +54,56 @@ class URHO3D_API RenderPipelineView
 
 public:
     explicit RenderPipelineView(RenderPipeline* renderPipeline);
-    ~RenderPipelineView() override;
+    RenderPipeline* GetRenderPipeline() const { return renderPipeline_; }
+
+    /// Called in the beginning of the update to check if pipeline should be executed.
+    virtual bool Define(RenderSurface* renderTarget, Viewport* viewport) = 0;
+    /// Called for defined pipelines before rendering. Frame info is only partially filled.
+    virtual void Update(const FrameInfo& frameInfo) = 0;
+    /// Called for updated pipelines in appropriate order.
+    virtual void Render() = 0;
+    /// Return frame info with all members filled.
+    virtual const FrameInfo& GetFrameInfo() const = 0;
+    /// Return render pipeline statistics for profiling.
+    virtual const RenderPipelineStats& GetStats() const = 0;
 
     /// Implement RenderPipelineInterface
     /// @{
     Context* GetContext() const override { return BaseClassName::GetContext(); }
-    RenderPipelineDebugger* GetDebugger() override { return &debugger_; }
+    RenderPipelineDebugger* GetDebugger() override { return nullptr; }
     /// @}
 
-    RenderPipeline* GetRenderPipeline() const { return renderPipeline_; }
-    const FrameInfo& GetFrameInfo() const;
-    const RenderPipelineStats& GetStats() const { return stats_; }
+protected:
+    RenderPipeline* const renderPipeline_{};
+    Graphics* const graphics_{};
+    Renderer* const renderer_{};
+};
+
+/// Default implementation of render pipeline instance.
+class URHO3D_API DefaultRenderPipelineView
+    : public RenderPipelineView
+{
+    URHO3D_OBJECT(DefaultRenderPipelineView, RenderPipelineView);
+
+public:
+    explicit DefaultRenderPipelineView(RenderPipeline* renderPipeline);
+    ~DefaultRenderPipelineView() override;
+
     const RenderPipelineSettings& GetSettings() const { return settings_; }
     void SetSettings(const RenderPipelineSettings& settings);
 
-    /// Rendering
+    /// Implement RenderPipelineInterface
+    /// @{
+    RenderPipelineDebugger* GetDebugger() override { return &debugger_; }
+    /// @}
+
+    /// Implement RenderPipelineView
     /// @{
     bool Define(RenderSurface* renderTarget, Viewport* viewport);
     void Update(const FrameInfo& frameInfo);
     void Render();
+    const FrameInfo& GetFrameInfo() const override;
+    const RenderPipelineStats& GetStats() const override { return stats_; }
     /// @}
 
 protected:
@@ -81,10 +112,6 @@ protected:
     void ApplySettings();
 
 private:
-    RenderPipeline* const renderPipeline_{};
-    Graphics* const graphics_{};
-    Renderer* const renderer_{};
-
     RenderPipelineSettings settings_;
     unsigned settingsPipelineStateHash_{};
     bool settingsDirty_{};
@@ -120,7 +147,7 @@ private:
     ea::vector<SharedPtr<PostProcessPass>> postProcessPasses_;
 };
 
-///
+/// Scene component that spawns render pipeline instances.
 class URHO3D_API RenderPipeline
     : public Component
 {
@@ -139,7 +166,7 @@ public:
     /// @}
 
     /// Create new instance of render pipeline.
-    SharedPtr<RenderPipelineView> Instantiate();
+    virtual SharedPtr<RenderPipelineView> Instantiate();
 
     /// Invoked when settings change.
     Signal<void(const RenderPipelineSettings&)> OnSettingsChanged;

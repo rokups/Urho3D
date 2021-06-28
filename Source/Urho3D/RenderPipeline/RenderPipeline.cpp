@@ -128,21 +128,26 @@ RenderPipelineView::RenderPipelineView(RenderPipeline* renderPipeline)
     , graphics_(context_->GetSubsystem<Graphics>())
     , renderer_(context_->GetSubsystem<Renderer>())
 {
-    SetSettings(renderPipeline_->GetSettings());
-    renderPipeline_->OnSettingsChanged.Subscribe(this, &RenderPipelineView::SetSettings);
 }
 
-RenderPipelineView::~RenderPipelineView()
+DefaultRenderPipelineView::DefaultRenderPipelineView(RenderPipeline* renderPipeline)
+    : RenderPipelineView(renderPipeline)
+{
+    SetSettings(renderPipeline_->GetSettings());
+    renderPipeline_->OnSettingsChanged.Subscribe(this, &DefaultRenderPipelineView::SetSettings);
+}
+
+DefaultRenderPipelineView::~DefaultRenderPipelineView()
 {
 }
 
-const FrameInfo& RenderPipelineView::GetFrameInfo() const
+const FrameInfo& DefaultRenderPipelineView::GetFrameInfo() const
 {
     static const FrameInfo defaultFrameInfo;
     return sceneProcessor_ ? sceneProcessor_->GetFrameInfo() : defaultFrameInfo;
 }
 
-void RenderPipelineView::SetSettings(const RenderPipelineSettings& settings)
+void DefaultRenderPipelineView::SetSettings(const RenderPipelineSettings& settings)
 {
     settings_ = settings;
     settings_.Validate();
@@ -152,7 +157,7 @@ void RenderPipelineView::SetSettings(const RenderPipelineSettings& settings)
     settingsPipelineStateHash_ = settings_.CalculatePipelineStateHash();
 }
 
-void RenderPipelineView::SendViewEvent(StringHash eventType)
+void DefaultRenderPipelineView::SendViewEvent(StringHash eventType)
 {
     using namespace BeginViewRender;
 
@@ -167,7 +172,7 @@ void RenderPipelineView::SendViewEvent(StringHash eventType)
     renderer_->SendEvent(eventType, eventData);
 }
 
-void RenderPipelineView::ApplySettings()
+void DefaultRenderPipelineView::ApplySettings()
 {
     sceneProcessor_->SetSettings(settings_);
     instancingBuffer_->SetSettings(settings_.instancingBuffer_);
@@ -270,7 +275,7 @@ void RenderPipelineView::ApplySettings()
     renderBufferManager_->SetSettings(settings_.renderBufferManager_);
 }
 
-bool RenderPipelineView::Define(RenderSurface* renderTarget, Viewport* viewport)
+bool DefaultRenderPipelineView::Define(RenderSurface* renderTarget, Viewport* viewport)
 {
     URHO3D_PROFILE("SetupRenderPipeline");
 
@@ -308,7 +313,7 @@ bool RenderPipelineView::Define(RenderSurface* renderTarget, Viewport* viewport)
     return true;
 }
 
-void RenderPipelineView::Update(const FrameInfo& frameInfo)
+void DefaultRenderPipelineView::Update(const FrameInfo& frameInfo)
 {
     URHO3D_PROFILE("UpdateRenderPipeline");
 
@@ -346,7 +351,7 @@ void RenderPipelineView::Update(const FrameInfo& frameInfo)
     OnUpdateEnd(this, frameInfo_);
 }
 
-void RenderPipelineView::Render()
+void DefaultRenderPipelineView::Render()
 {
     URHO3D_PROFILE("ExecuteRenderPipeline");
 
@@ -474,7 +479,7 @@ void RenderPipelineView::Render()
     }
 }
 
-unsigned RenderPipelineView::RecalculatePipelineStateHash() const
+unsigned DefaultRenderPipelineView::RecalculatePipelineStateHash() const
 {
     unsigned hash = settingsPipelineStateHash_;
     CombineHash(hash, sceneProcessor_->GetCameraProcessor()->GetPipelineStateHash());
@@ -507,8 +512,8 @@ void RenderPipeline::RegisterObject(Context* context)
     URHO3D_ENUM_ATTRIBUTE_EX("Ambient Mode", settings_.sceneProcessor_.ambientMode_, MarkSettingsDirty, ambientModeNames, DrawableAmbientMode::Directional, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Enable Instancing", bool, settings_.instancingBuffer_.enableInstancing_, MarkSettingsDirty, true, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Depth Pre-Pass", bool, settings_.sceneProcessor_.depthPrePass_, MarkSettingsDirty, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE_EX("Enable Shadows", bool, settings_.sceneProcessor_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
     URHO3D_ENUM_ATTRIBUTE_EX("Lighting Mode", settings_.sceneProcessor_.lightingMode_, MarkSettingsDirty, directLightingModeNames, DirectLightingMode::Forward, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Enable Shadows", bool, settings_.sceneProcessor_.enableShadows_, MarkSettingsDirty, true, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("PCF Kernel Size", unsigned, settings_.sceneProcessor_.pcfKernelSize_, MarkSettingsDirty, 1, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Use Variance Shadow Maps", bool, settings_.shadowMapAllocator_.enableVarianceShadowMaps_, MarkSettingsDirty, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("VSM Shadow Settings", Vector2, settings_.sceneProcessor_.varianceShadowMapParams_, MarkSettingsDirty, BatchRendererSettings{}.varianceShadowMapParams_, AM_DEFAULT);
@@ -539,7 +544,7 @@ void RenderPipeline::SetSettings(const RenderPipelineSettings& settings)
 
 SharedPtr<RenderPipelineView> RenderPipeline::Instantiate()
 {
-    return MakeShared<RenderPipelineView>(this);
+    return MakeShared<DefaultRenderPipelineView>(this);
 }
 
 void RenderPipeline::MarkSettingsDirty()
