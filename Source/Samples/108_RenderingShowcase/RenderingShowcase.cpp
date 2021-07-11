@@ -109,7 +109,7 @@ void RenderingShowcase::CreateScene()
     probeObjectNode->SetScale(0.5f);
 
     probeObject_ = probeObjectNode->CreateComponent<StaticModel>();
-    probeObject_->SetModel(cache->GetResource<Model>("Models/Teapot.mdl"));
+    probeObject_->SetModel(cache->GetResource<Model>("Models/TeaPot.mdl"));
     probeObject_->SetCastShadows(true);
     probeObject_->SetGlobalIlluminationType(GlobalIlluminationType::BlendLightProbes);
 }
