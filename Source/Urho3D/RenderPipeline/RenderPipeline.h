@@ -25,17 +25,9 @@
 #include "../Core/Object.h"
 #include "../Core/Signal.h"
 #include "../Graphics/Drawable.h"
-#include "../RenderPipeline/SceneProcessor.h"
-#include "../RenderPipeline/CameraProcessor.h"
-#include "../RenderPipeline/RenderBuffer.h"
-#include "../RenderPipeline/RenderBufferManager.h"
 #include "../RenderPipeline/RenderPipelineDefs.h"
 #include "../RenderPipeline/RenderPipelineDebugger.h"
-#include "../RenderPipeline/PostProcessPass.h"
-#include "../RenderPipeline/ScenePass.h"
-#include "../Scene/Serializable.h"
-
-#include <EASTL/optional.h>
+#include "../Scene/Component.h"
 
 namespace Urho3D
 {
@@ -43,7 +35,6 @@ namespace Urho3D
 class RenderPipeline;
 class RenderSurface;
 class Viewport;
-class ShadowMapAllocator;
 
 /// Base interface of render pipeline viewport instance.
 class URHO3D_API RenderPipelineView
@@ -77,74 +68,6 @@ protected:
     RenderPipeline* const renderPipeline_{};
     Graphics* const graphics_{};
     Renderer* const renderer_{};
-};
-
-/// Default implementation of render pipeline instance.
-class URHO3D_API DefaultRenderPipelineView
-    : public RenderPipelineView
-{
-    URHO3D_OBJECT(DefaultRenderPipelineView, RenderPipelineView);
-
-public:
-    explicit DefaultRenderPipelineView(RenderPipeline* renderPipeline);
-    ~DefaultRenderPipelineView() override;
-
-    const RenderPipelineSettings& GetSettings() const { return settings_; }
-    void SetSettings(const RenderPipelineSettings& settings);
-
-    /// Implement RenderPipelineInterface
-    /// @{
-    RenderPipelineDebugger* GetDebugger() override { return &debugger_; }
-    /// @}
-
-    /// Implement RenderPipelineView
-    /// @{
-    bool Define(RenderSurface* renderTarget, Viewport* viewport);
-    void Update(const FrameInfo& frameInfo);
-    void Render();
-    const FrameInfo& GetFrameInfo() const override;
-    const RenderPipelineStats& GetStats() const override { return stats_; }
-    /// @}
-
-protected:
-    unsigned RecalculatePipelineStateHash() const;
-    void SendViewEvent(StringHash eventType);
-    void ApplySettings();
-
-private:
-    RenderPipelineSettings settings_;
-    unsigned settingsPipelineStateHash_{};
-    bool settingsDirty_{};
-
-    /// Previous pipeline state hash.
-    unsigned oldPipelineStateHash_{};
-
-    CommonFrameInfo frameInfo_;
-    PostProcessPassFlags postProcessFlags_;
-
-    RenderPipelineStats stats_;
-    RenderPipelineDebugger debugger_;
-
-    SharedPtr<RenderBufferManager> renderBufferManager_;
-    SharedPtr<ShadowMapAllocator> shadowMapAllocator_;
-    SharedPtr<InstancingBuffer> instancingBuffer_;
-    SharedPtr<SceneProcessor> sceneProcessor_;
-
-    SharedPtr<UnorderedScenePass> depthPrePass_;
-    SharedPtr<UnorderedScenePass> opaquePass_;
-    SharedPtr<UnorderedScenePass> postOpaquePass_;
-    SharedPtr<BackToFrontScenePass> alphaPass_;
-    SharedPtr<BackToFrontScenePass> postAlphaPass_;
-
-    struct DeferredLightingData
-    {
-        SharedPtr<RenderBuffer> albedoBuffer_;
-        SharedPtr<RenderBuffer> specularBuffer_;
-        SharedPtr<RenderBuffer> normalBuffer_;
-    };
-    ea::optional<DeferredLightingData> deferred_;
-
-    ea::vector<SharedPtr<PostProcessPass>> postProcessPasses_;
 };
 
 /// Scene component that spawns render pipeline instances.

@@ -37,6 +37,7 @@ class Geometry;
 class Light;
 class Material;
 class PipelineState;
+class ShaderVariation;
 struct PipelineBatch;
 
 struct URHO3D_API DebugFrameSnapshotBatch
