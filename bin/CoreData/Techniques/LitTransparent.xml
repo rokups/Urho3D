@@ -1,0 +1,5 @@
+<technique vs="M_Default" ps="M_Default" vsdefines="TRANSPARENT" psdefines="TRANSPARENT">
+    <pass name="alpha" depthwrite="false" blend="premulalpha" />
+    <pass name="litalpha" depthwrite="false" blend="add" />
+    <pass name="shadow" vs="M_Default" ps="M_Default" excludes="NORMALMAP AO ENVCUBEMAP TRANSLUCENT VOLUMETRIC PBR TRANSPARENT PACKEDNORMAL" />
+</technique>

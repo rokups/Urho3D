@@ -116,7 +116,7 @@ void VectorBuffer::SetData(const void* data, unsigned size)
 void VectorBuffer::SetData(Deserializer& source, unsigned size)
 {
     buffer_.resize(size);
-    unsigned actualSize = source.Read(&buffer_[0], size);
+    unsigned actualSize = source.Read(buffer_.data(), size);
     if (actualSize != size)
         buffer_.resize(actualSize);
 

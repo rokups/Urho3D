@@ -49,8 +49,6 @@ void GlobalIllumination::RegisterObject(Context* context)
     context->RegisterFactory<GlobalIllumination>(SUBSYSTEM_CATEGORY);
 
     URHO3D_ATTRIBUTE("Emission Brightness", float, emissionBrightness_, 1.0f, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Is Background Static", bool, backgroundStatic_, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Background Brightness", float, backgroundBrightness_, 0.0f, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Data File", GetFileRef, SetFileRef, ResourceRef, ResourceRef{ BinaryFile::GetTypeStatic() }, AM_DEFAULT | AM_NOEDIT);
 }
 

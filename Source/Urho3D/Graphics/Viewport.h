@@ -36,6 +36,9 @@ class RenderPath;
 class Scene;
 class XMLFile;
 class View;
+class RenderPipelineView;
+class RenderSurface;
+class RenderPipeline;
 
 /// %Viewport definition either for a render surface or the backbuffer.
 class URHO3D_API Viewport : public Object
@@ -84,10 +87,15 @@ public:
     Camera* GetCamera() const;
     /// Return the internal rendering structure. May be null if the viewport has not been rendered yet.
     View* GetView() const;
+    /// Return render pipeline.
+    RenderPipelineView* GetRenderPipelineView() const;
 
     /// Return view rectangle. A zero rectangle (0 0 0 0) means to use the rendertarget's full dimensions. In this case you could fetch the actual view rectangle from View object, though it will be valid only after the first frame.
     /// @property
     const IntRect& GetRect() const { return rect_; }
+
+    /// Return effective view rectangle.
+    IntRect GetEffectiveRect(RenderSurface* renderTarget) const;
 
     /// Return rendering path.
     /// @property
@@ -126,6 +134,11 @@ private:
     SharedPtr<View> view_;
     /// Debug draw flag.
     bool drawDebug_;
+
+    /// Render pipeline component from scene_.
+    WeakPtr<RenderPipeline> renderPipelineComponent_;
+    /// Instance of render pipeline connected to renderPipelineComponent_.
+    SharedPtr<RenderPipelineView> renderPipeline_;
 };
 
 }

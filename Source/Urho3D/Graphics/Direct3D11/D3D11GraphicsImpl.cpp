@@ -57,11 +57,9 @@ GraphicsImpl::GraphicsImpl() :
         vertexOffsets_[i] = 0;
     }
 
-    for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
-    {
-        constantBuffers_[VS][i] = nullptr;
-        constantBuffers_[PS][i] = nullptr;
-    }
+    ea::fill(ea::begin(constantBuffers_), ea::end(constantBuffers_), nullptr);
+    ea::fill(ea::begin(constantBuffersStartSlots_), ea::end(constantBuffersStartSlots_), 0u);
+    ea::fill(ea::begin(constantBuffersNumSlots_), ea::end(constantBuffersNumSlots_), 0u);
 }
 
 bool GraphicsImpl::CheckMultiSampleSupport(DXGI_FORMAT format, unsigned sampleCount) const

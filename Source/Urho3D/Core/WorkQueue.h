@@ -22,12 +22,12 @@
 
 #pragma once
 
-#include <EASTL/list.h>
-#include <atomic>
-
 #include "../Core/Mutex.h"
 #include "../Core/Object.h"
+#include "../Container/MultiVector.h"
 
+#include <EASTL/list.h>
+#include <EASTL/span.h>
 #include <atomic>
 
 namespace Urho3D
@@ -66,7 +66,7 @@ public:
 private:
     bool pooled_{};
     /// Work function. Called without any parameters.
-    std::function<void()> workLambda_;
+    std::function<void(unsigned threadIndex)> workLambda_;
 };
 
 /// Work queue subsystem for multithreading.
@@ -89,7 +89,7 @@ public:
     /// Add a work item and resume worker threads.
     void AddWorkItem(const SharedPtr<WorkItem>& item);
     /// Add a work item and resume worker threads.
-    SharedPtr<WorkItem> AddWorkItem(std::function<void()> workFunction, unsigned priority = 0);
+    SharedPtr<WorkItem> AddWorkItem(std::function<void(unsigned threadIndex)> workFunction, unsigned priority = 0);
     /// Remove a work item before it has started executing. Return true if successfully removed.
     bool RemoveWorkItem(SharedPtr<WorkItem> item);
     /// Remove a number of work items before they have started executing. Return the number of items successfully removed.
@@ -122,6 +122,11 @@ public:
 
     /// Return how many milliseconds maximum to spend on non-threaded low-priority work.
     int GetNonThreadedWorkMs() const { return maxNonThreadedWorkMs_; }
+
+    /// Return current thread index.
+    static unsigned GetThreadIndex();
+    /// Return number of threads used by WorkQueue, including main thread. Current thread index is always lower.
+    static unsigned GetMaxThreadIndex();
 
 private:
     /// Process work items until shut down. Called by the worker threads.
@@ -160,5 +165,90 @@ private:
     /// Maximum milliseconds per frame to spend on low-priority work, when there are no worker threads.
     int maxNonThreadedWorkMs_;
 };
+
+/// Vector-like collection that can be safely filled from different WorkQueue threads simultaneously.
+template <class T>
+class WorkQueueVector : public MultiVector<T>
+{
+public:
+    /// Clear collection, considering number of threads in WorkQueue.
+    void Clear()
+    {
+        MultiVector<T>::Clear(WorkQueue::GetMaxThreadIndex());
+    }
+
+    /// Insert new element. Thread-safe as long as called from WorkQueue threads (or main thread).
+    auto Insert(const T& value)
+    {
+        const unsigned threadIndex = WorkQueue::GetThreadIndex();
+        return this->PushBack(threadIndex, value);
+    }
+
+    /// Emplace element. Thread-safe as long as called from WorkQueue threads (or main thread).
+    template <class ... Args>
+    T& Emplace(Args&& ... args)
+    {
+        const unsigned threadIndex = WorkQueue::GetThreadIndex();
+        return this->EmplaceBack(threadIndex, std::forward<Args>(args)...);
+    }
+};
+
+/// Process arbitrary array in multiple threads. Callback is copied internally.
+/// One copy of callback is always used by at most one thread.
+/// One copy of callback is always invoked from smaller to larger indices.
+/// Signature of callback: void(unsigned beginIndex, unsigned endIndex)
+template <class Callback>
+void ForEachParallel(WorkQueue* workQueue, unsigned bucket, unsigned size, Callback callback)
+{
+    // Just call in main thread
+    if (size <= bucket)
+    {
+        if (size > 0)
+            callback(0, size);
+        return;
+    }
+
+    std::atomic<unsigned> offset = 0;
+    const unsigned maxThreads = workQueue->GetNumThreads() + 1;
+    for (unsigned i = 0; i < maxThreads; ++i)
+    {
+        workQueue->AddWorkItem([=, &offset](unsigned /*threadIndex*/) mutable
+        {
+            while (true)
+            {
+                const unsigned beginIndex = offset.fetch_add(bucket, std::memory_order_relaxed);
+                if (beginIndex >= size)
+                    break;
+
+                const unsigned endIndex = ea::min(beginIndex + bucket, size);
+                callback(beginIndex, endIndex);
+            }
+        }, M_MAX_UNSIGNED);
+    }
+    workQueue->Complete(M_MAX_UNSIGNED);
+}
+
+/// Process collection in multiple threads.
+/// Signature of callback: void(unsigned index, T&& element)
+template <class Callback, class Collection>
+void ForEachParallel(WorkQueue* workQueue, unsigned bucket, Collection&& collection, const Callback& callback)
+{
+    using namespace ea;
+    const auto collectionSize = static_cast<unsigned>(size(collection));
+    ForEachParallel(workQueue, bucket, collectionSize,
+        [iter = begin(collection), iterIndex = 0u, &callback](unsigned beginIndex, unsigned endIndex) mutable
+    {
+        iter += beginIndex - iterIndex;
+        for (iterIndex = beginIndex; iterIndex < endIndex; ++iterIndex, ++iter)
+            callback(iterIndex, *iter);
+    });
+}
+
+/// Process collection in multiple threads with default bucket size.
+template <class Callback, class Collection>
+void ForEachParallel(WorkQueue* workQueue, Collection&& collection, const Callback& callback)
+{
+    ForEachParallel(workQueue, 1u, collection, callback);
+}
 
 }

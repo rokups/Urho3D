@@ -288,6 +288,10 @@ public:
     static const Color YELLOW;
     /// Transparent black color (black with no alpha).
     static const Color TRANSPARENT_BLACK;
+    /// Color-to-gray factors for color in gamma space.
+    static const Color LUMINOSITY_GAMMA;
+    /// Color-to-gray factors for color in linear space.
+    static const Color LUMINOSITY_LINEAR;
 
 protected:
     /// Return hue value given greatest and least RGB component, value-wise.

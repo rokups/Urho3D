@@ -27,12 +27,21 @@
 #include "../Core/Object.h"
 #include "../Graphics/GPUObject.h"
 #include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/PipelineStateTracker.h"
 
 namespace Urho3D
 {
 
+/// Type of index buffer.
+enum IndexBufferType
+{
+    IBT_NONE = 0,
+    IBT_UINT16,
+    IBT_UINT32
+};
+
 /// Hardware index buffer.
-class URHO3D_API IndexBuffer : public Object, public GPUObject
+class URHO3D_API IndexBuffer : public Object, public GPUObject, public PipelineStateTracker
 {
     URHO3D_OBJECT(IndexBuffer, Object);
 
@@ -108,6 +117,15 @@ public:
     /// Pack index data from unsigned int array into index buffer.
     static void PackIndexData(const unsigned source[], void* dest, bool largeIndices, unsigned start, unsigned count);
 
+    /// Return type of index buffer. Null is allowed.
+    static IndexBufferType GetIndexBufferType(IndexBuffer* indexBuffer)
+    {
+        if (!indexBuffer)
+            return IBT_NONE;
+        const bool largeIndices = indexBuffer->GetIndexSize() == 4;
+        return largeIndices ? IBT_UINT32 : IBT_UINT16;
+    }
+
 private:
     /// Create buffer.
     bool Create();
@@ -117,6 +135,9 @@ private:
     void* MapBuffer(unsigned start, unsigned count, bool discard);
     /// Unmap the GPU buffer. Not used on OpenGL.
     void UnmapBuffer();
+
+    /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
+    unsigned RecalculatePipelineStateHash() const override;
 
     /// Shadow data.
     ea::shared_array<unsigned char> shadowData_;
@@ -138,6 +159,54 @@ private:
     bool shadowed_;
     /// Discard lock flag. Used by OpenGL only.
     bool discardLock_;
+};
+
+/// Index Buffer of dynamic size. Resize policy is similar to standard vector.
+class URHO3D_API DynamicIndexBuffer : public Object
+{
+    URHO3D_OBJECT(DynamicIndexBuffer, Object);
+
+public:
+    DynamicIndexBuffer(Context* context);
+    bool Initialize(unsigned indexCount, bool largeIndices);
+
+    /// Discard existing content of the buffer.
+    void Discard();
+    /// Commit all added data to GPU.
+    void Commit();
+
+    /// Allocate indices. Returns index of first index and writeable buffer of sufficient size.
+    ea::pair<unsigned, unsigned char*> AddIndices(unsigned numIndices)
+    {
+        const unsigned startIndex = numIndices_;
+        if (startIndex + numIndices > maxNumIndices_)
+            GrowBuffer();
+
+        numIndices_ += numIndices;
+        unsigned char* data = shadowData_.data() + startIndex * indexSize_;
+        return { startIndex, data };
+    }
+
+    /// Store indices. Returns index of first vertex.
+    unsigned AddIndices(unsigned count, const void* data)
+    {
+        const auto indexAndData = AddIndices(count);
+        memcpy(indexAndData.second, data, count * indexSize_);
+        return indexAndData.first;
+    }
+
+    IndexBuffer* GetIndexBuffer() { return indexBuffer_; }
+
+private:
+    void GrowBuffer();
+
+    SharedPtr<IndexBuffer> indexBuffer_;
+    ByteVector shadowData_;
+    bool indexBufferNeedResize_{};
+
+    unsigned indexSize_{};
+    unsigned numIndices_{};
+    unsigned maxNumIndices_{};
 };
 
 }

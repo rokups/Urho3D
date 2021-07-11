@@ -1,0 +1,8 @@
+<technique vs="M_LegacyTerrain" ps="M_LegacyTerrain">
+    <pass name="base" />
+    <pass name="litbase" />
+    <pass name="light" depthtest="equal" depthwrite="false" blend="add" />
+    <pass name="deferred" />
+    <pass name="depth" vs="M_Default" ps="M_Default" excludes="NORMALMAP AO ENVCUBEMAP TRANSLUCENT VOLUMETRIC PBR TRANSPARENT PACKEDNORMAL" />
+    <pass name="shadow" vs="M_Default" ps="M_Default" excludes="NORMALMAP AO ENVCUBEMAP TRANSLUCENT VOLUMETRIC PBR TRANSPARENT PACKEDNORMAL" />
+</technique>

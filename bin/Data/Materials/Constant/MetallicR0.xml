@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<material>
+    <technique name="Techniques/LitOpaque.xml" />
+    <shader vsdefines="PBR" psdefines="PBR" />
+    <parameter name="MatDiffColor" value="0.98 0.86 0.57 1" />
+    <parameter name="Roughness" value="0" />
+    <parameter name="Metallic" value="1" />
+</material>

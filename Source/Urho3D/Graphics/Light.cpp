@@ -50,6 +50,14 @@ static const char* typeNames[] =
     nullptr
 };
 
+static const char* lightImportanceNames[] =
+{
+    "Auto",
+    "Important",
+    "Not Important",
+    nullptr
+};
+
 static const char* modeNames[] =
 {
     "Realtime",
@@ -99,7 +107,6 @@ Light::Light(Context* context) :
     shadowResolution_(1.0f),
     shadowNearFarRatio_(DEFAULT_SHADOWNEARFARRATIO),
     shadowMaxExtrusion_(DEFAULT_SHADOWMAXEXTRUSION),
-    perVertex_(false),
     usePhysicalValues_(false)
 {
 }
@@ -112,6 +119,7 @@ void Light::RegisterObject(Context* context)
 
     URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
     URHO3D_ENUM_ACCESSOR_ATTRIBUTE("Light Type", GetLightType, SetLightType, LightType, typeNames, DEFAULT_LIGHTTYPE, AM_DEFAULT);
+    URHO3D_ENUM_ACCESSOR_ATTRIBUTE("Light Importance", GetLightImportance, SetLightImportance, LightImportance, lightImportanceNames, DEFAULT_LIGHTIMPORTANCE, AM_DEFAULT);
     URHO3D_ENUM_ACCESSOR_ATTRIBUTE("Light Mode", GetLightMode, SetLightMode, LightMode, modeNames, LM_REALTIME, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Color", GetColor, SetColor, Color, Color::WHITE, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Specular Intensity", GetSpecularIntensity, SetSpecularIntensity, float, DEFAULT_SPECULARINTENSITY,
@@ -131,7 +139,6 @@ void Light::RegisterObject(Context* context)
         ResourceRef(Texture::GetTypeStatic()), AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Can Be Occluded", IsOccludee, SetOccludee, bool, true, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Cast Shadows", bool, castShadows_, false, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Per Vertex", bool, perVertex_, false, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Draw Distance", GetDrawDistance, SetDrawDistance, float, 0.0f, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Fade Distance", GetFadeDistance, SetFadeDistance, float, 0.0f, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Shadow Distance", GetShadowDistance, SetShadowDistance, float, 0.0f, AM_DEFAULT);
@@ -266,15 +273,15 @@ void Light::SetLightType(LightType type)
     MarkNetworkUpdate();
 }
 
-void Light::SetLightMode(LightMode mode)
+void Light::SetLightImportance(LightImportance importance)
 {
-    lightMode_ = mode;
+    lightImportance_ = importance;
     MarkNetworkUpdate();
 }
 
-void Light::SetPerVertex(bool enable)
+void Light::SetLightMode(LightMode mode)
 {
-    perVertex_ = enable;
+    lightMode_ = mode;
     MarkNetworkUpdate();
 }
 
@@ -475,6 +482,18 @@ Frustum Light::GetViewSpaceFrustum(const Matrix3x4& view) const
     return ret;
 }
 
+float Light::GetDistanceTo(Drawable* drawable) const
+{
+    if (GetLightType() == LIGHT_DIRECTIONAL || !node_)
+        return 0.0f;
+
+    const BoundingBox boundingBox = drawable->GetWorldBoundingBox();
+    const Vector3 lightPosition = node_->GetWorldPosition();
+    const Vector3 minDelta = boundingBox.min_ - lightPosition;
+    const Vector3 maxDelta = lightPosition - boundingBox.max_;
+    return VectorMax(Vector3::ZERO, VectorMax(minDelta, maxDelta)).Length();
+}
+
 int Light::GetNumShadowSplits() const
 {
     unsigned ret = 1;
@@ -493,7 +512,7 @@ int Light::GetNumShadowSplits() const
     return (int)Min(ret, MAX_CASCADE_SPLITS);
 }
 
-const Matrix3x4& Light::GetVolumeTransform(Camera* camera)
+const Matrix3x4& Light::GetVolumeTransform(const Camera* camera)
 {
     if (!node_)
         return Matrix3x4::IDENTITY;
@@ -650,7 +669,7 @@ void Light::SetLightQueue(LightBatchQueue* queue)
     lightQueue_ = queue;
 }
 
-Matrix3x4 Light::GetFullscreenQuadTransform(Camera* camera)
+Matrix3x4 Light::GetFullscreenQuadTransform(const Camera* camera)
 {
     Matrix3x4 quadTransform;
     Vector3 nearSize, farSize;

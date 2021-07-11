@@ -173,7 +173,7 @@ struct SphericalHarmonicsDot9
     /// Construct default.
     SphericalHarmonicsDot9() = default;
 
-    /// Construct from color.
+    /// Construct from color in linear color space.
     explicit SphericalHarmonicsDot9(const Vector3& color)
     {
         Ar_.w_ = color.x_;
@@ -181,7 +181,7 @@ struct SphericalHarmonicsDot9
         Ab_.w_ = color.z_;
     }
 
-    /// Construct from color.
+    /// Construct from color in linear color space.
     explicit SphericalHarmonicsDot9(const Color& color) : SphericalHarmonicsDot9(color.ToVector3()) {}
 
     /// Construct from spherical harmonics.
@@ -243,6 +243,15 @@ struct SphericalHarmonicsDot9
         Bg_ += rhs.Bg_;
         Bb_ += rhs.Bb_;
         C_ += rhs.C_;
+        return *this;
+    }
+
+    /// Accumulate spherical harmonics with constant value.
+    SphericalHarmonicsDot9& operator +=(const Vector3& rhs)
+    {
+        Ar_.w_ += rhs.x_;
+        Ag_.w_ += rhs.y_;
+        Ab_.w_ += rhs.z_;
         return *this;
     }
 

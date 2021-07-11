@@ -54,7 +54,7 @@ endmacro()
 define_engine_source_files (Container Core IO Math)
 
 if (NOT MINI_URHO)
-    define_engine_source_files (Audio Engine Input Resource Scene UI)
+    define_engine_source_files (Audio Engine Input RenderPipeline Resource Scene UI)
     define_engine_source_files (NORECURSE . Graphics)
     list (REMOVE_ITEM SOURCE_FILES BindAll.cpp)     # Utility file for BindTool.
     if (URHO3D_OPENGL)
@@ -188,6 +188,12 @@ set (THIRD_PARTY_DEPENDENCIES
     xatlas
     embree
     RmlUi
+    glslang
+    SPIRV
+    spirv-cross-core
+    spirv-cross-glsl
+    spirv-cross-msl
+    spirv-cross-hlsl
 )
 
 if (URHO3D_MERGE_STATIC_LIBS)
@@ -339,16 +345,15 @@ if (WEB)
         set (EXTRA_ "EXTRA_")
     endif ()
     target_link_libraries(Urho3D PUBLIC "-s ${EXTRA_}EXPORTED_RUNTIME_METHODS=['Pointer_stringify']" --bind)
-    if (EMSCRIPTEN_MEMORY_LIMIT)
-        math(EXPR EMSCRIPTEN_TOTAL_MEMORY "${EMSCRIPTEN_MEMORY_LIMIT} * 1024 * 1024")
-        if (EMSCRIPTEN_EMCC_VERSION VERSION_LESS 1.39.9)
-            target_link_libraries(Urho3D PUBLIC "-s TOTAL_MEMORY=${EMSCRIPTEN_TOTAL_MEMORY}")
-        else ()
-            target_link_libraries(Urho3D PUBLIC "-s INITIAL_MEMORY=${EMSCRIPTEN_TOTAL_MEMORY}")
-        endif ()
-    endif ()
-    if (EMSCRIPTEN_ALLOW_MEMORY_GROWTH)
+    if ("${EMSCRIPTEN_TOTAL_MEMORY}" STREQUAL "0")
         target_link_libraries(Urho3D PUBLIC "-s ALLOW_MEMORY_GROWTH=1" --no-heap-copy)
+    else ()
+        math(EXPR EMSCRIPTEN_TOTAL_MEMORY_BYTES "${EMSCRIPTEN_TOTAL_MEMORY} * 1024 * 1024")
+        if (EMSCRIPTEN_EMCC_VERSION VERSION_LESS 1.39.9)
+            target_link_libraries(Urho3D PUBLIC "-s TOTAL_MEMORY=${EMSCRIPTEN_TOTAL_MEMORY_BYTES}")
+        else ()
+            target_link_libraries(Urho3D PUBLIC "-s INITIAL_MEMORY=${EMSCRIPTEN_TOTAL_MEMORY_BYTES}")
+        endif ()
     endif ()
 endif ()
 

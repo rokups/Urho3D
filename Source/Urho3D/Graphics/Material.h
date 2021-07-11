@@ -22,12 +22,15 @@
 
 #pragma once
 
+#include "../Container/IndexAllocator.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/Light.h"
 #include "../Graphics/Technique.h"
 #include "../Math/Vector4.h"
 #include "../Resource/Resource.h"
 #include "../Scene/ValueAnimationInfo.h"
+
+#include <atomic>
 
 namespace Urho3D
 {
@@ -153,7 +156,7 @@ private:
 };
 
 /// Describes how to render 3D geometries.
-class URHO3D_API Material : public Resource
+class URHO3D_API Material : public Resource, public PipelineStateTracker, public IDFamily<Material>
 {
     URHO3D_OBJECT(Material, Resource);
 
@@ -165,6 +168,10 @@ public:
     /// Register object factory.
     /// @nobind
     static void RegisterObject(Context* context);
+
+    /// Create simple material with only base pass. Used by UI renderers.
+    static SharedPtr<Material> CreateBaseMaterial(Context* context,
+        const ea::string& shaderName, const ea::string& vsDefines, const ea::string& psDefines);
 
     /// Load resource from stream. May be called from a worker thread. Return true if successful.
     bool BeginLoad(Deserializer& source) override;
@@ -263,8 +270,12 @@ public:
     /// Return technique by index.
     /// @property{get_techniques}
     Technique* GetTechnique(unsigned index) const;
+    /// Find best technique for given drawable and quality settings.
+    Technique* FindTechnique(Drawable* drawable, MaterialQuality materialQuality) const;
     /// Return pass by technique index and pass name.
     Pass* GetPass(unsigned index, const ea::string& passName) const;
+    /// Return default pass. Used by UI materials. It's base pass of 0-th technique assigned to Material.
+    Pass* GetDefaultPass() const;
     /// Return texture by unit.
     /// @property{get_textures}
     Texture* GetTexture(TextureUnit unit) const;
@@ -321,7 +332,7 @@ public:
     unsigned char GetRenderOrder() const { return renderOrder_; }
 
     /// Return last auxiliary view rendered frame number.
-    unsigned GetAuxViewFrameNumber() const { return auxViewFrameNumber_; }
+    unsigned GetAuxViewFrameNumber() const { return auxViewFrameNumber_.load(std::memory_order_relaxed); }
 
     /// Return whether should render occlusion.
     /// @property
@@ -362,6 +373,12 @@ private:
     void UpdateEventSubscription();
     /// Update shader parameter animations.
     void HandleAttributeAnimationUpdate(StringHash eventType, VariantMap& eventData);
+    /// Refresh subscriptions to texture events.
+    void RefreshTextureEventSubscriptions();
+    /// Set texture without event resubscription.
+    void SetTextureInternal(TextureUnit unit, Texture* texture);
+    /// Recalculate hash of pipeline state configuration.
+    unsigned RecalculatePipelineStateHash() const override;
 
     /// Techniques.
     ea::vector<TechniqueEntry> techniques_;
@@ -386,7 +403,7 @@ private:
     /// Render order value.
     unsigned char renderOrder_{};
     /// Last auxiliary view rendered frame number.
-    unsigned auxViewFrameNumber_{};
+    std::atomic_uint32_t auxViewFrameNumber_{ 0 };
     /// Shader parameter hash value.
     unsigned shaderParameterHash_{};
     /// Alpha-to-coverage flag.

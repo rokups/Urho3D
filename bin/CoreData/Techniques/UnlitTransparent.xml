@@ -1,0 +1,4 @@
+<technique vs="M_Default" ps="M_Default" vsdefines="UNLIT" psdefines="UNLIT">
+    <pass name="alpha" depthwrite="false" blend="alpha" />
+    <pass name="shadow" vs="M_Default" ps="M_Default" />
+</technique>

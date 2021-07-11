@@ -47,7 +47,7 @@
 #  endif
 
 #  ifndef URHO3D_NO_EXPORT
-#    define URHO3D_NO_EXPORT 
+#    define URHO3D_NO_EXPORT
 #  endif
 #endif
 

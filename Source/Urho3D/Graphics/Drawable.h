@@ -25,6 +25,7 @@
 #pragma once
 
 #include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/PipelineStateTracker.h"
 #include "../Math/BoundingBox.h"
 #include "../Scene/Component.h"
 
@@ -46,6 +47,7 @@ static const unsigned DEFAULT_VIEWMASK = M_MAX_UNSIGNED;
 static const unsigned DEFAULT_LIGHTMASK = M_MAX_UNSIGNED;
 static const unsigned DEFAULT_SHADOWMASK = M_MAX_UNSIGNED;
 static const unsigned DEFAULT_ZONEMASK = M_MAX_UNSIGNED;
+static const unsigned PORTABLE_LIGHTMASK = 0xf;
 static const int MAX_VERTEX_LIGHTS = 4;
 static const float ANIMATION_LOD_BASESCALE = 2500.0f;
 
@@ -55,8 +57,11 @@ class Geometry;
 class Light;
 class Material;
 class OcclusionBuffer;
+class Octree;
 class Octant;
 class RayOctreeQuery;
+class RenderSurface;
+class Viewport;
 class Zone;
 struct RayQueryResult;
 struct WorkItem;
@@ -69,17 +74,48 @@ enum UpdateGeometryType
     UPDATE_WORKER_THREAD
 };
 
+/// Global illumination mode.
+enum class GlobalIlluminationType
+{
+    None,
+    UseLightMap,
+    BlendLightProbes,
+};
+
 /// Rendering frame update parameters.
 struct FrameInfo
 {
     /// Frame number.
-    unsigned frameNumber_;
+    unsigned frameNumber_{};
     /// Time elapsed since last frame.
-    float timeStep_;
+    float timeStep_{};
     /// Viewport size.
     IntVector2 viewSize_;
-    /// Camera being used.
-    Camera* camera_;
+    /// Viewport rectangle.
+    IntRect viewRect_;
+
+    /// Destination viewport.
+    Viewport* viewport_{};
+    /// Destination render surface.
+    RenderSurface* renderTarget_{};
+
+    /// Scene being rendered.
+    Scene* scene_{};
+    /// Camera being used for drawable culling.
+    Camera* camera_{};
+    /// Octree being used for queries.
+    Octree* octree_{};
+};
+
+/// Cached info about current zone.
+struct CachedDrawableZone
+{
+    /// Pointer to Zone.
+    Zone* zone_{};
+    /// Node position at the moment of last caching.
+    Vector3 cachePosition_;
+    /// Cache invalidation distance (squared).
+    float cacheInvalidationDistanceSquared_{ -1.0f };
 };
 
 /// Source data for a 3D geometry draw call.
@@ -132,7 +168,7 @@ struct URHO3D_API SourceBatch
 };
 
 /// Base class for visible components.
-class URHO3D_API Drawable : public Component
+class URHO3D_API Drawable : public Component, public PipelineStateTracker
 {
     URHO3D_OBJECT(Drawable, Component);
 
@@ -207,6 +243,8 @@ public:
     /// Set occludee flag.
     /// @property
     void SetOccludee(bool enable);
+    /// Set GI type.
+    void SetGlobalIlluminationType(GlobalIlluminationType type);
     /// Mark for update and octree reinsertion. Update is automatically queued when the drawable's scene node moves or changes scale.
     void MarkForUpdate();
 
@@ -265,6 +303,9 @@ public:
     /// @property
     bool IsOccludee() const { return occludee_; }
 
+    /// Return global illumination type.
+    GlobalIlluminationType GetGlobalIlluminationType() const { return giType_; }
+
     /// Return whether is in view this frame from any viewport camera. Excludes shadow map cameras.
     /// @property
     bool IsInView() const;
@@ -301,9 +342,15 @@ public:
     /// Return octree octant.
     Octant* GetOctant() const { return octant_; }
 
+    /// Return index in octree.
+    unsigned GetDrawableIndex() const { return drawableIndex_; }
+
+    /// Return whether the drawable is added to Octree.
+    bool IsInOctree() const { return drawableIndex_ != M_MAX_UNSIGNED; }
+
     /// Return current zone.
     /// @property
-    Zone* GetZone() const { return zone_; }
+    Zone* GetZone() const { return cachedZone_.zone_; }
 
     /// Return whether current zone is inconclusive or dirty due to the drawable moving.
     bool IsZoneDirty() const { return zoneDirty_; }
@@ -341,6 +388,15 @@ public:
     /// Return mutable light probe tetrahedron hint.
     unsigned& GetMutableLightProbeTetrahedronHint() { return lightProbeTetrahedronHint_; }
 
+    /// Return mutable cached zone data.
+    CachedDrawableZone& GetMutableCachedZone() { return cachedZone_; }
+
+    /// Return combined light masks of Drawable and its currently cached Zone.
+    unsigned GetLightMaskInZone() const;
+
+    /// Return combined shadow masks of Drawable and its currently cached Zone.
+    unsigned GetShadowMaskInZone() const;
+
     /// Add a per-pixel light affecting the object this frame.
     void AddLight(Light* light)
     {
@@ -360,6 +416,9 @@ public:
     }
 
 protected:
+    /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
+    unsigned RecalculatePipelineStateHash() const override;
+
     /// Handle node being assigned.
     void OnNodeSet(Node* node) override;
     /// Handle scene being assigned.
@@ -379,6 +438,8 @@ protected:
 
     /// Move into another octree octant.
     void SetOctant(Octant* octant) { octant_ = octant; }
+    /// Update drawable index.
+    void SetDrawableIndex(unsigned drawableIndex) { drawableIndex_ = drawableIndex; };
 
     /// World-space bounding box.
     BoundingBox worldBoundingBox_;
@@ -388,6 +449,8 @@ protected:
     ea::vector<SourceBatch> batches_;
     /// Drawable flags.
     DrawableFlags drawableFlags_;
+    /// Global illumination type.
+    GlobalIlluminationType giType_{};
     /// Bounding box dirty flag.
     bool worldBoundingBoxDirty_;
     /// Shadowcaster flag.
@@ -402,8 +465,10 @@ protected:
     bool zoneDirty_;
     /// Octree octant.
     Octant* octant_;
+    /// Index of Drawable in Scene. May be updated.
+    unsigned drawableIndex_{ M_MAX_UNSIGNED };
     /// Current zone.
-    Zone* zone_;
+    CachedDrawableZone cachedZone_;
     /// View mask.
     unsigned viewMask_;
     /// Light mask.

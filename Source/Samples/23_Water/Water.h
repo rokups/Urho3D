@@ -67,6 +67,8 @@ private:
     SharedPtr<Node> reflectionCameraNode_;
     /// Water body scene node.
     SharedPtr<Node> waterNode_;
+    /// Water material.
+    SharedPtr<Material> waterMaterial_;
     /// Reflection plane representing the water surface.
     Plane waterPlane_;
     /// Clipping plane for reflection rendering. Slightly biased downward from the reflection plane to avoid artifacts.

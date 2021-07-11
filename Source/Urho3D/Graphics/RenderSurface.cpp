@@ -36,7 +36,7 @@ namespace Urho3D
 
 RenderSurface::~RenderSurface()
 {
-    // only release if parent texture hasn't expired, in that case 
+    // only release if parent texture hasn't expired, in that case
     // parent texture was deleted and will have called release on render surface
     if (!parentTexture_.Expired())
     {
@@ -76,12 +76,12 @@ void RenderSurface::SetLinkedDepthStencil(RenderSurface* depthStencil)
 
 void RenderSurface::QueueUpdate()
 {
-    updateQueued_ = true;
+    updateQueued_.store(true, std::memory_order_relaxed);
 }
 
 void RenderSurface::ResetUpdateQueued()
 {
-    updateQueued_ = false;
+    updateQueued_.store(false, std::memory_order_relaxed);
 }
 
 int RenderSurface::GetWidth() const
@@ -92,6 +92,11 @@ int RenderSurface::GetWidth() const
 int RenderSurface::GetHeight() const
 {
     return parentTexture_->GetHeight();
+}
+
+IntVector2 RenderSurface::GetSize() const
+{
+    return { GetWidth(), GetHeight() };
 }
 
 TextureUsage RenderSurface::GetUsage() const
@@ -112,6 +117,31 @@ bool RenderSurface::GetAutoResolve() const
 Viewport* RenderSurface::GetViewport(unsigned index) const
 {
     return index < viewports_.size() ? viewports_[index] : nullptr;
+}
+
+IntVector2 RenderSurface::GetSize(Graphics* graphics, const RenderSurface* renderSurface)
+{
+    return renderSurface ? renderSurface->GetSize() : graphics->GetSize();
+}
+
+IntRect RenderSurface::GetRect(Graphics* graphics, const RenderSurface* renderSurface)
+{
+    return { IntVector2::ZERO, GetSize(graphics, renderSurface) };
+}
+
+unsigned RenderSurface::GetFormat(Graphics* /*graphics*/, const RenderSurface* renderSurface)
+{
+    return renderSurface ? renderSurface->GetParentTexture()->GetFormat() : Graphics::GetRGBFormat();
+}
+
+int RenderSurface::GetMultiSample(Graphics* graphics, const RenderSurface* renderSurface)
+{
+    return renderSurface ? renderSurface->GetMultiSample() : graphics->GetMultiSample();
+}
+
+bool RenderSurface::GetSRGB(Graphics* graphics, const RenderSurface* renderSurface)
+{
+    return renderSurface ? renderSurface->GetParentTexture()->GetSRGB() : graphics->GetSRGB();
 }
 
 }

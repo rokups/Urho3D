@@ -1,0 +1,13 @@
+<material>
+    <technique name="Techniques/LitWater.xml" />
+    <shader vsdefines="PBR" psdefines="PBR" />
+    <texture unit="normal" name="Textures/WaterNoise.dds" />
+    <parameter name="MatDiffColor" value="0.173 0.294 0.373 0.5" />
+    <parameter name="MatSpecColor" value="1.0 1.0 1.0 16" />
+    <parameter name="UOffset" value="1 0 0 0" />
+    <parameter name="VOffset" value="0 1 0 0" />
+    <parameter name="NoiseSpeed" value="0.05 0.05" />
+    <parameter name="NoiseStrength" value="0.02" />
+    <parameter name="NormalScale" value="0.1" />
+    <parameter name="FadeOffsetScale" value="0 5" />
+</material>

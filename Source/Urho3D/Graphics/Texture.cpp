@@ -101,6 +101,11 @@ void Texture::SetBorderColor(const Color& color)
     parametersDirty_ = true;
 }
 
+void Texture::SetLinear(bool linear)
+{
+    linear_ = linear;
+}
+
 void Texture::SetBackupTexture(Texture* texture)
 {
     backupTexture_ = texture;
@@ -223,6 +228,9 @@ void Texture::SetParameters(const XMLElement& element)
 
         if (name == "srgb")
             SetSRGB(paramElem.GetBool("enable"));
+
+        if (name == "linear")
+            SetLinear(paramElem.GetBool("enable"));
     }
 }
 

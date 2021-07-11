@@ -51,6 +51,14 @@ enum LightType
     LIGHT_POINT
 };
 
+/// Light importance.
+enum LightImportance
+{
+    LI_AUTO,
+    LI_IMPORTANT,
+    LI_NOT_IMPORTANT
+};
+
 static const float SHADOW_MIN_QUANTIZE = 0.1f;
 static const float SHADOW_MIN_VIEW = 1.0f;
 static const int MAX_LIGHT_SPLITS = 6;
@@ -61,6 +69,7 @@ static const unsigned MAX_CASCADE_SPLITS = 1;
 #endif
 
 static const LightType DEFAULT_LIGHTTYPE = LIGHT_POINT;
+static const LightImportance DEFAULT_LIGHTIMPORTANCE = LI_AUTO;
 static const float DEFAULT_RANGE = 10.0f;
 static const float DEFAULT_LIGHT_FOV = 30.0f;
 static const float DEFAULT_SPECULARINTENSITY = 1.0f;
@@ -199,11 +208,10 @@ public:
     /// Set light type.
     /// @property
     void SetLightType(LightType type);
+    /// Set light importance.
+    void SetLightImportance(LightImportance importance);
     /// Set light mode.
     void SetLightMode(LightMode mode);
-    /// Set vertex lighting mode.
-    /// @property
-    void SetPerVertex(bool enable);
     /// Set color.
     /// @property
     void SetColor(const Color& color);
@@ -277,12 +285,15 @@ public:
     /// Return light mode.
     LightMode GetLightMode() const { return lightMode_; }
 
+    /// Return light importance.
+    LightImportance GetLightImportance() const { return lightImportance_; }
+
     /// Return effective light mask. Baked lights have zero light mask.
     unsigned GetLightMaskEffective() const { return lightMode_ == LM_BAKED ? 0 : GetLightMask(); }
 
     /// Return vertex lighting mode.
     /// @property
-    bool GetPerVertex() const { return perVertex_; }
+    bool GetPerVertex() const { return lightImportance_ == LI_NOT_IMPORTANT; }
 
     /// Return color.
     /// @property
@@ -388,6 +399,8 @@ public:
     Frustum GetFrustum() const;
     /// Return spotlight frustum in the specified view space.
     Frustum GetViewSpaceFrustum(const Matrix3x4& view) const;
+    /// Return distance from light to drawable.
+    float GetDistanceTo(Drawable* drawable) const;
 
     /// Return number of shadow map cascade splits for a directional light, considering also graphics API limitations.
     /// @property
@@ -404,7 +417,7 @@ public:
     /// Set light queue used for this light. Called by View.
     void SetLightQueue(LightBatchQueue* queue);
     /// Return light volume model transform.
-    const Matrix3x4& GetVolumeTransform(Camera* camera);
+    const Matrix3x4& GetVolumeTransform(const Camera* camera);
 
     /// Return light queue. Called by View.
     LightBatchQueue* GetLightQueue() const { return lightQueue_; }
@@ -413,6 +426,23 @@ public:
     float GetIntensityDivisor(float attenuation = 1.0f) const
     {
         return Max(GetEffectiveColor().SumRGB(), 0.0f) * attenuation + M_EPSILON;
+    }
+
+    /// Return spot cutoff parameters.
+    /// Considering the angle between spot light axis and direction from light to object, returns:
+    /// first: cosine of the angle where lighting is zero.
+    /// second: inverted difference between zero and full light cosines.
+    /// For point and directional lights, (-2, 1) is returned,
+    /// which corresponds to max lighting at angles with cosine >= -1, i.e all angles altogether.
+    ea::pair<float, float> GetCutoffParams() const
+    {
+        if (lightType_ == LIGHT_SPOT)
+        {
+            const float cutoff = Cos(fov_ * 0.5f);
+            const float invCutoff = 1.0f / (1.0f - cutoff);
+            return { cutoff, invCutoff };
+        }
+        return { -2.0f, 1.0f };
     }
 
     /// Set ramp texture attribute.
@@ -425,7 +455,7 @@ public:
     ResourceRef GetShapeTextureAttr() const;
 
     /// Return a transform for deferred fullscreen quad (directional light) rendering.
-    static Matrix3x4 GetFullscreenQuadTransform(Camera* camera);
+    static Matrix3x4 GetFullscreenQuadTransform(const Camera* camera);
 
 protected:
     /// Recalculate the world-space bounding box.
@@ -440,6 +470,8 @@ private:
     void ValidateShadowBias() { shadowBias_.Validate(); }
     /// Light type.
     LightType lightType_;
+    /// Light importance.
+    LightImportance lightImportance_{};
     /// Light baking mode.
     LightMode lightMode_{};
     /// Color.
@@ -488,8 +520,6 @@ private:
     float shadowNearFarRatio_;
     /// Directional shadow max. extrusion distance.
     float shadowMaxExtrusion_;
-    /// Per-vertex lighting flag.
-    bool perVertex_;
     /// Use physical light values flag.
     bool usePhysicalValues_;
 };

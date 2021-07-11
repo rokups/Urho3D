@@ -130,8 +130,7 @@ cmake_dependent_option(URHO3D_THREADING          "Enable multithreading"        
 option                (URHO3D_WEBP               "WEBP support enabled"                                  ${URHO3D_ENABLE_ALL}                                    )
 # Web
 cmake_dependent_option(EMSCRIPTEN_WASM          "Use wasm instead of asm.js"                            ON                   "WEB"                           OFF)
-cmake_dependent_option(EMSCRIPTEN_ALLOW_MEMORY_GROWTH "Allow memory growth. Disables some optimizations." OFF                "WEB"                           OFF)
-set(EMSCRIPTEN_TOTAL_MEMORY 128MB CACHE STRING  "Memory limit in megabytes. Set to 0 for dynamic growth. Must be multiple of 64KB.")
+set(EMSCRIPTEN_TOTAL_MEMORY 128 CACHE STRING  "Memory limit in megabytes. Set to 0 for dynamic growth. Must be multiple of 64KB.")
 
 # Misc
 cmake_dependent_option(URHO3D_PLAYER            "Build player application"                              ${URHO3D_ENABLE_ALL} "NOT WEB"                       OFF)
@@ -158,6 +157,13 @@ string(TOUPPER "${URHO3D_GRAPHICS_API}" URHO3D_GRAPHICS_API)
 set (URHO3D_${URHO3D_GRAPHICS_API} ON)
 if (URHO3D_GLES2 OR URHO3D_GLES3)
     set (URHO3D_OPENGL ON)
+endif ()
+
+cmake_dependent_option(URHO3D_SPIRV "Enable universal GLSL shaders for other GAPIs via glslang and SpirV" ON "URHO3D_D3D11" OFF)
+# Whether to use legacy renderer. DX11 doesn't support legacy renderer. DX9 supports only legacy renderer.
+cmake_dependent_option(URHO3D_LEGACY_RENDERER "Use legacy renderer by default" OFF "URHO3D_OPENGL" OFF)
+if (URHO3D_D3D9)
+    set (URHO3D_LEGACY_RENDERER ON)
 endif ()
 
 if (URHO3D_CSHARP)

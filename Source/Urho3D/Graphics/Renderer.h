@@ -27,6 +27,8 @@
 #include "../Core/Mutex.h"
 #include "../Graphics/Batch.h"
 #include "../Graphics/Drawable.h"
+#include "../Graphics/DrawCommandQueue.h"
+#include "../Graphics/PipelineState.h"
 #include "../Graphics/Viewport.h"
 #include "../Math/Color.h"
 
@@ -36,6 +38,7 @@
 namespace Urho3D
 {
 
+class RenderPipelineView;
 class Geometry;
 class Drawable;
 class Light;
@@ -303,6 +306,10 @@ public:
     /// @property
     unsigned GetNumViewports() const { return viewports_.size(); }
 
+    /// Return new or existing pipeline state.
+    SharedPtr<PipelineState> GetOrCreatePipelineState(const PipelineStateDesc& desc);
+    /// Return default draw queue that can be used to cook and execute draw commands from main thread.
+    DrawCommandQueue* GetDefaultDrawQueue() { return defaultDrawQueue_.Get(); }
     /// Return backbuffer viewport by index.
     /// @property{get_viewports}
     Viewport* GetViewport(unsigned index) const;
@@ -426,7 +433,7 @@ public:
 
     /// Return number of views rendered.
     /// @property
-    unsigned GetNumViews() const { return views_.size(); }
+    unsigned GetNumViews() const { return views_.size() + renderPipelineViews_.size(); }
 
     /// Return number of primitives rendered.
     /// @property
@@ -471,6 +478,9 @@ public:
     /// Return the shadowed pointlight indirection cube map.
     TextureCube* GetIndirectionCubeMap() const { return indirectionCubeMap_; }
 
+    /// Return completely black 1x1x1 cubemap.
+    TextureCube* GetBlackCubeMap() const { return blackCubeMap_; }
+
     /// Return the instancing vertex buffer.
     VertexBuffer* GetInstancingBuffer() const { return dynamicInstancing_ ? instancingBuffer_.Get() : nullptr; }
 
@@ -499,6 +509,8 @@ public:
         (int width, int height, unsigned format, int multiSample, bool autoResolve, bool cubemap, bool filtered, bool srgb, unsigned persistentKey = 0);
     /// Allocate a depth-stencil surface that does not need to be readable. Should only be called during actual rendering, not before.
     RenderSurface* GetDepthStencil(int width, int height, int multiSample, bool autoResolve);
+    /// Allocate a depth-stencil surface that does not need to be readable. Should only be called during actual rendering, not before.
+    RenderSurface* GetDepthStencil(RenderSurface* renderSurface);
     /// Allocate an occlusion buffer.
     OcclusionBuffer* GetOcclusionBuffer(Camera* camera);
     /// Allocate a temporary shadow camera and a scene node for it. Is thread-safe.
@@ -592,6 +604,7 @@ private:
     SharedPtr<TextureCube> faceSelectCubeMap_;
     /// Indirection cube map for shadowed pointlights.
     SharedPtr<TextureCube> indirectionCubeMap_;
+    SharedPtr<TextureCube> blackCubeMap_;
     /// Reusable scene nodes with shadow camera components.
     ea::vector<SharedPtr<Node> > shadowCameraNodes_;
     /// Reusable occlusion buffers.
@@ -618,6 +631,8 @@ private:
     ea::vector<ea::pair<WeakPtr<RenderSurface>, WeakPtr<Viewport> > > queuedViewports_;
     /// Views that have been processed this frame.
     ea::vector<WeakPtr<View> > views_;
+    /// Render pipeline views that have been processed this frame.
+    ea::vector<WeakPtr<RenderPipelineView> > renderPipelineViews_;
     /// Prepared views by culling camera.
     ea::unordered_map<Camera*, WeakPtr<View> > preparedViews_;
     /// Octrees that have been updated during the frame.
@@ -710,6 +725,9 @@ private:
     SkinningMode skinningMode_{};
     /// Number of bones used for software skinning.
     unsigned numSoftwareSkinningBones_{ 4 };
+    /// Pipeline state cache.
+    SharedPtr<PipelineStateCache> pipelineStateCache_;
+    SharedPtr<DrawCommandQueue> defaultDrawQueue_;
 };
 
 }

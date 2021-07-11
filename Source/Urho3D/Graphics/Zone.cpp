@@ -23,11 +23,15 @@
 #include "../Precompiled.h"
 
 #include "../Core/Context.h"
+#include "../IO/Log.h"
 #include "../Graphics/DebugRenderer.h"
+#include "../Graphics/Renderer.h"
 #include "../Graphics/Octree.h"
 #include "../Graphics/TextureCube.h"
 #include "../Graphics/Zone.h"
+#include "../Resource/ImageCube.h"
 #include "../Resource/ResourceCache.h"
+#include "../Resource/ResourceEvents.h"
 #include "../Scene/Node.h"
 #include "../Scene/Scene.h"
 
@@ -73,8 +77,11 @@ void Zone::RegisterObject(Context* context)
     URHO3D_ACCESSOR_ATTRIBUTE("Is Enabled", IsEnabled, SetEnabled, bool, true, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Bounding Box Min", Vector3, boundingBox_.min_, MarkNodeDirty, DEFAULT_BOUNDING_BOX_MIN, AM_DEFAULT);
     URHO3D_ATTRIBUTE_EX("Bounding Box Max", Vector3, boundingBox_.max_, MarkNodeDirty, DEFAULT_BOUNDING_BOX_MAX, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Ambient Color", Color, ambientColor_, DEFAULT_AMBIENT_COLOR, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Fog Color", Color, fogColor_, DEFAULT_FOG_COLOR, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Ambient Color", Color, ambientColor_, MarkCachedAmbientDirty, DEFAULT_AMBIENT_COLOR, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Ambient Brightness", float, ambientBrightness_, MarkCachedAmbientDirty, 1.0f, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Background Brightness", float, backgroundBrightness_, MarkCachedAmbientDirty, 0.0f, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Is Background Static", bool, backgroundStatic_, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Fog Color", Color, fogColor_, MarkCachedAmbientDirty, DEFAULT_FOG_COLOR, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Fog Start", float, fogStart_, DEFAULT_FOG_START, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Fog End", float, fogEnd_, DEFAULT_FOG_END, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Fog Height", float, fogHeight_, DEFAULT_FOG_HEIGHT, AM_DEFAULT);
@@ -107,12 +114,33 @@ void Zone::SetAmbientColor(const Color& color)
 {
     ambientColor_ = color;
     MarkNetworkUpdate();
+    MarkCachedAmbientDirty();
+}
+
+void Zone::SetAmbientBrightness(float brightness)
+{
+    ambientBrightness_ = brightness;
+    MarkNetworkUpdate();
+    MarkCachedAmbientDirty();
+}
+
+void Zone::SetBackgroundBrightness(float brightness)
+{
+    backgroundBrightness_ = brightness;
+    MarkNetworkUpdate();
+    MarkCachedAmbientDirty();
+}
+
+void Zone::SetBackgroundStatic(bool isStatic)
+{
+    backgroundStatic_ = isStatic;
 }
 
 void Zone::SetFogColor(const Color& color)
 {
     fogColor_ = color;
     MarkNetworkUpdate();
+    MarkCachedAmbientDirty();
 }
 
 void Zone::SetFogStart(float start)
@@ -154,6 +182,8 @@ void Zone::SetPriority(int priority)
 void Zone::SetZoneTexture(Texture* texture)
 {
     zoneTexture_ = texture;
+    UpdateZoneTextureSubscription();
+    MarkCachedTextureDirty();
     MarkNetworkUpdate();
 }
 
@@ -173,6 +203,21 @@ void Zone::SetAmbientGradient(bool enable)
 {
     ambientGradient_ = enable;
     MarkNetworkUpdate();
+}
+
+const ReflectionProbeData* Zone::GetReflectionProbe() const
+{
+    return &reflectionProbeData_.Get();
+}
+
+const Vector3 Zone::GetAmbientLighting() const
+{
+    return cachedAmbientLighting_.Get();
+}
+
+const SphericalHarmonicsDot9 Zone::GetAmbientAndBackgroundLighting() const
+{
+    return cachedAmbientAndBackgroundLighting_.Get();
 }
 
 const Matrix3x4& Zone::GetInverseWorldTransform() const
@@ -219,6 +264,9 @@ void Zone::SetZoneTextureAttr(const ResourceRef& value)
 {
     auto* cache = GetSubsystem<ResourceCache>();
     zoneTexture_ = static_cast<Texture*>(cache->GetResource(value.type_, value.name_));
+    UpdateZoneTextureSubscription();
+    MarkCachedTextureDirty();
+    MarkCachedAmbientDirty();
 }
 
 ResourceRef Zone::GetZoneTextureAttr() const
@@ -237,6 +285,10 @@ void Zone::OnMarkedDirty(Node* node)
     }
 
     Drawable::OnMarkedDirty(node);
+
+    // Notify Octree
+    if (octant_)
+        octant_->GetOctree()->MarkZoneDirty(this);
 
     // Clear zone reference from all drawables inside the bounding box, and mark gradient dirty in neighbor zones
     ClearDrawablesZone();
@@ -267,7 +319,7 @@ void Zone::UpdateAmbientGradient()
         ea::vector<Zone*> result;
         {
             PointOctreeQuery query(reinterpret_cast<ea::vector<Drawable*>&>(result), minZPosition, DRAWABLE_ZONE);
-            octant_->GetRoot()->GetDrawables(query);
+            octant_->GetOctree()->GetDrawables(query);
         }
 
         // Gradient start position: get the highest priority zone that is not this zone
@@ -293,7 +345,7 @@ void Zone::UpdateAmbientGradient()
         // Do the same for gradient end position
         {
             PointOctreeQuery query(reinterpret_cast<ea::vector<Drawable*>&>(result), maxZPosition, DRAWABLE_ZONE);
-            octant_->GetRoot()->GetDrawables(query);
+            octant_->GetOctree()->GetDrawables(query);
         }
         bestPriority = M_MIN_INT;
         bestZone = nullptr;
@@ -324,11 +376,13 @@ void Zone::OnRemoveFromOctree()
 
 void Zone::ClearDrawablesZone()
 {
-    if (octant_ && lastWorldBoundingBox_.Defined())
+    const BoundingBox& currentWorldBoundingBox = GetWorldBoundingBox();
+    const BoundingBox dirtyWorldBoundingBox = currentWorldBoundingBox.Merged(lastWorldBoundingBox_);
+    if (octant_)
     {
         ea::vector<Drawable*> result;
-        BoxOctreeQuery query(result, lastWorldBoundingBox_, DRAWABLE_GEOMETRY | DRAWABLE_ZONE);
-        octant_->GetRoot()->GetDrawables(query);
+        BoxOctreeQuery query(result, dirtyWorldBoundingBox, DRAWABLE_GEOMETRY | DRAWABLE_ZONE);
+        octant_->GetOctree()->GetDrawables(query);
 
         for (auto i = result.begin(); i != result.end(); ++i)
         {
@@ -345,9 +399,85 @@ void Zone::ClearDrawablesZone()
         }
     }
 
-    lastWorldBoundingBox_ = GetWorldBoundingBox();
+    lastWorldBoundingBox_ = currentWorldBoundingBox;
     lastAmbientStartZone_.Reset();
     lastAmbientEndZone_.Reset();
+}
+
+void Zone::UpdateCachedData()
+{
+    if (cachedTextureLighting_.IsInvalidated())
+    {
+        SphericalHarmonicsDot9 sh;
+        if (zoneTexture_)
+        {
+            const ea::string& zoneTextureName = zoneTexture_->GetName();
+            auto cache = GetSubsystem<ResourceCache>();
+            auto zoneImage = !zoneTextureName.empty() ? cache->GetTempResource<ImageCube>(zoneTextureName) : nullptr;
+            if (zoneImage)
+                sh = SphericalHarmonicsDot9(zoneImage->CalculateSphericalHarmonics());
+            else
+                URHO3D_LOGWARNING(
+                    "Cannot extract spherical harmonics from Zone texture without corresponding resource in cache");
+        }
+
+        cachedTextureLighting_.Restore(sh);
+    }
+
+    if (cachedAmbientLighting_.IsInvalidated())
+    {
+        cachedAmbientLighting_.Restore((ambientColor_ * ambientBrightness_).GammaToLinear().ToVector3());
+    }
+
+    if (cachedAmbientAndBackgroundLighting_.IsInvalidated())
+    {
+        SphericalHarmonicsDot9 sh = zoneTexture_
+            ? cachedTextureLighting_.Get()
+            : SphericalHarmonicsDot9(fogColor_.GammaToLinear());
+
+        sh *= backgroundBrightness_;
+        sh += GetAmbientLighting();
+
+        cachedAmbientAndBackgroundLighting_.Restore(sh);
+    }
+
+    if (reflectionProbeData_.IsInvalidated())
+    {
+        ReflectionProbeData data;
+        data.reflectionMap_ = zoneTexture_ ? zoneTexture_->Cast<TextureCube>() : nullptr;
+        auto renderer = GetSubsystem<Renderer>();
+        if (!data.reflectionMap_ && renderer)
+            data.reflectionMap_ = renderer->GetBlackCubeMap();
+        data.roughnessToLODFactor_ = data.reflectionMap_ ? LogBaseTwo(data.reflectionMap_->GetWidth()) : 1.0f;
+        data.reflectionMapSH_ = cachedTextureLighting_.Get();
+
+        reflectionProbeData_.Restore(data);
+    }
+}
+
+void Zone::UpdateZoneTextureSubscription()
+{
+    UnsubscribeFromEvent(E_RELOADFINISHED);
+    if (zoneTexture_)
+    {
+        SubscribeToEvent(zoneTexture_, E_RELOADFINISHED,
+            [&](StringHash eventType, VariantMap& eventData)
+        {
+            MarkCachedTextureDirty();
+        });
+    }
+}
+
+void Zone::MarkCachedAmbientDirty()
+{
+    cachedAmbientLighting_.Invalidate();
+    cachedAmbientAndBackgroundLighting_.Invalidate();
+}
+
+void Zone::MarkCachedTextureDirty()
+{
+    cachedTextureLighting_.Invalidate();
+    reflectionProbeData_.Invalidate();
 }
 
 }

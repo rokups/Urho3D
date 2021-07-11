@@ -72,6 +72,8 @@
 namespace Urho3D
 {
 
+GraphicsCaps Graphics::caps;
+
 void Graphics::SetExternalWindow(void* window)
 {
     if (!window_)

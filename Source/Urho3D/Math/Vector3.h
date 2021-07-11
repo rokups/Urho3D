@@ -533,6 +533,9 @@ inline Vector3 VectorCeil(const Vector3& vec) { return Vector3(Ceil(vec.x_), Cei
 /// Per-component absolute value of 3-vector.
 inline Vector3 VectorAbs(const Vector3& vec) { return Vector3(Abs(vec.x_), Abs(vec.y_), Abs(vec.z_)); }
 
+/// Per-component square root of 3-vector.
+inline Vector3 VectorSqrt(const Vector3& vec) { return Vector3(Sqrt(vec.x_), Sqrt(vec.y_), Sqrt(vec.z_)); }
+
 /// Per-component floor of 3-vector. Returns IntVector3.
 inline IntVector3 VectorFloorToInt(const Vector3& vec) { return IntVector3(FloorToInt(vec.x_), FloorToInt(vec.y_), FloorToInt(vec.z_)); }
 

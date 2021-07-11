@@ -49,6 +49,12 @@ namespace Urho3D
 
 const char* GEOMETRY_CATEGORY = "Geometry";
 
+static const ea::vector<ea::string> giTypeNames = {
+    "None",
+    "Use LightMap",
+    "Blend Light Probes"
+};
+
 SourceBatch::SourceBatch() = default;
 
 SourceBatch::SourceBatch(const SourceBatch& batch) = default;
@@ -69,7 +75,6 @@ Drawable::Drawable(Context* context, DrawableFlags drawableFlags) :
     updateQueued_(false),
     zoneDirty_(false),
     octant_(nullptr),
-    zone_(nullptr),
     viewMask_(DEFAULT_VIEWMASK),
     lightMask_(DEFAULT_LIGHTMASK),
     shadowMask_(DEFAULT_SHADOWMASK),
@@ -101,6 +106,7 @@ void Drawable::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE("Light Mask", int, lightMask_, DEFAULT_LIGHTMASK, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Shadow Mask", int, shadowMask_, DEFAULT_SHADOWMASK, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Zone Mask", GetZoneMask, SetZoneMask, unsigned, DEFAULT_ZONEMASK, AM_DEFAULT);
+    URHO3D_ENUM_ACCESSOR_ATTRIBUTE("Global Illumination", GetGlobalIlluminationType, SetGlobalIlluminationType, GlobalIlluminationType, giTypeNames, GlobalIlluminationType::None, AM_DEFAULT);
 }
 
 void Drawable::OnSetEnabled()
@@ -195,6 +201,7 @@ void Drawable::SetViewMask(unsigned mask)
 void Drawable::SetLightMask(unsigned mask)
 {
     lightMask_ = mask;
+    MarkPipelineStateHashDirty();
     MarkNetworkUpdate();
 }
 
@@ -208,6 +215,7 @@ void Drawable::SetZoneMask(unsigned mask)
 {
     zoneMask_ = mask;
     // Mark dirty to reset cached zone
+    cachedZone_.cacheInvalidationDistanceSquared_ = -1.0f;
     OnMarkedDirty(node_);
     MarkNetworkUpdate();
 }
@@ -237,15 +245,22 @@ void Drawable::SetOccludee(bool enable)
         occludee_ = enable;
         // Reinsert to octree to make sure octant occlusion does not erroneously hide this drawable
         if (octant_ && !updateQueued_)
-            octant_->GetRoot()->QueueUpdate(this);
+            octant_->GetOctree()->QueueUpdate(this);
         MarkNetworkUpdate();
     }
+}
+
+void Drawable::SetGlobalIlluminationType(GlobalIlluminationType type)
+{
+    giType_ = type;
+    MarkPipelineStateHashDirty();
+    MarkNetworkUpdate();
 }
 
 void Drawable::MarkForUpdate()
 {
     if (!updateQueued_ && octant_)
-        octant_->GetRoot()->QueueUpdate(this);
+        octant_->GetOctree()->QueueUpdate(this);
 }
 
 const BoundingBox& Drawable::GetWorldBoundingBox()
@@ -279,9 +294,32 @@ bool Drawable::IsInView(const FrameInfo& frame, bool anyCamera) const
     return viewFrameNumber_ == frame.frameNumber_ && (anyCamera || viewCameras_.contains(frame.camera_));
 }
 
+unsigned Drawable::GetLightMaskInZone() const
+{
+    const unsigned zoneLightMask = cachedZone_.zone_ ? cachedZone_.zone_->GetLightMask() : 0xffffffff;
+    return zoneLightMask & lightMask_;
+}
+
+unsigned Drawable::GetShadowMaskInZone() const
+{
+    const unsigned zoneShadowMask = cachedZone_.zone_ ? cachedZone_.zone_->GetShadowMask() : 0xffffffff;
+    return zoneShadowMask & shadowMask_;
+}
+
+unsigned Drawable::RecalculatePipelineStateHash() const
+{
+    unsigned hash = 0;
+    CombineHash(hash, GetLightMaskInZone() & PORTABLE_LIGHTMASK);
+    CombineHash(hash, static_cast<unsigned>(giType_));
+    return hash;
+}
+
 void Drawable::SetZone(Zone* zone, bool temporary)
 {
-    zone_ = zone;
+    if (zone)
+        cachedZone_.zone_ = zone;
+    else
+        cachedZone_ = {};
 
     // If the zone assignment was temporary (inconclusive) set the dirty flag so that it will be re-evaluated on the next frame
     zoneDirty_ = temporary;
@@ -374,7 +412,7 @@ void Drawable::OnMarkedDirty(Node* node)
 {
     worldBoundingBoxDirty_ = true;
     if (!updateQueued_ && octant_)
-        octant_->GetRoot()->QueueUpdate(this);
+        octant_->GetOctree()->QueueUpdate(this);
 
     // Mark zone assignment dirty when transform changes
     if (node == node_)
@@ -392,7 +430,7 @@ void Drawable::AddToOctree()
     {
         auto* octree = scene->GetComponent<Octree>();
         if (octree)
-            octree->InsertDrawable(this);
+            octree->AddDrawable(this);
         else
             URHO3D_LOGERROR("No Octree component in scene, drawable will not render");
     }
@@ -407,14 +445,14 @@ void Drawable::RemoveFromOctree()
 {
     if (octant_)
     {
-        Octree* octree = octant_->GetRoot();
+        Octree* octree = octant_->GetOctree();
         if (updateQueued_)
             octree->CancelUpdate(this);
 
         // Perform subclass specific deinitialization if necessary
         OnRemoveFromOctree();
 
-        octant_->RemoveDrawable(this);
+        octree->RemoveDrawable(this, octant_);
     }
 }
 

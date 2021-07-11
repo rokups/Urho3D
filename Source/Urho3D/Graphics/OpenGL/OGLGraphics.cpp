@@ -162,6 +162,25 @@ extern "C"
 namespace Urho3D
 {
 
+namespace
+{
+
+int GetIntParam(GLenum name)
+{
+    int value;
+    glGetIntegerv(name, &value);
+    return value;
+}
+
+IntVector2 GetIntVectorParam(GLenum name)
+{
+    IntVector2 value;
+    glGetIntegerv(name, &value.x_);
+    return value;
+}
+
+}
+
 static const unsigned glCmpFunc[] =
 {
     GL_ALWAYS,
@@ -256,6 +275,7 @@ static const unsigned glElementComponents[] =
 static unsigned glesDepthStencilFormat = GL_DEPTH_COMPONENT16;
 static unsigned glesReadableDepthFormat = GL_DEPTH_COMPONENT;
 #endif
+static unsigned glReadableDepthStencilFormat = 0;
 
 static ea::string extensions;
 
@@ -384,7 +404,7 @@ bool Graphics::SetScreenMode(int width, int height, const ScreenModeParams& para
         if (!forceGL2_)
         {
             SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
             SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
             apiName_ = "GL3";
         }
@@ -1038,6 +1058,22 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
     indexBuffer_ = buffer;
 }
 
+ShaderProgramLayout* Graphics::GetShaderProgramLayout(ShaderVariation* vs, ShaderVariation* ps)
+{
+    const auto combination = ea::make_pair(vs, ps);
+    auto iter = impl_->shaderPrograms_.find(combination);
+    if (iter != impl_->shaderPrograms_.end())
+        return iter->second;
+
+    // TODO: Some overhead due to redundant setting of shader program
+    ShaderVariation* prevVertexShader = vertexShader_;
+    ShaderVariation* prevPixelShader = pixelShader_;
+    SetShaders(vs, ps);
+    ShaderProgramLayout* layout = impl_->shaderProgram_;
+    SetShaders(prevVertexShader, prevPixelShader);
+    return layout;
+}
+
 void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 {
     if (vs == vertexShader_ && ps == pixelShader_)
@@ -1052,10 +1088,10 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 
             bool success = vs->Create();
             if (success)
-                URHO3D_LOGDEBUG("Compiled vertex shader " + vs->GetFullName());
+                URHO3D_LOGDEBUG("Compiled vertex shader {}", vs->GetFullName());
             else
             {
-                URHO3D_LOGERROR("Failed to compile vertex shader " + vs->GetFullName() + ":\n" + vs->GetCompilerOutput());
+                URHO3D_LOGERROR("Failed to compile vertex shader {}:\n{}", vs->GetFullName(), vs->GetCompilerOutput());
                 vs = nullptr;
             }
         }
@@ -1071,10 +1107,10 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 
             bool success = ps->Create();
             if (success)
-                URHO3D_LOGDEBUG("Compiled pixel shader " + ps->GetFullName());
+                URHO3D_LOGDEBUG("Compiled pixel shader {}", ps->GetFullName());
             else
             {
-                URHO3D_LOGERROR("Failed to compile pixel shader " + ps->GetFullName() + ":\n" + ps->GetCompilerOutput());
+                URHO3D_LOGERROR("Failed to compile pixel shader {}:\n{}", ps->GetFullName(), ps->GetCompilerOutput());
                 ps = nullptr;
             }
         }
@@ -1136,27 +1172,11 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
         }
     }
 
-    // Update the clip plane uniform on GL3, and set constant buffers
+    // Update the clip plane uniform on GL3
+    // TODO(legacy): Remove it when legacy renderer is removed
 #ifndef GL_ES_VERSION_2_0
     if (gl3Support && impl_->shaderProgram_)
-    {
-        const SharedPtr<ConstantBuffer>* constantBuffers = impl_->shaderProgram_->GetConstantBuffers();
-        for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS * 2; ++i)
-        {
-            ConstantBuffer* buffer = constantBuffers[i];
-            if (buffer != impl_->constantBuffers_[i])
-            {
-                unsigned object = buffer ? buffer->GetGPUObjectName() : 0;
-                glBindBufferBase(GL_UNIFORM_BUFFER, i, object);
-                // Calling glBindBufferBase also affects the generic buffer binding point
-                impl_->boundUBO_ = object;
-                impl_->constantBuffers_[i] = buffer;
-                ShaderProgram::ClearGlobalParameterSource((ShaderParameterGroup)(i % MAX_SHADER_PARAMETER_GROUPS));
-            }
-        }
-
         SetShaderParameter(VSP_CLIPPLANE, useClipPlane_ ? clipPlane_ : Vector4(0.0f, 0.0f, 0.0f, 1.0f));
-    }
 #endif
 
     // Store shader combination if shader dumping in progress
@@ -1177,6 +1197,29 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
     impl_->vertexBuffersDirty_ = true;
 }
 
+void Graphics::SetShaderConstantBuffers(ea::span<const ConstantBufferRange, MAX_SHADER_PARAMETER_GROUPS> constantBuffers)
+{
+    if (!caps.constantBuffersSupported_)
+    {
+        URHO3D_LOGERROR("Constant buffers are disabled, SetShaderConstantBuffers call is ignored");
+        return;
+    }
+
+#ifndef GL_ES_VERSION_2_0
+    for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
+    {
+        const ConstantBufferRange& range = constantBuffers[i];
+        if (range != constantBuffers_[i])
+        {
+            const unsigned object = range.constantBuffer_ ? range.constantBuffer_->GetGPUObjectName() : 0;
+            glBindBufferRange(GL_UNIFORM_BUFFER, i, object, range.offset_, range.size_);
+            impl_->boundUBO_ = object;
+            constantBuffers_[i] = range;
+        }
+    }
+#endif
+}
+
 void Graphics::SetShaderParameter(StringHash param, const float data[], unsigned count)
 {
     if (impl_->shaderProgram_)
@@ -1184,15 +1227,6 @@ void Graphics::SetShaderParameter(StringHash param, const float data[], unsigned
         const ShaderParameter* info = impl_->shaderProgram_->GetParameter(param);
         if (info)
         {
-            if (info->bufferPtr_)
-            {
-                ConstantBuffer* buffer = info->bufferPtr_;
-                if (!buffer->IsDirty())
-                    impl_->dirtyConstantBuffers_.push_back(buffer);
-                buffer->SetParameter(info->offset_, (unsigned)(count * sizeof(float)), data);
-                return;
-            }
-
             switch (info->glType_)
             {
             case GL_FLOAT:
@@ -1215,6 +1249,12 @@ void Graphics::SetShaderParameter(StringHash param, const float data[], unsigned
                 glUniformMatrix3fv(info->location_, count / 9, GL_FALSE, data);
                 break;
 
+#ifndef GL_ES_VERSION_2_0
+            case GL_FLOAT_MAT3x4:
+                glUniformMatrix3x4fv(info->location_, count / 12, GL_FALSE, data);
+                break;
+#endif
+
             case GL_FLOAT_MAT4:
                 glUniformMatrix4fv(info->location_, count / 16, GL_FALSE, data);
                 break;
@@ -1232,15 +1272,6 @@ void Graphics::SetShaderParameter(StringHash param, float value)
         const ShaderParameter* info = impl_->shaderProgram_->GetParameter(param);
         if (info)
         {
-            if (info->bufferPtr_)
-            {
-                ConstantBuffer* buffer = info->bufferPtr_;
-                if (!buffer->IsDirty())
-                    impl_->dirtyConstantBuffers_.push_back(buffer);
-                buffer->SetParameter(info->offset_, sizeof(float), &value);
-                return;
-            }
-
             glUniform1fv(info->location_, 1, &value);
         }
     }
@@ -1253,15 +1284,6 @@ void Graphics::SetShaderParameter(StringHash param, int value)
         const ShaderParameter* info = impl_->shaderProgram_->GetParameter(param);
         if (info)
         {
-            if (info->bufferPtr_)
-            {
-                ConstantBuffer* buffer = info->bufferPtr_;
-                if (!buffer->IsDirty())
-                    impl_->dirtyConstantBuffers_.push_back(buffer);
-                buffer->SetParameter(info->offset_, sizeof(int), &value);
-                return;
-            }
-
             glUniform1i(info->location_, value);
         }
     }
@@ -1275,15 +1297,6 @@ void Graphics::SetShaderParameter(StringHash param, bool value)
         const ShaderParameter* info = impl_->shaderProgram_->GetParameter(param);
         if (info)
         {
-            if (info->bufferPtr_)
-            {
-                ConstantBuffer* buffer = info->bufferPtr_;
-                if (!buffer->IsDirty())
-                    impl_->dirtyConstantBuffers_.push_back(buffer);
-                buffer->SetParameter(info->offset_, sizeof(bool), &value);
-                return;
-            }
-
             glUniform1i(info->location_, (int)value);
         }
     }
@@ -1301,15 +1314,6 @@ void Graphics::SetShaderParameter(StringHash param, const Vector2& vector)
         const ShaderParameter* info = impl_->shaderProgram_->GetParameter(param);
         if (info)
         {
-            if (info->bufferPtr_)
-            {
-                ConstantBuffer* buffer = info->bufferPtr_;
-                if (!buffer->IsDirty())
-                    impl_->dirtyConstantBuffers_.push_back(buffer);
-                buffer->SetParameter(info->offset_, sizeof(Vector2), &vector);
-                return;
-            }
-
             // Check the uniform type to avoid mismatch
             switch (info->glType_)
             {
@@ -1334,16 +1338,22 @@ void Graphics::SetShaderParameter(StringHash param, const Matrix3& matrix)
         const ShaderParameter* info = impl_->shaderProgram_->GetParameter(param);
         if (info)
         {
-            if (info->bufferPtr_)
+            switch (info->glType_)
             {
-                ConstantBuffer* buffer = info->bufferPtr_;
-                if (!buffer->IsDirty())
-                    impl_->dirtyConstantBuffers_.push_back(buffer);
-                buffer->SetVector3ArrayParameter(info->offset_, 3, &matrix);
-                return;
-            }
+            case GL_FLOAT_MAT3:
+                glUniformMatrix3fv(info->location_, 1, GL_FALSE, matrix.Data());
+                break;
 
-            glUniformMatrix3fv(info->location_, 1, GL_FALSE, matrix.Data());
+#ifndef GL_ES_VERSION_2_0
+            case GL_FLOAT_MAT3x4:
+                glUniformMatrix3x4fv(info->location_, 1, GL_FALSE, Matrix3x4(matrix).Data());
+                break;
+#endif
+
+            case GL_FLOAT_MAT4:
+                glUniformMatrix4fv(info->location_, 1, GL_FALSE, Matrix4(matrix).Data());
+                break;
+            }
         }
     }
 }
@@ -1355,15 +1365,6 @@ void Graphics::SetShaderParameter(StringHash param, const Vector3& vector)
         const ShaderParameter* info = impl_->shaderProgram_->GetParameter(param);
         if (info)
         {
-            if (info->bufferPtr_)
-            {
-                ConstantBuffer* buffer = info->bufferPtr_;
-                if (!buffer->IsDirty())
-                    impl_->dirtyConstantBuffers_.push_back(buffer);
-                buffer->SetParameter(info->offset_, sizeof(Vector3), &vector);
-                return;
-            }
-
             // Check the uniform type to avoid mismatch
             switch (info->glType_)
             {
@@ -1392,16 +1393,22 @@ void Graphics::SetShaderParameter(StringHash param, const Matrix4& matrix)
         const ShaderParameter* info = impl_->shaderProgram_->GetParameter(param);
         if (info)
         {
-            if (info->bufferPtr_)
+            switch (info->glType_)
             {
-                ConstantBuffer* buffer = info->bufferPtr_;
-                if (!buffer->IsDirty())
-                    impl_->dirtyConstantBuffers_.push_back(buffer);
-                buffer->SetParameter(info->offset_, sizeof(Matrix4), &matrix);
-                return;
-            }
+            case GL_FLOAT_MAT3:
+                glUniformMatrix3fv(info->location_, 1, GL_FALSE, matrix.ToMatrix3().Data());
+                break;
 
-            glUniformMatrix4fv(info->location_, 1, GL_FALSE, matrix.Data());
+#ifndef GL_ES_VERSION_2_0
+            case GL_FLOAT_MAT3x4:
+                glUniformMatrix3x4fv(info->location_, 1, GL_FALSE, Matrix3x4(matrix).Data());
+                break;
+#endif
+
+            case GL_FLOAT_MAT4:
+                glUniformMatrix4fv(info->location_, 1, GL_FALSE, matrix.Data());
+                break;
+            }
         }
     }
 }
@@ -1413,15 +1420,6 @@ void Graphics::SetShaderParameter(StringHash param, const Vector4& vector)
         const ShaderParameter* info = impl_->shaderProgram_->GetParameter(param);
         if (info)
         {
-            if (info->bufferPtr_)
-            {
-                ConstantBuffer* buffer = info->bufferPtr_;
-                if (!buffer->IsDirty())
-                    impl_->dirtyConstantBuffers_.push_back(buffer);
-                buffer->SetParameter(info->offset_, sizeof(Vector4), &vector);
-                return;
-            }
-
             // Check the uniform type to avoid mismatch
             switch (info->glType_)
             {
@@ -1454,31 +1452,22 @@ void Graphics::SetShaderParameter(StringHash param, const Matrix3x4& matrix)
         const ShaderParameter* info = impl_->shaderProgram_->GetParameter(param);
         if (info)
         {
-            // Expand to a full Matrix4
-            static Matrix4 fullMatrix;
-            fullMatrix.m00_ = matrix.m00_;
-            fullMatrix.m01_ = matrix.m01_;
-            fullMatrix.m02_ = matrix.m02_;
-            fullMatrix.m03_ = matrix.m03_;
-            fullMatrix.m10_ = matrix.m10_;
-            fullMatrix.m11_ = matrix.m11_;
-            fullMatrix.m12_ = matrix.m12_;
-            fullMatrix.m13_ = matrix.m13_;
-            fullMatrix.m20_ = matrix.m20_;
-            fullMatrix.m21_ = matrix.m21_;
-            fullMatrix.m22_ = matrix.m22_;
-            fullMatrix.m23_ = matrix.m23_;
-
-            if (info->bufferPtr_)
+            switch (info->glType_)
             {
-                ConstantBuffer* buffer = info->bufferPtr_;
-                if (!buffer->IsDirty())
-                    impl_->dirtyConstantBuffers_.push_back(buffer);
-                buffer->SetParameter(info->offset_, sizeof(Matrix4), &fullMatrix);
-                return;
-            }
+            case GL_FLOAT_MAT3:
+                glUniformMatrix3fv(info->location_, 1, GL_FALSE, matrix.ToMatrix3().Data());
+                break;
 
-            glUniformMatrix4fv(info->location_, 1, GL_FALSE, fullMatrix.Data());
+#ifndef GL_ES_VERSION_2_0
+            case GL_FLOAT_MAT3x4:
+                glUniformMatrix3x4fv(info->location_, 1, GL_FALSE, matrix.Data());
+                break;
+#endif
+
+            case GL_FLOAT_MAT4:
+                glUniformMatrix4fv(info->location_, 1, GL_FALSE, matrix.ToMatrix4().Data());
+                break;
+            };
         }
     }
 }
@@ -2365,9 +2354,6 @@ void Graphics::CleanupShaderPrograms(ShaderVariation* variation)
 
 ConstantBuffer* Graphics::GetOrCreateConstantBuffer(ShaderType /*type*/,  unsigned index, unsigned size)
 {
-    // Note: shaderType parameter is not used on OpenGL, instead binding index should already use the PS range
-    // for PS constant buffers
-
     unsigned key = (index << 16u) | size;
     auto i = impl_->allConstantBuffers_.find(key);
     if (i == impl_->allConstantBuffers_.end())
@@ -2762,6 +2748,11 @@ unsigned Graphics::GetReadableDepthFormat()
 #endif
 }
 
+unsigned Graphics::GetReadableDepthStencilFormat()
+{
+    return glReadableDepthStencilFormat;
+}
+
 unsigned Graphics::GetFormat(const ea::string& formatName)
 {
     ea::string nameLower = formatName.to_lower();
@@ -2805,12 +2796,14 @@ unsigned Graphics::GetFormat(const ea::string& formatName)
 
 void Graphics::CheckFeatureSupport()
 {
+    caps.maxNumRenderTargets_ = 1;
+    caps.globalUniformsSupported_ = true;
+
     // Check supported features: light pre-pass, deferred rendering and hardware depth texture
     lightPrepassSupport_ = false;
     deferredSupport_ = false;
 
 #ifndef GL_ES_VERSION_2_0
-    int numSupportedRTs = 1;
     if (gl3Support)
     {
         // Work around GLEW failure to check extensions properly from a GL3 context
@@ -2820,7 +2813,9 @@ void Graphics::CheckFeatureSupport()
         sRGBSupport_ = true;
         sRGBWriteSupport_ = true;
 
-        glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &numSupportedRTs);
+        caps.constantBufferOffsetAlignment_ = GetIntParam(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT);
+        caps.constantBuffersSupported_ = true;
+        caps.maxNumRenderTargets_ = GetIntParam(GL_MAX_COLOR_ATTACHMENTS);
     }
     else
     {
@@ -2830,13 +2825,14 @@ void Graphics::CheckFeatureSupport()
         sRGBSupport_ = GLEW_EXT_texture_sRGB != 0;
         sRGBWriteSupport_ = GLEW_EXT_framebuffer_sRGB != 0;
 
-        glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS_EXT, &numSupportedRTs);
+        caps.constantBuffersSupported_ = false;
+        caps.maxNumRenderTargets_ = GetIntParam(GL_MAX_COLOR_ATTACHMENTS_EXT);
     }
 
     // Must support 2 rendertargets for light pre-pass, and 4 for deferred
-    if (numSupportedRTs >= 2)
+    if (caps.maxNumRenderTargets_ >= 2)
         lightPrepassSupport_ = true;
-    if (numSupportedRTs >= 4)
+    if (caps.maxNumRenderTargets_ >= 4)
         deferredSupport_ = true;
 
 #if defined(__APPLE__) && !defined(IOS) && !defined(TVOS)
@@ -2847,6 +2843,9 @@ void Graphics::CheckFeatureSupport()
     if (renderer.contains("Intel", false))
         dummyColorFormat_ = GetRGBAFormat();
 #endif
+    // Check if can use depth-stencil for textures
+    if (gl3Support || (CheckExtension("GL_EXT_packed_depth_stencil") && CheckExtension("GL_ARB_depth_texture")))
+        glReadableDepthStencilFormat = GL_DEPTH24_STENCIL8_EXT;
 #else
     // Check for supported compressed texture formats
 #ifdef __EMSCRIPTEN__
@@ -2868,7 +2867,11 @@ void Graphics::CheckFeatureSupport()
     if (CheckExtension("GL_OES_depth24"))
         glesDepthStencilFormat = GL_DEPTH_COMPONENT24_OES;
     if (CheckExtension("GL_OES_packed_depth_stencil"))
+    {
         glesDepthStencilFormat = GL_DEPTH24_STENCIL8_OES;
+        if (CheckExtension("GL_OES_depth_texture"))
+            glReadableDepthStencilFormat = GL_DEPTH24_STENCIL8_OES;
+    }
 #ifdef __EMSCRIPTEN__
     if (!CheckExtension("WEBGL_depth_texture"))
 #else
@@ -2898,26 +2901,16 @@ void Graphics::CheckFeatureSupport()
     hardwareShadowSupport_ = shadowMapFormat_ != 0;
 
     // Get number of uniforms available
-    GLint maxVertexUniforms{};
-    GLint maxPixelUniforms{};
-    glGetIntegerv(GL_MAX_VERTEX_UNIFORM_VECTORS, &maxVertexUniforms);
-    glGetIntegerv(GL_MAX_FRAGMENT_UNIFORM_VECTORS, &maxPixelUniforms);
-    maxVertexShaderUniforms_ = static_cast<unsigned>(maxVertexUniforms);
-    maxPixelShaderUniforms_ = static_cast<unsigned>(maxPixelUniforms);
+    caps.maxVertexShaderUniforms_ = GetIntParam(GL_MAX_VERTEX_UNIFORM_VECTORS);
+    caps.maxPixelShaderUniforms_ = GetIntParam(GL_MAX_FRAGMENT_UNIFORM_VECTORS);
+
+    caps.maxTextureSize_ = GetIntParam(GL_MAX_TEXTURE_SIZE);
+    const IntVector2 maxViewportDims = GetIntVectorParam(GL_MAX_VIEWPORT_DIMS);
+    caps.maxRenderTargetSize_ = NextPowerOfTwo(ea::min(maxViewportDims.x_, maxViewportDims.y_) + 1) >> 1;
 }
 
 void Graphics::PrepareDraw()
 {
-#ifndef GL_ES_VERSION_2_0
-    if (gl3Support)
-    {
-        for (auto i = impl_->dirtyConstantBuffers_.begin(); i !=
-            impl_->dirtyConstantBuffers_.end(); ++i)
-            (*i)->Apply();
-        impl_->dirtyConstantBuffers_.clear();
-    }
-#endif
-
     if (impl_->fboDirty_)
     {
         impl_->fboDirty_ = false;
@@ -3160,7 +3153,7 @@ void Graphics::PrepareDraw()
 
                 if (k != impl_->vertexAttributes_->end())
                 {
-                    unsigned location = k->second;
+                    const unsigned location = k->second.first;
                     unsigned locationMask = 1u << location;
                     if (assignedLocations & locationMask)
                         continue; // Already assigned by higher index vertex buffer
@@ -3194,9 +3187,20 @@ void Graphics::PrepareDraw()
                     }
 
                     SetVBO(buffer->GetGPUObjectName());
-                    glVertexAttribPointer(location, glElementComponents[element.type_], glElementTypes[element.type_],
-                        element.type_ == TYPE_UBYTE4_NORM ? GL_TRUE : GL_FALSE, (unsigned)buffer->GetVertexSize(),
-                        (const void *)(size_t)dataStart);
+#ifndef GL_ES_VERSION_2_0
+                    const bool isInteger = k->second.second;
+                    if (isInteger)
+                    {
+                        glVertexAttribIPointer(location, glElementComponents[element.type_], glElementTypes[element.type_],
+                            (unsigned)buffer->GetVertexSize(), (const void *)(size_t)dataStart);
+                    }
+                    else
+#endif
+                    {
+                        glVertexAttribPointer(location, glElementComponents[element.type_], glElementTypes[element.type_],
+                            element.type_ == TYPE_UBYTE4_NORM ? GL_TRUE : GL_FALSE, (unsigned)buffer->GetVertexSize(),
+                            (const void *)(size_t)dataStart);
+                    }
                 }
             }
         }
@@ -3249,6 +3253,9 @@ void Graphics::ResetCachedState()
 {
     for (auto& vertexBuffer : vertexBuffers_)
         vertexBuffer = nullptr;
+
+    for (auto& constantBuffer : constantBuffers_)
+        constantBuffer = {};
 
     for (unsigned i = 0; i < MAX_TEXTURE_UNITS; ++i)
     {
@@ -3304,10 +3311,6 @@ void Graphics::ResetCachedState()
         SetDepthTest(CMP_LESSEQUAL);
         SetDepthWrite(true);
     }
-
-    for (auto& constantBuffer : impl_->constantBuffers_)
-        constantBuffer = nullptr;
-    impl_->dirtyConstantBuffers_.clear();
 }
 
 void Graphics::SetTextureUnitMappings()

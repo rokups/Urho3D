@@ -220,6 +220,22 @@ public:
         return (value_ & flags) == flags && (flags != 0 || value_ == flags);
     }
 
+    /// Set or unset specified subset of flags
+    /// @{
+    void Set(const Integer flags, bool enabled = true)
+    {
+        if (enabled)
+            value_ |= flags;
+        else
+            value_ &= ~flags;
+    }
+
+    void Set(const Enum value, bool enabled = true)
+    {
+        Set(static_cast<Integer>(value), enabled);
+    }
+    /// @}
+
     /// Return underlying integer (constant).
     Integer AsInteger() const { return value_; }
 

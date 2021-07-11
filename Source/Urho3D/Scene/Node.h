@@ -377,6 +377,9 @@ public:
     /// Return name hash.
     StringHash GetNameHash() const { return impl_->nameHash_; }
 
+    /// Return full node name for debugging. Unique for each node in the scene. Slow!
+    ea::string GetFullNameDebug() const;
+
     /// Return all tags.
     /// @property
     const StringVector& GetTags() const { return impl_->tags_; }
@@ -579,6 +582,8 @@ public:
     /// Return child scene nodes with a specific tag.
     ea::vector<Node*> GetChildrenWithTag(const ea::string& tag, bool recursive = false) const;
 
+    /// Return index of direct child or M_MAX_UNSIGNED if not found.
+    unsigned GetChildIndex(const Node* child) const;
     /// Return child scene node by index.
     Node* GetChild(unsigned index) const;
     /// Return child scene node by name.
@@ -600,6 +605,8 @@ public:
 
     /// Return all components of type. Optionally recursive.
     void GetComponents(ea::vector<Component*>& dest, StringHash type, bool recursive = false) const;
+    /// Return index of owned component or M_MAX_UNSIGNED if not found.
+    unsigned GetComponentIndex(const Component* component) const;
     /// Return component by type. If there are several, returns the first.
     Component* GetComponent(StringHash type, bool recursive = false) const;
     /// Return component in parent node. If there are several, returns the first. May optional traverse up to the root node.

@@ -66,6 +66,7 @@ URHO3D_EVENT(E_ENDRENDERING, EndRendering)
 URHO3D_EVENT(E_BEGINVIEWUPDATE, BeginViewUpdate)
 {
     URHO3D_PARAM(P_VIEW, View);                    // View pointer
+    URHO3D_PARAM(P_RENDERPIPELINEVIEW, RenderPipelineView); // RenderPipelineView pointer
     URHO3D_PARAM(P_TEXTURE, Texture);              // Texture pointer
     URHO3D_PARAM(P_SURFACE, Surface);              // RenderSurface pointer
     URHO3D_PARAM(P_SCENE, Scene);                  // Scene pointer
@@ -76,6 +77,7 @@ URHO3D_EVENT(E_BEGINVIEWUPDATE, BeginViewUpdate)
 URHO3D_EVENT(E_ENDVIEWUPDATE, EndViewUpdate)
 {
     URHO3D_PARAM(P_VIEW, View);                    // View pointer
+    URHO3D_PARAM(P_RENDERPIPELINEVIEW, RenderPipelineView); // RenderPipelineView pointer
     URHO3D_PARAM(P_TEXTURE, Texture);              // Texture pointer
     URHO3D_PARAM(P_SURFACE, Surface);              // RenderSurface pointer
     URHO3D_PARAM(P_SCENE, Scene);                  // Scene pointer
@@ -86,6 +88,7 @@ URHO3D_EVENT(E_ENDVIEWUPDATE, EndViewUpdate)
 URHO3D_EVENT(E_BEGINVIEWRENDER, BeginViewRender)
 {
     URHO3D_PARAM(P_VIEW, View);                    // View pointer
+    URHO3D_PARAM(P_RENDERPIPELINEVIEW, RenderPipelineView); // RenderPipelineView pointer
     URHO3D_PARAM(P_TEXTURE, Texture);              // Texture pointer
     URHO3D_PARAM(P_SURFACE, Surface);              // RenderSurface pointer
     URHO3D_PARAM(P_SCENE, Scene);                  // Scene pointer
@@ -96,6 +99,7 @@ URHO3D_EVENT(E_BEGINVIEWRENDER, BeginViewRender)
 URHO3D_EVENT(E_VIEWBUFFERSREADY, ViewBuffersReady)
 {
     URHO3D_PARAM(P_VIEW, View);                    // View pointer
+    URHO3D_PARAM(P_RENDERPIPELINEVIEW, RenderPipelineView); // RenderPipelineView pointer
     URHO3D_PARAM(P_TEXTURE, Texture);              // Texture pointer
     URHO3D_PARAM(P_SURFACE, Surface);              // RenderSurface pointer
     URHO3D_PARAM(P_SCENE, Scene);                  // Scene pointer
@@ -106,6 +110,7 @@ URHO3D_EVENT(E_VIEWBUFFERSREADY, ViewBuffersReady)
 URHO3D_EVENT(E_VIEWGLOBALSHADERPARAMETERS, ViewGlobalShaderParameters)
 {
     URHO3D_PARAM(P_VIEW, View);                    // View pointer
+    URHO3D_PARAM(P_RENDERPIPELINEVIEW, RenderPipelineView); // RenderPipelineView pointer
     URHO3D_PARAM(P_TEXTURE, Texture);              // Texture pointer
     URHO3D_PARAM(P_SURFACE, Surface);              // RenderSurface pointer
     URHO3D_PARAM(P_SCENE, Scene);                  // Scene pointer
@@ -116,6 +121,7 @@ URHO3D_EVENT(E_VIEWGLOBALSHADERPARAMETERS, ViewGlobalShaderParameters)
 URHO3D_EVENT(E_ENDVIEWRENDER, EndViewRender)
 {
     URHO3D_PARAM(P_VIEW, View);                    // View pointer
+    URHO3D_PARAM(P_RENDERPIPELINEVIEW, RenderPipelineView); // RenderPipelineView pointer
     URHO3D_PARAM(P_TEXTURE, Texture);              // Texture pointer
     URHO3D_PARAM(P_SURFACE, Surface);              // RenderSurface pointer
     URHO3D_PARAM(P_SCENE, Scene);                  // Scene pointer

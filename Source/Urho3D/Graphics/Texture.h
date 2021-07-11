@@ -66,6 +66,8 @@ public:
     /// Set border color for border addressing mode.
     /// @property
     void SetBorderColor(const Color& color);
+    /// Set whether the texture data is in linear color space (instead of gamma space).
+    void SetLinear(bool linear);
     /// Set sRGB sampling and writing mode.
     /// @property
     void SetSRGB(bool enable);
@@ -99,6 +101,9 @@ public:
     /// Return size.
     IntVector2 GetSize() const { return IntVector2(width_, height_); }
 
+    /// Return viewport rectange.
+    IntRect GetRect() const { return { 0, 0, width_, height_ }; }
+
     /// Return depth.
     int GetDepth() const { return depth_; }
 
@@ -120,6 +125,9 @@ public:
     /// Return border color.
     /// @property
     const Color& GetBorderColor() const { return borderColor_; }
+
+    /// Return whether the texture data are in linear space (instead of gamma space).
+    bool GetLinear() const { return linear_; }
 
     /// Return whether is using sRGB sampling and writing.
     /// @property
@@ -271,6 +279,8 @@ protected:
     int multiSample_{1};
     /// sRGB sampling and writing mode flag.
     bool sRGB_{};
+    /// Whether the texture data is in linear color space (instead of gamma space).
+    bool linear_{};
     /// Parameters dirty flag.
     bool parametersDirty_{true};
     /// Multisampling autoresolve flag.

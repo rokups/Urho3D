@@ -34,6 +34,7 @@
 #include "../Graphics/Zone.h"
 #include "../IO/Log.h"
 #include "../Scene/Scene.h"
+#include "../Resource/ResourceCache.h"
 
 #include <EASTL/algorithm.h>
 
@@ -105,11 +106,14 @@ void DefaultBakedSceneCollector::LockScene(Scene* scene, const Vector3& chunkSiz
 
     // Collect light probe groups
     scene_->GetComponents(lightProbeGroups_, true);
+    scene_->GetComponents(zones_, true);
 
     // Collect nodes
     ea::vector<StaticModel*> staticModels;
     ea::vector<Terrain*> terrains;
     ea::vector<LightProbeGroup*> lightProbeGroups;
+    ea::vector<Light*> lights;
+    ea::vector<Drawable*> drawablesToBeUpdated;
 
     for (Node* node : children)
     {
@@ -121,6 +125,7 @@ void DefaultBakedSceneCollector::LockScene(Scene* scene, const Vector3& chunkSiz
         node->GetComponents(staticModels);
         node->GetComponents(terrains);
         node->GetComponents(lightProbeGroups);
+        node->GetComponents(lights);
 
         for (StaticModel* staticModel : staticModels)
         {
@@ -128,6 +133,7 @@ void DefaultBakedSceneCollector::LockScene(Scene* scene, const Vector3& chunkSiz
             {
                 chunkData.geometries_.push_back(staticModel);
                 chunkData.boundingBox_.Merge(staticModel->GetWorldBoundingBox());
+                drawablesToBeUpdated.push_back(staticModel);
             }
         }
 
@@ -137,6 +143,9 @@ void DefaultBakedSceneCollector::LockScene(Scene* scene, const Vector3& chunkSiz
             {
                 chunkData.geometries_.push_back(terrain);
                 chunkData.boundingBox_.Merge(terrain->CalculateWorldBoundingBox());
+                const IntVector2 numPatches = terrain->GetNumPatches();
+                for (unsigned i = 0; i < numPatches.x_ * numPatches.y_; ++i)
+                    drawablesToBeUpdated.push_back(terrain->GetPatch(i));
             }
         }
 
@@ -148,12 +157,63 @@ void DefaultBakedSceneCollector::LockScene(Scene* scene, const Vector3& chunkSiz
                 chunkData.boundingBox_.Merge(lightProbeGroup->GetWorldBoundingBox());
             }
         }
+
+        for (Light* light : lights)
+        {
+            if (light->GetLightMode() != LM_REALTIME)
+                drawablesToBeUpdated.push_back(light);
+        }
     }
+
+    // Force zone updates for drawables
+    for (Drawable* drawable : drawablesToBeUpdated)
+    {
+        CachedDrawableZone& cachedZone = drawable->GetMutableCachedZone();
+        cachedZone = octree_->QueryZone(drawable->GetNode()->GetWorldPosition(), drawable->GetZoneMask());
+    }
+
+    // Prepare backgrounds
+    ea::vector<BakedSceneBackground> backgrounds;
+    backgrounds.push_back(BakedSceneBackground{});
+
+    for (Zone* zone : zones_)
+    {
+        // Non-static zones always have black background
+        if (!zone->IsBackgroundStatic())
+        {
+            zoneToBackgroundMap_.emplace(zone, 0);
+            continue;
+        }
+
+        BakedSceneBackground background;
+        if (Texture* texture = zone->GetZoneTexture())
+        {
+            auto cache = scene_->GetSubsystem<ResourceCache>();
+            background.image_ = cache->GetResource<ImageCube>(texture->GetName());
+            if (background.image_)
+            {
+                const unsigned bestLevel = background.image_->GetSphericalHarmonicsMipLevel();
+                background.image_ = background.image_->GetDecompressedImageLevel(bestLevel);
+            }
+        }
+        background.color_ = background.image_ ? Color::WHITE : zone->GetFogColor();
+        background.intensity_ = zone->GetBackgroundBrightness();
+
+        zoneToBackgroundMap_.emplace(zone, backgrounds.size());
+        backgrounds.push_back(background);
+    }
+
+    backgrounds_ = ea::make_shared<const ea::vector<BakedSceneBackground>>(ea::move(backgrounds));
 }
 
 ea::vector<IntVector3> DefaultBakedSceneCollector::GetChunks()
 {
     return chunks_.keys();
+}
+
+BakedSceneBackgroundArrayPtr DefaultBakedSceneCollector::GetBackgrounds()
+{
+    return backgrounds_;
 }
 
 ea::vector<Component*> DefaultBakedSceneCollector::GetUniqueGeometries(const IntVector3& chunkIndex)
@@ -174,6 +234,17 @@ ea::vector<LightProbeGroup*> DefaultBakedSceneCollector::GetUniqueLightProbeGrou
     if (iter != chunks_.end())
         return iter->second.lightProbeGroups_;
     return {};
+}
+
+Zone* DefaultBakedSceneCollector::GetLightProbeGroupZone(const IntVector3& chunkIndex, LightProbeGroup* lightProbeGroup)
+{
+    return octree_->QueryZone(lightProbeGroup->GetWorldBoundingBox().Center(), lightProbeGroup->GetZoneMask()).zone_;
+}
+
+unsigned DefaultBakedSceneCollector::GetZoneBackground(const IntVector3& chunkIndex, Zone* zone)
+{
+    auto iter = zoneToBackgroundMap_.find(zone);
+    return iter != zoneToBackgroundMap_.end() ? iter->second : 0;
 }
 
 BoundingBox DefaultBakedSceneCollector::GetChunkBoundingBox(const IntVector3& chunkIndex)

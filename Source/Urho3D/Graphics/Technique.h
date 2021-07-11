@@ -26,6 +26,7 @@
 
 #include "../Container/Hash.h"
 #include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/PipelineStateTracker.h"
 #include "../Resource/Resource.h"
 
 namespace Urho3D
@@ -76,7 +77,7 @@ enum PassLightingMode
 };
 
 /// %Material rendering pass, which defines shaders and render state.
-class URHO3D_API Pass : public RefCounted
+class URHO3D_API Pass : public RefCounted, public PipelineStateTracker
 {
 public:
     /// Construct.
@@ -165,6 +166,9 @@ public:
     /// @property
     bool IsDesktop() const { return isDesktop_; }
 
+    /// Return whether the pass uses cutout transparency via ALPHAMASK.
+    bool IsAlphaMask() const { return isAlphaMask_; }
+
     /// Return vertex shader name.
     /// @property
     const ea::string& GetVertexShader() const { return vertexShaderName_; }
@@ -205,6 +209,9 @@ public:
     ea::string GetEffectivePixelShaderDefines() const;
 
 private:
+    /// Recalculate hash of pipeline state configuration.
+    unsigned RecalculatePipelineStateHash() const override;
+
     /// Pass index.
     unsigned index_;
     /// Blend mode.
@@ -223,6 +230,8 @@ private:
     bool alphaToCoverage_;
     /// Require desktop level hardware flag.
     bool isDesktop_;
+    /// Whether the pass uses cutout transparency via ALPHAMASK.
+    bool isAlphaMask_{};
     /// Vertex shader name.
     ea::string vertexShaderName_;
     /// Pixel shader name.
@@ -293,7 +302,7 @@ public:
     bool HasPass(const ea::string& name) const;
 
     /// Return a pass, or null if not found.
-    Pass* GetPass(unsigned passIndex) const { return passIndex < passes_.size() ? passes_[passIndex] : nullptr; }
+    Pass* GetPass(unsigned passIndex) const { return passIndex < passes_.size() ? passes_[passIndex].Get() : nullptr; }
 
     /// Return a pass by name, or null if not found. This overload should not be called in time-critical rendering loops; use a pre-acquired pass index instead.
     Pass* GetPass(const ea::string& name) const;

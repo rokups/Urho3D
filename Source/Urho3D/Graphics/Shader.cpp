@@ -38,6 +38,36 @@
 namespace Urho3D
 {
 
+ea::array<bool, 128> GenerateAllowedCharacterMask()
+{
+    ea::array<bool, 128> result;
+    // Allow letters, numbers and whitespace
+    for (unsigned ch = 0; ch < 128; ++ch)
+        result[ch] = std::isalnum(ch) || std::isspace(ch);
+    // Allow specific symbols (see https://www.khronos.org/files/opengles_shading_language.pdf)
+    const char specialSymbols[] = {
+        '_', '.', '+', '-', '/', '*', '%',
+        '<', '>', '[', ']', '(', ')', '{', '}',
+        '^', '|', '&', '~', '=', '!', ':', ';', ',', '?',
+        '#'
+    };
+    for (char ch : specialSymbols)
+        result[ch] = true;
+    return result;
+};
+
+template <class Iter, class Value>
+Iter FindNth(Iter begin, Iter end, const Value& value, unsigned count)
+{
+    auto iter = ea::find(begin, end, value);
+    while (count > 0 && iter != end)
+    {
+        iter = ea::find(ea::next(iter), end, value);
+        --count;
+    }
+    return iter;
+}
+
 void CommentOutFunction(ea::string& code, const ea::string& signature)
 {
     unsigned startPos = code.find(signature);
@@ -62,6 +92,16 @@ void CommentOutFunction(ea::string& code, const ea::string& signature)
         }
     }
 }
+
+ea::string FormatLineDirective(bool isGLSL, const ea::string& fileName, unsigned fileIndex, unsigned line)
+{
+    if (isGLSL)
+        return Format("#line {} {}\n", line, fileIndex);
+    else
+        return Format("#line {} \"{}\"\n", line, fileName);
+}
+
+ea::unordered_map<ea::string, unsigned> Shader::fileToIndexMapping;
 
 Shader::Shader(Context* context) :
     Resource(context),
@@ -92,8 +132,26 @@ bool Shader::BeginLoad(Deserializer& source)
     // Load the shader source code and resolve any includes
     timeStamp_ = 0;
     ea::string shaderCode;
-    if (!ProcessSource(shaderCode, source))
-        return false;
+    ProcessSource(shaderCode, source);
+
+    // Validate shader code
+    if (graphics->IsShaderValidationEnabled())
+    {
+        static const auto characterMask = GenerateAllowedCharacterMask();
+        static const unsigned maxSnippetSize = 5;
+
+        const auto isAllowed = [](char ch) { return ch >= 0 && ch <= 127 && characterMask[ch]; };
+        const auto badCharacterIter = ea::find_if_not(shaderCode.begin(), shaderCode.end(), isAllowed);
+        if (badCharacterIter != shaderCode.end())
+        {
+            const auto snippetEnd = FindNth(badCharacterIter, shaderCode.end(), '\n', maxSnippetSize / 2);
+            const auto snippetBegin = FindNth(
+                ea::make_reverse_iterator(badCharacterIter), shaderCode.rend(), '\n', maxSnippetSize / 2).base();
+            const ea::string snippet(snippetBegin, snippetEnd);
+            URHO3D_LOGWARNING("Unexpected character #{} '{}' in shader code:\n{}",
+                static_cast<unsigned>(static_cast<unsigned char>(*badCharacterIter)), *badCharacterIter, snippet);
+        }
+    }
 
     // Comment out the unneeded shader function
     vsSourceCode_ = shaderCode;
@@ -171,9 +229,17 @@ unsigned Shader::GetShaderDefinesHash(const char* defines) const
     return definesHash;
 }
 
-bool Shader::ProcessSource(ea::string& code, Deserializer& source)
+void Shader::ProcessSource(ea::string& code, Deserializer& source)
 {
     auto* cache = GetSubsystem<ResourceCache>();
+    auto* graphics = GetSubsystem<Graphics>();
+    const ea::string& fileName = source.GetName();
+    const bool isGLSL = IsGLSL();
+
+    // Add file to index
+    unsigned& fileIndex = fileToIndexMapping[fileName];
+    if (!fileIndex)
+        fileIndex = fileToIndexMapping.size();
 
     // If the source if a non-packaged file, store the timestamp
     auto* file = dynamic_cast<File*>(&source);
@@ -190,6 +256,9 @@ bool Shader::ProcessSource(ea::string& code, Deserializer& source)
     if (source.GetName() != GetName())
         cache->StoreResourceDependency(this, source.GetName());
 
+    unsigned numNewLines = 0;
+    unsigned currentLine = 1;
+    code += FormatLineDirective(isGLSL, fileName, fileIndex, currentLine);
     while (!source.IsEof())
     {
         ea::string line = source.ReadLine();
@@ -198,25 +267,39 @@ bool Shader::ProcessSource(ea::string& code, Deserializer& source)
         {
             ea::string includeFileName = GetPath(source.GetName()) + line.substr(9).replaced("\"", "").trimmed();
 
+            // Add included code or error directive
             SharedPtr<File> includeFile = cache->GetFile(includeFileName);
-            if (!includeFile)
-                return false;
+            if (includeFile)
+                ProcessSource(code, *includeFile);
+            else
+                code += Format("#error Missing include file <{}>\n", includeFileName);
 
-            // Add the include file into the current code recursively
-            if (!ProcessSource(code, *includeFile))
-                return false;
+            code += FormatLineDirective(isGLSL, fileName, fileIndex, currentLine);
         }
         else
         {
-            code += line;
-            code += "\n";
+            const bool isLineContinuation = line.length() >= 1 && line.back() == '\\';
+            if (isLineContinuation)
+                line.erase(line.end() - 1);
+
+            // If shader validation is enabled, trim comments manually to avoid validating comment contents
+            if (!graphics->IsShaderValidationEnabled() || !line.trimmed().starts_with("//"))
+                code += line;
+
+            ++numNewLines;
+            if (!isLineContinuation)
+            {
+                // When line continuation chain is over, append skipped newlines to keep line numbers
+                for (unsigned i = 0; i < numNewLines; ++i)
+                    code += "\n";
+                numNewLines = 0;
+            }
         }
+        ++currentLine;
     }
 
     // Finally insert an empty line to mark the space between files
     code += "\n";
-
-    return true;
 }
 
 ea::string Shader::NormalizeDefines(const ea::string& defines)
@@ -230,6 +313,23 @@ void Shader::RefreshMemoryUse()
 {
     SetMemoryUse(
         (unsigned)(sizeof(Shader) + vsSourceCode_.length() + psSourceCode_.length() + numVariations_ * sizeof(ShaderVariation)));
+}
+
+ea::string Shader::GetShaderFileList()
+{
+    ea::vector<ea::pair<ea::string, unsigned>> fileList(fileToIndexMapping.begin(), fileToIndexMapping.end());
+    ea::sort(fileList.begin(), fileList.end(),
+        [](const ea::pair<ea::string, unsigned>& lhs, const ea::pair<ea::string, unsigned>& rhs)
+    {
+        return lhs.second < rhs.second;
+    });
+
+    ea::string result;
+    result += "Shader Files:\n";
+    for (const auto& item : fileList)
+        result += Format("{}: {}\n", item.second, item.first);
+    result += "\n";
+    return result;
 }
 
 }

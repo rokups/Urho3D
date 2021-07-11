@@ -41,7 +41,8 @@ struct BakedLight
     explicit BakedLight(Light* light)
         : lightType_(light->GetLightType())
         , lightMode_(light->GetLightMode())
-        , color_(light->GetEffectiveColor())
+        , lightMask_(light->GetLightMask())
+        , color_(light->GetEffectiveColor().GammaToLinear())
         , indirectBrightness_(light->GetIndirectBrightness())
         , distance_(light->GetRange())
         , fov_(light->GetFov())
@@ -59,6 +60,7 @@ struct BakedLight
     LightType lightType_{};
     /// Light mode.
     LightMode lightMode_{};
+    unsigned lightMask_{};
     /// Light color.
     Color color_{};
     /// Indirect brightness.

@@ -1,0 +1,34 @@
+<rml>
+<head>
+    <link type="text/rcss" href="rml.rcss"/>
+    <link type="text/rcss" href="default.rcss"/>
+    <title>Inspector</title>
+</head>
+
+<body id="window" style="width: 45%; left: 52%; top: 5%; height: 80%;">
+    <div data-model="RmlSerializableInspector_model">
+        <div id="titlebar">
+            <handle move_target="#document">
+                <div id="title">{{type}} Inspector</div>
+                <button class="close-window" onclick="{'e': 'RmlSerializableInspector_CloseWindow'}"></button>
+            </handle>
+        </div>
+        <div style="overflow-y: scroll; position: absolute; top: 25pt; bottom: 10pt; left: 0pt; right: 7pt;">
+            <table>
+                <tbody>
+                    <tr style="height: 30dp" data-for="attribute : attributes">
+                        <td style="width: 40%; text-align: right; vertical-align: middle; padding-right: 5pt;">{{attribute.name}}</td>
+                        <td style="width: 60%; vertical-align: middle">
+                            <input type="checkbox" value="value" data-if="attribute.type == 1" data-checked="attribute.value"/>
+                            <input type="text" style="width: 90%" data-if="attribute.type == 2" data-value="attribute.value"/>
+                            <span data-if="attribute.type == 3" data-rml="attribute.enum_selector"></span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <handle size_target="#document" class="resize-handle"></handle>
+</body>
+
+</rml>

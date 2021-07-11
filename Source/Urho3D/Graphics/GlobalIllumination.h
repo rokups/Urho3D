@@ -64,14 +64,6 @@ public:
     void SetEmissionBrightness(float emissionBrightness) { emissionBrightness_ = emissionBrightness; }
     /// Return emission brightness.
     float GetEmissionBrightness() const { return emissionBrightness_; }
-    /// Set background static.
-    void SetBackgroundStatic(bool backgroundStatic) { backgroundStatic_ = backgroundStatic; }
-    /// Return whether the background is static.
-    bool GetBackgroundStatic() const { return backgroundStatic_; }
-    /// Set background brightness.
-    void SetBackgroundBrightness(float brightness) { backgroundBrightness_ = brightness; }
-    /// Return background brightness.
-    float GetBackgroundBrightness() const { return backgroundBrightness_; }
 
     /// Set reference on file with baked data.
     void SetFileRef(const ResourceRef& fileRef);
@@ -87,10 +79,6 @@ private:
 
     /// Emission indirect brightness.
     float emissionBrightness_{ 1.0f };
-    /// Whether the background (Zone and Skybox) is static.
-    bool backgroundStatic_{};
-    /// Background brightness multiplier.
-    float backgroundBrightness_{};
 
     /// Reference on file with GI data.
     ResourceRef fileRef_{ BinaryFile::GetTypeStatic() };

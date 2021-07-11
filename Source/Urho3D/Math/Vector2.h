@@ -437,6 +437,9 @@ inline Vector2 VectorCeil(const Vector2& vec) { return Vector2(Ceil(vec.x_), Cei
 /// Per-component absolute value of 2-vector.
 inline Vector2 VectorAbs(const Vector2& vec) { return Vector2(Abs(vec.x_), Abs(vec.y_)); }
 
+/// Per-component square root of 2-vector.
+inline Vector2 VectorSqrt(const Vector2& vec) { return Vector2(Sqrt(vec.x_), Sqrt(vec.y_)); }
+
 /// Per-component floor of 2-vector. Returns IntVector2.
 inline IntVector2 VectorFloorToInt(const Vector2& vec) { return IntVector2(FloorToInt(vec.x_), FloorToInt(vec.y_)); }
 

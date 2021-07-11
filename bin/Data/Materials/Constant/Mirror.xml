@@ -1,0 +1,7 @@
+<material>
+    <technique name="Techniques/LitOpaque.xml" />
+    <shader vsdefines="ENVCUBEMAP" psdefines="ENVCUBEMAP" />
+    <parameter name="MatDiffColor" value="0 0 0 1" />
+    <parameter name="MatSpecColor" value="1 1 1 128" />
+    <parameter name="MatEnvMapColor" value="1 1 1" />
+</material>

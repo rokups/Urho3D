@@ -33,6 +33,8 @@
 namespace Urho3D
 {
 
+class Zone;
+
 static const float DEFAULT_NEARCLIP = 0.1f;
 static const float DEFAULT_FARCLIP = 1000.0f;
 static const float DEFAULT_CAMERA_FOV = 45.0f;
@@ -93,6 +95,8 @@ public:
     /// Set view mask. Will be and'ed with object's view mask to see if the object should be rendered.
     /// @property
     void SetViewMask(unsigned mask);
+    /// Set zone mask.
+    void SetZoneMask(unsigned mask);
     /// Set view override flags.
     /// @property
     void SetViewOverrideFlags(ViewOverrideFlags flags);
@@ -158,6 +162,9 @@ public:
     /// @property
     unsigned GetViewMask() const { return viewMask_; }
 
+    /// Return zone mask.
+    unsigned GetZoneMask() const { return zoneMask_; }
+
     /// Return view override flags.
     /// @property
     ViewOverrideFlags GetViewOverrideFlags() const { return viewOverrideFlags_; }
@@ -183,6 +190,8 @@ public:
     /// Return projection matrix converted to API-specific format for use as a shader parameter.
     /// @property
     Matrix4 GetGPUProjection() const;
+    /// Return effective view-projection matrix with optionally applied depth bias.
+    Matrix4 GetEffectiveGPUViewProjection(float constantDepthBias) const;
     /// Return view matrix.
     /// @property
     const Matrix3x4& GetView() const;
@@ -195,6 +204,8 @@ public:
     /// Return half view size.
     /// @property
     float GetHalfViewSize() const;
+    /// Return dimensions of camera frustum at given distance.
+    Vector2 GetViewSizeAt(float z) const;
     /// Return frustum split by custom near and far clip distances.
     Frustum GetSplitFrustum(float nearClip, float farClip) const;
     /// Return frustum in view space.
@@ -264,6 +275,22 @@ public:
     /// Return clipping plane attribute.
     Vector4 GetClipPlaneAttr() const;
 
+    /// Set current zone.
+    void SetZone(Zone* zone) { zone_ = zone; }
+    /// Return current zone.
+    Zone* GetZone() const { return zone_; }
+
+    /// Return effective ambient light color.
+    const Color& GetEffectiveAmbientColor() const;
+    /// Return effective ambient light brightness.
+    float GetEffectiveAmbientBrightness() const;
+    /// Return effective fog color considering current zone.
+    const Color& GetEffectiveFogColor() const;
+    /// Return effective fog start distance considering current zone.
+    float GetEffectiveFogStart() const;
+    /// Return effective fog end distance considering current zone.
+    float GetEffectiveFogEnd() const;
+
 protected:
     /// Handle node being assigned.
     void OnNodeSet(Node* node) override;
@@ -324,6 +351,10 @@ private:
     float lodBias_;
     /// View mask.
     unsigned viewMask_;
+    /// Zone mask.
+    unsigned zoneMask_{};
+    /// Current zone containing camera.
+    Zone* zone_{};
     /// View override flags.
     ViewOverrideFlags viewOverrideFlags_;
     /// Fill mode.

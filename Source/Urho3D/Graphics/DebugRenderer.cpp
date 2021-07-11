@@ -34,6 +34,7 @@
 #include "../Graphics/VertexBuffer.h"
 #include "../Graphics/IndexBuffer.h"
 #include "../Graphics/Geometry.h"
+#include "../Graphics/Renderer.h"
 #include "../Math/Polyhedron.h"
 #include "../Resource/ResourceCache.h"
 
@@ -543,14 +544,12 @@ void DebugRenderer::Render()
     if (!HasContent())
         return;
 
+    auto* renderer = GetSubsystem<Renderer>();
     auto* graphics = GetSubsystem<Graphics>();
     // Engine does not render when window is closed or device is lost
     assert(graphics && graphics->IsInitialized() && !graphics->IsDeviceLost());
 
     URHO3D_PROFILE("RenderDebugGeometry");
-
-    ShaderVariation* vs = graphics->GetShader(VS, "Basic", "VERTEXCOLOR");
-    ShaderVariation* ps = graphics->GetShader(PS, "Basic", "VERTEXCOLOR");
 
     unsigned numVertices = (lines_.size() + noDepthLines_.size()) * 2 + (triangles_.size() + noDepthTriangles_.size()) * 3;
     // Resize the vertex buffer if too small or much too large
@@ -639,56 +638,73 @@ void DebugRenderer::Render()
 
     vertexBuffer_->Unlock();
 
-    graphics->SetBlendMode(lineAntiAlias_ ? BLEND_ALPHA : BLEND_REPLACE);
-    graphics->SetColorWrite(true);
-    graphics->SetCullMode(CULL_NONE);
-    graphics->SetDepthWrite(true);
-    graphics->SetLineAntiAlias(lineAntiAlias_);
-    graphics->SetScissorTest(false);
-    graphics->SetStencilTest(false);
-    graphics->SetShaders(vs, ps);
-    graphics->SetShaderParameter(VSP_MODEL, Matrix3x4::IDENTITY);
-    graphics->SetShaderParameter(VSP_VIEW, view_);
-    graphics->SetShaderParameter(VSP_VIEWINV, view_.Inverse());
-    graphics->SetShaderParameter(VSP_VIEWPROJ, gpuProjection_ * view_);
-    graphics->SetShaderParameter(PSP_MATDIFFCOLOR, Color(1.0f, 1.0f, 1.0f, 1.0f));
-    graphics->SetVertexBuffer(vertexBuffer_);
+    if (!pipelineStatesInitialized_)
+        InitializePipelineStates();
+
+    DrawCommandQueue* drawQueue = renderer->GetDefaultDrawQueue();
+    drawQueue->Reset(false /*preferConstantBuffers*/);
+
+    const auto setDefaultConstants = [&]()
+    {
+        if (drawQueue->BeginShaderParameterGroup(SP_CAMERA))
+        {
+            drawQueue->AddShaderParameter(VSP_VIEW, view_);
+            drawQueue->AddShaderParameter(VSP_VIEWINV, view_.Inverse());
+            drawQueue->AddShaderParameter(VSP_VIEWPROJ, gpuProjection_ * view_);
+            drawQueue->CommitShaderParameterGroup(SP_CAMERA);
+        }
+
+        if (drawQueue->BeginShaderParameterGroup(SP_MATERIAL, false))
+        {
+            drawQueue->AddShaderParameter(PSP_MATDIFFCOLOR, Color::WHITE.ToVector4());
+            drawQueue->CommitShaderParameterGroup(SP_MATERIAL);
+        }
+
+        if (drawQueue->BeginShaderParameterGroup(SP_OBJECT))
+        {
+            drawQueue->AddShaderParameter(VSP_MODEL, Matrix3x4::IDENTITY);
+            drawQueue->CommitShaderParameterGroup(SP_OBJECT);
+        }
+    };
+
+    drawQueue->SetBuffers({ { vertexBuffer_ }, nullptr, nullptr });
 
     unsigned start = 0;
     unsigned count = 0;
     if (lines_.size())
     {
         count = lines_.size() * 2;
-        graphics->SetDepthTest(CMP_LESSEQUAL);
-        graphics->Draw(LINE_LIST, start, count);
+        drawQueue->SetPipelineState(depthLinesPipelineState_[lineAntiAlias_]);
+        setDefaultConstants();
+        drawQueue->Draw(start, count);
         start += count;
     }
     if (noDepthLines_.size())
     {
         count = noDepthLines_.size() * 2;
-        graphics->SetDepthTest(CMP_ALWAYS);
-        graphics->Draw(LINE_LIST, start, count);
+        drawQueue->SetPipelineState(noDepthLinesPipelineState_[lineAntiAlias_]);
+        setDefaultConstants();
+        drawQueue->Draw(start, count);
         start += count;
     }
-
-    graphics->SetBlendMode(BLEND_ALPHA);
-    graphics->SetDepthWrite(false);
 
     if (triangles_.size())
     {
         count = triangles_.size() * 3;
-        graphics->SetDepthTest(CMP_LESSEQUAL);
-        graphics->Draw(TRIANGLE_LIST, start, count);
+        drawQueue->SetPipelineState(depthTrianglesPipelineState_);
+        setDefaultConstants();
+        drawQueue->Draw(start, count);
         start += count;
     }
     if (noDepthTriangles_.size())
     {
         count = noDepthTriangles_.size() * 3;
-        graphics->SetDepthTest(CMP_ALWAYS);
-        graphics->Draw(TRIANGLE_LIST, start, count);
+        drawQueue->SetPipelineState(noDepthTrianglesPipelineState_);
+        setDefaultConstants();
+        drawQueue->Draw(start, count);
     }
 
-    graphics->SetLineAntiAlias(false);
+    drawQueue->Execute();
 }
 
 bool DebugRenderer::IsInside(const BoundingBox& box) const
@@ -722,6 +738,43 @@ void DebugRenderer::HandleEndFrame(StringHash eventType, VariantMap& eventData)
         triangles_.reserve(trianglesSize);
     if (noDepthTriangles_.capacity() > noDepthTrianglesSize * 2)
         noDepthTriangles_.reserve(noDepthTrianglesSize);
+}
+
+void DebugRenderer::InitializePipelineStates()
+{
+    pipelineStatesInitialized_ = true;
+
+    auto* renderer = GetSubsystem<Renderer>();
+    auto* graphics = GetSubsystem<Graphics>();
+
+    auto createPipelineState = [&](PrimitiveType primitiveType, BlendMode blendMode, CompareMode depthCompare,
+        bool depthWriteEnabled, bool lineAntiAlias)
+    {
+        PipelineStateDesc desc;
+        desc.InitializeInputLayout(GeometryBufferArray{ { vertexBuffer_ }, nullptr, nullptr });
+        desc.colorWriteEnabled_ = true;
+
+        desc.vertexShader_ = graphics->GetShader(VS, "Basic", "VERTEXCOLOR");
+        desc.pixelShader_ = graphics->GetShader(PS, "Basic", "VERTEXCOLOR");
+
+        desc.primitiveType_ = primitiveType;
+        desc.depthCompareFunction_ = depthCompare;
+        desc.depthWriteEnabled_ = depthWriteEnabled;
+        desc.blendMode_ = blendMode;
+        desc.lineAntiAlias_ = lineAntiAlias;
+
+        return renderer->GetOrCreatePipelineState(desc);
+    };
+
+    for (bool lineAntiAlias : { false, true })
+    {
+        const BlendMode blendMode = lineAntiAlias_ ? BLEND_ALPHA : BLEND_REPLACE;
+        depthLinesPipelineState_[lineAntiAlias] = createPipelineState(LINE_LIST, blendMode, CMP_LESSEQUAL, true, lineAntiAlias);
+        noDepthLinesPipelineState_[lineAntiAlias] = createPipelineState(LINE_LIST, blendMode, CMP_ALWAYS, false, lineAntiAlias);
+    }
+
+    depthTrianglesPipelineState_ = createPipelineState(TRIANGLE_LIST, BLEND_ALPHA, CMP_LESSEQUAL, false, false);
+    noDepthTrianglesPipelineState_ = createPipelineState(TRIANGLE_LIST, BLEND_ALPHA, CMP_ALWAYS, false, false);
 }
 
 }

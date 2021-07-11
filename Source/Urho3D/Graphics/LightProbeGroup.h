@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "../Graphics/Drawable.h"
 #include "../Math/BoundingBox.h"
 #include "../Math/SphericalHarmonics.h"
 #include "../Scene/Component.h"
@@ -89,8 +90,6 @@ struct LightProbeCollection
     ea::vector<unsigned> offsets_;
     /// Number of light probes owned by corresponding group.
     ea::vector<unsigned> counts_;
-    /// Baked data file for corresponding group.
-    ea::vector<ea::string> bakedDataFiles_;
     /// Group names.
     ea::vector<ea::string> names_;
 
@@ -118,7 +117,6 @@ struct LightProbeCollection
         worldPositions_.clear();
         offsets_.clear();
         counts_.clear();
-        bakedDataFiles_.clear();
         names_.clear();
     }
 };
@@ -150,7 +148,7 @@ public:
     static void CollectLightProbes(Scene* scene,
         LightProbeCollection& collection, LightProbeCollectionBakedData* bakedData, bool reload = false);
     /// Save light probes baked data for specific element. Return false if failed.
-    static bool SaveLightProbesBakedData(Context* context,
+    static bool SaveLightProbesBakedData(Context* context, const ea::string& fileName,
         const LightProbeCollection& collection, const LightProbeCollectionBakedData& bakedData, unsigned index);
 
     /// Return bounding box in local space.
@@ -163,14 +161,17 @@ public:
     /// Reload baked light probes data.
     void ReloadBakedData();
 
-    /// Set whether the auto placement enabled.
+    /// Attributes
+    /// @{
     void SetAutoPlacementEnabled(bool enabled);
-    /// Return auto placement step.
     bool GetAutoPlacementEnabled() const { return autoPlacementEnabled_; }
-    /// Set auto placement step.
     void SetAutoPlacementStep(float step);
-    /// Return auto placement step.
     float GetAutoPlacementStep() const { return autoPlacementStep_; }
+    void SetLightMask(unsigned lightMask) { lightMask_ = lightMask; }
+    unsigned GetLightMask() const { return lightMask_; }
+    void SetZoneMask(unsigned zoneMask) { zoneMask_ = zoneMask; }
+    unsigned GetZoneMask() const { return zoneMask_; }
+    /// @}
 
     /// Set light probes.
     void SetLightProbes(const LightProbeVector& lightProbes);
@@ -206,6 +207,10 @@ protected:
     /// Bounding box in local space.
     BoundingBox localBoundingBox_;
 
+    /// Light mask of light probe group.
+    unsigned lightMask_{ DEFAULT_LIGHTMASK };
+    /// Zone mask of light probe group.
+    unsigned zoneMask_{ DEFAULT_ZONEMASK };
     /// Whether the auto placement is enabled.
     bool autoPlacementEnabled_{ true };
     /// Automatic placement step.

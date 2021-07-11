@@ -24,16 +24,18 @@
 
 #include <EASTL/shared_array.h>
 
+#include "../Container/ByteVector.h"
 #include "../Core/Object.h"
 #include "../Graphics/GPUObject.h"
 #include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/PipelineStateTracker.h"
 #include "../Math/Vector4.h"
 
 namespace Urho3D
 {
 
 /// Hardware vertex buffer.
-class URHO3D_API VertexBuffer : public Object, public GPUObject
+class URHO3D_API VertexBuffer : public Object, public GPUObject, public PipelineStateTracker
 {
     URHO3D_OBJECT(VertexBuffer, Object);
 
@@ -173,6 +175,9 @@ private:
     /// Unmap the GPU buffer. Not used on OpenGL.
     void UnmapBuffer();
 
+    /// Recalculate hash (must not be non zero). Shall be save to call from multiple threads as long as the object is not changing.
+    unsigned RecalculatePipelineStateHash() const override;
+
     /// Shadow data.
     ea::shared_array<unsigned char> shadowData_;
     /// Number of vertices.
@@ -199,6 +204,55 @@ private:
     bool shadowed_{};
     /// Discard lock flag. Used by OpenGL only.
     bool discardLock_{};
+};
+
+/// Vertex Buffer of dynamic size. Resize policy is similar to standard vector.
+class URHO3D_API DynamicVertexBuffer : public Object
+{
+    URHO3D_OBJECT(DynamicVertexBuffer, Object);
+
+public:
+    DynamicVertexBuffer(Context* context);
+    bool Initialize(unsigned vertexCount, const ea::vector<VertexElement>& elements);
+
+    /// Discard existing content of the buffer.
+    void Discard();
+    /// Commit all added data to GPU.
+    void Commit();
+
+    /// Allocate vertices. Returns index of first vertex and writeable buffer of sufficient size.
+    ea::pair<unsigned, unsigned char*> AddVertices(unsigned count)
+    {
+        const unsigned startVertex = numVertices_;
+        if (startVertex + count > maxNumVertices_)
+            GrowBuffer();
+
+        numVertices_ += count;
+        unsigned char* data = shadowData_.data() + startVertex * vertexSize_;
+        return { startVertex, data };
+    }
+
+    /// Store vertices. Returns index of first vertex.
+    unsigned AddVertices(unsigned count, const void* data)
+    {
+        const auto indexAndData = AddVertices(count);
+        memcpy(indexAndData.second, data, count * vertexSize_);
+        return indexAndData.first;
+    }
+
+    VertexBuffer* GetVertexBuffer() const { return vertexBuffer_; }
+    unsigned GetVertexCount() const { return numVertices_; }
+
+private:
+    void GrowBuffer();
+
+    SharedPtr<VertexBuffer> vertexBuffer_;
+    ByteVector shadowData_;
+    bool vertexBufferNeedResize_{};
+
+    unsigned vertexSize_{};
+    unsigned numVertices_{};
+    unsigned maxNumVertices_{};
 };
 
 }

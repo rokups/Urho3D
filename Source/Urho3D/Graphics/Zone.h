@@ -22,9 +22,12 @@
 
 #pragma once
 
+#include "../Core/ThreadSafeCache.h"
 #include "../Graphics/Drawable.h"
+#include "../Graphics/ReflectionProbe.h"
 #include "../Graphics/Texture.h"
 #include "../Math/Color.h"
+#include "../Math/SphericalHarmonics.h"
 
 namespace Urho3D
 {
@@ -52,6 +55,12 @@ public:
     /// Set ambient color.
     /// @property
     void SetAmbientColor(const Color& color);
+    /// Set ambient brightness.
+    void SetAmbientBrightness(float brightness);
+    /// Set background brightness.
+    void SetBackgroundBrightness(float brightness);
+    /// Set the background is considered static by lightmapper.
+    void SetBackgroundStatic(bool isStatic);
     /// Set fog color.
     /// @property
     void SetFogColor(const Color& color);
@@ -90,6 +99,24 @@ public:
     /// Return zone's own ambient color, disregarding gradient mode.
     /// @property
     const Color& GetAmbientColor() const { return ambientColor_; }
+
+    /// Return ambient brightness.
+    float GetAmbientBrightness() const { return ambientBrightness_; }
+
+    /// Return background brightness.
+    float GetBackgroundBrightness() const { return backgroundBrightness_; }
+
+    /// Return whether the background is static.
+    float IsBackgroundStatic() const { return backgroundStatic_; }
+
+    /// Return reflection probe data. Pointer is valid until Zone is destroyed.
+    const ReflectionProbeData* GetReflectionProbe() const;
+
+    /// Return zone's ambient light in linear space.
+    const Vector3 GetAmbientLighting() const;
+
+    /// Return zone's ambient and background light in linear space.
+    const SphericalHarmonicsDot9 GetAmbientAndBackgroundLighting() const;
 
     /// Return ambient start color. Not safe to call from worker threads due to possible octree query.
     /// @property
@@ -145,6 +172,11 @@ public:
     /// Return zone texture attribute.
     ResourceRef GetZoneTextureAttr() const;
 
+    /// Internal. Update all cached variables.
+    void UpdateCachedData();
+    /// Internal. Clear zone reference from drawables inside the bounding box.
+    void ClearDrawablesZone();
+
 protected:
     /// Handle node transform being dirtied.
     void OnMarkedDirty(Node* node) override;
@@ -154,10 +186,12 @@ protected:
     void OnRemoveFromOctree() override;
     /// Recalculate the ambient gradient colors from neighbor zones. Not safe to call from worker threads due to octree query.
     void UpdateAmbientGradient();
-    /// Clear zone reference from drawables inside the bounding box.
-    void ClearDrawablesZone();
     /// Mark node transform dirty.
     void MarkNodeDirty() { OnMarkedDirty(node_); }
+
+    void UpdateZoneTextureSubscription();
+    void MarkCachedAmbientDirty();
+    void MarkCachedTextureDirty();
 
     /// Cached inverse world transform matrix.
     mutable Matrix3x4 inverseWorld_;
@@ -173,6 +207,12 @@ protected:
     BoundingBox lastWorldBoundingBox_;
     /// Ambient color.
     Color ambientColor_;
+    /// Ambient brightness.
+    float ambientBrightness_{ 1.0f };
+    /// Background brightness.
+    float backgroundBrightness_{ 0.0f };
+    /// Whether the background is static.
+    bool backgroundStatic_{};
     /// Cached ambient start color.
     Color ambientStartColor_;
     /// Cached ambient end color.
@@ -195,6 +235,15 @@ protected:
     WeakPtr<Zone> lastAmbientStartZone_;
     /// Last zone used for ambient gradient end color.
     WeakPtr<Zone> lastAmbientEndZone_;
+
+    mutable ThreadSafeCache<ReflectionProbeData> reflectionProbeData_;
+
+    /// Cached ambient lighting in linear space.
+    /// @{
+    mutable ThreadSafeCache<Vector3> cachedAmbientLighting_;
+    mutable ThreadSafeCache<SphericalHarmonicsDot9> cachedTextureLighting_;
+    mutable ThreadSafeCache<SphericalHarmonicsDot9> cachedAmbientAndBackgroundLighting_;
+    /// @}
 };
 
 }

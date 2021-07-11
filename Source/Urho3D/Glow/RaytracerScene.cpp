@@ -458,7 +458,7 @@ RaytracerScene::~RaytracerScene()
 }
 
 SharedPtr<RaytracerScene> CreateRaytracingScene(Context* context, const ea::vector<Component*>& geometries,
-    unsigned lightmapUVChannel, const RaytracingBackground& background)
+    unsigned lightmapUVChannel, const BakedSceneBackgroundArrayPtr& backgrounds)
 {
     // Queue models for parsing.
     // Value determines whether the model needs lightmap UV and smooth normal.
@@ -565,7 +565,7 @@ SharedPtr<RaytracerScene> CreateRaytracingScene(Context* context, const ea::vect
     const Vector3 sceneSize = boundingBox.Size();
     const float maxDistance = ea::max({ sceneSize.x_, sceneSize.y_, sceneSize.z_ });
 
-    return MakeShared<RaytracerScene>(context, device, scene, ea::move(geometryIndex), background, maxDistance);
+    return MakeShared<RaytracerScene>(context, device, scene, ea::move(geometryIndex), backgrounds, maxDistance);
 }
 
 }

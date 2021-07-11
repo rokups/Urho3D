@@ -33,6 +33,10 @@
 namespace Urho3D
 {
 
+/// Thread index.
+static thread_local unsigned currentThreadIndex = M_MAX_UNSIGNED;
+static unsigned maxThreadIndex = 1;
+
 /// Worker thread managed by the work queue.
 class WorkerThread : public Thread, public RefCounted
 {
@@ -48,6 +52,7 @@ public:
     void ThreadFunction() override
     {
         URHO3D_PROFILE_THREAD(Format("WorkerThread {}", (uint64_t)GetCurrentThreadID()).c_str());
+        currentThreadIndex = index_;
         // Init FPU state first
         InitFPU();
         owner_->ProcessItems(index_);
@@ -73,6 +78,7 @@ WorkQueue::WorkQueue(Context* context) :
     lastSize_(0),
     maxNonThreadedWorkMs_(5)
 {
+    currentThreadIndex = 0;
     SubscribeToEvent(E_BEGINFRAME, URHO3D_HANDLER(WorkQueue, HandleBeginFrame));
 }
 
@@ -97,6 +103,7 @@ void WorkQueue::CreateThreads(unsigned numThreads)
     // Start threads in paused mode
     Pause();
 
+    maxThreadIndex = numThreads + 1;
     for (unsigned i = 0; i < numThreads; ++i)
     {
         SharedPtr<WorkerThread> thread(new WorkerThread(this, i + 1));
@@ -174,11 +181,11 @@ void WorkQueue::AddWorkItem(const SharedPtr<WorkItem>& item)
     }
 }
 
-SharedPtr<WorkItem> WorkQueue::AddWorkItem(std::function<void()> workFunction, unsigned priority)
+SharedPtr<WorkItem> WorkQueue::AddWorkItem(std::function<void(unsigned threadIndex)> workFunction, unsigned priority)
 {
     SharedPtr<WorkItem> item = GetFreeItem();
     item->workLambda_ = std::move(workFunction);
-    item->workFunction_ = [](const WorkItem* item, unsigned) { item->workLambda_(); };
+    item->workFunction_ = [](const WorkItem* item, unsigned threadIndex) { item->workLambda_(threadIndex); };
     item->priority_ = priority;
     AddWorkItem(item);
     return item;
@@ -445,6 +452,16 @@ void WorkQueue::HandleBeginFrame(StringHash eventType, VariantMap& eventData)
     // Complete and signal items down to the lowest priority
     PurgeCompleted(0);
     PurgePool();
+}
+
+unsigned WorkQueue::GetThreadIndex()
+{
+    return currentThreadIndex;
+}
+
+unsigned WorkQueue::GetMaxThreadIndex()
+{
+    return maxThreadIndex;
 }
 
 }

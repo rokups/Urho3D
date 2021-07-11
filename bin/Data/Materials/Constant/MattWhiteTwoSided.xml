@@ -1,0 +1,7 @@
+<material>
+    <technique name="Techniques/LitOpaque.xml" />
+    <cull value="none" />
+    <shader vsdefines="TRANSLUCENT" psdefines="TRANSLUCENT" />
+    <parameter name="MatDiffColor" value="1 1 1 1" />
+    <parameter name="MatSpecColor" value="0 0 0 16" />
+</material>

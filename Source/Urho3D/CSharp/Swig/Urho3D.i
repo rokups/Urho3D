@@ -250,11 +250,6 @@ AddEqualityOperators(Urho3D::Variant);
 %ignore Urho3D::Texture::OnDeviceLost;
 %ignore Urho3D::Texture::OnDeviceReset;
 %ignore Urho3D::Texture::Release;
-%ignore Urho3D::ShaderProgram::OnDeviceLost;
-%ignore Urho3D::ShaderProgram::OnDeviceReset;
-%ignore Urho3D::ShaderProgram::Release;
-%ignore Urho3D::ShaderProgram::vsConstantBuffers_;   // Array
-%ignore Urho3D::ShaderProgram::psConstantBuffers_;   // Array
 
 // --------------------------------------- SDL ---------------------------------------
 namespace SDL
@@ -577,10 +572,8 @@ public:
 %ignore Urho3D::RenderPathCommand::textureNames_;    // Needs array of strings
 %ignore Urho3D::VertexBufferMorph::morphData_;      // Needs SharedPtrArray
 %ignore Urho3D::ShaderVariation::GetConstantBufferSizes;
-%ignore Urho3D::ShaderProgram::GetConstantBuffers;
 %ignore Urho3D::DecalVertex::blendIndices_;
 %ignore Urho3D::DecalVertex::blendWeights_;
-%ignore Urho3D::ShaderProgram::GetVertexAttributes;
 %ignore Urho3D::ShaderVariation::elementSemanticNames;
 %ignore Urho3D::CustomGeometry::DrawOcclusion;
 %ignore Urho3D::CustomGeometry::MakeCircleGraph;
@@ -660,13 +653,6 @@ public:
 %include "Urho3D/Graphics/ConstantBuffer.h"
 %include "Urho3D/Graphics/ShaderVariation.h"
 %include "Urho3D/Graphics/ShaderPrecache.h"
-#if defined(URHO3D_OPENGL)
-%include "Urho3D/Graphics/OpenGL/OGLShaderProgram.h"
-#elif defined(URHO3D_D3D11)
-%include "Urho3D/Graphics/Direct3D11/D3D11ShaderProgram.h"
-#else
-%include "Urho3D/Graphics/Direct3D9/D3D9ShaderProgram.h"
-#endif
 %include "Urho3D/Graphics/Tangent.h"
 //%include "Urho3D/Graphics/VertexDeclaration.h"
 %include "Urho3D/Graphics/Camera.h"

@@ -25,6 +25,8 @@
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/Viewport.h"
 
+#include <atomic>
+
 namespace Urho3D
 {
 
@@ -75,6 +77,9 @@ public:
     /// @property
     int GetHeight() const;
 
+    /// Return size.
+    IntVector2 GetSize() const;
+
     /// Return usage.
     /// @property
     TextureUsage GetUsage() const;
@@ -106,7 +111,7 @@ public:
     RenderSurface* GetLinkedDepthStencil() const { return linkedDepthStencil_; }
 
     /// Return whether manual update queued. Called internally.
-    bool IsUpdateQueued() const { return updateQueued_; }
+    bool IsUpdateQueued() const { return updateQueued_.load(std::memory_order_relaxed); }
 
     /// Reset update queued flag. Called internally.
     void ResetUpdateQueued();
@@ -136,6 +141,15 @@ public:
 
     /// Set or clear the need resolve flag. Called internally by Graphics.
     void SetResolveDirty(bool enable) { resolveDirty_ = enable; }
+
+    /// Property getters that can work with null RenderSurface corresponding to main viewport
+    /// @{
+    static IntVector2 GetSize(Graphics* graphics, const RenderSurface* renderSurface);
+    static IntRect GetRect(Graphics* graphics, const RenderSurface* renderSurface);
+    static unsigned GetFormat(Graphics* graphics, const RenderSurface* renderSurface);
+    static int GetMultiSample(Graphics* graphics, const RenderSurface* renderSurface);
+    static bool GetSRGB(Graphics* graphics, const RenderSurface* renderSurface);
+    /// @}
 
 private:
     /// Graphics subsystem.
@@ -177,7 +191,7 @@ private:
     /// Update mode for viewports.
     RenderSurfaceUpdateMode updateMode_{SURFACE_UPDATEVISIBLE};
     /// Update queued flag.
-    bool updateQueued_{};
+    std::atomic_bool updateQueued_{ false };
     /// Multisampled resolve dirty flag.
     bool resolveDirty_{};
 };

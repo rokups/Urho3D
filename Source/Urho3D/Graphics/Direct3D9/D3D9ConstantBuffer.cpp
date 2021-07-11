@@ -45,7 +45,7 @@ bool ConstantBuffer::SetSize(unsigned size)
     return false;
 }
 
-void ConstantBuffer::Apply()
+void ConstantBuffer::Update(const void* data)
 {
 }
 

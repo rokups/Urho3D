@@ -25,7 +25,9 @@
 #pragma once
 
 #include "../Core/Object.h"
+#include "../Graphics/DrawCommandQueue.h"
 #include "../Graphics/VertexBuffer.h"
+#include "../RenderPipeline/BatchStateCache.h"
 #include "../UI/Cursor.h"
 #include "../UI/UIBatch.h"
 
@@ -381,9 +383,13 @@ private:
     IntVector2 GetEffectiveRootElementSize(bool applyScale = true) const;
     /// Return true when subsystem should not process any mouse/keyboard input.
     bool IsHandlingInput() const;
+    /// Return material corresponding to UIBatch.
+    Material* GetBatchMaterial(const UIBatch& batch) const;
 
     /// Graphics subsystem.
     WeakPtr<Graphics> graphics_;
+    /// Renderer subsystem.
+    WeakPtr<Renderer> renderer_;
     /// UI root element.
     SharedPtr<UIElement> rootElement_;
     /// UI root modal element.
@@ -392,6 +398,8 @@ private:
     SharedPtr<Cursor> cursor_;
     /// Currently focused element.
     WeakPtr<UIElement> focusElement_;
+    /// Cached pipeline states.
+    SharedPtr<DefaultUIBatchStateCache> batchStateCache_;
     /// UI rendering batches.
     ea::vector<UIBatch> batches_;
     /// UI rendering vertex data.
@@ -476,6 +484,14 @@ private:
     WeakPtr<Texture2D> texture_;
     /// Color which will be used to clear target texture.
     Color clearColor_ = Color::TRANSPARENT_BLACK;
+
+    /// Default materials
+    /// @{
+    SharedPtr<Material> noTextureMaterial_;
+    SharedPtr<Material> alphaMapMaterial_;
+    SharedPtr<Material> diffMapMaterial_;
+    SharedPtr<Material> diffMapAlphaMaskMaterial_;
+    /// @}
 };
 
 /// Register UI library objects.

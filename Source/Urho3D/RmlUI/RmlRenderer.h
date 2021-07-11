@@ -23,6 +23,7 @@
 
 
 #include "../Container/Ptr.h"
+#include "../RenderPipeline/BatchStateCache.h"
 
 #include <RmlUi/Core/RenderInterface.h>
 
@@ -31,90 +32,70 @@ namespace Urho3D
 {
 
 class Context;
-class IndexBuffer;
-class VertexBuffer;
-class Texture;
+class DrawCommandQueue;
+class DynamicIndexBuffer;
+class DynamicVertexBuffer;
+class Texture2D;
 
 namespace Detail
 {
 
-struct CompiledGeometryForRml
-{
-    SharedPtr<VertexBuffer> vertexBuffer_;
-    SharedPtr<IndexBuffer> indexBuffer_;
-    Rml::TextureHandle texture_;
-};
-
 class URHO3D_API RmlRenderer : public Object, public Rml::RenderInterface
 {
     URHO3D_OBJECT(RmlRenderer, Object);
+
 public:
-    /// Construct.
     explicit RmlRenderer(Context* context);
-    /// Compile geometry for later reuse.
-    void CompileGeometry(CompiledGeometryForRml& compiledGeometryOut, Rml::Vertex* vertices, int numVertices, int* indices, int numIndices, const Rml::TextureHandle texture);
-    /// Compile geometry for later reuse.
-    Rml::CompiledGeometryHandle CompileGeometry(Rml::Vertex* vertices, int numVertices, int* indices, int numIndices, const Rml::TextureHandle texture) override;
-    /// Render compiled geometry.
-    void RenderCompiledGeometry(Rml::CompiledGeometryHandle geometryHandle, const Rml::Vector2f& translation) override;
-    /// Compile and render geometry.
-    void RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices, Rml::TextureHandle texture, const Rml::Vector2f& translation) override;
-    /// Free compiled geometry which was returned by previous call to CompileGeometry().
-    void ReleaseCompiledGeometry(Rml::CompiledGeometryHandle geometry) override;
-    /// Enable or disable scissor region.
-    void EnableScissorRegion(bool enable) override;
-    /// Update scissor region.
-    void SetScissorRegion(int x, int y, int width, int height) override;
-    /// Apply requested scissor region.
-    void ApplyScissorRegion(RenderSurface* surface, const IntVector2& viewSize);
-    /// Load a texture from resource cache.
-    bool LoadTexture(Rml::TextureHandle& textureOut, Rml::Vector2i& sizeOut, const Rml::String& source) override;
-    /// Create a texture from pixelbuffer.
+
+    void BeginRendering();
+    void EndRendering();
+
+    /// Rml::RenderInterface implementation
+    /// @{
     bool GenerateTexture(Rml::TextureHandle& handleOut, const Rml::byte* source, const Rml::Vector2i& size) override;
-    /// Release a texture that was previously created by LoadTexture() or GenerateTexture().
     void ReleaseTexture(Rml::TextureHandle textureHandle) override;
-    /// Set or unset a custom transform.
+    bool LoadTexture(Rml::TextureHandle& textureOut, Rml::Vector2i& sizeOut, const Rml::String& source) override;
+
+    void RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices, Rml::TextureHandle texture, const Rml::Vector2f& translation) override;
+    void EnableScissorRegion(bool enable) override;
+    void SetScissorRegion(int x, int y, int width, int height) override;
     void SetTransform(const Rml::Matrix4f* transform) override;
+    /// @}
 
 private:
     /// Perform initialization tasks that require graphics subsystem.
     void InitializeGraphics();
+    Material* GetBatchMaterial(Texture2D* texture);
 
-    /// Graphics subsystem instance.
-    WeakPtr<Graphics> graphics_;
-    /// Set to true when RmlUi requests use of scissor region.
-    bool scissorEnabled_ = false;
-    /// Set to true when RmlUi requests use of a specific
-    bool transformEnabled_ = false;
-    /// Scissor region set by RmlUi.
-    IntRect scissor_;
-    /// Temporary buffer used for rendering uncompiled geometry.
-    SharedPtr<VertexBuffer> vertexBuffer_;
-    /// Temporary buffer used for rendering uncompiled geometry.
-    SharedPtr<IndexBuffer> indexBuffer_;
-    /// Transform requested by RmlUi. This pointer points either to data owned by RmlUi or to Matrix4::IDENTITY.data().
-    const float* matrix_ = nullptr;
-    /// Last viewport size.
-    IntVector2 lastViewportSize_;
-    /// Flag indicating last batch rendered into a custom rendertarget.
-    bool lastViewportHadRenderTarget_ = false;
-    /// Last projection matrix. Reused when viewport size does not change.
+    /// Default materials
+    /// @{
+    SharedPtr<Material> noTextureMaterial_;
+    SharedPtr<Material> alphaMapMaterial_;
+    SharedPtr<Material> diffMapMaterial_;
+    /// @}
+
+    /// Cached between frames and calls
+    /// @{
+    SharedPtr<DefaultUIBatchStateCache> batchStateCache_;
+    SharedPtr<DynamicVertexBuffer> vertexBuffer_;
+    SharedPtr<DynamicIndexBuffer> indexBuffer_;
+    /// @}
+
+    /// Constant between BeginRendering/EndRendering
+    /// @{
+    UIBatchStateCreateContext batchStateCreateContext_;
+    RenderSurface* renderSurface_{};
+    bool isRenderSurfaceSRGB_{};
+    IntVector2 viewportSize_{};
+    DrawCommandQueue* drawQueue_{};
     Matrix4 projection_;
+    /// @}
 
-    /// Pixel shader for rendering untextured elements.
-    SharedPtr<ShaderVariation> noTexturePS_;
-    /// Vertex shader for rendering untextured elements.
-    SharedPtr<ShaderVariation> noTextureVS_;
-    /// Pixel shader for rendering opaque textured elements.
-    SharedPtr<ShaderVariation> textureOpaquePS_;
-    /// Pixel shader for rendering transparent textured elements.
-    SharedPtr<ShaderVariation> textureAlphaPS_;
-    /// Vertex shader for rendering textured elements.
-    SharedPtr<ShaderVariation> textureVS_;
-    /// Pixel shader for applying scissor regions when custom transform matrix is in effect.
-    SharedPtr<ShaderVariation> stencilPS_;
-    /// Vertex shader for applying scissor regions when custom transform matrix is in effect.
-    SharedPtr<ShaderVariation> stencilVS_;
+    bool scissorEnabled_ = false;
+    IntRect scissor_;
+
+    bool transformEnabled_ = false;
+    Matrix3x4 transform_;
 };
 
 }   // namespace Detail

@@ -33,6 +33,16 @@
 namespace Urho3D
 {
 
+/// Light probe collection with extra data needed for baking.
+struct LightProbeCollectionForBaking : public LightProbeCollection
+{
+    /// Size is the same as number of probes.
+    /// @{
+    ea::vector<unsigned> lightMasks_;
+    ea::vector<unsigned> backgroundIds_;
+    /// @}
+};
+
 /// Baking chunk. Contains everything to bake light for given chunk.
 struct BakedSceneChunk
 {
@@ -40,6 +50,7 @@ struct BakedSceneChunk
     ea::vector<unsigned> lightmaps_;
     /// Direct lightmaps required to bake this chunk.
     ea::vector<unsigned> requiredDirectLightmaps_;
+
     /// Raytracer scene.
     SharedPtr<RaytracerScene> raytracerScene_;
     /// Geometry buffers.
@@ -49,7 +60,7 @@ struct BakedSceneChunk
     /// Lights to bake.
     ea::vector<BakedLight> bakedLights_;
     /// Light probes collection.
-    LightProbeCollection lightProbesCollection_;
+    LightProbeCollectionForBaking lightProbesCollection_;
     /// Number of unique light probe groups. Used for saving results.
     unsigned numUniqueLightProbes_{};
 };

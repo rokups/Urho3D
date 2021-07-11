@@ -40,6 +40,7 @@
 #include "../IO/Log.h"
 #include "../IO/VectorBuffer.h"
 #include "../Resource/ResourceCache.h"
+#include "../Resource/ResourceEvents.h"
 #include "../Resource/XMLFile.h"
 #include "../Resource/JSONFile.h"
 #include "../Scene/Scene.h"
@@ -168,6 +169,22 @@ Material::~Material() = default;
 void Material::RegisterObject(Context* context)
 {
     context->RegisterFactory<Material>();
+}
+
+SharedPtr<Material> Material::CreateBaseMaterial(Context* context,
+    const ea::string& shaderName, const ea::string& vsDefines, const ea::string& psDefines)
+{
+    auto technique = MakeShared<Technique>(context);
+    Pass* pass = technique->CreatePass("base");
+    pass->SetVertexShader(shaderName);
+    pass->SetVertexShaderDefines(vsDefines);
+    pass->SetPixelShader(shaderName);
+    pass->SetPixelShaderDefines(psDefines);
+
+    auto material = MakeShared<Material>(context);
+    material->SetTechnique(0, technique);
+
+    return material;
 }
 
 bool Material::BeginLoad(Deserializer& source)
@@ -416,18 +433,19 @@ bool Material::Load(const XMLElement& source)
                     type = Texture3D::GetTypeStatic();
 
                 if (type == Texture3D::GetTypeStatic())
-                    SetTexture(unit, cache->GetResource<Texture3D>(name));
+                    SetTextureInternal(unit, cache->GetResource<Texture3D>(name));
                 else if (type == Texture2DArray::GetTypeStatic())
-                    SetTexture(unit, cache->GetResource<Texture2DArray>(name));
+                    SetTextureInternal(unit, cache->GetResource<Texture2DArray>(name));
                 else
 #endif
-                    SetTexture(unit, cache->GetResource<TextureCube>(name));
+                    SetTextureInternal(unit, cache->GetResource<TextureCube>(name));
             }
             else
-                SetTexture(unit, cache->GetResource<Texture2D>(name));
+                SetTextureInternal(unit, cache->GetResource<Texture2D>(name));
         }
         textureElem = textureElem.GetNext("texture");
     }
+    RefreshTextureEventSubscriptions();
 
     batchedParameterUpdate_ = true;
     XMLElement parameterElem = source.GetChild("parameter");
@@ -573,17 +591,18 @@ bool Material::Load(const JSONValue& source)
                     type = Texture3D::GetTypeStatic();
 
                 if (type == Texture3D::GetTypeStatic())
-                    SetTexture(unit, cache->GetResource<Texture3D>(textureName));
+                    SetTextureInternal(unit, cache->GetResource<Texture3D>(textureName));
                 else if (type == Texture2DArray::GetTypeStatic())
-                    SetTexture(unit, cache->GetResource<Texture2DArray>(textureName));
+                    SetTextureInternal(unit, cache->GetResource<Texture2DArray>(textureName));
                 else
 #endif
-                    SetTexture(unit, cache->GetResource<TextureCube>(textureName));
+                    SetTextureInternal(unit, cache->GetResource<TextureCube>(textureName));
             }
             else
-                SetTexture(unit, cache->GetResource<Texture2D>(textureName));
+                SetTextureInternal(unit, cache->GetResource<Texture2D>(textureName));
         }
     }
+    RefreshTextureEventSubscriptions();
 
     // Get shader parameters
     batchedParameterUpdate_ = true;
@@ -903,6 +922,7 @@ void Material::SetVertexShaderDefines(const ea::string& defines)
     {
         vertexShaderDefines_ = defines;
         ApplyShaderDefines();
+        MarkPipelineStateHashDirty();
     }
 }
 
@@ -912,6 +932,7 @@ void Material::SetPixelShaderDefines(const ea::string& defines)
     {
         pixelShaderDefines_ = defines;
         ApplyShaderDefines();
+        MarkPipelineStateHashDirty();
     }
 }
 
@@ -927,6 +948,7 @@ void Material::SetShaderParameter(const ea::string& name, const Variant& value)
     if (nameHash == PSP_MATSPECCOLOR)
     {
         VariantType type = value.GetType();
+        const bool oldSpecular = specular_;
         if (type == VAR_VECTOR3)
         {
             const Vector3& vec = value.GetVector3();
@@ -937,6 +959,8 @@ void Material::SetShaderParameter(const ea::string& name, const Variant& value)
             const Vector4& vec = value.GetVector4();
             specular_ = vec.x_ > 0.0f || vec.y_ > 0.0f || vec.z_ > 0.0f;
         }
+        if (oldSpecular != specular_)
+            MarkPipelineStateHashDirty();
     }
 
     if (!batchedParameterUpdate_)
@@ -996,6 +1020,12 @@ void Material::SetShaderParameterAnimationSpeed(const ea::string& name, float sp
 
 void Material::SetTexture(TextureUnit unit, Texture* texture)
 {
+    SetTextureInternal(unit, texture);
+    RefreshTextureEventSubscriptions();
+}
+
+void Material::SetTextureInternal(TextureUnit unit, Texture* texture)
+{
     if (unit < MAX_TEXTURE_UNITS)
     {
         if (texture)
@@ -1039,27 +1069,32 @@ void Material::SetUVTransform(const Vector2& offset, float rotation, float repea
 void Material::SetCullMode(CullMode mode)
 {
     cullMode_ = mode;
+    MarkPipelineStateHashDirty();
 }
 
 void Material::SetShadowCullMode(CullMode mode)
 {
     shadowCullMode_ = mode;
+    MarkPipelineStateHashDirty();
 }
 
 void Material::SetFillMode(FillMode mode)
 {
     fillMode_ = mode;
+    MarkPipelineStateHashDirty();
 }
 
 void Material::SetDepthBias(const BiasParameters& parameters)
 {
     depthBias_ = parameters;
     depthBias_.Validate();
+    MarkPipelineStateHashDirty();
 }
 
 void Material::SetAlphaToCoverage(bool enable)
 {
     alphaToCoverage_ = enable;
+    MarkPipelineStateHashDirty();
 }
 
 void Material::SetLineAntiAlias(bool enable)
@@ -1092,7 +1127,11 @@ void Material::RemoveShaderParameter(const ea::string& name)
     shaderParameters_.erase(nameHash);
 
     if (nameHash == PSP_MATSPECCOLOR)
+    {
+        if (specular_)
+            MarkPipelineStateHashDirty();
         specular_ = false;
+    }
 
     RefreshShaderParameterHash();
     RefreshMemoryUse();
@@ -1129,6 +1168,7 @@ SharedPtr<Material> Material::Clone(const ea::string& cloneName) const
     ret->fillMode_ = fillMode_;
     ret->renderOrder_ = renderOrder_;
     ret->RefreshMemoryUse();
+    ret->RefreshTextureEventSubscriptions();
 
     return ret;
 }
@@ -1140,7 +1180,7 @@ void Material::SortTechniques()
 
 void Material::MarkForAuxView(unsigned frameNumber)
 {
-    auxViewFrameNumber_ = frameNumber;
+    auxViewFrameNumber_.store(frameNumber, std::memory_order_relaxed);
 }
 
 const TechniqueEntry& Material::GetTechniqueEntry(unsigned index) const
@@ -1153,10 +1193,43 @@ Technique* Material::GetTechnique(unsigned index) const
     return index < techniques_.size() ? techniques_[index].technique_ : nullptr;
 }
 
+Technique* Material::FindTechnique(Drawable* drawable, MaterialQuality materialQuality) const
+{
+    const ea::vector<TechniqueEntry>& techniques = GetTechniques();
+
+    // If only one technique, no choice
+    if (techniques.size() == 1)
+        return techniques[0].technique_;
+
+    // TODO: Consider optimizing this loop
+    const float lodDistance = drawable->GetLodDistance();
+    for (unsigned i = 0; i < techniques.size(); ++i)
+    {
+        const TechniqueEntry& entry = techniques[i];
+        Technique* tech = entry.technique_;
+
+        if (!tech || (!tech->IsSupported()) || materialQuality < entry.qualityLevel_)
+            continue;
+        if (lodDistance >= entry.lodDistance_)
+            return tech;
+    }
+
+    // If no suitable technique found, fallback to the last
+    return techniques.size() ? techniques.back().technique_ : nullptr;
+}
+
 Pass* Material::GetPass(unsigned index, const ea::string& passName) const
 {
     Technique* tech = index < techniques_.size() ? techniques_[index].technique_ : nullptr;
     return tech ? tech->GetPass(passName) : nullptr;
+}
+
+Pass* Material::GetDefaultPass() const
+{
+    static const unsigned basePassIndex = Technique::GetPassIndex("base");
+    if (Technique* tech = GetTechnique(0))
+        return tech->GetSupportedPass(basePassIndex);
+    return nullptr;
 }
 
 Texture* Material::GetTexture(TextureUnit unit) const
@@ -1223,6 +1296,7 @@ void Material::ResetToDefaults()
         GetSubsystem<ResourceCache>()->GetResource<Technique>("Techniques/NoTexture.xml"));
 
     textures_.clear();
+    RefreshTextureEventSubscriptions();
 
     batchedParameterUpdate_ = true;
     shaderParameters_.clear();
@@ -1234,6 +1308,8 @@ void Material::ResetToDefaults()
     SetShaderParameter("MatSpecColor", Vector4(0.0f, 0.0f, 0.0f, 1.0f));
     SetShaderParameter("Roughness", 0.5f);
     SetShaderParameter("Metallic", 0.0f);
+    SetShaderParameter("DielectricReflectance", 0.5f);
+    SetShaderParameter("NormalScale", 1.0f);
     batchedParameterUpdate_ = false;
 
     cullMode_ = CULL_CCW;
@@ -1345,6 +1421,37 @@ void Material::ApplyShaderDefines(unsigned index)
         techniques_[index].technique_ = techniques_[index].original_;
     else
         techniques_[index].technique_ = techniques_[index].original_->CloneWithDefines(vertexShaderDefines_, pixelShaderDefines_);
+}
+
+void Material::RefreshTextureEventSubscriptions()
+{
+    UnsubscribeFromEvent(E_RELOADFINISHED);
+    const auto onReload = [this](StringHash, const VariantMap&) { MarkPipelineStateHashDirty(); };
+    for (const auto& item : textures_)
+        SubscribeToEvent(item.second, E_RELOADFINISHED, onReload);
+    MarkPipelineStateHashDirty();
+}
+
+unsigned Material::RecalculatePipelineStateHash() const
+{
+    unsigned hash = 0;
+    CombineHash(hash, MakeHash(vertexShaderDefines_));
+    CombineHash(hash, MakeHash(pixelShaderDefines_));
+    CombineHash(hash, cullMode_);
+    CombineHash(hash, shadowCullMode_);
+    CombineHash(hash, fillMode_);
+    CombineHash(hash, depthBias_.constantBias_);
+    CombineHash(hash, depthBias_.slopeScaledBias_);
+    CombineHash(hash, alphaToCoverage_);
+    CombineHash(hash, specular_);
+    for (const auto& item : textures_)
+    {
+        CombineHash(hash, item.first);
+        CombineHash(hash, item.second->GetSRGB());
+        CombineHash(hash, item.second->GetLinear());
+    }
+
+    return hash;
 }
 
 }

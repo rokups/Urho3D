@@ -57,14 +57,20 @@ public:
     /// Return either vertex or pixel shader source code.
     const ea::string& GetSourceCode(ShaderType type) const { return type == VS ? vsSourceCode_ : psSourceCode_; }
 
+    /// Return whether the shader is GLSL shader. Used for universal shader support by DX11.
+    bool IsGLSL() const { return GetName().ends_with(".glsl"); }
+
     /// Return the latest timestamp of the shader code and its includes.
     unsigned GetTimeStamp() const { return timeStamp_; }
+
+    /// Return global list of shader files.
+    static ea::string GetShaderFileList();
 
 private:
     /// Return hash for given shader defines and current global shader defines.
     unsigned GetShaderDefinesHash(const char* defines) const;
     /// Process source code and include files. Return true if successful.
-    bool ProcessSource(ea::string& code, Deserializer& source);
+    void ProcessSource(ea::string& code, Deserializer& source);
     /// Sort the defines and strip extra spaces to prevent creation of unnecessary duplicate shader variations.
     ea::string NormalizeDefines(const ea::string& defines);
     /// Recalculate the memory used by the shader.
@@ -82,6 +88,8 @@ private:
     unsigned timeStamp_;
     /// Number of unique variations so far.
     unsigned numVariations_;
+    /// Mapping of shader files for error reporting.
+    static ea::unordered_map<ea::string, unsigned> fileToIndexMapping;
 };
 
 }

@@ -114,7 +114,7 @@ void Scene::RegisterObject(Context* context)
     URHO3D_ATTRIBUTE("Next Local Component ID", unsigned, localComponentID_, FIRST_LOCAL_ID, AM_FILE | AM_NOEDIT);
     URHO3D_ATTRIBUTE("Variables", VariantMap, vars_, Variant::emptyVariantMap, AM_FILE); // Network replication of vars uses custom data
     URHO3D_MIXED_ACCESSOR_ATTRIBUTE("Variable Names", GetVarNamesAttr, SetVarNamesAttr, ea::string, EMPTY_STRING, AM_FILE | AM_NOEDIT);
-    URHO3D_ATTRIBUTE_EX("Lightmaps", ResourceRefList, lightmaps_, MarkLightmapTexturesDirty, ResourceRefList(Texture2D::GetTypeStatic()), AM_DEFAULT);
+    URHO3D_ATTRIBUTE_EX("Lightmaps", ResourceRefList, lightmaps_, ReloadLightmaps, ResourceRefList(Texture2D::GetTypeStatic()), AM_DEFAULT);
 }
 
 bool Scene::CreateComponentIndex(StringHash componentType)
@@ -255,29 +255,26 @@ void Scene::AddReplicationState(NodeReplicationState* state)
 void Scene::ResetLightmaps()
 {
     lightmaps_.names_.clear();
-    MarkLightmapTexturesDirty();
+    lightmapTextures_.clear();
 }
 
 void Scene::AddLightmap(const ea::string& lightmapTextureName)
 {
     lightmaps_.names_.push_back(lightmapTextureName);
-    MarkLightmapTexturesDirty();
+    auto cache = GetSubsystem<ResourceCache>();
+    lightmapTextures_.emplace_back(cache->GetResource<Texture2D>(lightmapTextureName));
 }
 
-Texture2D* Scene::GetLightmapTexture(unsigned index)
+void Scene::ReloadLightmaps()
 {
-    if (lightmapTexturesDirty_)
-    {
-        auto cache = GetSubsystem<ResourceCache>();
-        lightmapTextures_.clear();
-        for (const ea::string& lightmapTextureName : lightmaps_.names_)
-        {
-            SharedPtr<Texture2D> texture{ cache->GetResource<Texture2D>(lightmapTextureName) };
-            lightmapTextures_.push_back(texture);
-        }
+    auto cache = GetSubsystem<ResourceCache>();
+    lightmapTextures_.clear();
+    for (const ea::string& lightmapTextureName : lightmaps_.names_)
+        lightmapTextures_.emplace_back(cache->GetResource<Texture2D>(lightmapTextureName));
+}
 
-        lightmapTexturesDirty_ = false;
-    }
+Texture2D* Scene::GetLightmapTexture(unsigned index) const
+{
     return index < lightmapTextures_.size() ? lightmapTextures_[index] : nullptr;
 }
 

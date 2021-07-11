@@ -142,7 +142,7 @@ public:
     /// Add lightmap texture.
     void AddLightmap(const ea::string& lightmapTextureName);
     /// Return lightmap texture.
-    Texture2D* GetLightmapTexture(unsigned index);
+    Texture2D* GetLightmapTexture(unsigned index) const;
 
     /// Load from an XML file. Return true if successful.
     bool LoadXML(Deserializer& source);
@@ -336,8 +336,8 @@ private:
     void PreloadResourcesJSON(const JSONValue& value);
     /// Return component index storage for given type.
     SceneComponentIndex* GetMutableComponentIndex(StringHash componentType);
-    /// Mark lightmap textures dirty.
-    void MarkLightmapTexturesDirty() { lightmapTexturesDirty_ = true; }
+    /// Reload lightmap textures.
+    void ReloadLightmaps();
 
     /// Types of components that should be indexed.
     ea::vector<StringHash> indexedComponentTypes_;
@@ -403,8 +403,6 @@ private:
 
     /// Lightmap textures names.
     ResourceRefList lightmaps_;
-    /// Whether the lightmap textures are dirty.
-    bool lightmapTexturesDirty_{ false };
     /// Loaded lightmap textures.
     ea::vector<SharedPtr<Texture2D>> lightmapTextures_;
 };

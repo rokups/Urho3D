@@ -1445,6 +1445,12 @@ ea::vector<Node*> Node::GetChildrenWithTag(const ea::string& tag, bool recursive
     return dest;
 }
 
+unsigned Node::GetChildIndex(const Node* child) const
+{
+    auto iter = ea::find(children_.begin(), children_.end(), child);
+    return iter != children_.end() ? static_cast<unsigned>(iter - children_.begin()) : M_MAX_UNSIGNED;
+}
+
 Node* Node::GetChild(unsigned index) const
 {
     return index < children_.size() ? children_[index] : nullptr;
@@ -1506,6 +1512,12 @@ void Node::GetComponents(ea::vector<Component*>& dest, StringHash type, bool rec
         GetComponentsRecursive(dest, type);
 }
 
+unsigned Node::GetComponentIndex(const Component* component) const
+{
+    auto iter = ea::find(components_.begin(), components_.end(), component);
+    return iter != components_.end() ? static_cast<unsigned>(iter - components_.begin()) : M_MAX_UNSIGNED;
+}
+
 bool Node::HasComponent(StringHash type) const
 {
     for (auto i = components_.begin(); i != components_.end(); ++i)
@@ -1519,6 +1531,13 @@ bool Node::HasComponent(StringHash type) const
 bool Node::IsReplicated() const
 {
     return Scene::IsReplicatedID(id_);
+}
+
+ea::string Node::GetFullNameDebug() const
+{
+    ea::string fullName = parent_ ? Format("{}/[{}]", parent_->GetFullNameDebug(), parent_->GetChildIndex(this)) : "";
+    fullName += impl_->name_.empty() ? GetTypeName() : impl_->name_;
+    return fullName;
 }
 
 bool Node::HasTag(const ea::string& tag) const

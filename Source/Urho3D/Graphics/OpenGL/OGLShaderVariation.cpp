@@ -29,6 +29,8 @@
 #include "../../Graphics/ShaderVariation.h"
 #include "../../IO/Log.h"
 
+#include <cctype>
+
 #include "../../DebugNew.h"
 
 namespace Urho3D
@@ -194,6 +196,8 @@ bool ShaderVariation::Create()
         glGetShaderInfoLog(object_.name_, length, &outLength, &compilerOutput_[0]);
         glDeleteShader(object_.name_);
         object_.name_ = 0;
+
+        compilerOutput_ = Shader::GetShaderFileList() + compilerOutput_;
     }
     else
         compilerOutput_.clear();

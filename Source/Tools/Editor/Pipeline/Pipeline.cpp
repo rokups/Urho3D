@@ -290,7 +290,7 @@ SharedPtr<WorkItem> Pipeline::ScheduleImport(Asset* asset, Flavor* flavor, Pipel
 
     asset->AddRef();
     asset->importing_ = true;
-    return context_->GetSubsystem<WorkQueue>()->AddWorkItem([this, asset, flavor, flags]()
+    return context_->GetSubsystem<WorkQueue>()->AddWorkItem([this, asset, flavor, flags](unsigned /*threadIndex*/)
     {
         if (ExecuteImport(asset, flavor, flags))
         {

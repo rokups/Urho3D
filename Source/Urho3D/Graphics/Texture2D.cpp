@@ -162,6 +162,22 @@ bool Texture2D::SetSize(int width, int height, unsigned format, TextureUsage usa
 
 bool Texture2D::GetImage(Image& image) const
 {
+#ifdef URHO3D_D3D11
+    if (format_ == DXGI_FORMAT_B8G8R8X8_UNORM)
+    {
+        image.SetSize(width_, height_, 4);
+        unsigned char* imageData = image.GetData();
+        GetData(0, imageData);
+        const unsigned numPixels = width_ * height_;
+        for (unsigned i = 0; i < numPixels; ++i)
+        {
+            ea::swap(imageData[i * 4], imageData[i * 4 + 2]);
+            imageData[i * 4 + 3] = 255;
+        }
+        return true;
+    }
+#endif
+
     if (format_ != Graphics::GetRGBAFormat() && format_ != Graphics::GetRGBFormat())
     {
         URHO3D_LOGERROR("Unsupported texture format, can not convert to Image");

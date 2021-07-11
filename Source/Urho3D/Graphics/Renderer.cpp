@@ -44,11 +44,13 @@
 #include "../Graphics/VertexBuffer.h"
 #include "../Graphics/View.h"
 #include "../Graphics/Zone.h"
+#include "../RenderPipeline/RenderPipeline.h"
 #include "../IO/Log.h"
 #include "../Resource/ResourceCache.h"
 #include "../Resource/XMLFile.h"
 #include "../Scene/Scene.h"
 
+#include <EASTL/bonus/adaptors.h>
 #include <EASTL/functional.h>
 
 #include "../DebugNew.h"
@@ -275,11 +277,13 @@ inline ea::vector<VertexElement> CreateInstancingBufferElements(unsigned numExtr
 
 Renderer::Renderer(Context* context) :
     Object(context),
-    defaultZone_(context->CreateObject<Zone>())
+    defaultZone_(context->CreateObject<Zone>()),
+    pipelineStateCache_(MakeShared<PipelineStateCache>(context))
 {
     SubscribeToEvent(E_SCREENMODE, URHO3D_HANDLER(Renderer, HandleScreenMode));
 
-#if URHO3D_SPHERICAL_HARMONICS
+    // TODO(legacy): Remove global shader parameters
+#if URHO3D_SPHERICAL_HARMONICS && defined(URHO3D_LEGACY_RENDERER)
     sphericalHarmonics_ = true;
     SetGlobalShaderDefine("SPHERICALHARMONICS", sphericalHarmonics_);
 #endif
@@ -595,6 +599,11 @@ void Renderer::ApplyShadowMapFilter(View* view, Texture2D* shadowMap, float blur
         (shadowMapFilterInstance_->*shadowMapFilter_)(view, shadowMap, blurScale);
 }
 
+SharedPtr<PipelineState> Renderer::GetOrCreatePipelineState(const PipelineStateDesc& desc)
+{
+    return pipelineStateCache_->GetPipelineState(desc);
+}
+
 Viewport* Renderer::GetViewport(unsigned index) const
 {
     return index < viewports_.size() ? viewports_[index] : nullptr;
@@ -663,6 +672,16 @@ unsigned Renderer::GetNumLights(bool allViews) const
         numLights += view->GetLights().size();
     }
 
+    if (allViews)
+    {
+        for (const RenderPipelineView* view : renderPipelineViews_)
+        {
+            if (!view)
+                continue;
+            numLights += view->GetStats().numLights_;
+        }
+    }
+
     return numLights;
 }
 
@@ -685,6 +704,16 @@ unsigned Renderer::GetNumShadowMaps(bool allViews) const
         }
     }
 
+    if (allViews)
+    {
+        for (const RenderPipelineView* view : renderPipelineViews_)
+        {
+            if (!view)
+                continue;
+            numShadowMaps += view->GetStats().numShadowedLights_;
+        }
+    }
+
     return numShadowMaps;
 }
 
@@ -702,6 +731,16 @@ unsigned Renderer::GetNumOccluders(bool allViews) const
         numOccluders += view->GetNumActiveOccluders();
     }
 
+    if (allViews)
+    {
+        for (const RenderPipelineView* view : renderPipelineViews_)
+        {
+            if (!view)
+                continue;
+            numOccluders += view->GetStats().numOccluders_;
+        }
+    }
+
     return numOccluders;
 }
 
@@ -710,6 +749,7 @@ void Renderer::Update(float timeStep)
     URHO3D_PROFILE("UpdateViews");
 
     views_.clear();
+    renderPipelineViews_.clear();
     preparedViews_.clear();
 
     // If device lost, do not perform update. This is because any dynamic vertex/index buffer updates happen already here,
@@ -797,6 +837,13 @@ void Renderer::Render()
         // Screen buffers can be reused between views, as each is rendered completely
         PrepareViewRender();
         views_[i]->Render();
+    }
+
+    // Render RenderPipeline views.
+    for (RenderPipelineView* renderPipelineView : ea::reverse(renderPipelineViews_))
+    {
+        PrepareViewRender();
+        renderPipelineView->Render();
     }
 
     // Copy the number of batches & primitives from Graphics so that we can account for 3D geometry only
@@ -1060,7 +1107,7 @@ Texture2D* Renderer::GetShadowMap(Light* light, Camera* camera, unsigned viewWid
 Texture* Renderer::GetScreenBuffer(int width, int height, unsigned format, int multiSample, bool autoResolve, bool cubemap, bool filtered, bool srgb,
     unsigned persistentKey)
 {
-    bool depthStencil = (format == Graphics::GetDepthStencilFormat()) || (format == Graphics::GetReadableDepthFormat());
+    bool depthStencil = (format == Graphics::GetDepthStencilFormat()) || (format == Graphics::GetReadableDepthFormat()) || format == Graphics::GetReadableDepthStencilFormat();
     if (depthStencil)
     {
         filtered = false;
@@ -1162,6 +1209,19 @@ RenderSurface* Renderer::GetDepthStencil(int width, int height, int multiSample,
         return static_cast<Texture2D*>(GetScreenBuffer(width, height, Graphics::GetDepthStencilFormat(), multiSample, autoResolve,
             false, false, false))->GetRenderSurface();
     }
+}
+
+RenderSurface* Renderer::GetDepthStencil(RenderSurface* renderSurface)
+{
+    // If using the backbuffer, return the backbuffer depth-stencil
+    if (!renderSurface)
+        return nullptr;
+
+    if (RenderSurface* linkedDepthStencil = renderSurface->GetLinkedDepthStencil())
+        return linkedDepthStencil;
+
+    return GetDepthStencil(renderSurface->GetWidth(), renderSurface->GetHeight(),
+        renderSurface->GetMultiSample(), renderSurface->GetAutoResolve());
 }
 
 OcclusionBuffer* Renderer::GetOcclusionBuffer(Camera* camera)
@@ -1546,16 +1606,29 @@ void Renderer::UpdateQueuedViewport(unsigned index)
         return;
 
     // (Re)allocate the view structure if necessary
-    if (!viewport->GetView() || resetViews_)
+    const bool isInitialized = viewport->GetView() || viewport->GetRenderPipelineView();
+    if (!isInitialized || resetViews_)
         viewport->AllocateView();
 
+    RenderPipelineView* renderPipelineView = viewport->GetRenderPipelineView();
     View* view = viewport->GetView();
-    assert(view);
-    // Check if view can be defined successfully (has either valid scene, camera and octree, or no scene passes)
-    if (!view->Define(renderTarget, viewport))
-        return;
+    assert(view || renderPipelineView);
 
-    views_.push_back(WeakPtr<View>(view));
+    if (renderPipelineView)
+    {
+        if (!renderPipelineView->Define(renderTarget, viewport))
+            return;
+
+        renderPipelineViews_.push_back(WeakPtr<RenderPipelineView>(renderPipelineView));
+    }
+    else
+    {
+        // Check if view can be defined successfully (has either valid scene, camera and octree, or no scene passes)
+        if (!view->Define(renderTarget, viewport))
+            return;
+
+        views_.push_back(WeakPtr<View>(view));
+    }
 
     const IntRect& viewRect = viewport->GetRect();
     Scene* scene = viewport->GetScene();
@@ -1584,7 +1657,14 @@ void Renderer::UpdateQueuedViewport(unsigned index)
 
     // Update view. This may queue further views. View will send update begin/end events once its state is set
     ResetShadowMapAllocations(); // Each view can reuse the same shadow maps
-    view->Update(frame_);
+    if (renderPipelineView)
+    {
+        renderPipelineView->Update(frame_);
+    }
+    else
+    {
+        view->Update(frame_);
+    }
 }
 
 void Renderer::PrepareViewRender()
@@ -1654,7 +1734,9 @@ void Renderer::Initialize()
     graphics_ = graphics;
     graphics_->SetGlobalShaderDefines(globalShaderDefinesString_);
 
-    hardwareSkinningSupported_ = graphics_->GetMaxVertexShaderUniforms() >= 256;
+    defaultDrawQueue_ = MakeShared<DrawCommandQueue>(graphics_);
+
+    hardwareSkinningSupported_ = graphics_->GetCaps().maxVertexShaderUniforms_ >= 256;
 
     if (!graphics_->GetShadowMapFormat())
         drawShadows_ = false;
@@ -1898,6 +1980,14 @@ void Renderer::CreateGeometries()
         SetIndirectionTextureData();
     }
 #endif
+
+    blackCubeMap_ = MakeShared<TextureCube>(context_);
+    blackCubeMap_->SetNumLevels(1);
+    blackCubeMap_->SetSize(1, graphics_->GetRGBAFormat());
+    blackCubeMap_->SetFilterMode(FILTER_NEAREST);
+    const unsigned char blackCubeMapData[4] = { 0, 0, 0, 255 };
+    for (unsigned i = 0; i < MAX_CUBEMAP_FACES; ++i)
+        blackCubeMap_->SetData((CubeMapFace)i, 0, 0, 0, 1, 1, blackCubeMapData);
 }
 
 void Renderer::SetIndirectionTextureData()

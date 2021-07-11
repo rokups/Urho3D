@@ -1,0 +1,5 @@
+<material>
+    <technique name="Techniques/LitOpaque.xml" />
+    <parameter name="MatDiffColor" value="1 1 1 1" />
+    <parameter name="MatSpecColor" value="1 1 1 128" />
+</material>

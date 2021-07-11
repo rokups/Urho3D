@@ -77,6 +77,13 @@ private:
     bool isClosing_ = false;
     /// Sample which will be started automatically.
     ea::string startSample_;
+
+    /// Generic Serializable inspector.
+    /// @{
+    SharedPtr<Scene> inspectorNode_;
+    bool oldMouseVisible_{};
+    MouseMode oldMouseMode_{};
+    /// @}
 };
 
 }

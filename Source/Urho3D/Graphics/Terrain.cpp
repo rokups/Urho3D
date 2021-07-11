@@ -1118,7 +1118,10 @@ void Terrain::CreateGeometry()
                         patch->SetOccludee(occludee_);
                     }
 
-                    patch->SetBakeLightmap(GetBakeLightmapEffective());
+                    const bool bakeLightmap = GetBakeLightmapEffective();
+                    patch->SetBakeLightmap(bakeLightmap);
+                    patch->SetGlobalIlluminationType(
+                        bakeLightmap ? GlobalIlluminationType::UseLightMap : GlobalIlluminationType::None);
                     patch->SetLightmapIndex(lightmapIndex_);
                     patch->SetLightmapScaleOffset(lightmapScaleOffset_);
 
@@ -1527,7 +1530,9 @@ void Terrain::UpdatePatchesLightmaps()
     {
         if (patch)
         {
-            patch->SetBakeLightmap(GetBakeLightmapEffective());
+            const bool bakeLightmap = GetBakeLightmapEffective();
+            patch->SetBakeLightmap(bakeLightmap);
+            patch->SetGlobalIlluminationType(bakeLightmap ? GlobalIlluminationType::UseLightMap : GlobalIlluminationType::None);
             patch->SetLightmapIndex(lightmapIndex_);
             patch->SetLightmapScaleOffset(lightmapScaleOffset_);
         }

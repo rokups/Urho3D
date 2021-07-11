@@ -61,16 +61,6 @@ void ParallelFor(unsigned count, unsigned numTasks, const T& callback)
         task.wait();
 }
 
-/// Load render path.
-inline SharedPtr<RenderPath> LoadRenderPath(Context* context, const ea::string& renderPathName)
-{
-    auto renderPath = MakeShared<RenderPath>();
-    auto renderPathXml = context->GetSubsystem<ResourceCache>()->GetResource<XMLFile>(renderPathName);
-    if (!renderPath->Load(renderPathXml))
-        return nullptr;
-    return renderPath;
-}
-
 /// Return whether the material is opaque.
 inline bool IsMaterialOpaque(const Material* material)
 {
@@ -157,8 +147,8 @@ inline Vector4 GetLightmapScaleOffset(const Component* component)
 
 /// Create material for geometry buffer baking.
 inline SharedPtr<Material> CreateBakingMaterial(Material* bakingMaterial, Material* sourceMaterial,
-    const Vector4& scaleOffset, unsigned tapIndex, unsigned numTaps, const Vector2& tapOffset, unsigned geometryId,
-    const Vector2& scaledAndConstBias)
+    const Vector4& scaleOffset, unsigned tapIndex, unsigned numTaps, const Vector2& tapOffset,
+    unsigned geometryId, const Vector2& scaledAndConstBias)
 {
     auto renderer = bakingMaterial->GetContext()->GetSubsystem<Renderer>();
     if (!sourceMaterial)

@@ -27,8 +27,10 @@
 #include "../Graphics/Graphics.h"
 #include "../Graphics/Renderer.h"
 #include "../Graphics/RenderPath.h"
+#include "../Graphics/RenderSurface.h"
 #include "../Graphics/View.h"
 #include "../Graphics/Viewport.h"
+#include "../RenderPipeline/RenderPipeline.h"
 #include "../Resource/ResourceCache.h"
 #include "../Resource/XMLFile.h"
 #include "../Scene/Scene.h"
@@ -75,6 +77,14 @@ void Viewport::RegisterObject(Context* context)
 
 void Viewport::SetScene(Scene* scene)
 {
+#ifndef URHO3D_LEGACY_RENDERER
+    if (!!scene_ != !!scene)
+    {
+        renderPipeline_ = nullptr;
+        view_ = nullptr;
+    }
+#endif
+
     scene_ = scene;
 }
 
@@ -131,6 +141,27 @@ Camera* Viewport::GetCamera() const
     return camera_;
 }
 
+IntRect Viewport::GetEffectiveRect(RenderSurface* renderTarget) const
+{
+    const IntVector2 renderTargetSize = RenderSurface::GetSize(GetSubsystem<Graphics>(), renderTarget);
+
+    if (rect_ == IntRect::ZERO)
+    {
+        // Return render target dimensions if viewport rectangle is not defined
+        return { IntVector2::ZERO, renderTargetSize };
+    }
+    else
+    {
+        // Validate and return viewport rectangle
+        IntRect rect;
+        rect.left_ = Clamp(rect_.left_, 0, renderTargetSize.x_ - 1);
+        rect.top_ = Clamp(rect_.top_, 0, renderTargetSize.y_ - 1);
+        rect.right_ = Clamp(rect_.right_, rect.left_ + 1, renderTargetSize.x_);
+        rect.bottom_ = Clamp(rect_.bottom_, rect.top_ + 1, renderTargetSize.y_);
+        return rect;
+    }
+}
+
 Camera* Viewport::GetCullCamera() const
 {
     return cullCamera_;
@@ -139,6 +170,13 @@ Camera* Viewport::GetCullCamera() const
 View* Viewport::GetView() const
 {
     return view_;
+}
+
+RenderPipelineView* Viewport::GetRenderPipelineView() const
+{
+    if (renderPipelineComponent_ && renderPipelineComponent_->GetScene() == scene_)
+        return renderPipeline_;
+    return nullptr;
 }
 
 RenderPath* Viewport::GetRenderPath() const
@@ -220,7 +258,26 @@ Vector3 Viewport::ScreenToWorldPoint(int x, int y, float depth) const
 
 void Viewport::AllocateView()
 {
-    view_ = context_->CreateObject<View>();
+#ifndef URHO3D_LEGACY_RENDERER
+    if (!GetRenderPipelineView())
+    {
+        renderPipelineComponent_ = nullptr;
+        renderPipeline_ = nullptr;
+    }
+
+    if (!renderPipelineComponent_ && scene_)
+    {
+        renderPipelineComponent_ = scene_->GetDerivedComponent<RenderPipeline>();
+        if (!renderPipelineComponent_)
+            renderPipelineComponent_ = scene_->CreateComponent<RenderPipeline>();
+    }
+
+    if (!renderPipeline_ && renderPipelineComponent_)
+        renderPipeline_ = renderPipelineComponent_->Instantiate();
+#endif
+
+    if (!renderPipeline_)
+        view_ = MakeShared<View>(context_);
 }
 
 }

@@ -25,6 +25,7 @@
 #pragma once
 
 #include "../Container/FlagSet.h"
+#include "../Container/Hash.h"
 #include "../Math/StringHash.h"
 
 namespace Urho3D
@@ -152,7 +153,7 @@ enum LegacyVertexElement
 };
 
 /// Arbitrary vertex declaration element datatypes.
-enum VertexElementType
+enum VertexElementType : unsigned char
 {
     TYPE_INT = 0,
     TYPE_FLOAT,
@@ -165,7 +166,7 @@ enum VertexElementType
 };
 
 /// Arbitrary vertex declaration element semantics.
-enum VertexElementSemantic
+enum VertexElementSemantic : unsigned char
 {
     SEM_POSITION = 0,
     SEM_NORMAL,
@@ -207,6 +208,18 @@ struct URHO3D_API VertexElement
 
     /// Test for inequality with another vertex element.
     bool operator !=(const VertexElement& rhs) const { return !(*this == rhs); }
+
+    /// Return hash value of the vertex element.
+    unsigned ToHash() const
+    {
+        unsigned hash = 0;
+        CombineHash(hash, type_);
+        CombineHash(hash, semantic_);
+        CombineHash(hash, index_);
+        CombineHash(hash, perInstance_);
+        CombineHash(hash, offset_);
+        return hash;
+    }
 
     /// Data type of element.
     VertexElementType type_;
@@ -410,7 +423,6 @@ extern URHO3D_API const StringHash VSP_LIGHTMATRICES;
 extern URHO3D_API const StringHash VSP_SKINMATRICES;
 extern URHO3D_API const StringHash VSP_VERTEXLIGHTS;
 extern URHO3D_API const StringHash VSP_LMOFFSET;
-#if URHO3D_SPHERICAL_HARMONICS
 extern URHO3D_API const StringHash VSP_SHAR;
 extern URHO3D_API const StringHash VSP_SHAG;
 extern URHO3D_API const StringHash VSP_SHAB;
@@ -418,9 +430,7 @@ extern URHO3D_API const StringHash VSP_SHBR;
 extern URHO3D_API const StringHash VSP_SHBG;
 extern URHO3D_API const StringHash VSP_SHBB;
 extern URHO3D_API const StringHash VSP_SHC;
-#else
 extern URHO3D_API const StringHash VSP_AMBIENT;
-#endif
 extern URHO3D_API const StringHash PSP_AMBIENTCOLOR;
 extern URHO3D_API const StringHash PSP_CAMERAPOS;
 extern URHO3D_API const StringHash PSP_DELTATIME;
@@ -440,6 +450,7 @@ extern URHO3D_API const StringHash PSP_MATSPECCOLOR;
 extern URHO3D_API const StringHash PSP_NEARCLIP;
 extern URHO3D_API const StringHash PSP_FARCLIP;
 extern URHO3D_API const StringHash PSP_SHADOWCUBEADJUST;
+extern URHO3D_API const StringHash PSP_SHADOWCUBEUVBIAS;
 extern URHO3D_API const StringHash PSP_SHADOWDEPTHFADE;
 extern URHO3D_API const StringHash PSP_SHADOWINTENSITY;
 extern URHO3D_API const StringHash PSP_SHADOWMAPINVSIZE;
@@ -466,6 +477,7 @@ enum MaterialQuality : unsigned
 
 enum ClearTarget : unsigned
 {
+    CLEAR_NONE = 0x0,
     CLEAR_COLOR = 0x1,
     CLEAR_DEPTH = 0x2,
     CLEAR_STENCIL = 0x4,

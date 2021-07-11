@@ -30,7 +30,6 @@ namespace Urho3D
 {
 
 class Octree;
-class Skybox;
 class Zone;
 
 static const int NUM_OCTANTS = 8;
@@ -42,7 +41,7 @@ class URHO3D_API Octant
 {
 public:
     /// Construct.
-    Octant(const BoundingBox& box, unsigned level, Octant* parent, Octree* root, unsigned index = ROOT_INDEX);
+    Octant(const BoundingBox& box, unsigned level, Octant* parent, Octree* octree, unsigned index = ROOT_INDEX);
     /// Destruct. Move drawables to root if available (detach if not) and free child octants.
     virtual ~Octant();
 
@@ -89,8 +88,8 @@ public:
     /// Return parent octant.
     Octant* GetParent() const { return parent_; }
 
-    /// Return octree root.
-    Octree* GetRoot() const { return root_; }
+    /// Return octree.
+    Octree* GetOctree() const { return octree_; }
 
     /// Return number of drawables.
     unsigned GetNumDrawables() const { return numDrawables_; }
@@ -98,21 +97,24 @@ public:
     /// Return true if there are no drawable objects in this octant and child octants.
     bool IsEmpty() { return numDrawables_ == 0; }
 
-    /// Reset root pointer recursively. Called when the whole octree is being destroyed.
-    void ResetRoot();
+    /// Set size for the root octant. If octree is not empty, drawable objects will be temporarily moved to the root.
+    void SetRootSize(const BoundingBox& box);
+    /// Reset octree pointer recursively. Called when the whole octree is being destroyed.
+    void ResetOctree();
     /// Draw bounds to the debug graphics recursively.
     /// @nobind
     void DrawDebugGeometry(DebugRenderer* debug, bool depthTest);
 
-protected:
-    /// Initialize bounding box.
-    void Initialize(const BoundingBox& box);
     /// Return drawable objects by a query, called internally.
     void GetDrawablesInternal(OctreeQuery& query, bool inside) const;
     /// Return drawable objects by a ray query, called internally.
     void GetDrawablesInternal(RayOctreeQuery& query) const;
     /// Return drawable objects only for a threaded ray query, called internally.
     void GetDrawablesOnlyInternal(RayOctreeQuery& query, ea::vector<Drawable*>& drawables) const;
+
+protected:
+    /// Initialize bounding box.
+    void Initialize(const BoundingBox& box);
 
     /// Increase drawable object count recursively.
     void IncDrawableCount()
@@ -151,19 +153,62 @@ protected:
     /// World bounding box half size.
     Vector3 halfSize_;
     /// Subdivision level.
-    unsigned level_;
+    unsigned level_{};
     /// Number of drawable objects in this octant and child octants.
     unsigned numDrawables_{};
     /// Parent octant.
-    Octant* parent_;
+    Octant* parent_{};
     /// Octree root.
-    Octree* root_;
+    Octree* octree_{};
     /// Octant index relative to its siblings or ROOT_INDEX for root octant.
-    unsigned index_;
+    unsigned index_{};
+};
+
+/// Acceleration structure for zone search.
+class URHO3D_API ZoneLookupIndex
+{
+public:
+    explicit ZoneLookupIndex(Context* context);
+
+    /// @name Manage zones
+    /// @{
+    void AddZone(Zone* zone);
+    void UpdateZone(Zone* zone);
+    void RemoveZone(Zone* zone);
+    /// @}
+
+    /// Commit all updates. Called on every frame.
+    void Commit();
+
+    /// Query zone for given position and mask.
+    CachedDrawableZone QueryZone(const Vector3& position, unsigned zoneMask) const;
+    /// Return background zone.
+    Zone* GetBackgroundZone() const;
+
+private:
+    /// Cached zone parameters.
+    struct ZoneData
+    {
+        /// Local bounding box.
+        BoundingBox boundingBox_;
+        /// Inverse world transform.
+        Matrix3x4 inverseWorldTransform_;
+        /// Zone mask.
+        unsigned zoneMask_{};
+    };
+
+    /// Default zone.
+    Zone* defaultZone_{};
+    /// Zones.
+    ea::vector<Zone*> zones_;
+    /// Cached zone parameters.
+    ea::vector<ZoneData> zonesData_;
+    /// Whether zones are dirty.
+    bool zonesDirty_{};
 };
 
 /// %Octree component. Should be added only to the root scene node.
-class URHO3D_API Octree : public Component, public Octant
+class URHO3D_API Octree : public Component
 {
     URHO3D_OBJECT(Octree, Component);
 
@@ -188,6 +233,13 @@ public:
     /// Remove a manually added drawable.
     void RemoveManualDrawable(Drawable* drawable);
 
+    /// Add drawable is added to octree. For internal use only.
+    void AddDrawable(Drawable* drawable);
+    /// Remove drawable from octree. For internal use only.
+    void RemoveDrawable(Drawable* drawable, Octant* octant);
+    /// Notify Octree that zone parameters changed. For internal use only.
+    void MarkZoneDirty(Zone* zone);
+
     /// Return drawable objects by a query.
     /// @nobind
     void GetDrawables(OctreeQuery& query) const;
@@ -195,15 +247,25 @@ public:
     void Raycast(RayOctreeQuery& query) const;
     /// Return the closest drawable object by a ray query.
     void RaycastSingle(RayOctreeQuery& query) const;
-    /// Return active Zone or default renderer zone if none found.
-    /// Behavior is underfined if there are multiple active zones.
-    Zone* GetZone(unsigned viewMask = DEFAULT_VIEWMASK) const;
-    /// Return active Skybox. Behavior is underfined if there are multiple active skyboxes.
-    Skybox* GetSkybox(unsigned viewMask = DEFAULT_VIEWMASK) const;
+    /// Return best zone for drawable.
+    CachedDrawableZone QueryZone(Drawable* drawable) const;
+    /// Return best zone for drawable with given center in world space and zone mask.
+    CachedDrawableZone QueryZone(const Vector3& drawablePosition, unsigned zoneMask) const;
+    /// Return background zone (arbitrary zone with 0 priority or lower). Zones with positive priority are ignored.
+    Zone* GetBackgroundZone() const;
+
+    /// Return root octant.
+    const Octant* GetRootOctant() const { return &rootOctant_; }
+
+    /// Return root octant.
+    Octant* GetRootOctant() { return &rootOctant_; }
 
     /// Return subdivision levels.
     /// @property
     unsigned GetNumLevels() const { return numLevels_; }
+
+    /// Return all drawables in all octants.
+    const ea::vector<Drawable*>& GetAllDrawables() const { return drawables_; }
 
     /// Mark drawable object as requiring an update and a reinsertion.
     void QueueUpdate(Drawable* drawable);
@@ -218,16 +280,24 @@ private:
     /// Update octree size.
     void UpdateOctreeSize() { SetSize(worldBoundingBox_, numLevels_); }
 
+    /// Root octant.
+    Octant rootOctant_;
     /// Drawable objects that require update.
     ea::vector<Drawable*> drawableUpdates_;
     /// Drawable objects that were inserted during threaded update phase.
     ea::vector<Drawable*> threadedDrawableUpdates_;
+    /// All Drawable objects.
+    ea::vector<Drawable*> drawables_;
     /// Mutex for octree reinsertions.
     Mutex octreeMutex_;
     /// Ray query temporary list of drawables.
     mutable ea::vector<Drawable*> rayQueryDrawables_;
     /// Subdivision level.
     unsigned numLevels_;
+    /// World bounding box.
+    BoundingBox worldBoundingBox_;
+    /// Zones.
+    ZoneLookupIndex zones_;
 };
 
 }

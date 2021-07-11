@@ -28,6 +28,7 @@
 #include "../../Graphics/GPUObject.h"
 #include "../../Graphics/GraphicsDefs.h"
 #include "../../Graphics/ShaderVariation.h"
+#include "../../Graphics/ShaderProgramLayout.h"
 
 namespace Urho3D
 {
@@ -36,7 +37,7 @@ class ConstantBuffer;
 class Graphics;
 
 /// Linked shader program on the GPU.
-class URHO3D_API ShaderProgram : public RefCounted, public GPUObject
+class URHO3D_API ShaderProgram : public ShaderProgramLayout, public GPUObject
 {
 public:
     /// Construct.
@@ -69,13 +70,10 @@ public:
     const ea::string& GetLinkerOutput() const { return linkerOutput_; }
 
     /// Return semantic to vertex attributes location mappings used by the shader.
-    const ea::unordered_map<ea::pair<unsigned char, unsigned char>, unsigned>& GetVertexAttributes() const { return vertexAttributes_; }
+    const ea::unordered_map<ea::pair<unsigned char, unsigned char>, ea::pair<unsigned, bool>>& GetVertexAttributes() const { return vertexAttributes_; }
 
     /// Return attribute location use bitmask.
     unsigned GetUsedVertexAttributes() const { return usedVertexAttributes_; }
-
-    /// Return all constant buffers.
-    const SharedPtr<ConstantBuffer>* GetConstantBuffers() const { return &constantBuffers_[0]; }
 
     /// Check whether a shader parameter group needs update. Does not actually check whether parameters exist in the shaders.
     bool NeedParameterUpdate(ShaderParameterGroup group, const void* source);
@@ -97,11 +95,9 @@ private:
     /// Texture unit use.
     bool useTextureUnits_[MAX_TEXTURE_UNITS]{};
     /// Vertex attributes.
-    ea::unordered_map<ea::pair<unsigned char, unsigned char>, unsigned> vertexAttributes_;
+    ea::unordered_map<ea::pair<unsigned char, unsigned char>, ea::pair<unsigned, bool>> vertexAttributes_;
     /// Used vertex attribute location bitmask.
     unsigned usedVertexAttributes_{};
-    /// Constant buffers by binding index.
-    SharedPtr<ConstantBuffer> constantBuffers_[MAX_SHADER_PARAMETER_GROUPS * 2];
     /// Remembered shader parameter sources for individual uniform mode.
     const void* parameterSources_[MAX_SHADER_PARAMETER_GROUPS]{};
     /// Shader link error string.
@@ -111,8 +107,6 @@ private:
 
     /// Global shader parameter source framenumber.
     static unsigned globalFrameNumber;
-    /// Remembered global shader parameter sources for constant buffer mode.
-    static const void* globalParameterSources[MAX_SHADER_PARAMETER_GROUPS];
 };
 
 }

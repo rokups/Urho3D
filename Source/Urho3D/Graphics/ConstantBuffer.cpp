@@ -48,32 +48,4 @@ void ConstantBuffer::RegisterObject(Context* context)
     context->RegisterFactory<ConstantBuffer>();
 }
 
-void ConstantBuffer::SetParameter(unsigned offset, unsigned size, const void* data)
-{
-    if (offset + size > size_)
-        return; // Would overflow the buffer
-
-    memcpy(shadowData_.get() + offset, data, size);
-    dirty_ = true;
-}
-
-void ConstantBuffer::SetVector3ArrayParameter(unsigned offset, unsigned rows, const void* data)
-{
-    if (offset + rows * 4 * sizeof(float) > size_)
-        return; // Would overflow the buffer
-
-    auto* dest = (float*)&shadowData_[offset];
-    const auto* src = (const float*)data;
-
-    while (rows--)
-    {
-        *dest++ = *src++;
-        *dest++ = *src++;
-        *dest++ = *src++;
-        ++dest; // Skip over the w coordinate
-    }
-
-    dirty_ = true;
-}
-
 }

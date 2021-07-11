@@ -20,10 +20,10 @@
 // THE SOFTWARE.
 //
 
+#include "../Glow/BakedSceneChunk.h"
 #include "../Glow/Helpers.h"
 #include "../Glow/RaytracerScene.h"
 #include "../Glow/LightTracer.h"
-#include "../Graphics/LightProbeGroup.h"
 #include "../IO/Log.h"
 #include "../Math/TetrahedralMesh.h"
 
@@ -386,6 +386,7 @@ struct ChartDirectTracingKernel
     bool bakeDirect_{};
     /// Whether to bake direct light for indirect lighting.
     bool bakeIndirect_{};
+    unsigned lightMask_{};
 
     /// Current smooth interpolated normal.
     Vector3 currentSmoothNormal_;
@@ -418,7 +419,8 @@ struct ChartDirectTracingKernel
     bool BeginElement(unsigned elementIndex, DirectTracingContextForCharts& rayContext, Vector3& position)
     {
         const unsigned geometryId = geometryBuffer_->geometryIds_[elementIndex];
-        if (!geometryId)
+        const unsigned objectLightMask = geometryBuffer_->lightMasks_[elementIndex];
+        if (!geometryId || (objectLightMask & lightMask_) == 0)
             return false;
 
         // Initialize per-element data in ray context
@@ -469,7 +471,7 @@ struct ChartDirectTracingKernel
 struct LightProbeDirectTracingKernel
 {
     /// Light probes collection.
-    const LightProbeCollection* collection_{};
+    const LightProbeCollectionForBaking* collection_{};
     /// Light probes baked data.
     LightProbeCollectionBakedData* bakedData_{};
     /// Settings.
@@ -480,6 +482,7 @@ struct LightProbeDirectTracingKernel
     unsigned numSamples_{ 1 };
     /// Whether to bake direct light for direct lighting itself.
     bool bakeDirect_{};
+    unsigned lightMask_{};
 
     /// Accumulated light SH.
     SphericalHarmonicsColor9 accumulatedLightSH_;
@@ -506,6 +509,10 @@ struct LightProbeDirectTracingKernel
     /// Begin tracing element.
     bool BeginElement(unsigned elementIndex, DirectTracingContextForLightProbes& /*rayContext*/, Vector3& position)
     {
+        const unsigned probeLightMask = collection_->lightMasks_[elementIndex];
+        if ((probeLightMask & lightMask_) == 0)
+            return false;
+
         position = collection_->worldPositions_[elementIndex];
 
         accumulatedLightSH_ = {};
@@ -640,20 +647,24 @@ struct ChartIndirectTracingKernel
     /// Settings.
     const IndirectLightTracingSettings* settings_{};
 
-    /// Current position.
+    /// Static within element:
+    /// @{
     Vector3 currentPosition_;
-    /// Current normal of actual geometry face.
     Vector3 currentFaceNormal_;
-    /// Current smooth interpolated normal.
     Vector3 currentSmoothNormal_;
-    /// Current geometry ID.
     unsigned currentGeometryId_;
+    unsigned currentBackgroundIndex_{};
+    /// Last sampled tetrahedron, used for LOD indirect lighting.
+    unsigned lightProbesMeshHint_{};
+    /// @}
+
+    /// Static within sample:
+    /// @{
+    Vector3 currentSampleDirection_;
+    /// @}
 
     /// Accumulated indirect light value.
     Vector4 accumulatedIndirectLight_;
-
-    /// Last sampled tetrahedron.
-    unsigned lightProbesMeshHint_{};
 
     /// Return number of elements to trace.
     unsigned GetNumElements() const { return bakedIndirect_->light_.size(); }
@@ -669,8 +680,10 @@ struct ChartIndirectTracingKernel
             return false;
 
         currentPosition_ = geometryBuffer_->positions_[elementIndex];
+        currentFaceNormal_ = geometryBuffer_->faceNormals_[elementIndex];
         currentSmoothNormal_ = geometryBuffer_->smoothNormals_[elementIndex];
         currentGeometryId_ = geometryId;
+        currentBackgroundIndex_ = geometryBuffer_->backgroundIds_[elementIndex];
 
         // Fallback to light probes if has LODs
         const unsigned raytracerGeometryId = (*geometryBufferToRaytracer_)[geometryId];
@@ -690,15 +703,18 @@ struct ChartIndirectTracingKernel
         return true;
     };
 
+    unsigned GetElementBackgroundIndex() const { return currentBackgroundIndex_; }
+
     /// Begin sample. Return position, normal and initial ray direction.
     void BeginSample(unsigned /*sampleIndex*/,
-        Vector3& position, Vector3& faceNormal, Vector3& smoothNormal, Vector3& rayDirection, Vector3& albedo) const
+        Vector3& position, Vector3& faceNormal, Vector3& smoothNormal, Vector3& rayDirection, Vector3& albedo)
     {
         position = currentPosition_;
         faceNormal = currentFaceNormal_;
         smoothNormal = currentSmoothNormal_;
         albedo = Vector3::ONE;
-        rayDirection = RandomHemisphereDirection(currentFaceNormal_);
+        currentSampleDirection_ = RandomHemisphereDirection(currentFaceNormal_);
+        rayDirection = currentSampleDirection_;
     }
 
     /// End sample.
@@ -718,7 +734,7 @@ struct ChartIndirectTracingKernel
 struct LightProbeIndirectTracingKernel
 {
     /// Light probes collection.
-    const LightProbeCollection* collection_{};
+    const LightProbeCollectionForBaking* collection_{};
     /// Light probes baked data.
     LightProbeCollectionBakedData* bakedData_{};
     /// Settings.
@@ -726,6 +742,7 @@ struct LightProbeIndirectTracingKernel
 
     /// Current position.
     Vector3 currentPosition_;
+    unsigned backgroundId_{};
 
     /// Current sample direction.
     Vector3 currentSampleDirection_;
@@ -743,10 +760,13 @@ struct LightProbeIndirectTracingKernel
     bool BeginElement(unsigned elementIndex)
     {
         currentPosition_ = collection_->worldPositions_[elementIndex];
+        backgroundId_ = collection_->backgroundIds_[elementIndex];
 
         accumulatedLightSH_ = {};
         return true;
     };
+
+    unsigned GetElementBackgroundIndex() const { return backgroundId_; }
 
     /// Begin sample. Return position, normal and initial ray direction.
     void BeginSample(unsigned /*sampleIndex*/,
@@ -770,7 +790,9 @@ struct LightProbeIndirectTracingKernel
     /// End tracing element.
     void EndElement(unsigned elementIndex)
     {
-        const float weight = M_PI / GetNumSamples();
+        // BRDF assumes flat surface and multiplies light by 2 to compensate N.L variation.
+        // Light probe N.L is constant (1.0) so we have to revert this compensation now.
+        const float weight = 0.5f * 4.0f * M_PI / GetNumSamples();
         const SphericalHarmonicsDot9 sh{ accumulatedLightSH_ * weight };
         bakedData_->sphericalHarmonics_[elementIndex] += sh;
     }
@@ -791,7 +813,7 @@ void TraceIndirectLight(T sharedKernel, const ea::vector<const LightmapChartBake
         RTCScene scene = raytracerScene.GetEmbreeScene();
         const float maxDistance = raytracerScene.GetMaxDistance();
         const auto& geometryIndex = raytracerScene.GetGeometries();
-        const RaytracingBackground& background = raytracerScene.GetBackground();
+        const auto& backgrounds = raytracerScene.GetBackgrounds();
 
         Vector3 albedo[IndirectLightTracingSettings::MaxBounces];
         Vector3 incomingSamples[IndirectLightTracingSettings::MaxBounces];
@@ -813,6 +835,8 @@ void TraceIndirectLight(T sharedKernel, const ea::vector<const LightmapChartBake
         {
             if (!kernel.BeginElement(elementIndex))
                 continue;
+
+            const BakedSceneBackground& background = (*backgrounds)[kernel.GetElementBackgroundIndex()];
 
             for (unsigned sampleIndex = 0; sampleIndex < kernel.GetNumSamples(); ++sampleIndex)
             {
@@ -836,11 +860,14 @@ void TraceIndirectLight(T sharedKernel, const ea::vector<const LightmapChartBake
                     rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
                     rtcIntersect1(scene, &rayContext, &rayHit);
 
+                    // Apply angle between receiving surface and ray, multiply by two to normalize
+                    const float cosTheta = ea::max(0.0f, currentRayDirection.DotProduct(currentSmoothNormal));
+                    incomingFactors[bounceIndex] = cosTheta * 2.0f;
+
                     // If hit background, pick light and break
                     if (rayHit.hit.geomID == RTC_INVALID_GEOMETRY_ID)
                     {
-                        incomingSamples[bounceIndex] = background.SampleBackground(currentRayDirection);
-                        incomingFactors[bounceIndex] = 1.0f;
+                        incomingSamples[bounceIndex] = background.SampleLinear(currentRayDirection);
                         ++numBounces;
                         break;
                     }
@@ -856,15 +883,9 @@ void TraceIndirectLight(T sharedKernel, const ea::vector<const LightmapChartBake
                         RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, RaytracerScene::LightmapUVAttribute, &lightmapUV.x_, 2);
 
                     // Modify incoming flux
-                    const float probability = 1 / (2 * M_PI);
-                    const float cosTheta = ea::max(0.0f, currentRayDirection.DotProduct(currentSmoothNormal));
-                    const float reflectance = 1 / M_PI;
-                    const float brdf = reflectance / M_PI;
-
                     const unsigned lightmapIndex = geometry.lightmapIndex_;
                     const IntVector2 sampleLocation = bakedDirect[lightmapIndex]->GetNearestLocation(lightmapUV);
                     incomingSamples[bounceIndex] = bakedDirect[lightmapIndex]->GetSurfaceLight(sampleLocation);
-                    incomingFactors[bounceIndex] = brdf * cosTheta / probability;
                     ++numBounces;
 
                     // Go to next hemisphere
@@ -1037,7 +1058,8 @@ void BakeDirectLightForCharts(LightmapChartBakedDirect& bakedDirect, const Light
     const bool bakeIndirect = true;
     const unsigned numSamples = CalculateNumSamples(light, settings.maxSamples_);
     const ChartDirectTracingKernel kernel{ &bakedDirect, &geometryBuffer, &geometryBufferToRaytracer,
-        &raytracerScene.GetGeometries(), &settings, light.indirectBrightness_, numSamples, bakeDirect, bakeIndirect };
+        &raytracerScene.GetGeometries(), &settings, light.indirectBrightness_, numSamples,
+        bakeDirect, bakeIndirect, light.lightMask_ };
 
     if (light.lightType_ == LIGHT_DIRECTIONAL)
     {
@@ -1059,13 +1081,13 @@ void BakeDirectLightForCharts(LightmapChartBakedDirect& bakedDirect, const Light
 }
 
 void BakeDirectLightForLightProbes(
-    LightProbeCollectionBakedData& bakedData, const LightProbeCollection& collection,
+    LightProbeCollectionBakedData& bakedData, const LightProbeCollectionForBaking& collection,
     const RaytracerScene& raytracerScene, const BakedLight& light, const DirectLightTracingSettings& settings)
 {
     const bool bakeDirect = light.lightMode_ == LM_BAKED;
     const unsigned numSamples = CalculateNumSamples(light, settings.maxSamples_);
     const LightProbeDirectTracingKernel kernel{ &collection, &bakedData, &settings,
-        &raytracerScene.GetGeometries(), numSamples, bakeDirect };
+        &raytracerScene.GetGeometries(), numSamples, bakeDirect, light.lightMask_ };
 
     if (light.lightType_ == LIGHT_DIRECTIONAL)
     {
@@ -1101,7 +1123,7 @@ void BakeIndirectLightForCharts(LightmapChartBakedIndirect& bakedIndirect,
 }
 
 void BakeIndirectLightForLightProbes(
-    LightProbeCollectionBakedData& bakedData, const LightProbeCollection& collection,
+    LightProbeCollectionBakedData& bakedData, const LightProbeCollectionForBaking& collection,
     const ea::vector<const LightmapChartBakedDirect*>& bakedDirect,
     const RaytracerScene& raytracerScene, const IndirectLightTracingSettings& settings)
 {

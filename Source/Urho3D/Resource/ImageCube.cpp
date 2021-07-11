@@ -223,20 +223,26 @@ bool ImageCube::BeginLoad(Deserializer& source)
     return true;
 }
 
-SharedPtr<ImageCube> ImageCube::GetDecompressedImage() const
+SharedPtr<ImageCube> ImageCube::GetDecompressedImageLevel(unsigned index) const
 {
     auto copy = MakeShared<ImageCube>(context_);
 
     copy->parametersXml_ = parametersXml_;
     copy->faceImages_ = faceImages_;
+    copy->width_ = ea::max<int>(1u, width_ >> index);
 
     for (SharedPtr<Image>& faceImage : copy->faceImages_)
     {
         if (faceImage)
-            faceImage = faceImage->GetDecompressedImage();
+            faceImage = faceImage->GetDecompressedImageLevel(index);
     }
 
     return copy;
+}
+
+SharedPtr<ImageCube> ImageCube::GetDecompressedImage() const
+{
+    return GetDecompressedImageLevel(0);
 }
 
 Color ImageCube::SampleNearest(const Vector3& direction) const
@@ -246,11 +252,16 @@ Color ImageCube::SampleNearest(const Vector3& direction) const
     return faceImages_[projection.first]->GetPixel(texel.x_, texel.y_);
 }
 
+Vector3 ImageCube::ProjectTexelOnCubeLevel(CubeMapFace face, int x, int y, unsigned level) const
+{
+    const float u = (x + 0.5f) / (width_ >> level);
+    const float v = (y + 0.5f) / (width_ >> level);
+    return ProjectUVOnCube(face, { u, v });
+}
+
 Vector3 ImageCube::ProjectTexelOnCube(CubeMapFace face, int x, int y) const
 {
-    const float u = (x + 0.5f) / width_;
-    const float v = (y + 0.5f) / width_;
-    return ProjectUVOnCube(face, { u, v });
+    return ProjectTexelOnCubeLevel(face, x, y, 0);
 }
 
 ea::pair<CubeMapFace, IntVector2> ImageCube::ProjectDirectionOnFaceTexel(const Vector3& direction) const
@@ -260,6 +271,13 @@ ea::pair<CubeMapFace, IntVector2> ImageCube::ProjectDirectionOnFaceTexel(const V
     const int x = Clamp(FloorToInt(uv.x_ * width_), 0, width_);
     const int y = Clamp(FloorToInt(uv.y_ * width_), 0, width_);
     return { faceUV.first, { x, y } };
+}
+
+unsigned ImageCube::GetSphericalHarmonicsMipLevel() const
+{
+    const unsigned maxLevel = LogBaseTwo(width_);
+    const unsigned bestLevelCountedFromSmallest = ea::min(maxLevel, LogBaseTwo(8)); // 8x8 should be enough for SH
+    return maxLevel - bestLevelCountedFromSmallest;
 }
 
 SphericalHarmonicsColor9 ImageCube::CalculateSphericalHarmonics() const
@@ -275,16 +293,18 @@ SphericalHarmonicsColor9 ImageCube::CalculateSphericalHarmonics() const
         if (!faceImage)
             continue;
 
-        auto decompressedImage = faceImage->GetDecompressedImage();
+        const unsigned bestLevel = GetSphericalHarmonicsMipLevel();
+        const unsigned bestLevelWidth = width_ >> bestLevel;
+        auto decompressedImage = faceImage->GetDecompressedImageLevel(bestLevel);
 
-        for (int y = 0; y < width_; ++y)
+        for (int y = 0; y < bestLevelWidth; ++y)
         {
-            for (int x = 0; x < width_; ++x)
+            for (int x = 0; x < bestLevelWidth; ++x)
             {
-                const Color sample = decompressedImage->GetPixel(x, y);
-                const Vector3 offset = ProjectTexelOnCube(face, x, y);
+                const Color sample = decompressedImage->GetPixel(x, y).GammaToLinear();
+                const Vector3 offset = ProjectTexelOnCubeLevel(face, x, y, bestLevel);
                 const float distance = offset.Length();
-                const float weight = 4.0f / (distance * distance * distance);
+                const float weight = 1.0f / (distance * distance * distance);
                 const Vector3 direction = offset / distance;
 
                 result += SphericalHarmonicsColor9(direction, sample) * weight;

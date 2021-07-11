@@ -1056,6 +1056,22 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
     }
 }
 
+ShaderProgramLayout* Graphics::GetShaderProgramLayout(ShaderVariation* vs, ShaderVariation* ps)
+{
+    const auto combination = ea::make_pair(vs, ps);
+    auto iter = impl_->shaderPrograms_.find(combination);
+    if (iter != impl_->shaderPrograms_.end())
+        return iter->second;
+
+    // TODO: Some overhead due to redundant setting of shader program
+    ShaderVariation* prevVertexShader = vertexShader_;
+    ShaderVariation* prevPixelShader = pixelShader_;
+    SetShaders(vs, ps);
+    ShaderProgramLayout* layout = impl_->shaderProgram_;
+    SetShaders(prevVertexShader, prevPixelShader);
+    return layout;
+}
+
 void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 {
     if (vs == vertexShader_ && ps == pixelShader_)
@@ -1143,6 +1159,11 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
     // Store shader combination if shader dumping in progress
     if (shaderPrecache_)
         shaderPrecache_->StoreShaders(vertexShader_, pixelShader_);
+}
+
+void Graphics::SetShaderConstantBuffers(ea::span<const ConstantBufferRange, MAX_SHADER_PARAMETER_GROUPS> constantBuffers)
+{
+    URHO3D_LOGERROR("Graphics::SetShaderConstantBuffers is not supported for D3D9 graphics");
 }
 
 void Graphics::SetShaderParameter(StringHash param, const float data[], unsigned count)
@@ -2158,6 +2179,11 @@ unsigned Graphics::GetReadableDepthFormat()
     return readableDepthFormat;
 }
 
+unsigned Graphics::GetReadableDepthStencilFormat()
+{
+    return readableDepthFormat;
+}
+
 unsigned Graphics::GetFormat(const ea::string& formatName)
 {
     ea::string nameLower = formatName.to_lower();
@@ -2468,8 +2494,12 @@ void Graphics::CheckFeatureSupport()
     sRGBSupport_ = impl_->CheckFormatSupport(D3DFMT_X8R8G8B8, D3DUSAGE_QUERY_SRGBREAD, D3DRTYPE_TEXTURE);
     sRGBWriteSupport_ = impl_->CheckFormatSupport(D3DFMT_X8R8G8B8, D3DUSAGE_QUERY_SRGBWRITE, D3DRTYPE_TEXTURE);
 
-    maxVertexShaderUniforms_ = impl_->deviceCaps_.MaxVertexShaderConst;
-    maxPixelShaderUniforms_ = impl_->deviceCaps_.MaxVertexShaderConst; // there's no MaxPixelShaderConst
+    caps.globalUniformsSupported_ = true;
+    caps.maxVertexShaderUniforms_ = impl_->deviceCaps_.MaxVertexShaderConst;
+    caps.maxPixelShaderUniforms_ = impl_->deviceCaps_.MaxVertexShaderConst; // there's no MaxPixelShaderConst
+    caps.maxTextureSize_ = ea::min(impl_->deviceCaps_.MaxTextureWidth, impl_->deviceCaps_.MaxTextureHeight);
+    caps.maxRenderTargetSize_ = caps.maxTextureSize_; // probably incorrect
+    caps.maxNumRenderTargets_ = 4;
 }
 
 void Graphics::ResetDevice()

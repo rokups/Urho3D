@@ -25,6 +25,7 @@
 #include "../Core/Context.h"
 #include "../Graphics/Geometry.h"
 #include "../Graphics/Graphics.h"
+#include "../Graphics/GraphicsEvents.h"
 #include "../Graphics/IndexBuffer.h"
 #include "../Graphics/VertexBuffer.h"
 #include "../IO/Log.h"
@@ -68,7 +69,7 @@ bool Geometry::SetNumVertexBuffers(unsigned num)
         return false;
     }
 
-    unsigned oldSize = vertexBuffers_.size();
+    vertexBuffersDependencies_.resize(num);
     vertexBuffers_.resize(num);
 
     return true;
@@ -82,17 +83,22 @@ bool Geometry::SetVertexBuffer(unsigned index, VertexBuffer* buffer)
         return false;
     }
 
+    vertexBuffersDependencies_[index] = CreateDependency(buffer);
     vertexBuffers_[index] = buffer;
     return true;
 }
 
 void Geometry::SetVertexBuffers(const ea::vector<SharedPtr<VertexBuffer>>& vertexBuffers)
 {
+    vertexBuffersDependencies_.resize(vertexBuffers.size());
+    for (unsigned i = 0; i < vertexBuffers.size(); ++i)
+        vertexBuffersDependencies_[i] = CreateDependency(vertexBuffers[i]);
     vertexBuffers_ = vertexBuffers;
 }
 
 void Geometry::SetIndexBuffer(IndexBuffer* buffer)
 {
+    indexBufferDependency_ = CreateDependency(indexBuffer_);
     indexBuffer_ = buffer;
 }
 
@@ -129,6 +135,7 @@ bool Geometry::SetDrawRange(PrimitiveType type, unsigned indexStart, unsigned in
         vertexCount_ = 0;
     }
 
+    MarkPipelineStateHashDirty();
     return true;
 }
 
@@ -157,6 +164,7 @@ bool Geometry::SetDrawRange(PrimitiveType type, unsigned indexStart, unsigned in
     vertexStart_ = vertexStart;
     vertexCount_ = vertexCount;
 
+    RecalculatePipelineStateHash();
     return true;
 }
 
@@ -206,6 +214,27 @@ void Geometry::Draw(Graphics* graphics)
 VertexBuffer* Geometry::GetVertexBuffer(unsigned index) const
 {
     return index < vertexBuffers_.size() ? vertexBuffers_[index] : nullptr;
+}
+
+unsigned Geometry::GetPrimitiveCount() const
+{
+    const unsigned indexCount = indexBuffer_ ? indexCount_ : vertexCount_;
+    switch (primitiveType_)
+    {
+    case TRIANGLE_LIST:
+        return indexCount / 3;
+    case LINE_LIST:
+        return indexCount / 2;
+    case POINT_LIST:
+        return indexCount;
+    case TRIANGLE_STRIP:
+    case TRIANGLE_FAN:
+        return indexCount >= 2 ? indexCount - 2 : 0;
+    case LINE_STRIP:
+        return indexCount >= 1 ? indexCount - 1 : 0;
+    default:
+        return 0;
+    }
 }
 
 unsigned short Geometry::GetBufferHash() const
@@ -353,6 +382,19 @@ bool Geometry::IsInside(const Ray& ray) const
 
     return vertexData ? (indexData ? ray.InsideGeometry(vertexData, vertexSize, indexData, indexSize, indexStart_, indexCount_) :
                          ray.InsideGeometry(vertexData, vertexSize, vertexStart_, vertexCount_)) : false;
+}
+
+unsigned Geometry::RecalculatePipelineStateHash() const
+{
+    unsigned hash = 0;
+    CombineHash(hash, vertexBuffers_.size());
+    for (VertexBuffer* vertexBuffer : vertexBuffers_)
+    {
+        CombineHash(hash, vertexBuffer ? vertexBuffer->GetPipelineStateHash() : 0);
+    }
+    CombineHash(hash, indexBuffer_ ? indexBuffer_->GetPipelineStateHash() : 0);
+    CombineHash(hash, primitiveType_);
+    return hash;
 }
 
 }

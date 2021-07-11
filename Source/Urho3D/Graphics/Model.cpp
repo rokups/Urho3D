@@ -637,7 +637,7 @@ SharedPtr<Model> Model::Clone(const ea::string& cloneName) const
         if (origBuffer)
         {
             cloneBuffer = context_->CreateObject<VertexBuffer>();
-            cloneBuffer->SetSize(origBuffer->GetVertexCount(), origBuffer->GetElementMask(), origBuffer->IsDynamic());
+            cloneBuffer->SetSize(origBuffer->GetVertexCount(), origBuffer->GetElements(), origBuffer->IsDynamic());
             cloneBuffer->SetShadowed(origBuffer->IsShadowed());
             if (origBuffer->IsShadowed())
                 cloneBuffer->SetData(origBuffer->GetShadowData());

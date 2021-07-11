@@ -59,6 +59,10 @@ public:
     XMLFile* GetParametersXML() const { return parametersXml_; }
     /// Return image data from a face's zero mip level.
     Image* GetImage(CubeMapFace face) const { return faceImages_[face]; }
+    /// Return mip level used for SH calculation.
+    unsigned GetSphericalHarmonicsMipLevel() const;
+    /// Return decompressed cube image mip level.
+    SharedPtr<ImageCube> GetDecompressedImageLevel(unsigned index) const;
     /// Return decompressed cube image.
     SharedPtr<ImageCube> GetDecompressedImage() const;
 
@@ -66,6 +70,8 @@ public:
     Color SampleNearest(const Vector3& direction) const;
     /// Return offset from the center of the unit cube for given texel (assuming zero mip level).
     Vector3 ProjectTexelOnCube(CubeMapFace face, int x, int y) const;
+    /// Return offset from the center of the unit cube for given texel.
+    Vector3 ProjectTexelOnCubeLevel(CubeMapFace face, int x, int y, unsigned level) const;
     /// Project direction on texel of cubemap face.
     ea::pair<CubeMapFace, IntVector2> ProjectDirectionOnFaceTexel(const Vector3& direction) const;
     /// Calculate spherical harmonics for the cube map.

@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "../Graphics/PipelineState.h"
 #include "../Math/Color.h"
 #include "../Math/Frustum.h"
 #include "../Scene/Component.h"
@@ -182,6 +183,8 @@ public:
 private:
     /// Handle end of frame. Clear debug geometry.
     void HandleEndFrame(StringHash eventType, VariantMap& eventData);
+    /// Initialize pipeline states. Is expected to be called only once.
+    void InitializePipelineStates();
 
     /// Lines rendered with depth test.
     ea::vector<DebugLine> lines_;
@@ -205,6 +208,15 @@ private:
     bool lineAntiAlias_;
     /// Active camera.
     WeakPtr<Camera> camera_;
+
+    /// @name Pipeline states
+    /// @{
+    bool pipelineStatesInitialized_{};
+    SharedPtr<PipelineState> depthLinesPipelineState_[2];
+    SharedPtr<PipelineState> noDepthLinesPipelineState_[2];
+    SharedPtr<PipelineState> depthTrianglesPipelineState_;
+    SharedPtr<PipelineState> noDepthTrianglesPipelineState_;
+    /// @}
 };
 
 }

@@ -41,11 +41,32 @@ inline void CombineHash(unsigned& result, unsigned hash)
     result ^= hash + 0x9e3779b9 + (result << 6) + (result >> 2);
 }
 
+/// Fold 64-bit hash to 32-bit.
+inline unsigned FoldHash(unsigned long long value)
+{
+    auto result = static_cast<unsigned>(value);
+    CombineHash(result, static_cast<unsigned>(value >> 32ull));
+    return result;
+}
+
+/// Make hash for floating-point variable with zero error tolerance.
+inline unsigned MakeHash(float value)
+{
+    unsigned uintValue{};
+    memcpy(&uintValue, &value, sizeof(float));
+    CombineHash(uintValue, 0); // shuffle it a bit
+    return uintValue;
+}
+
 /// Make hash template helper.
 template <class T>
 inline unsigned MakeHash(const T& value)
 {
-    return ea::hash<T>{}(value);
+    const auto hash = ea::hash<T>{}(value);
+    if constexpr (sizeof(hash) > 4)
+        return FoldHash(hash);
+    else
+        return hash;
 }
 
 }

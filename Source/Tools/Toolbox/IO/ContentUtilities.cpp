@@ -138,7 +138,7 @@ ContentType GetContentType(Context* context, const ea::string& resourcePath)
                 return CTYPE_BINARY;
         }
         else
-            xml = context->GetSubsystem<ResourceCache>()->GetResource<XMLFile>(resourcePath, false);
+            xml = context->GetSubsystem<ResourceCache>()->GetTempResource<XMLFile>(resourcePath, false);
 
         if (!xml)
             return CTYPE_BINARY;

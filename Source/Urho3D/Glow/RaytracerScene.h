@@ -25,6 +25,7 @@
 #pragma once
 
 #include "../Container/Ptr.h"
+#include "../Glow/BakedSceneBackground.h"
 #include "../Glow/EmbreeForward.h"
 #include "../Graphics/LightBakingSettings.h"
 #include "../Math/BoundingBox.h"
@@ -40,25 +41,6 @@ namespace Urho3D
 class Context;
 class Node;
 class Component;
-
-/// Raytracer scene background description.
-struct RaytracingBackground
-{
-    /// Background light intensity.
-    Vector3 lightIntensity_;
-    /// Background image.
-    SharedPtr<ImageCube> backgroundImage_;
-    /// Background image brightness.
-    float backgroundImageBrightness_{ 1.0f };
-
-    /// Sample background.
-    Vector3 SampleBackground(const Vector3& direction) const
-    {
-        if (!backgroundImage_)
-            return lightIntensity_;
-        return backgroundImageBrightness_ * backgroundImage_->SampleNearest(direction).ToVector3();
-    }
-};
 
 /// Material of raytracing geometry.
 struct RaytracingGeometryMaterial
@@ -160,12 +142,12 @@ public:
 
     /// Construct.
     RaytracerScene(Context* context, embree3::RTCDevice embreeDevice, embree3::RTCScene raytracerScene,
-        ea::vector<RaytracerGeometry> geometries, const RaytracingBackground& background, float maxDistance)
+        ea::vector<RaytracerGeometry> geometries, const BakedSceneBackgroundArrayPtr& backgrounds, float maxDistance)
         : context_(context)
         , device_(embreeDevice)
         , scene_(raytracerScene)
         , geometries_(ea::move(geometries))
-        , background_(background)
+        , backgrounds_(backgrounds)
         , maxDistance_(maxDistance)
     {
     }
@@ -181,7 +163,7 @@ public:
     /// Return geometries.
     const ea::vector<RaytracerGeometry>& GetGeometries() const { return geometries_; }
     /// Return background.
-    const RaytracingBackground& GetBackground() const { return background_; }
+    const BakedSceneBackgroundArrayPtr& GetBackgrounds() const { return backgrounds_; }
     /// Return max distance between two points.
     float GetMaxDistance() const { return maxDistance_; }
 
@@ -195,13 +177,13 @@ private:
     /// Geometries.
     ea::vector<RaytracerGeometry> geometries_;
     /// Background.
-    RaytracingBackground background_;
+    BakedSceneBackgroundArrayPtr backgrounds_;
     /// Max distance between two points.
     float maxDistance_{};
 };
 
 // Create scene for raytracing.
 URHO3D_API SharedPtr<RaytracerScene> CreateRaytracingScene(Context* context,
-    const ea::vector<Component*>& geometries, unsigned uvChannel, const RaytracingBackground& background);
+    const ea::vector<Component*>& geometries, unsigned uvChannel, const BakedSceneBackgroundArrayPtr& background);
 
 }

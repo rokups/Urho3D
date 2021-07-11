@@ -720,15 +720,16 @@ void Text3D::UpdateTextMaterials(bool forceUpdate)
             switch (GetTextEffect())
             {
             case TE_SHADOW:
-                if (texture)
-                {
-                    Vector2 shadowOffset(0.5f / texture->GetWidth(), 0.5f / texture->GetHeight());
-                    material->SetShaderParameter("ShadowOffset", shadowOffset);
-                }
+            {
+                const Vector2 textureSize = texture ? static_cast<Vector2>(texture->GetSize()) : Vector2::ONE * 128;
+                const Vector2 shadowOffset = 0.5f * static_cast<Vector2>(text_.shadowOffset_) / textureSize;
+                material->SetShaderParameter("ShadowOffset", shadowOffset);
                 material->SetShaderParameter("ShadowColor", GetEffectColor());
                 break;
+            }
 
             case TE_STROKE:
+                material->SetShaderParameter("StrokeThickness", text_.strokeThickness_ * 0.025); // random magic number
                 material->SetShaderParameter("StrokeColor", GetEffectColor());
                 break;
 

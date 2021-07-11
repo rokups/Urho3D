@@ -34,7 +34,7 @@ namespace Urho3D
 
 class RaytracerScene;
 class TetrahedralMesh;
-struct LightProbeCollection;
+struct LightProbeCollectionForBaking;
 
 /// Preprocess geometry buffer. Fix shadow bleeding.
 URHO3D_API void PreprocessGeometryBuffer(LightmapChartGeometryBuffer& geometryBuffer,
@@ -125,7 +125,7 @@ URHO3D_API void BakeDirectLightForCharts(LightmapChartBakedDirect& bakedDirect, 
 
 /// Accumulate direct light for light probes.
 URHO3D_API void BakeDirectLightForLightProbes(
-    LightProbeCollectionBakedData& bakedData, const LightProbeCollection& collection,
+    LightProbeCollectionBakedData& bakedData, const LightProbeCollectionForBaking& collection,
     const RaytracerScene& raytracerScene, const BakedLight& light, const DirectLightTracingSettings& settings);
 
 /// Accumulate indirect light for charts.
@@ -137,7 +137,7 @@ URHO3D_API void BakeIndirectLightForCharts(LightmapChartBakedIndirect& bakedIndi
 
 /// Accumulate indirect light for light probes.
 URHO3D_API void BakeIndirectLightForLightProbes(
-    LightProbeCollectionBakedData& bakedData, const LightProbeCollection& collection,
+    LightProbeCollectionBakedData& bakedData, const LightProbeCollectionForBaking& collection,
     const ea::vector<const LightmapChartBakedDirect*>& bakedDirect,
     const RaytracerScene& raytracerScene, const IndirectLightTracingSettings& settings);
 

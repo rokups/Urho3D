@@ -275,7 +275,10 @@ unsigned Texture::GetExternalFormat(unsigned format)
     else
         return format;
 #else
-    return format;
+    if (format == GL_DEPTH24_STENCIL8_OES)
+        return GL_DEPTH_STENCIL_OES;
+    else
+        return format;
 #endif
 }
 
@@ -293,7 +296,9 @@ unsigned Texture::GetDataType(unsigned format)
     else
         return GL_UNSIGNED_BYTE;
 #else
-    if (format == GL_DEPTH_COMPONENT || format == GL_DEPTH_COMPONENT24_OES)
+    if (format == GL_DEPTH24_STENCIL8_OES)
+        return GL_UNSIGNED_INT_24_8_OES;
+    else if (format == GL_DEPTH_COMPONENT || format == GL_DEPTH_COMPONENT24_OES)
         return GL_UNSIGNED_INT;
     else if (format == GL_DEPTH_COMPONENT16)
         return GL_UNSIGNED_SHORT;

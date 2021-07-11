@@ -54,8 +54,8 @@ public:
 protected:
     /// Set resource name.
     void SetResourceName(const ea::string& resourceName);
-    /// Render scene tab context menu.
-    void OnRenderContextMenu();
+    /// Render tab context menu.
+    virtual void OnRenderContextMenu();
 
     /// Name of loaded resource.
     ea::string resourceName_;

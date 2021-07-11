@@ -65,6 +65,35 @@ static Log* GetLog()
     return logInstance;
 }
 
+unsigned FindLastNewlineInRange(const ea::string& str, unsigned position, unsigned count)
+{
+    const char symbols[] = { '\n' };
+    return ea::find_last_of(str.begin() + position, str.begin() + position + count,
+        ea::begin(symbols), ea::end(symbols)) - str.begin();
+}
+
+ea::vector<ea::string> SliceTextByNewline(const ea::string& str, unsigned maxChunkSize)
+{
+    if (str.size() <= maxChunkSize)
+        return { str };
+
+    ea::vector<ea::string> result;
+
+    unsigned startPosition = 0;
+    while (startPosition < str.size())
+    {
+        const unsigned maxSize = ea::min<unsigned>(str.size() - startPosition, maxChunkSize);
+        const unsigned sliceIndex = startPosition + maxSize != str.size()
+            ? FindLastNewlineInRange(str, startPosition, maxSize) : str.size() - 1;
+        const unsigned chunkSize = sliceIndex != ea::string::npos
+            ? sliceIndex - startPosition + 1 : maxSize;
+
+        result.push_back(str.substr(startPosition, chunkSize));
+        startPosition += chunkSize;
+    }
+    return result;
+}
+
 #if defined(IOS) || defined(TVOS)
 template<typename Mutex>
 class IOSSink : public spdlog::sinks::base_sink<Mutex>
@@ -341,7 +370,17 @@ void Log::SendMessageEvent(LogLevel level, time_t timestamp, const ea::string& l
         return;
 
 #if URHO3D_PROFILING
-    TracyMessageC(message.c_str(), message.size(), LOG_LEVEL_COLORS[level].ToUIntArgb());
+    const unsigned maxMessageLength = std::numeric_limits<uint16_t>::max() - 1;
+    if (message.size() <= maxMessageLength)
+    {
+        TracyMessageC(message.c_str(), message.size(), LOG_LEVEL_COLORS[level].ToUIntArgb());
+    }
+    else
+    {
+        const auto chunks = SliceTextByNewline(message, maxMessageLength);
+        for (const ea::string& chunk : chunks)
+            TracyMessageC(chunk.c_str(), chunk.size(), LOG_LEVEL_COLORS[level].ToUIntArgb());
+    }
 #endif
 
     auto* logInstance = GetLog();

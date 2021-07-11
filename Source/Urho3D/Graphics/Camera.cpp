@@ -26,6 +26,7 @@
 #include "../Graphics/Camera.h"
 #include "../Graphics/DebugRenderer.h"
 #include "../Graphics/Drawable.h"
+#include "../Graphics/Zone.h"
 #include "../Scene/Node.h"
 
 #include "../DebugNew.h"
@@ -61,6 +62,7 @@ Camera::Camera(Context* context) :
     zoom_(1.0f),
     lodBias_(1.0f),
     viewMask_(DEFAULT_VIEWMASK),
+    zoneMask_(DEFAULT_ZONEMASK),
     viewOverrideFlags_(VO_NONE),
     fillMode_(FILL_SOLID),
     projectionOffset_(Vector2::ZERO),
@@ -92,6 +94,7 @@ void Camera::RegisterObject(Context* context)
     URHO3D_ACCESSOR_ATTRIBUTE("Zoom", GetZoom, SetZoom, float, 1.0f, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("LOD Bias", GetLodBias, SetLodBias, float, 1.0f, AM_DEFAULT);
     URHO3D_ATTRIBUTE("View Mask", int, viewMask_, DEFAULT_VIEWMASK, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Zone Mask", int, zoneMask_, DEFAULT_ZONEMASK, AM_DEFAULT);
     URHO3D_ATTRIBUTE("View Override Flags", unsigned, viewOverrideFlags_.AsInteger(), VO_NONE, AM_DEFAULT);
     URHO3D_ACCESSOR_ATTRIBUTE("Projection Offset", GetProjectionOffset, SetProjectionOffset, Vector2, Vector2::ZERO, AM_DEFAULT);
     URHO3D_MIXED_ACCESSOR_ATTRIBUTE("Reflection Plane", GetReflectionPlaneAttr, SetReflectionPlaneAttr, Vector4,
@@ -179,6 +182,12 @@ void Camera::SetLodBias(float bias)
 void Camera::SetViewMask(unsigned mask)
 {
     viewMask_ = mask;
+    MarkNetworkUpdate();
+}
+
+void Camera::SetZoneMask(unsigned mask)
+{
+    zoneMask_ = mask;
     MarkNetworkUpdate();
 }
 
@@ -477,6 +486,18 @@ Matrix4 Camera::GetGPUProjection() const
 #endif
 }
 
+Matrix4 Camera::GetEffectiveGPUViewProjection(float constantDepthBias) const
+{
+    Matrix4 projection = GetGPUProjection();
+    // glPolygonOffset is not supported in GL ES 2.0
+#ifdef URHO3D_OPENGL
+    const float constantBias = 2.0f * constantDepthBias;
+    projection.m22_ += projection.m32_ * constantBias;
+    projection.m23_ += projection.m33_ * constantBias;
+#endif
+    return projection * GetView();
+}
+
 void Camera::GetFrustumSize(Vector3& nearSize, Vector3& farSize) const
 {
     Frustum viewSpaceFrustum = GetViewSpaceFrustum();
@@ -497,6 +518,16 @@ float Camera::GetHalfViewSize() const
         return tanf(fov_ * M_DEGTORAD * 0.5f) / zoom_;
     else
         return orthoSize_ * 0.5f / zoom_;
+}
+
+Vector2 Camera::GetViewSizeAt(float z) const
+{
+    const float halfHeight = GetHalfViewSize();
+    const Vector2 halfSize{ aspectRatio_ * halfHeight, halfHeight };
+    if (orthographic_)
+        return halfSize;
+    else
+        return halfSize * z;
 }
 
 float Camera::GetDistance(const Vector3& worldPos) const
@@ -730,4 +761,28 @@ void Camera::UpdateViewProjectionMatrices() const
     cachedViewProj_.Restore({ viewProj, inverseViewProj });
 }
 
+const Color& Camera::GetEffectiveAmbientColor() const
+{
+    return zone_ ? zone_->GetAmbientColor() : Color::TRANSPARENT_BLACK;
+}
+
+float Camera::GetEffectiveAmbientBrightness() const
+{
+    return zone_ ? zone_->GetAmbientBrightness() : 1.0f;
+}
+
+const Color& Camera::GetEffectiveFogColor() const
+{
+    return zone_ ? zone_->GetFogColor() : Color::TRANSPARENT_BLACK;
+}
+
+float Camera::GetEffectiveFogStart() const
+{
+    return zone_ ? zone_->GetFogStart() : M_LARGE_VALUE;
+}
+
+float Camera::GetEffectiveFogEnd() const
+{
+    return zone_ ? zone_->GetFogEnd() : M_LARGE_VALUE;
+}
 }

@@ -132,7 +132,7 @@ private:
     /// Vertex attribute instancing bitmask for keeping track of divisors.
     unsigned instancingVertexAttributes_{};
     /// Current mapping of vertex attribute locations by semantic. The map is owned by the shader program, so care must be taken to switch a null shader program when it's destroyed.
-    const ea::unordered_map<ea::pair<unsigned char, unsigned char>, unsigned>* vertexAttributes_{};
+    const ea::unordered_map<ea::pair<unsigned char, unsigned char>, ea::pair<unsigned, bool>>* vertexAttributes_{};
     /// Currently bound frame buffer object.
     unsigned boundFBO_{};
     /// Currently bound vertex buffer object.
@@ -151,10 +151,6 @@ private:
     unsigned textureTypes_[MAX_TEXTURE_UNITS]{};
     /// Constant buffer search map.
     ConstantBufferMap allConstantBuffers_;
-    /// Currently bound constant buffers.
-    ConstantBuffer* constantBuffers_[MAX_SHADER_PARAMETER_GROUPS * 2]{};
-    /// Dirty constant buffers.
-    ea::vector<ConstantBuffer*> dirtyConstantBuffers_;
     /// Last used instance data offset.
     unsigned lastInstanceOffset_{};
     /// Map for additional depth textures, to emulate Direct3D9 ability to mix render texture and backbuffer rendering.

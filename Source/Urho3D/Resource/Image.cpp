@@ -2111,18 +2111,30 @@ CompressedLevel Image::GetCompressedLevel(unsigned index) const
     }
 }
 
-SharedPtr<Image> Image::GetDecompressedImage() const
+SharedPtr<Image> Image::GetDecompressedImageLevel(unsigned index) const
 {
     if (!IsCompressed())
-        return ConvertToRGBA();
+    {
+        if (index == 0)
+            return ConvertToRGBA();
+        else
+            return GetNextLevel()->GetDecompressedImageLevel(index - 1);
+    }
+    else
+    {
+        const CompressedLevel compressedLevel = GetCompressedLevel(ea::min(index, numCompressedLevels_));
 
-    const CompressedLevel compressedLevel = GetCompressedLevel(0);
+        auto decompressedImage = MakeShared<Image>(context_);
+        decompressedImage->SetSize(compressedLevel.width_, compressedLevel.height_, 4);
+        compressedLevel.Decompress(decompressedImage->GetData());
 
-    auto decompressedImage = MakeShared<Image>(context_);
-    decompressedImage->SetSize(compressedLevel.width_, compressedLevel.height_, 4);
-    compressedLevel.Decompress(decompressedImage->GetData());
+        return decompressedImage;
+    }
+}
 
-    return decompressedImage;
+SharedPtr<Image> Image::GetDecompressedImage() const
+{
+    return GetDecompressedImageLevel(0);
 }
 
 SharedPtr<Image> Image::GetSubimage(const IntRect& rect) const

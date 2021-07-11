@@ -160,6 +160,12 @@ static const D3D11_FILL_MODE d3dFillMode[] =
     D3D11_FILL_WIREFRAME // Point fill mode not supported
 };
 
+struct ClearFramebufferConstantBuffer
+{
+    Matrix3x4 matrix_;
+    Vector4 color_;
+};
+
 static void GetD3DPrimitiveType(unsigned elementCount, PrimitiveType type, unsigned& primitiveCount,
     D3D_PRIMITIVE_TOPOLOGY& d3dPrimitiveType)
 {
@@ -552,9 +558,14 @@ void Graphics::Clear(ClearTargetFlags flags, const Color& color, float depth, un
 
         Geometry* geometry = renderer->GetQuadGeometry();
 
-        Matrix3x4 model = Matrix3x4::IDENTITY;
-        Matrix4 projection = Matrix4::IDENTITY;
-        model.m23_ = Clamp(depth, 0.0f, 1.0f);
+        ClearFramebufferConstantBuffer bufferData;
+        bufferData.matrix_.m23_ = Clamp(depth, 0.0f, 1.0f);
+        bufferData.color_ = color.ToVector4();
+
+        ConstantBufferRange buffers[MAX_SHADER_PARAMETER_GROUPS];
+        buffers[0].constantBuffer_ = GetOrCreateConstantBuffer(VS, 0, sizeof(bufferData));
+        buffers[0].constantBuffer_->Update(&bufferData);
+        buffers[0].size_ = sizeof(bufferData);
 
         SetBlendMode(BLEND_REPLACE);
         SetColorWrite(flags & CLEAR_COLOR);
@@ -565,9 +576,7 @@ void Graphics::Clear(ClearTargetFlags flags, const Color& color, float depth, un
         SetScissorTest(false);
         SetStencilTest(flags & CLEAR_STENCIL, CMP_ALWAYS, OP_REF, OP_KEEP, OP_KEEP, stencil);
         SetShaders(GetShader(VS, "ClearFramebuffer"), GetShader(PS, "ClearFramebuffer"));
-        SetShaderParameter(VSP_MODEL, model);
-        SetShaderParameter(VSP_VIEWPROJ, projection);
-        SetShaderParameter(PSP_MATDIFFCOLOR, color);
+        SetShaderConstantBuffers(buffers);
 
         geometry->Draw(this);
 
@@ -709,7 +718,7 @@ void Graphics::Draw(PrimitiveType type, unsigned vertexStart, unsigned vertexCou
 
 void Graphics::Draw(PrimitiveType type, unsigned indexStart, unsigned indexCount, unsigned minVertex, unsigned vertexCount)
 {
-    if (!vertexCount || !impl_->shaderProgram_)
+    if (!impl_->shaderProgram_)
         return;
 
     PrepareDraw();
@@ -734,7 +743,7 @@ void Graphics::Draw(PrimitiveType type, unsigned indexStart, unsigned indexCount
 
 void Graphics::Draw(PrimitiveType type, unsigned indexStart, unsigned indexCount, unsigned baseVertexIndex, unsigned minVertex, unsigned vertexCount)
 {
-    if (!vertexCount || !impl_->shaderProgram_)
+    if (!impl_->shaderProgram_)
         return;
 
     PrepareDraw();
@@ -898,17 +907,24 @@ void Graphics::SetIndexBuffer(IndexBuffer* buffer)
     }
 }
 
+ShaderProgramLayout* Graphics::GetShaderProgramLayout(ShaderVariation* vs, ShaderVariation* ps)
+{
+    const auto combination = ea::make_pair(vs, ps);
+    auto iter = impl_->shaderPrograms_.find(combination);
+    if (iter != impl_->shaderPrograms_.end())
+        return iter->second;
+
+    // TODO: Some overhead due to redundant setting of shader program
+    ShaderVariation* prevVertexShader = vertexShader_;
+    ShaderVariation* prevPixelShader = pixelShader_;
+    SetShaders(vs, ps);
+    ShaderProgramLayout* layout = impl_->shaderProgram_;
+    SetShaders(prevVertexShader, prevPixelShader);
+    return layout;
+}
+
 void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
 {
-    // Switch to the clip plane variations if necessary
-    if (useClipPlane_)
-    {
-        if (vs)
-            vs = vs->GetOwner()->GetVariation(VS, vs->GetDefinesClipPlane());
-        if (ps)
-            ps = ps->GetOwner()->GetVariation(PS, ps->GetDefinesClipPlane());
-    }
-
     if (vs == vertexShader_ && ps == pixelShader_)
         return;
 
@@ -972,35 +988,6 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
             ShaderProgram* newProgram = impl_->shaderPrograms_[key] = new ShaderProgram(this, vertexShader_, pixelShader_);
             impl_->shaderProgram_ = newProgram;
         }
-
-        bool vsBuffersChanged = false;
-        bool psBuffersChanged = false;
-
-        for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
-        {
-            ID3D11Buffer* vsBuffer = impl_->shaderProgram_->vsConstantBuffers_[i] ? (ID3D11Buffer*)impl_->shaderProgram_->vsConstantBuffers_[i]->
-                GetGPUObject() : nullptr;
-            if (vsBuffer != impl_->constantBuffers_[VS][i])
-            {
-                impl_->constantBuffers_[VS][i] = vsBuffer;
-                shaderParameterSources_[i] = (const void*)M_MAX_UNSIGNED;
-                vsBuffersChanged = true;
-            }
-
-            ID3D11Buffer* psBuffer = impl_->shaderProgram_->psConstantBuffers_[i] ? (ID3D11Buffer*)impl_->shaderProgram_->psConstantBuffers_[i]->
-                GetGPUObject() : nullptr;
-            if (psBuffer != impl_->constantBuffers_[PS][i])
-            {
-                impl_->constantBuffers_[PS][i] = psBuffer;
-                shaderParameterSources_[i] = (const void*)M_MAX_UNSIGNED;
-                psBuffersChanged = true;
-            }
-        }
-
-        if (vsBuffersChanged)
-            impl_->deviceContext_->VSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[VS][0]);
-        if (psBuffersChanged)
-            impl_->deviceContext_->PSSetConstantBuffers(0, MAX_SHADER_PARAMETER_GROUPS, &impl_->constantBuffers_[PS][0]);
     }
     else
         impl_->shaderProgram_ = nullptr;
@@ -1008,158 +995,98 @@ void Graphics::SetShaders(ShaderVariation* vs, ShaderVariation* ps)
     // Store shader combination if shader dumping in progress
     if (shaderPrecache_)
         shaderPrecache_->StoreShaders(vertexShader_, pixelShader_);
+}
 
-    // Update clip plane parameter if necessary
-    if (useClipPlane_)
-        SetShaderParameter(VSP_CLIPPLANE, clipPlane_);
+void Graphics::SetShaderConstantBuffers(ea::span<const ConstantBufferRange, MAX_SHADER_PARAMETER_GROUPS> constantBuffers)
+{
+    bool buffersDirty = false;
+    for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
+    {
+        const ConstantBufferRange& range = constantBuffers[i];
+        if (range != constantBuffers_[i])
+        {
+            buffersDirty = true;
+            impl_->constantBuffers_[i] = reinterpret_cast<ID3D11Buffer*>(range.constantBuffer_->GetGPUObject());
+            impl_->constantBuffersStartSlots_[i] = range.offset_ / 16;
+            impl_->constantBuffersNumSlots_[i] = (range.size_ / 16 + 15) / 16 * 16;
+        }
+    }
+
+    if (buffersDirty)
+    {
+        // TODO: Optimize unused buffers
+        impl_->deviceContext_->VSSetConstantBuffers1(0, MAX_SHADER_PARAMETER_GROUPS,
+            impl_->constantBuffers_, impl_->constantBuffersStartSlots_, impl_->constantBuffersNumSlots_);
+        impl_->deviceContext_->PSSetConstantBuffers1(0, MAX_SHADER_PARAMETER_GROUPS,
+            impl_->constantBuffers_, impl_->constantBuffersStartSlots_, impl_->constantBuffersNumSlots_);
+    }
 }
 
 void Graphics::SetShaderParameter(StringHash param, const float data[], unsigned count)
 {
-    ea::unordered_map<StringHash, ShaderParameter>::iterator i;
-    if (!impl_->shaderProgram_ || (i = impl_->shaderProgram_->parameters_.find(param)) == impl_->shaderProgram_->parameters_.end())
-        return;
-
-    ConstantBuffer* buffer = i->second.bufferPtr_;
-    if (!buffer->IsDirty())
-        impl_->dirtyConstantBuffers_.emplace_back(buffer);
-    buffer->SetParameter(i->second.offset_, (unsigned)(count * sizeof(float)), data);
+    URHO3D_LOGERROR("Graphics::SetShaderParameter is not supported for DX11");
 }
 
 void Graphics::SetShaderParameter(StringHash param, float value)
 {
-    ea::unordered_map<StringHash, ShaderParameter>::iterator i;
-    if (!impl_->shaderProgram_ || (i = impl_->shaderProgram_->parameters_.find(param)) == impl_->shaderProgram_->parameters_.end())
-        return;
-
-    ConstantBuffer* buffer = i->second.bufferPtr_;
-    if (!buffer->IsDirty())
-        impl_->dirtyConstantBuffers_.emplace_back(buffer);
-    buffer->SetParameter(i->second.offset_, sizeof(float), &value);
+    URHO3D_LOGERROR("Graphics::SetShaderParameter is not supported for DX11");
 }
 
 void Graphics::SetShaderParameter(StringHash param, int value)
 {
-    ea::unordered_map<StringHash, ShaderParameter>::iterator i;
-    if (!impl_->shaderProgram_ || (i = impl_->shaderProgram_->parameters_.find(param)) == impl_->shaderProgram_->parameters_.end())
-        return;
-
-    ConstantBuffer* buffer = i->second.bufferPtr_;
-    if (!buffer->IsDirty())
-        impl_->dirtyConstantBuffers_.emplace_back(buffer);
-    buffer->SetParameter(i->second.offset_, sizeof(int), &value);
+    URHO3D_LOGERROR("Graphics::SetShaderParameter is not supported for DX11");
 }
 
 void Graphics::SetShaderParameter(StringHash param, bool value)
 {
-    ea::unordered_map<StringHash, ShaderParameter>::iterator i;
-    if (!impl_->shaderProgram_ || (i = impl_->shaderProgram_->parameters_.find(param)) == impl_->shaderProgram_->parameters_.end())
-        return;
-
-    ConstantBuffer* buffer = i->second.bufferPtr_;
-    if (!buffer->IsDirty())
-        impl_->dirtyConstantBuffers_.emplace_back(buffer);
-    buffer->SetParameter(i->second.offset_, sizeof(bool), &value);
+    URHO3D_LOGERROR("Graphics::SetShaderParameter is not supported for DX11");
 }
 
 void Graphics::SetShaderParameter(StringHash param, const Color& color)
 {
-    ea::unordered_map<StringHash, ShaderParameter>::iterator i;
-    if (!impl_->shaderProgram_ || (i = impl_->shaderProgram_->parameters_.find(param)) == impl_->shaderProgram_->parameters_.end())
-        return;
-
-    ConstantBuffer* buffer = i->second.bufferPtr_;
-    if (!buffer->IsDirty())
-        impl_->dirtyConstantBuffers_.emplace_back(buffer);
-    buffer->SetParameter(i->second.offset_, sizeof(Color), &color);
+    URHO3D_LOGERROR("Graphics::SetShaderParameter is not supported for DX11");
 }
 
 void Graphics::SetShaderParameter(StringHash param, const Vector2& vector)
 {
-    ea::unordered_map<StringHash, ShaderParameter>::iterator i;
-    if (!impl_->shaderProgram_ || (i = impl_->shaderProgram_->parameters_.find(param)) == impl_->shaderProgram_->parameters_.end())
-        return;
-
-    ConstantBuffer* buffer = i->second.bufferPtr_;
-    if (!buffer->IsDirty())
-        impl_->dirtyConstantBuffers_.emplace_back(buffer);
-    buffer->SetParameter(i->second.offset_, sizeof(Vector2), &vector);
+    URHO3D_LOGERROR("Graphics::SetShaderParameter is not supported for DX11");
 }
 
 void Graphics::SetShaderParameter(StringHash param, const Matrix3& matrix)
 {
-    ea::unordered_map<StringHash, ShaderParameter>::iterator i;
-    if (!impl_->shaderProgram_ || (i = impl_->shaderProgram_->parameters_.find(param)) == impl_->shaderProgram_->parameters_.end())
-        return;
-
-    ConstantBuffer* buffer = i->second.bufferPtr_;
-    if (!buffer->IsDirty())
-        impl_->dirtyConstantBuffers_.emplace_back(buffer);
-    buffer->SetVector3ArrayParameter(i->second.offset_, 3, &matrix);
+    URHO3D_LOGERROR("Graphics::SetShaderParameter is not supported for DX11");
 }
 
 void Graphics::SetShaderParameter(StringHash param, const Vector3& vector)
 {
-    ea::unordered_map<StringHash, ShaderParameter>::iterator i;
-    if (!impl_->shaderProgram_ || (i = impl_->shaderProgram_->parameters_.find(param)) == impl_->shaderProgram_->parameters_.end())
-        return;
-
-    ConstantBuffer* buffer = i->second.bufferPtr_;
-    if (!buffer->IsDirty())
-        impl_->dirtyConstantBuffers_.emplace_back(buffer);
-    buffer->SetParameter(i->second.offset_, sizeof(Vector3), &vector);
+    URHO3D_LOGERROR("Graphics::SetShaderParameter is not supported for DX11");
 }
 
 void Graphics::SetShaderParameter(StringHash param, const Matrix4& matrix)
 {
-    ea::unordered_map<StringHash, ShaderParameter>::iterator i;
-    if (!impl_->shaderProgram_ || (i = impl_->shaderProgram_->parameters_.find(param)) == impl_->shaderProgram_->parameters_.end())
-        return;
-
-    ConstantBuffer* buffer = i->second.bufferPtr_;
-    if (!buffer->IsDirty())
-        impl_->dirtyConstantBuffers_.emplace_back(buffer);
-    buffer->SetParameter(i->second.offset_, sizeof(Matrix4), &matrix);
+    URHO3D_LOGERROR("Graphics::SetShaderParameter is not supported for DX11");
 }
 
 void Graphics::SetShaderParameter(StringHash param, const Vector4& vector)
 {
-    ea::unordered_map<StringHash, ShaderParameter>::iterator i;
-    if (!impl_->shaderProgram_ || (i = impl_->shaderProgram_->parameters_.find(param)) == impl_->shaderProgram_->parameters_.end())
-        return;
-
-    ConstantBuffer* buffer = i->second.bufferPtr_;
-    if (!buffer->IsDirty())
-        impl_->dirtyConstantBuffers_.emplace_back(buffer);
-    buffer->SetParameter(i->second.offset_, sizeof(Vector4), &vector);
+    URHO3D_LOGERROR("Graphics::SetShaderParameter is not supported for DX11");
 }
 
 void Graphics::SetShaderParameter(StringHash param, const Matrix3x4& matrix)
 {
-    ea::unordered_map<StringHash, ShaderParameter>::iterator i;
-    if (!impl_->shaderProgram_ || (i = impl_->shaderProgram_->parameters_.find(param)) == impl_->shaderProgram_->parameters_.end())
-        return;
-
-    ConstantBuffer* buffer = i->second.bufferPtr_;
-    if (!buffer->IsDirty())
-        impl_->dirtyConstantBuffers_.emplace_back(buffer);
-    buffer->SetParameter(i->second.offset_, sizeof(Matrix3x4), &matrix);
+    URHO3D_LOGERROR("Graphics::SetShaderParameter is not supported for DX11");
 }
 
 bool Graphics::NeedParameterUpdate(ShaderParameterGroup group, const void* source)
 {
-    if ((unsigned)(size_t)shaderParameterSources_[group] == M_MAX_UNSIGNED || shaderParameterSources_[group] != source)
-    {
-        shaderParameterSources_[group] = source;
-        return true;
-    }
-    else
-        return false;
+    URHO3D_LOGERROR("Graphics::NeedParameterUpdate is not supported for DX11");
+    return false;
 }
 
 bool Graphics::HasShaderParameter(StringHash param)
 {
-    return impl_->shaderProgram_ && impl_->shaderProgram_->parameters_.find(param) != impl_->shaderProgram_->parameters_.end();
+    URHO3D_LOGERROR("Graphics::HasShaderParameter is not supported for DX11");
+    return false;
 }
 
 bool Graphics::HasTextureUnit(TextureUnit unit)
@@ -1595,14 +1522,8 @@ void Graphics::SetStencilTest(bool enable, CompareMode mode, StencilOp pass, Ste
 
 void Graphics::SetClipPlane(bool enable, const Plane& clipPlane, const Matrix3x4& view, const Matrix4& projection)
 {
+    // Basically no-op for DX11, clip plane has to be managed in user code
     useClipPlane_ = enable;
-
-    if (enable)
-    {
-        Matrix4 viewProj = projection * view;
-        clipPlane_ = clipPlane.Transformed(viewProj).ToVector4();
-        SetShaderParameter(VSP_CLIPPLANE, clipPlane_);
-    }
 }
 
 bool Graphics::IsInitialized() const
@@ -1655,17 +1576,34 @@ ShaderVariation* Graphics::GetShader(ShaderType type, const ea::string& name, co
 
 ShaderVariation* Graphics::GetShader(ShaderType type, const char* name, const char* defines) const
 {
-    if (lastShaderName_ != name || !lastShader_)
+    // Return cached shader
+    if (lastShaderName_ == name && lastShader_)
+        return lastShader_->GetVariation(type, defines);
+
+    auto cache = context_->GetSubsystem<ResourceCache>();
+    lastShader_ = nullptr;
+
+    // Try to load universal shader
+    if (strncmp(universalShaderNamePrefix_.c_str(), name, universalShaderNamePrefix_.size()) == 0)
     {
-        ResourceCache* cache = GetSubsystem<ResourceCache>();
+        const ea::string universalShaderName = Format(universalShaderPath_, name);
+        if (cache->Exists(universalShaderName))
+        {
+            lastShader_ = cache->GetResource<Shader>(universalShaderName);
+            lastShaderName_ = name;
+        }
+    }
 
-        ea::string fullShaderName = shaderPath_ + name + shaderExtension_;
+    // Try to load native shader
+    if (!lastShader_)
+    {
+        const ea::string fullShaderName = shaderPath_ + name + shaderExtension_;
         // Try to reduce repeated error log prints because of missing shaders
-        if (lastShaderName_ == name && !cache->Exists(fullShaderName))
-            return nullptr;
-
-        lastShader_ = cache->GetResource<Shader>(fullShaderName);
-        lastShaderName_ = name;
+        if (lastShaderName_ != name || cache->Exists(fullShaderName))
+        {
+            lastShader_ = cache->GetResource<Shader>(fullShaderName);
+            lastShaderName_ = name;
+        }
     }
 
     return lastShader_ ? lastShader_->GetVariation(type, defines) : nullptr;
@@ -1916,6 +1854,11 @@ unsigned Graphics::GetReadableDepthFormat()
     return DXGI_FORMAT_R24G8_TYPELESS;
 }
 
+unsigned Graphics::GetReadableDepthStencilFormat()
+{
+    return DXGI_FORMAT_R24G8_TYPELESS;
+}
+
 unsigned Graphics::GetFormat(const ea::string& formatName)
 {
     ea::string nameLower = formatName.to_lower();
@@ -2058,37 +2001,40 @@ bool Graphics::CreateDevice(int width, int height)
     // Device needs only to be created once
     if (!impl_->device_)
     {
-        D3D_FEATURE_LEVEL featureLevels[] =
+        UINT deviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+#ifdef _DEBUG
+        deviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+        ID3D11DeviceContext* deviceContext = nullptr;
+        const D3D_FEATURE_LEVEL featureLevels[] =
         {
             D3D_FEATURE_LEVEL_11_1,
-            D3D_FEATURE_LEVEL_11_0,
+            //D3D_FEATURE_LEVEL_11_0,
             D3D_FEATURE_LEVEL_10_1,
-            D3D_FEATURE_LEVEL_10_0,
+            //D3D_FEATURE_LEVEL_10_0,
         };
         HRESULT hr = D3D11CreateDevice(
             nullptr,
             D3D_DRIVER_TYPE_HARDWARE,
             nullptr,
-            D3D11_CREATE_DEVICE_BGRA_SUPPORT
-#if URHO3D_DEBUG
-            | D3D11_CREATE_DEVICE_DEBUG
-#endif
-            ,
+            deviceFlags,
             featureLevels,
             ARRAYSIZE(featureLevels),
             D3D11_SDK_VERSION,
             &impl_->device_,
             nullptr,
-            &impl_->deviceContext_
+            &deviceContext
         );
 
         if (FAILED(hr))
         {
             URHO3D_SAFE_RELEASE(impl_->device_);
-            URHO3D_SAFE_RELEASE(impl_->deviceContext_);
+            URHO3D_SAFE_RELEASE(deviceContext);
             URHO3D_LOGD3DERROR("Failed to create D3D11 device", hr);
             return false;
         }
+
+        deviceContext->QueryInterface(IID_ID3D11DeviceContext1, reinterpret_cast<void**>(&impl_->deviceContext_));
 
         CheckFeatureSupport();
         // Set the flush mode now as the device has been created
@@ -2323,12 +2269,20 @@ void Graphics::CheckFeatureSupport()
     sRGBSupport_ = true;
     sRGBWriteSupport_ = true;
 
-    maxVertexShaderUniforms_ = 4096;
-    maxPixelShaderUniforms_ = 4096;
+    caps.maxVertexShaderUniforms_ = D3D11_REQ_CONSTANT_BUFFER_ELEMENT_COUNT;
+    caps.maxPixelShaderUniforms_ = D3D11_REQ_CONSTANT_BUFFER_ELEMENT_COUNT;
+    caps.constantBuffersSupported_ = true;
+    caps.constantBufferOffsetAlignment_ = 256;
+    caps.maxTextureSize_ = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+    caps.maxRenderTargetSize_ = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+    caps.maxNumRenderTargets_ = 8;
 }
 
 void Graphics::ResetCachedState()
 {
+    for (auto& constantBuffer : constantBuffers_)
+        constantBuffer = {};
+
     for (unsigned i = 0; i < MAX_VERTEX_STREAMS; ++i)
     {
         vertexBuffers_[i] = nullptr;
@@ -2350,11 +2304,9 @@ void Graphics::ResetCachedState()
         impl_->renderTargetViews_[i] = nullptr;
     }
 
-    for (unsigned i = 0; i < MAX_SHADER_PARAMETER_GROUPS; ++i)
-    {
-        impl_->constantBuffers_[VS][i] = nullptr;
-        impl_->constantBuffers_[PS][i] = nullptr;
-    }
+    ea::fill(ea::begin(impl_->constantBuffers_), ea::end(impl_->constantBuffers_), nullptr);
+    ea::fill(ea::begin(impl_->constantBuffersStartSlots_), ea::end(impl_->constantBuffersStartSlots_), 0u);
+    ea::fill(ea::begin(impl_->constantBuffersNumSlots_), ea::end(impl_->constantBuffersNumSlots_), 0u);
 
     depthStencil_ = nullptr;
     impl_->depthStencilView_ = nullptr;
@@ -2400,7 +2352,6 @@ void Graphics::ResetCachedState()
     impl_->rasterizerStateHash_ = M_MAX_UNSIGNED;
     impl_->firstDirtyTexture_ = impl_->lastDirtyTexture_ = M_MAX_UNSIGNED;
     impl_->firstDirtyVB_ = impl_->lastDirtyVB_ = M_MAX_UNSIGNED;
-    impl_->dirtyConstantBuffers_.clear();
 }
 
 void Graphics::PrepareDraw()
@@ -2631,10 +2582,6 @@ void Graphics::PrepareDraw()
         impl_->deviceContext_->RSSetScissorRects(1, &d3dRect);
         impl_->scissorRectDirty_ = false;
     }
-
-    for (unsigned i = 0; i < impl_->dirtyConstantBuffers_.size(); ++i)
-        impl_->dirtyConstantBuffers_[i]->Apply();
-    impl_->dirtyConstantBuffers_.clear();
 }
 
 void Graphics::CreateResolveTexture()

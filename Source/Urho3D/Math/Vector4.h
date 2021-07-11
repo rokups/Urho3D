@@ -52,6 +52,15 @@ public:
     {
     }
 
+    /// Construct from two 2-dimensional vectors.
+    Vector4(const Vector2& v1, const Vector2& v2) noexcept :
+        x_(v1.x_),
+        y_(v1.y_),
+        z_(v2.x_),
+        w_(v2.y_)
+    {
+    }
+
     /// Construct from coordinates.
     Vector4(float x, float y, float z, float w) noexcept :
         x_(x),

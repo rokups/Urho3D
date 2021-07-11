@@ -33,6 +33,7 @@
 #include "../Graphics/Viewport.h"
 #include "../Graphics/Camera.h"
 #include "../Graphics/Technique.h"
+#include "../Graphics/Renderer.h"
 #include "../Input/Input.h"
 #include "../IO/Log.h"
 #include "../Resource/ResourceCache.h"
@@ -47,6 +48,7 @@
 #include "../RmlUI/RmlFile.h"
 #include "../RmlUI/RmlEventListeners.h"
 #include "../RmlUI/RmlCanvasComponent.h"
+#include "../RmlUI/RmlSerializableInspector.h"
 #include "../RmlUI/RmlUIComponent.h"
 
 #include <atomic>
@@ -582,6 +584,7 @@ bool RmlUI::IsInputCapturedInternal() const
 void RmlUI::Render()
 {
     Graphics* graphics = GetSubsystem<Graphics>();
+    Renderer* renderer = GetSubsystem<Renderer>();
     if (!graphics || !graphics->IsInitialized())
         return;
 
@@ -589,7 +592,7 @@ void RmlUI::Render()
     graphics->ResetRenderTargets();
     if (renderSurface_)
     {
-        graphics->SetDepthStencil(renderSurface_->GetLinkedDepthStencil());
+        graphics->SetDepthStencil(renderer->GetDepthStencil(renderSurface_));
         graphics->SetRenderTarget(0, renderSurface_);
         graphics->SetViewport(IntRect(0, 0, renderSurface_->GetWidth(), renderSurface_->GetHeight()));
 
@@ -599,7 +602,12 @@ void RmlUI::Render()
     else
         graphics->SetRenderTarget(0, (RenderSurface*)nullptr);
 
-    rmlContext_->Render();
+    if (auto rmlRenderer = dynamic_cast<Detail::RmlRenderer*>(Rml::GetRenderInterface()))
+    {
+        rmlRenderer->BeginRendering();
+        rmlContext_->Render();
+        rmlRenderer->EndRendering();
+    }
 }
 
 void RmlUI::OnDocumentUnload(Rml::ElementDocument* document)
@@ -704,6 +712,7 @@ void RegisterRmlUILibrary(Context* context)
     context->RegisterFactory<RmlUI>();
     RmlUIComponent::RegisterObject(context);
     RmlCanvasComponent::RegisterObject(context);
+    RmlSerializableInspector::RegisterObject(context);
 }
 
 }

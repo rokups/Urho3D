@@ -26,6 +26,7 @@
 
 #include "../Core/Context.h"
 #include "../Graphics/Graphics.h"
+#include "../Graphics/GraphicsEvents.h"
 #include "../Graphics/IndexBuffer.h"
 #include "../IO/Log.h"
 
@@ -88,6 +89,8 @@ bool IndexBuffer::SetSize(unsigned indexCount, bool largeIndices, bool dynamic)
     indexCount_ = indexCount;
     indexSize_ = (unsigned)(largeIndices ? sizeof(unsigned) : sizeof(unsigned short));
     dynamic_ = dynamic;
+
+    MarkPipelineStateHashDirty();
 
     if (shadowed_ && indexCount_ && indexSize_)
         shadowData_ = new unsigned char[indexCount_ * indexSize_];
@@ -213,6 +216,67 @@ void IndexBuffer::PackIndexData(const unsigned source[], void* dest, bool largeI
             memcpy(&destBytes[i * stride], &index, sizeof(index));
         }
     }
+}
+
+unsigned IndexBuffer::RecalculatePipelineStateHash() const
+{
+    unsigned hash = 0;
+    CombineHash(hash, indexSize_);
+    return ea::max(1u, hash);
+}
+
+DynamicIndexBuffer::DynamicIndexBuffer(Context* context)
+    : Object(context)
+    , indexBuffer_(MakeShared<IndexBuffer>(context))
+{
+}
+
+bool DynamicIndexBuffer::Initialize(unsigned indexCount, bool largeIndices)
+{
+    numIndices_ = 0;
+    maxNumIndices_ = indexCount;
+
+    if (!indexBuffer_->SetSize(indexCount, largeIndices, true))
+    {
+        URHO3D_LOGERROR("Failed to create DynamicIndexBuffer");
+        return false;
+    }
+
+    indexSize_ = indexBuffer_->GetIndexSize();
+    shadowData_.resize(indexSize_ * maxNumIndices_);
+    return true;
+}
+
+void DynamicIndexBuffer::Discard()
+{
+    numIndices_ = 0;
+}
+
+void DynamicIndexBuffer::Commit()
+{
+    if (numIndices_ == 0)
+        return;
+
+    if (indexBufferNeedResize_)
+    {
+        indexBufferNeedResize_ = false;
+        const bool largeIndices = indexBuffer_->GetIndexSize() == 4;
+        if (!indexBuffer_->SetSize(maxNumIndices_, largeIndices, true))
+        {
+            URHO3D_LOGERROR("Failed to grow DynamicIndexBuffer to {} vertices with stride {}",
+                maxNumIndices_, indexSize_);
+            return;
+        }
+    }
+
+    indexBuffer_->SetData(shadowData_.data());
+}
+
+void DynamicIndexBuffer::GrowBuffer()
+{
+    maxNumIndices_ = maxNumIndices_ > 0 ? 2 * maxNumIndices_ : 128;
+    shadowData_.resize(maxNumIndices_ * indexSize_);
+    indexBufferNeedResize_ = true;
 }
 
 }

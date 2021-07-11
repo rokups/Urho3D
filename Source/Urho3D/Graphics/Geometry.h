@@ -24,8 +24,10 @@
 
 #include <EASTL/shared_array.h>
 
+#include "../Container/IndexAllocator.h"
 #include "../Core/Object.h"
 #include "../Graphics/GraphicsDefs.h"
+#include "../Graphics/PipelineStateTracker.h"
 
 namespace Urho3D
 {
@@ -36,7 +38,7 @@ class Graphics;
 class VertexBuffer;
 
 /// Defines one or more vertex buffers, an index buffer and a draw range.
-class URHO3D_API Geometry : public Object
+class URHO3D_API Geometry : public Object, public PipelineStateTracker, public IDFamily<Geometry>
 {
     URHO3D_OBJECT(Geometry, Object);
 
@@ -115,6 +117,9 @@ public:
     /// @property
     float GetLodDistance() const { return lodDistance_; }
 
+    /// Return number of primitives.
+    unsigned GetPrimitiveCount() const;
+
     /// Return buffers' combined hash value for state sorting.
     unsigned short GetBufferHash() const;
     /// Return raw vertex and index data for CPU operations, or null pointers if not available. Will return data of the first vertex buffer if override data not set.
@@ -131,11 +136,25 @@ public:
     /// @property
     bool IsEmpty() const { return indexCount_ == 0 && vertexCount_ == 0; }
 
+    /// Return whether the geometry can be rendered using instancing buffer.
+    bool IsInstanced(GeometryType geometryType) const
+    {
+        return (geometryType == GEOM_STATIC || geometryType == GEOM_INSTANCED)
+            && indexBuffer_ != nullptr;
+    }
+
 private:
+    /// Recalculate hash. Shall be save to call from multiple threads as long as the object is not changing.
+    unsigned RecalculatePipelineStateHash() const override;
+
     /// Vertex buffers.
     ea::vector<SharedPtr<VertexBuffer> > vertexBuffers_;
+    /// Vertex buffers dependencies.
+    ea::vector<PipelineStateSubscription> vertexBuffersDependencies_;
     /// Index buffer.
     SharedPtr<IndexBuffer> indexBuffer_;
+    /// Index buffer dependency.
+    PipelineStateSubscription indexBufferDependency_;
     /// Primitive type.
     PrimitiveType primitiveType_;
     /// Start index.

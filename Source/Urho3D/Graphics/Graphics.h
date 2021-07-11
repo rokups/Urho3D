@@ -23,12 +23,13 @@
 #pragma once
 
 #include <EASTL/unique_ptr.h>
-#include <EASTL/unique_ptr.h>
+#include <EASTL/span.h>
 
 #include "../Core/Mutex.h"
 #include "../Core/Object.h"
 #include "../Graphics/GraphicsDefs.h"
 #include "../Graphics/ShaderVariation.h"
+#include "../Graphics/PipelineState.h"
 #include "../Math/Color.h"
 #include "../Math/Plane.h"
 #include "../Math/Rect.h"
@@ -40,6 +41,7 @@ namespace Urho3D
 {
 
 class ConstantBuffer;
+class ShaderProgramLayout;
 class File;
 class Image;
 class IndexBuffer;
@@ -136,6 +138,44 @@ struct WindowModeParams
     ScreenModeParams screenParams_;
 };
 
+/// Range of constant buffer to bind.
+struct ConstantBufferRange
+{
+    /// Constant buffer.
+    ConstantBuffer* constantBuffer_{};
+    /// Offset in buffer. Shall be multiply of constant buffer offset alignment.
+    unsigned offset_{};
+    /// Size of region.
+    unsigned size_{};
+
+    /// Compare equal.
+    bool operator ==(const ConstantBufferRange& rhs) const
+    {
+        return constantBuffer_ == rhs.constantBuffer_
+            && offset_ == rhs.offset_
+            && size_ == rhs.size_;
+    }
+
+    /// Compare not equal.
+    bool operator !=(const ConstantBufferRange& rhs) const { return !(*this == rhs); }
+};
+
+/// Graphics capabilities aggregator.
+/// TODO: Move all other things here
+struct GraphicsCaps
+{
+    bool constantBuffersSupported_{};
+    bool globalUniformsSupported_{};
+
+    unsigned maxVertexShaderUniforms_{};
+    unsigned maxPixelShaderUniforms_{};
+    unsigned constantBufferOffsetAlignment_{};
+
+    unsigned maxTextureSize_{};
+    unsigned maxRenderTargetSize_{};
+    unsigned maxNumRenderTargets_{};
+};
+
 /// %Graphics subsystem. Manages the application window, rendering state and GPU resources.
 class URHO3D_API Graphics : public Object
 {
@@ -147,6 +187,8 @@ public:
     /// Destruct. Release the Direct3D11 device and close the window.
     ~Graphics() override;
 
+    /// Set whether shaders are checked for invalid symbols.
+    void SetShaderValidationEnabled(bool enabled) { validateShaders_ = enabled; }
     /// Set external window handle. Only effective before setting the initial screen mode.
     void SetExternalWindow(void* window);
     /// Set window title.
@@ -229,8 +271,12 @@ public:
     bool SetVertexBuffers(const ea::vector<SharedPtr<VertexBuffer> >& buffers, unsigned instanceOffset = 0);
     /// Set index buffer.
     void SetIndexBuffer(IndexBuffer* buffer);
+    /// Return constant buffer layout for given shaders.
+    ShaderProgramLayout* GetShaderProgramLayout(ShaderVariation* vs, ShaderVariation* ps);
     /// Set shaders.
     void SetShaders(ShaderVariation* vs, ShaderVariation* ps);
+    /// Set shader constant buffers.
+    void SetShaderConstantBuffers(ea::span<const ConstantBufferRange, MAX_SHADER_PARAMETER_GROUPS> constantBuffers);
     /// Set shader float constants.
     void SetShaderParameter(StringHash param, const float data[], unsigned count);
     /// Set shader float constant.
@@ -340,6 +386,9 @@ public:
 
     /// Return graphics implementation, which holds the actual API-specific resources.
     GraphicsImpl* GetImpl() const { return impl_; }
+
+    /// Return whether shader validation is enabled.
+    bool IsShaderValidationEnabled() const { return validateShaders_; }
 
     /// Return OS-specific external window handle. Null if not in use.
     void* GetExternalWindow() const { return externalWindow_; }
@@ -477,12 +526,6 @@ public:
     /// Return whether sRGB conversion on rendertarget writing is supported.
     /// @property
     bool GetSRGBWriteSupport() const { return sRGBWriteSupport_; }
-
-    /// Return max vertex shader uniforms support.
-    unsigned GetMaxVertexShaderUniforms() const { return maxVertexShaderUniforms_; }
-
-    /// Return max pixel shader uniforms support.
-    unsigned GetMaxPixelShaderUniforms() const { return maxPixelShaderUniforms_; }
 
     /// Return supported fullscreen resolutions (third component is refreshRate). Will be empty if listing the resolutions is not supported on the platform (e.g. Web).
     /// @property
@@ -701,6 +744,8 @@ public:
     static unsigned GetDepthStencilFormat();
     /// Return the API-specific readable hardware depth format, or 0 if not supported.
     static unsigned GetReadableDepthFormat();
+    /// Return the API-specific readable hardware depth-stencil format, or 0 if not supported.
+    static unsigned GetReadableDepthStencilFormat();
     /// Return the API-specific texture format from a textual description, for example "rgb".
     static unsigned GetFormat(const ea::string& formatName);
 
@@ -711,6 +756,8 @@ public:
     static unsigned GetMaxBones();
     /// Return whether is using an OpenGL 3 context. Return always false on Direct3D9 & Direct3D11.
     static bool GetGL3Support();
+    /// Return graphics capabilities.
+    static const GraphicsCaps& GetCaps() { return caps; }
 
     /// Get the SDL_Window as a void* to avoid having to include the graphics implementation
     void* GetSDLWindow() { return window_; }
@@ -800,6 +847,8 @@ private:
     IntVector2 position_;
     /// Screen mode parameters.
     ScreenModeParams screenParams_;
+    /// Whether the shader validation is enabled.
+    bool validateShaders_{};
     /// Flush GPU command buffer flag.
     bool flushGPU_{};
     /// Force OpenGL 2 flag. Only used on OpenGL.
@@ -828,10 +877,6 @@ private:
     bool sRGBSupport_{};
     /// sRGB conversion on write support flag.
     bool sRGBWriteSupport_{};
-    /// Max number of vertex shader uniforms.
-    unsigned maxVertexShaderUniforms_{};
-    /// Max number of pixel shader uniforms.
-    unsigned maxPixelShaderUniforms_{};
     /// Number of primitives this frame.
     unsigned numPrimitives_{};
     /// Number of batches this frame.
@@ -866,6 +911,8 @@ private:
     ea::unordered_map<ea::string, TextureUnit> textureUnits_;
     /// Rendertargets in use.
     RenderSurface* renderTargets_[MAX_RENDERTARGETS]{};
+    /// Constan buffer ranges in use.
+    ConstantBufferRange constantBuffers_[MAX_SHADER_PARAMETER_GROUPS]{};
     /// Depth-stencil surface in use.
     RenderSurface* depthStencil_{};
     /// Viewport coordinates.
@@ -922,6 +969,10 @@ private:
     const void* shaderParameterSources_[MAX_SHADER_PARAMETER_GROUPS]{};
     /// Base directory for shaders.
     ea::string shaderPath_;
+    /// Shader name prefix for universal shaders.
+    ea::string universalShaderNamePrefix_{ "v2/" };
+    /// Format string for universal shaders.
+    ea::string universalShaderPath_{ "Shaders/GLSL/{}.glsl" };
     /// Cache directory for Direct3D binary shaders.
     ea::string shaderCacheDir_;
     /// File extension for shaders.
@@ -945,6 +996,8 @@ private:
     static const Vector2 pixelUVOffset;
     /// OpenGL3 support flag.
     static bool gl3Support;
+    /// Graphics capabilities. Static for easier access.
+    static GraphicsCaps caps;
 };
 
 /// Register Graphics library objects.
