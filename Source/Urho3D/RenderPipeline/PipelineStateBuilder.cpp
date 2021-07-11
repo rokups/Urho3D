@@ -219,7 +219,7 @@ void PipelineStateBuilder::SetupUserPassState(const Drawable* drawable,
 
     pipelineStateDesc_.colorWriteEnabled_ = true;
     pipelineStateDesc_.blendMode_ = pass->GetBlendMode();
-    pipelineStateDesc_.alphaToCoverageEnabled_ = pass->GetAlphaToCoverage();
+    pipelineStateDesc_.alphaToCoverageEnabled_ = pass->GetAlphaToCoverage() || material->GetAlphaToCoverage();
     pipelineStateDesc_.constantDepthBias_ = material->GetDepthBias().constantBias_;
     pipelineStateDesc_.slopeScaledDepthBias_ = material->GetDepthBias().slopeScaledBias_;
 

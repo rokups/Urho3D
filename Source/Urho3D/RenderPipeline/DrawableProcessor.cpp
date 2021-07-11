@@ -429,6 +429,7 @@ void DrawableProcessor::ProcessVisibleDrawable(Drawable* drawable)
             // Update scene passes
             for (DrawableProcessorPass* pass : passes_)
             {
+                // TODO: Check whether pass is supported on mobile?
                 const DrawableProcessorPass::AddBatchResult result = pass->AddBatch(
                     threadIndex, drawable, sourceBatchIndex, technique);
                 if (result.forwardLitAdded_)

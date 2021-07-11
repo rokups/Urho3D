@@ -31,25 +31,25 @@
 
 /// =================================== Disable inputs ===================================
 
-#ifdef URHO3D_IGNORE_MATERIAL_DIFFUSE
+#ifdef URHO3D_DISABLE_DIFFUSE_SAMPLING
     #ifdef URHO3D_MATERIAL_HAS_DIFFUSE
         #undef URHO3D_MATERIAL_HAS_DIFFUSE
     #endif
 #endif
 
-#ifdef URHO3D_IGNORE_MATERIAL_NORMAL
+#ifdef URHO3D_DISABLE_NORMAL_SAMPLING
     #ifdef URHO3D_MATERIAL_HAS_NORMAL
         #undef URHO3D_MATERIAL_HAS_NORMAL
     #endif
 #endif
 
-#ifdef URHO3D_IGNORE_MATERIAL_SPECULAR
+#ifdef URHO3D_DISABLE_SPECULAR_SAMPLING
     #ifdef URHO3D_MATERIAL_HAS_SPECULAR
         #undef URHO3D_MATERIAL_HAS_SPECULAR
     #endif
 #endif
 
-#ifdef URHO3D_IGNORE_MATERIAL_EMISSIVE
+#ifdef URHO3D_DISABLE_EMISSIVE_SAMPLING
     #ifdef URHO3D_MATERIAL_HAS_EMISSIVE
         #undef URHO3D_MATERIAL_HAS_EMISSIVE
     #endif

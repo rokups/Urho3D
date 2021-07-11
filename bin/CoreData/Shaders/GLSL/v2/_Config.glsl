@@ -41,11 +41,11 @@
 // #define URHO3D_SURFACE_NEED_BACKGROUND_DEPTH
 // #define URHO3D_SURFACE_NEED_BACKGROUND_COLOR
 
-/// Configures what built-in inputs should be ignored by built-in utilities.
-// #define URHO3D_IGNORE_MATERIAL_DIFFUSE
-// #define URHO3D_IGNORE_MATERIAL_NORMAL
-// #define URHO3D_IGNORE_MATERIAL_SPECULAR
-// #define URHO3D_IGNORE_MATERIAL_EMISSIVE
+/// Configures whether to disable automatic sampling of built-in inputs.
+// #define URHO3D_DISABLE_DIFFUSE_SAMPLING
+// #define URHO3D_DISABLE_NORMAL_SAMPLING
+// #define URHO3D_DISABLE_SPECULAR_SAMPLING
+// #define URHO3D_DISABLE_EMISSIVE_SAMPLING
 
 
 /// =================================== Material defines ===================================
