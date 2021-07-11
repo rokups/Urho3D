@@ -130,8 +130,7 @@ cmake_dependent_option(URHO3D_THREADING          "Enable multithreading"        
 option                (URHO3D_WEBP               "WEBP support enabled"                                  ${URHO3D_ENABLE_ALL}                                    )
 # Web
 cmake_dependent_option(EMSCRIPTEN_WASM          "Use wasm instead of asm.js"                            ON                   "WEB"                           OFF)
-cmake_dependent_option(EMSCRIPTEN_ALLOW_MEMORY_GROWTH "Allow memory growth. Disables some optimizations." OFF                "WEB"                           OFF)
-set(EMSCRIPTEN_TOTAL_MEMORY 128MB CACHE STRING  "Memory limit in megabytes. Set to 0 for dynamic growth. Must be multiple of 64KB.")
+set(EMSCRIPTEN_TOTAL_MEMORY 128 CACHE STRING  "Memory limit in megabytes. Set to 0 for dynamic growth. Must be multiple of 64KB.")
 
 # Misc
 cmake_dependent_option(URHO3D_PLAYER            "Build player application"                              ${URHO3D_ENABLE_ALL} "NOT WEB"                       OFF)
